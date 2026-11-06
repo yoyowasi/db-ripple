@@ -1,0 +1,29 @@
+# 비밀값(SA 비밀번호 등)은 .env에만 두고 커밋하지 않는다
+.env
+.env.*
+!.env.example
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# Node · Vue
+node_modules/
+dist/
+
+# SQL Server 백업·데이터 파일(공개 샘플도 저장소에 넣지 않는다)
+*.bak
+*.mdf
+*.ldf
+*.ndf
+
+# Claude Code 개인 설정
+.claude/settings.local.json
+
+# OS · 편집기
+.DS_Store
+Thumbs.db
+.idea/
