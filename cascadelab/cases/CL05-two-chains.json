@@ -1,0 +1,54 @@
+{
+  "id": "CL05",
+  "pattern": "CL05",
+  "title": "한 부모에서 갈라지는 CASCADE 체인 2개",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl05.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "DELETE FROM cl05.P WHERE id = 1;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl05.P", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 1 }, "causes": ["DIRECT"] } ], "basis": "문장 WHERE id = 1" },
+      { "table": "cl05.X", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 10 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 11 }, "causes": ["FK_CASCADE"] } ],
+        "basis": "FK_cl05_X_P, p_id = 1(시드 10, 11)" },
+      { "table": "cl05.X2", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 100 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 110 }, "causes": ["FK_CASCADE"] } ],
+        "basis": "FK_cl05_X2_X, x_id IN (10, 11)" },
+      { "table": "cl05.Y", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 30 }, "causes": ["FK_CASCADE"] } ],
+        "basis": "FK_cl05_Y_P, p_id = 1(시드 30)" },
+      { "table": "cl05.Y2", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 300 }, "causes": ["FK_CASCADE"] } ],
+        "basis": "FK_cl05_Y2_Y, y_id = 30" }
+    ],
+    "firings": [
+      { "node": "F:cl05.P:DELETE", "table": "cl05.P", "operation": "DELETE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1 },
+      { "node": "F:cl05.X:DELETE", "table": "cl05.X", "operation": "DELETE", "rowCount": 2, "causeKind": "FK_CASCADE", "depth": 1 },
+      { "node": "F:cl05.X2:DELETE", "table": "cl05.X2", "operation": "DELETE", "rowCount": 2, "causeKind": "FK_CASCADE", "depth": 1 },
+      { "node": "F:cl05.Y:DELETE", "table": "cl05.Y", "operation": "DELETE", "rowCount": 1, "causeKind": "FK_CASCADE", "depth": 1 },
+      { "node": "F:cl05.Y2:DELETE", "table": "cl05.Y2", "operation": "DELETE", "rowCount": 1, "causeKind": "FK_CASCADE", "depth": 1 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl05.P:DELETE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl05.P:DELETE", "child": "F:cl05.X:DELETE", "kind": "FK", "name": "FK_cl05_X_P", "action": "CASCADE", "event": "DELETE", "confidence": "certain", "basis": "§7.2 3단계, §7.3" },
+      { "statementIndex": 1, "parent": "F:cl05.X:DELETE", "child": "F:cl05.X2:DELETE", "kind": "FK", "name": "FK_cl05_X2_X", "action": "CASCADE", "event": "DELETE", "confidence": "certain", "basis": "§7.2 3단계, §7.3" },
+      { "statementIndex": 1, "parent": "F:cl05.P:DELETE", "child": "F:cl05.Y:DELETE", "kind": "FK", "name": "FK_cl05_Y_P", "action": "CASCADE", "event": "DELETE", "confidence": "certain", "basis": "§7.2 3단계, §7.3" },
+      { "statementIndex": 1, "parent": "F:cl05.Y:DELETE", "child": "F:cl05.Y2:DELETE", "kind": "FK", "name": "FK_cl05_Y2_Y", "action": "CASCADE", "event": "DELETE", "confidence": "certain", "basis": "§7.2 3단계, §7.3" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "X 체인과 Y 체인 사이 순서(어느 체인의 묶음이 먼저 기록되는지)", "alternatives": ["X 체인 먼저", "Y 체인 먼저"], "basis": "A2: 직접 대상에서 갈라진 체인 사이 순서는 미정. §10.2 CL05 형제 순서 observed_only, §10.4 M4로 반복 안정성만 기록" },
+      { "id": "OO2", "what": "X·X2·Y·Y2 묶음의 depth = 1", "basis": "H2 전제값, A7" }
+    ]
+  },
+  "rationale": [
+    { "claim": "두 체인은 서로 다른 테이블로만 가므로 트리이고 FK 생성이 허용된다", "basis": "A4(같은 테이블 재도달만 1785로 거부, 갈라짐은 허용)" },
+    { "claim": "형제 순서를 뺀 인과 그래프(간선 5개)는 반복해도 같아야 한다", "basis": "§10.4 M4" }
+  ]
+}

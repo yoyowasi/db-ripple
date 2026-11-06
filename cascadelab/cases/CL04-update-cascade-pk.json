@@ -1,0 +1,46 @@
+{
+  "id": "CL04",
+  "pattern": "CL04",
+  "title": "ON UPDATE CASCADE, 부모 PK 다중 행 변경",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl04.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "UPDATE cl04.P SET id = id + 100 WHERE id IN (1, 2);" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl04.P", "keyColumns": ["id"], "updated": [],
+        "deleted": [ { "key": { "id": 1 }, "causes": ["DIRECT"] }, { "key": { "id": 2 }, "causes": ["DIRECT"] } ],
+        "inserted": [ { "key": { "id": 101 }, "causes": ["DIRECT"] }, { "key": { "id": 102 }, "causes": ["DIRECT"] } ],
+        "basis": "PK 조인 순 변경이라 옛 키는 DELETED, 새 키는 INSERTED(§6.2 NetChange). 3은 그대로" },
+      { "table": "cl04.Ch", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [
+          { "key": { "id": 10 }, "causes": ["FK_CASCADE"], "changedColumns": ["p_id"], "after": { "p_id": 101 } },
+          { "key": { "id": 11 }, "causes": ["FK_CASCADE"], "changedColumns": ["p_id"], "after": { "p_id": 101 } },
+          { "key": { "id": 20 }, "causes": ["FK_CASCADE"], "changedColumns": ["p_id"], "after": { "p_id": 102 } }
+        ],
+        "basis": "FK_cl04_Ch_P ON UPDATE CASCADE, p_id IN (1, 2)인 행(시드 10, 11, 20). 30(p 3)은 그대로" }
+    ],
+    "firings": [
+      { "node": "F:cl04.P:UPDATE", "table": "cl04.P", "operation": "UPDATE", "rowCount": 2, "causeKind": "DIRECT", "depth": 1, "pairing": "UNPAIRED" },
+      { "node": "F:cl04.Ch:UPDATE", "table": "cl04.Ch", "operation": "UPDATE", "rowCount": 3, "causeKind": "FK_CASCADE", "depth": 1, "pairing": "BY_PK" }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl04.P:UPDATE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl04.P:UPDATE", "child": "F:cl04.Ch:UPDATE", "kind": "FK", "name": "FK_cl04_Ch_P", "action": "CASCADE", "event": "UPDATE", "confidence": "certain", "basis": "§7.2 3단계 UPDATE CASCADE 집합 판정(before ∈ 부모 deleted {1,2}, after ∈ 부모 inserted {101,102}), §7.3" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "Ch 묶음의 depth = 1", "basis": "H2 전제값, A7" },
+      { "id": "OO2", "what": "P 행의 옛 키-새 키 짝(1->101, 2->102)과 Ch 행의 parentRowIds", "basis": "A12: PK가 바뀔 때 짝짓는 방법은 문서에 없다. 그래서 P는 UNPAIRED이고 parentRowIds는 채우지 않는 것이 정답이다(§6.2 pairing)" }
+    ]
+  },
+  "rationale": [
+    { "claim": "부모 PK를 바꾸는 UPDATE는 ON UPDATE CASCADE를 일으킨다", "basis": "§7.2 3단계 대상 FK(키를 바꾸는 UPDATE -> ON UPDATE 동작)" },
+    { "claim": "다중 행 PK 변경은 짝 미확정", "basis": "A12, §6.2 pairing UNPAIRED" },
+    { "claim": "Ch의 PK(id)는 안 바뀌므로 Ch는 BY_PK로 짝지어 UPDATED", "basis": "§6.2 pairing, A12" }
+  ]
+}

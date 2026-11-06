@@ -1,0 +1,42 @@
+{
+  "id": "CL03",
+  "pattern": "CL03",
+  "title": "ON DELETE SET DEFAULT (기본값 0이 부모에 있음)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl03.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "DELETE FROM cl03.Category WHERE id = 1;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl03.Category", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 1 }, "causes": ["DIRECT"] } ],
+        "basis": "문장 WHERE id = 1" },
+      { "table": "cl03.Product", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [
+          { "key": { "id": 10 }, "causes": ["FK_SET_DEFAULT"], "changedColumns": ["category_id"], "after": { "category_id": 0 } },
+          { "key": { "id": 11 }, "causes": ["FK_SET_DEFAULT"], "changedColumns": ["category_id"], "after": { "category_id": 0 } }
+        ],
+        "basis": "FK_cl03_Product_Category ON DELETE SET DEFAULT + DF_cl03_Product_category_id DEFAULT (0). category_id = 1인 행(시드 10, 11)" }
+    ],
+    "firings": [
+      { "node": "F:cl03.Category:DELETE", "table": "cl03.Category", "operation": "DELETE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1 },
+      { "node": "F:cl03.Product:UPDATE", "table": "cl03.Product", "operation": "UPDATE", "rowCount": 2, "causeKind": "FK_SET_DEFAULT", "depth": 1, "pairing": "BY_PK" }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl03.Category:DELETE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl03.Category:DELETE", "child": "F:cl03.Product:UPDATE", "kind": "FK", "name": "FK_cl03_Product_Category", "action": "SET_DEFAULT", "event": "DELETE", "confidence": "certain", "basis": "§7.2 3단계 SET DEFAULT 행 일치(after = 기본값), §7.3" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "Product 묶음의 depth = 1", "basis": "H2 전제값, A7" }
+    ]
+  },
+  "rationale": [
+    { "claim": "기본값 0인 Category 행이 있어 FK 검사를 통과한다", "basis": "시드 Category(0, 'none'), §7.2 3단계" },
+    { "claim": "Grp/Item은 이 문장과 무관해 변경 0이다", "basis": "FK 연쇄는 삭제된 부모의 자식에만 닿는다(A4 트리)" }
+  ]
+}

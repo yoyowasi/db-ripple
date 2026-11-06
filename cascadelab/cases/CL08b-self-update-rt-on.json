@@ -1,0 +1,47 @@
+{
+  "id": "CL08b",
+  "pattern": "CL08",
+  "title": "트리거가 같은 테이블 갱신, RECURSIVE_TRIGGERS ON",
+  "database": "CascadeLab_RT",
+  "schemaScript": "sql/cl08.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "ON", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "UPDATE cl08.Acct SET bal = bal + 10 WHERE id = 1;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl08.Acct", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [
+          { "key": { "id": 1 }, "causes": ["DIRECT", "TRIGGER"], "changedColumns": ["bal", "touched"], "after": { "touched": 3 } }
+        ],
+        "basis": "ON이면 trg_Acct_upd가 자기 UPDATE로 다시 발동한다. inserted.touched 0,1,2일 때 1씩 올리고 3이면 가드로 끝나므로 touched = 3. id 2는 그대로" }
+    ],
+    "firings": [
+      { "node": "F:cl08.Acct:UPDATE#1", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "pairing": "SINGLE_ROW" },
+      { "node": "F:cl08.Acct:UPDATE#2", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2, "pairing": "SINGLE_ROW" },
+      { "node": "F:cl08.Acct:UPDATE#3", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 3, "pairing": "SINGLE_ROW" },
+      { "node": "F:cl08.Acct:UPDATE#4", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 4, "pairing": "SINGLE_ROW" }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl08.Acct:UPDATE#1", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl08.Acct:UPDATE#1", "child": "T:cl08.trg_Acct_upd#1", "kind": "FIRES", "name": "cl08.trg_Acct_upd", "confidence": "inferred", "basis": "§6.3, §7.3" },
+      { "statementIndex": 1, "parent": "T:cl08.trg_Acct_upd#1", "child": "F:cl08.Acct:UPDATE#2", "kind": "WRITES", "name": "cl08.trg_Acct_upd", "confidence": "inferred", "basis": "§7.2 2·4단계" },
+      { "statementIndex": 1, "parent": "F:cl08.Acct:UPDATE#2", "child": "T:cl08.trg_Acct_upd#2", "kind": "FIRES", "name": "cl08.trg_Acct_upd", "confidence": "inferred", "basis": "A8 ON = 직접 재귀 허용" },
+      { "statementIndex": 1, "parent": "T:cl08.trg_Acct_upd#2", "child": "F:cl08.Acct:UPDATE#3", "kind": "WRITES", "name": "cl08.trg_Acct_upd", "confidence": "inferred", "basis": "§7.2 2·4단계" },
+      { "statementIndex": 1, "parent": "F:cl08.Acct:UPDATE#3", "child": "T:cl08.trg_Acct_upd#3", "kind": "FIRES", "name": "cl08.trg_Acct_upd", "confidence": "inferred", "basis": "A8" },
+      { "statementIndex": 1, "parent": "T:cl08.trg_Acct_upd#3", "child": "F:cl08.Acct:UPDATE#4", "kind": "WRITES", "name": "cl08.trg_Acct_upd", "confidence": "inferred", "basis": "§7.2 2·4단계" },
+      { "statementIndex": 1, "parent": "F:cl08.Acct:UPDATE#4", "child": "T:cl08.trg_Acct_upd#4", "kind": "FIRES", "name": "cl08.trg_Acct_upd", "confidence": "inferred", "observed": false, "basis": "가드로 변경 없이 끝남 -> §6.3 observed: false(점선)" }
+    ],
+    "observedOnly": []
+  },
+  "rationale": [
+    { "claim": "depth 1~4는 트리거 스택 수다", "basis": "A7. FK 연쇄가 없어 H2와 무관" },
+    { "claim": "4단은 32단 한도 안이라 오류 217 없이 끝난다", "basis": "A8(최대 32단계)" },
+    { "claim": "중첩 UPDATE마다 감사 트리거도 발동하므로(ON은 재귀를 막지 않음) 잔차가 없다", "basis": "A8, §7.2 6단계(설명 안 된 변경이 없으면 Residual 없음)" },
+    { "claim": "가드 IF NOT EXISTS(... touched < 3) RETURN 때문에 0행 UPDATE가 생기지 않아 0행 발동(A3) 문제를 피한다", "basis": "A3" },
+    { "claim": "RECURSIVE_TRIGGERS는 DB 옵션이라 ON 변형은 별도 DB CascadeLab_RT에 둔다", "basis": "A8(실제 값은 원본 DB를 따름), 환경 지문 비교" }
+  ]
+}

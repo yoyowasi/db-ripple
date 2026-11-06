@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/spikes/" />
+  <Folder Name="/spikes/dotnet/">
+    <Project Path="spikes/dotnet/Sp4.ScriptDom.Tests/Sp4.ScriptDom.Tests.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/DbRipple.Cli/DbRipple.Cli.csproj" />
+    <Project Path="src/DbRipple.Core/DbRipple.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DbRipple.Core.Tests/DbRipple.Core.Tests.csproj" />
+  </Folder>
+</Solution>

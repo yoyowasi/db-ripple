@@ -1,0 +1,51 @@
+{
+  "id": "CL01",
+  "pattern": "CL01",
+  "title": "ON DELETE CASCADE 4단 (A -> B -> C -> D)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl01.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "DELETE FROM cl01.A WHERE id = 1;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl01.A", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 1 }, "causes": ["DIRECT"] } ],
+        "basis": "문장 WHERE id = 1" },
+      { "table": "cl01.B", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 10 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 11 }, "causes": ["FK_CASCADE"] } ],
+        "basis": "FK_cl01_B_A ON DELETE CASCADE, a_id = 1인 행(시드 10, 11). A1" },
+      { "table": "cl01.C", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 100 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 101 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 110 }, "causes": ["FK_CASCADE"] } ],
+        "basis": "FK_cl01_C_B, b_id IN (10, 11)인 행. A1" },
+      { "table": "cl01.D", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 1000 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 1001 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 1100 }, "causes": ["FK_CASCADE"] } ],
+        "basis": "FK_cl01_D_C, c_id IN (100, 101, 110)인 행. A1" }
+    ],
+    "firings": [
+      { "node": "F:cl01.A:DELETE", "table": "cl01.A", "operation": "DELETE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1 },
+      { "node": "F:cl01.B:DELETE", "table": "cl01.B", "operation": "DELETE", "rowCount": 2, "causeKind": "FK_CASCADE", "depth": 1 },
+      { "node": "F:cl01.C:DELETE", "table": "cl01.C", "operation": "DELETE", "rowCount": 3, "causeKind": "FK_CASCADE", "depth": 1 },
+      { "node": "F:cl01.D:DELETE", "table": "cl01.D", "operation": "DELETE", "rowCount": 3, "causeKind": "FK_CASCADE", "depth": 1 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl01.A:DELETE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl01.A:DELETE", "child": "F:cl01.B:DELETE", "kind": "FK", "name": "FK_cl01_B_A", "action": "CASCADE", "event": "DELETE", "confidence": "certain", "basis": "§7.2 3단계(부모 후보 1, 전 행 일치, 트리거 없음), §7.3" },
+      { "statementIndex": 1, "parent": "F:cl01.B:DELETE", "child": "F:cl01.C:DELETE", "kind": "FK", "name": "FK_cl01_C_B", "action": "CASCADE", "event": "DELETE", "confidence": "certain", "basis": "§7.2 3단계, §7.3" },
+      { "statementIndex": 1, "parent": "F:cl01.C:DELETE", "child": "F:cl01.D:DELETE", "kind": "FK", "name": "FK_cl01_D_C", "action": "CASCADE", "event": "DELETE", "confidence": "certain", "basis": "§7.2 3단계, §7.3" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "B·C·D 묶음의 depth = 1", "basis": "H2 전제값. A7: FK 연쇄로 발동한 트리거의 TRIGGER_NESTLEVEL은 문서에 없다." },
+      { "id": "OO2", "what": "묶음 사이 captureSeq 순서", "basis": "A1 '연쇄의 반대 순서'의 정의가 문서에 없다. §7.2 7단계" }
+    ]
+  },
+  "rationale": [
+    { "claim": "한 문장이 시작한 연쇄는 트리이고 A->B->C->D 한 경로뿐이다", "basis": "A4, H4" },
+    { "claim": "연쇄 대상마다 감사 AFTER 트리거가 한 번 발동해 묶음이 4개다", "basis": "A1, A3" },
+    { "claim": "A=2, B=20, C=200, D=2000은 바뀌지 않는다", "basis": "시드: 이 행들은 a_id = 2 경로에만 매달림" }
+  ]
+}

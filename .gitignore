@@ -27,3 +27,6 @@ dist/
 .DS_Store
 Thumbs.db
 .idea/
+
+# 로컬 개발 데이터(.bak 다운로드 등)
+.data/

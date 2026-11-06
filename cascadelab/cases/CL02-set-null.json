@@ -1,0 +1,43 @@
+{
+  "id": "CL02",
+  "pattern": "CL02",
+  "title": "ON DELETE SET NULL",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl02.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "DELETE FROM cl02.Dept WHERE id = 1;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl02.Dept", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 1 }, "causes": ["DIRECT"] } ],
+        "basis": "문장 WHERE id = 1" },
+      { "table": "cl02.Emp", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [
+          { "key": { "id": 10 }, "causes": ["FK_SET_NULL"], "changedColumns": ["dept_id"], "after": { "dept_id": null } },
+          { "key": { "id": 11 }, "causes": ["FK_SET_NULL"], "changedColumns": ["dept_id"], "after": { "dept_id": null } }
+        ],
+        "basis": "FK_cl02_Emp_Dept ON DELETE SET NULL, dept_id = 1인 행(시드 10, 11). 20(dept 2)·30(NULL)은 그대로" }
+    ],
+    "firings": [
+      { "node": "F:cl02.Dept:DELETE", "table": "cl02.Dept", "operation": "DELETE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1 },
+      { "node": "F:cl02.Emp:UPDATE", "table": "cl02.Emp", "operation": "UPDATE", "rowCount": 2, "causeKind": "FK_SET_NULL", "depth": 1, "pairing": "BY_PK" }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl02.Dept:DELETE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl02.Dept:DELETE", "child": "F:cl02.Emp:UPDATE", "kind": "FK", "name": "FK_cl02_Emp_Dept", "action": "SET_NULL", "event": "DELETE", "confidence": "certain", "basis": "§7.2 3단계 SET NULL 행 일치(before ∈ 부모 키, after NULL), §7.3" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "Emp 묶음의 depth = 1", "basis": "H2 전제값, A7" }
+    ]
+  },
+  "rationale": [
+    { "claim": "SET NULL은 자식 행을 지우지 않고 FK 열만 NULL로 바꾸므로 자식 쪽 연산은 UPDATE다", "basis": "§7.2 3단계(대상 FK: DELETE -> SET NULL, 행 일치는 after 값), §10.2 CL02" },
+    { "claim": "자식 묶음도 감사 AFTER 트리거로 수집된다", "basis": "A1" },
+    { "claim": "바뀐 열은 dept_id 하나다", "basis": "A12(바뀐 열은 값 비교로 계산)" }
+  ]
+}

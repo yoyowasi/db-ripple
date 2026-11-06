@@ -1,0 +1,56 @@
+{
+  "id": "CL07",
+  "pattern": "CL07",
+  "title": "트리거가 다른 테이블을 쓰는 3단 사슬 (A -> B -> C -> D)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl07.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "UPDATE cl07.A SET v = v + 1 WHERE id = 1;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl07.A", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [ { "key": { "id": 1 }, "causes": ["DIRECT"], "changedColumns": ["v"] } ],
+        "basis": "문장 WHERE id = 1" },
+      { "table": "cl07.B", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [
+          { "key": { "id": 10 }, "causes": ["TRIGGER"], "changedColumns": ["total"] },
+          { "key": { "id": 11 }, "causes": ["TRIGGER"], "changedColumns": ["total"] }
+        ],
+        "basis": "trg_A_upd: a_id = 1인 B 행(시드 10, 11). 20은 그대로" },
+      { "table": "cl07.C", "keyColumns": ["b_id"], "updated": [], "deleted": [],
+        "inserted": [ { "key": { "b_id": 10 }, "causes": ["TRIGGER"] }, { "key": { "b_id": 11 }, "causes": ["TRIGGER"] } ],
+        "basis": "trg_B_upd: inserted(B 10, 11)마다 1행" },
+      { "table": "cl07.D", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [ { "key": { "id": 1 }, "causes": ["TRIGGER"], "changedColumns": ["cnt"] } ],
+        "basis": "trg_C_ins: D id = 1의 cnt += 삽입 행 수" }
+    ],
+    "firings": [
+      { "node": "F:cl07.A:UPDATE", "table": "cl07.A", "operation": "UPDATE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "pairing": "BY_PK" },
+      { "node": "F:cl07.B:UPDATE", "table": "cl07.B", "operation": "UPDATE", "rowCount": 2, "causeKind": "TRIGGER", "depth": 2, "pairing": "BY_PK" },
+      { "node": "F:cl07.C:INSERT", "table": "cl07.C", "operation": "INSERT", "rowCount": 2, "causeKind": "TRIGGER", "depth": 3 },
+      { "node": "F:cl07.D:UPDATE", "table": "cl07.D", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 4, "pairing": "SINGLE_ROW" }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl07.A:UPDATE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl07.A:UPDATE", "child": "T:cl07.trg_A_upd", "kind": "FIRES", "name": "cl07.trg_A_upd", "confidence": "inferred", "basis": "§6.3 FIRES, §7.3" },
+      { "statementIndex": 1, "parent": "T:cl07.trg_A_upd", "child": "F:cl07.B:UPDATE", "kind": "WRITES", "name": "cl07.trg_A_upd", "confidence": "inferred", "basis": "§7.2 2단계 괄호 + 4단계 정적 쓰기 대상(B) 후보 1개" },
+      { "statementIndex": 1, "parent": "F:cl07.B:UPDATE", "child": "T:cl07.trg_B_upd", "kind": "FIRES", "name": "cl07.trg_B_upd", "confidence": "inferred", "basis": "§6.3, §7.3" },
+      { "statementIndex": 1, "parent": "T:cl07.trg_B_upd", "child": "F:cl07.C:INSERT", "kind": "WRITES", "name": "cl07.trg_B_upd", "confidence": "inferred", "basis": "§7.2 2·4단계(정적 쓰기 대상 C)" },
+      { "statementIndex": 1, "parent": "F:cl07.C:INSERT", "child": "T:cl07.trg_C_ins", "kind": "FIRES", "name": "cl07.trg_C_ins", "confidence": "inferred", "basis": "§6.3, §7.3" },
+      { "statementIndex": 1, "parent": "T:cl07.trg_C_ins", "child": "F:cl07.D:UPDATE", "kind": "WRITES", "name": "cl07.trg_C_ins", "confidence": "inferred", "basis": "§7.2 2·4단계(정적 쓰기 대상 D)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "captureSeq가 D < C < B < A(후위 순서)인지", "basis": "CL07의 확인 대상인 H1(감사 Last면 중첩 변경이 먼저 기록됨)은 A6에서 나온 추론이다. 정답 간선은 이 순서와 무관하다" }
+    ]
+  },
+  "rationale": [
+    { "claim": "depth 1~4는 트리거 스택 수다(사용자 문장 1, 트리거 안 DML마다 +1)", "basis": "A7(인자 없는 TRIGGER_NESTLEVEL 정의), FK 연쇄가 없어 H2와 무관" },
+    { "claim": "중첩 3단이 실행되려면 nested triggers = 1이어야 하고 32단 한도 안이다", "basis": "A8" },
+    { "claim": "C 키는 b_id라 결정적이다", "basis": "A13 회피 설계" }
+  ]
+}

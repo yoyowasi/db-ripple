@@ -1,0 +1,45 @@
+{
+  "id": "CL08a",
+  "pattern": "CL08",
+  "title": "트리거가 같은 테이블 갱신, RECURSIVE_TRIGGERS OFF",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl08.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "UPDATE cl08.Acct SET bal = bal + 10 WHERE id = 1;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl08.Acct", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [
+          { "key": { "id": 1 }, "causes": ["DIRECT", { "oneOf": ["TRIGGER", "SAME_TABLE_TRIGGER"], "ref": "OO1" }],
+            "changedColumns": ["bal", "touched"], "after": { "touched": 1 } }
+        ],
+        "basis": "문장이 bal을, trg_Acct_upd가 touched를 1회 바꾼다. OFF라 trg_Acct_upd는 자기 자신을 다시 발동하지 않으므로 touched = 1(A8, 직접 재귀 금지). id 2는 그대로" }
+    ],
+    "firings": [
+      { "node": "F:cl08.Acct:UPDATE#1", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "pairing": "SINGLE_ROW" }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl08.Acct:UPDATE#1", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl08.Acct:UPDATE#1", "child": "T:cl08.trg_Acct_upd#1", "kind": "FIRES", "name": "cl08.trg_Acct_upd", "confidence": "inferred", "basis": "§6.3 FIRES, §7.3" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "트리거 안 UPDATE(touched 0 -> 1)가 감사 트리거를 발동하는지",
+        "alternatives": [
+          { "label": "a. 감사 발동", "firings": [ { "node": "F:cl08.Acct:UPDATE#2", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2 } ],
+            "edges": [ { "statementIndex": 1, "parent": "T:cl08.trg_Acct_upd#1", "child": "F:cl08.Acct:UPDATE#2", "kind": "WRITES", "name": "cl08.trg_Acct_upd", "confidence": "inferred" } ] },
+          { "label": "b. 감사 미발동 -> 잔차", "residuals": [ { "node": "R:cl08.Acct", "category": "SAME_TABLE_TRIGGER", "changedColumns": ["touched"] } ],
+            "edges": [ { "statementIndex": 1, "parent": "T:cl08.trg_Acct_upd#1", "child": "R:cl08.Acct", "kind": "RESIDUAL", "name": "cl08.trg_Acct_upd", "confidence": "inferred" } ] }
+        ],
+        "basis": "A8은 OFF가 막는 범위를 '직접 재귀'로만 적는다. 감사 트리거는 다른 트리거라 문서 문자 그대로면 a다. 설계 E14·DM2는 같은 상황을 잔차(b)로 다룬다. 둘 중 어느 쪽인지는 문서로 정해지지 않으므로 SP3·월요일 실측으로 정한다" }
+    ]
+  },
+  "rationale": [
+    { "claim": "순 변경(키 1개, 바뀐 열 bal·touched, touched = 1)은 a·b 어느 쪽이든 같다", "basis": "§6.2 NetChange는 최종 상태 기준" },
+    { "claim": "b라면 감사 after의 touched(0)와 재조회 값(1)이 달라 REREAD + SAME_TABLE_TRIGGER 잔차가 된다", "basis": "§7.2 6단계, §6.2 finalAfterSource" }
+  ]
+}

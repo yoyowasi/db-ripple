@@ -1,0 +1,47 @@
+{
+  "id": "CL06",
+  "pattern": "CL06",
+  "title": "CASCADE 대상 테이블의 AFTER 트리거",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl06.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "DELETE FROM cl06.Ord WHERE id = 1;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl06.Ord", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 1 }, "causes": ["DIRECT"] } ],
+        "basis": "문장 WHERE id = 1" },
+      { "table": "cl06.Line", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 10 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 11 }, "causes": ["FK_CASCADE"] } ],
+        "basis": "FK_cl06_Line_Ord ON DELETE CASCADE, ord_id = 1인 행(시드 10, 11). 20은 그대로" },
+      { "table": "cl06.LineLog", "keyColumns": ["line_id"], "updated": [], "deleted": [],
+        "inserted": [ { "key": { "line_id": 10 }, "causes": ["TRIGGER"] }, { "key": { "line_id": 11 }, "causes": ["TRIGGER"] } ],
+        "basis": "trg_Line_del이 deleted의 id마다 1행 삽입. A1(연쇄가 대상 테이블 AFTER 트리거를 발동)" }
+    ],
+    "firings": [
+      { "node": "F:cl06.Ord:DELETE", "table": "cl06.Ord", "operation": "DELETE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1 },
+      { "node": "F:cl06.Line:DELETE", "table": "cl06.Line", "operation": "DELETE", "rowCount": 2, "causeKind": "FK_CASCADE", "depth": 1 },
+      { "node": "F:cl06.LineLog:INSERT", "table": "cl06.LineLog", "operation": "INSERT", "rowCount": 2, "causeKind": "TRIGGER", "depth": 2 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl06.Ord:DELETE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl06.Ord:DELETE", "child": "F:cl06.Line:DELETE", "kind": "FK", "name": "FK_cl06_Line_Ord", "action": "CASCADE", "event": "DELETE", "confidence": "certain", "basis": "§7.2 3단계: 부모 Ord에 사용자 트리거가 없어 쓰기 경합 없음, §7.3" },
+      { "statementIndex": 1, "parent": "F:cl06.Line:DELETE", "child": "T:cl06.trg_Line_del", "kind": "FIRES", "name": "cl06.trg_Line_del", "confidence": "inferred", "basis": "A1, §6.3 FIRES(카탈로그 추론), §7.3 트리거 최고 inferred" },
+      { "statementIndex": 1, "parent": "T:cl06.trg_Line_del", "child": "F:cl06.LineLog:INSERT", "kind": "WRITES", "name": "cl06.trg_Line_del", "confidence": "inferred", "basis": "§7.2 4단계(정적 쓰기 대상 후보 1개 -> inferred), §6.3 WRITES <= FIRES" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "depth 값(Line = 1, LineLog = 2)", "basis": "CL06의 확인 대상이 H2다. A7: FK 연쇄로 발동한 트리거의 TRIGGER_NESTLEVEL은 문서에 없다. H2가 맞으면 이 값, 틀리면 Line이 2·LineLog가 3일 수 있다" },
+      { "id": "OO2", "what": "trg_Line_del이 Ord 감사 묶음보다 먼저 끝나는지 등 묶음 사이 순서", "basis": "A1 '연쇄의 반대 순서' 정의 없음, A2" }
+    ]
+  },
+  "rationale": [
+    { "claim": "FK 연쇄 삭제도 Line의 AFTER DELETE 트리거를 발동한다", "basis": "A1(사용자 지정 핵심 가정, 문서로 확인됨)" },
+    { "claim": "트리거는 Line 연쇄 행 2개를 한 번에 받는다(행 단위 트리거 없음)", "basis": "A3" },
+    { "claim": "LineLog 키는 line_id라 결정적이다(IDENTITY 아님)", "basis": "A13 회피 설계" }
+  ]
+}

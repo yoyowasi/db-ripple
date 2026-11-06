@@ -1,6 +1,6 @@
 # SQL 실행 전 변경 미리보기 도구 — 아키텍처 설계
 
-> 상태: 설계 v1.2 (구현 코드 없음, 독립 검토 2회 반영) · 작성 2026-11-06 · 조사 기준일 2026-11-06
+> 상태: 설계 v1.3 초안 (1주차 1일, 2026-11-06: 정적 검토 반영분만 들어 있고 스파이크 실측 전이다. D1·D3·D4와 H1~H5는 아직 v1.2 상태) · v1.2 작성 2026-11-06(독립 검토 2회 반영) · 조사 기준일 2026-11-06
 > 범위: 졸업작품, 1인, 약 1달(AI 보조), MVP를 먼저 만들고 계속 개선 · 공개 샘플 DB만 사용
 
 **ID 규칙**
@@ -242,7 +242,7 @@ flowchart LR
 | C6 | 배치 분석기 | ScriptDom으로 파싱하고, GO 배치와 문장을 나누고, 허용 목록을 판정하고, 대상 테이블·위치·경고를 계산한다. 파싱에 실패하면 거부한다. | `Analyze(sql)` → `AnalysisResult{statements[], rejects[], warnings[]}` |
 | C7 | 카탈로그 | 다음을 읽어 기준선마다 캐시한다.<br/>• 테이블, 열·형식, PK·유일 인덱스, 데이터 파일 논리 이름<br/>• FK와 참조 동작(`is_disabled` 포함)<br/>• 트리거(이벤트, AFTER/INSTEAD OF, First/Last, 암호화 여부)<br/>• 트리거 본문 정적 분석(ScriptDom: 쓰기 대상, 동적 SQL, ROLLBACK, 외부 호출)<br/>• 비결정 열(IDENTITY, SEQUENCE 기본값, GETDATE·NEWID 기본값, rowversion, 계산 열) | `GetCatalog(db)` → `Catalog` |
 | C8 | 샌드박스 관리자 | 기준선을 만든다(§5.1: 기존 스냅샷 삭제 → 원본 COPY_ONLY 백업 → RESTORE WITH MOVE → 수집 장치 설치 → 파일별 경로를 지정한 기준 스냅샷). 새로 고침, 환경 지문 비교, 미리보기 1건 잠금, "오염" 표시와 재구축을 맡는다. | `BuildBaseline()`, `Refresh()`, `GetStatus()` → `SandboxStatus` |
-| C9 | 수집 장치 설치기 | 감사 저장소(헤더·행 이미지·제어 테이블, SEQUENCE, §6.2)를 만든다. 테이블별 감사 트리거를 생성하고(형식 변환 규칙 포함) 연산별 Last로 지정한다. 감사 저장소에는 IDENTITY 열을 두지 않는다. 수집 범위 매니페스트를 쓴다. | `Install(catalog)` → `CaptureManifest` |
+| C9 | 수집 장치 설치기 | 감사 저장소(헤더·행 이미지·제어 테이블, SEQUENCE, §6.2)를 만든다. 테이블·연산별 감사 트리거를 생성하고(형식 변환 규칙 포함) 각각 그 연산의 Last로 지정한다. 감사 저장소에는 IDENTITY 열을 두지 않는다. 수집 범위 매니페스트를 쓴다. | `Install(catalog)` → `CaptureManifest` |
 | C10 | 미리보기 실행기 | 실행 봉투(전용 연결, 풀링 끔, 고정 SET 옵션, 도구 소유 트랜잭션)를 연다. 문장마다 `EXECUTE AS USER` → 실행 → REVERT → 경계·이미지 수 읽기 → 상한 점검(제어 테이블 갱신)을 한다. 롤백 전에 수집 기록을 읽고, 수집된 키를 재조회하고, 최종 차이를 계산한다. 평가 모드에서는 ROLLBACK 직전에 평가 훅을 같은 연결로 부른다. BEGIN TRAN 직후 수집 순번 최댓값을 읽어 경계 0으로 둔다. 실패하면 전체 사용자 테이블을 대상으로 롤백 뒤 남은 변경을 검사한다. | `Execute(analysis)` → `RawCapture` |
 | C11 | 변경 수집기 | 헤더와 행 이미지로 변경 묶음을 구성하고, UPDATE 전후 행을 짝짓고, 바뀐 열을 계산하고, 비결정 열을 표시하고, 값을 정규화한다. 재조회 값을 반영한다(§7.2 6단계). | `Collect(raw)` → `Firing[]`, `RowChange[]` |
 | C12 | 최종 차이 계산기 | 스냅샷과 현재 DB의 테이블별 순 변경을 계산한다. PK로 조인하고, 힙은 다중집합으로 비교하고, 형식을 정규화한다. **열린 트랜잭션을 가진 연결을 받아 그 연결에서 계산한다**(미커밋 변경을 보기 위해). 제품 전용이며 평가 오라클과 코드를 공유하지 않는다. | `Diff(connection, liveDb, snapshotDb, tables)` → `NetChange[]` |
@@ -398,6 +398,8 @@ sequenceDiagram
 | | `keyJson` | 키 열 JSON. 키 없는 테이블(ROW)은 null |
 | | `rowJson` | 행 전체 JSON(§6.1). KEYS 모드에서는 null |
 | AuditControl | `mode`, `cap` | 1행. FULL 또는 KEYS, 이미지 상한. 실행기가 문장 사이에 같은 트랜잭션 안에서 갱신한다. |
+
+**저장 형식(v1.3, 2026-11-06 C9 첫판에서 고정):** 스키마 `audit`(소유자 dbo), 순번 `audit.CaptureSeq`(bigint SEQUENCE), `imageKind` 값은 `'DELETED'`·`'INSERTED'`, AuditRowImage 기본 키는 (`captureSeq`, `imageKind`, `ordinal`)이고 FK는 두지 않는다. AuditControl은 `id = 1` 한 행만 허용한다.
 
 **감사 트리거의 마지막 문장:** 마지막 INSERT는 발동 행 수와 같은 행 수를 남긴다. INSERT·UPDATE는 inserted 쪽, DELETE는 deleted 쪽 이미지가 마지막이다. KEYS 모드에서도 키 이미지로 같은 행 수를 남기고, 키 없는 테이블은 keyJson·rowJson이 모두 null인 행으로 남긴다. 상한 판정에 쓰는 이미지 수는 rowJson이 있는 행만 센다(UPDATE 한 행은 deleted·inserted로 2).
 
@@ -818,6 +820,7 @@ MVP의 미리보기 요청은 끝날 때까지 기다리는 동기 방식이다.
 PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/trigger-definition.html), [CREATE TRIGGER](https://www.postgresql.org/docs/current/sql-createtrigger.html), [pg_trigger](https://www.postgresql.org/docs/current/catalog-pg-trigger.html), [pg_trigger_depth](https://www.postgresql.org/docs/current/functions-info.html), [CREATE DATABASE](https://www.postgresql.org/docs/current/sql-createdatabase.html), [RETURNING](https://www.postgresql.org/docs/current/dml-returning.html), [PG 18 릴리스 노트](https://www.postgresql.org/docs/18/release-18.html)
 
 - **결정:** A로 한다. 이미지 태그를 CU로 고정하고 `MSSQL_PID=EnterpriseDeveloper`로 띄운다. SP0에서 에디션이나 스냅샷 확인이 실패하면 B로 바꾸고, 같은 SP0을 2022에서 다시 한다. 파서는 문서로 확인된 TSql160Parser를 기본으로 하고, SP4에서 확인되면 더 높은 버전 클래스를 쓴다. 허용 목록이 DML 세 종류뿐이라 파서 버전 차이의 영향은 작다. 모르는 구문은 파싱 실패로 거부한다.
+- **v1.3 반영(2026-11-06, 근거: SP4, 라이브러리 실행):** ScriptDom 180.140.0에는 TSql170Parser와 TSql180Parser가 있다. 대상 엔진의 호환성 수준(2025는 170)에 맞춰 TSql170Parser를 쓰고, 2022로 바꾸면 TSql160Parser를 쓴다. DML·CREATE TRIGGER 표본은 160과 180의 파싱 결과가 같았다. 170과 180의 차이는 확인하지 않았다. 에디션·스냅샷(SP0)이 확인되기 전이므로 D1 자체는 아직 확정하지 않는다.
 - **반대 의견(패널, 충실도 관점):** B가 문서로 더 확실하다. → SP0을 첫날 끝내고, 실패하면 B로 바꾸는 분기를 미리 정했다.
 - **이후 범위:** PostgreSQL 어댑터. 카탈로그, 수집 장치 설치기, 최종 차이 계산기만 DB별로 바꾸면 되도록 경계를 둔다.
 
@@ -844,7 +847,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 
 **감사 트리거 규칙**
 
-1. 테이블마다 1개를 둔다(INSERT·UPDATE·DELETE). 연산별로 `sp_settriggerorder`의 Last를 지정한다. 그 연산에 이미 사용자 Last가 있으면 지정하지 않고(`NONE`) 매니페스트에 표시한다. **First에는 두지 않는다.** 앞에서 실행된 트리거가 다음 트리거 시작 시점의 @@ROWCOUNT에 영향을 주는지 문서에 없기 때문이다(A9).
+1. 테이블·연산마다 1개를 둔다(INSERT, UPDATE, DELETE 각각). 이름은 `[테이블 스키마].[dbr_audit_<테이블>_<I|U|D>]`다(DML 트리거는 테이블과 같은 스키마에 속한다). **v1.3 변경(2026-11-06, 근거: 정적 검토, SP2(d)로 실측 확인 예정):** v1.2는 "테이블마다 1개(INSERT·UPDATE·DELETE)"였다. 0행 발동이면 inserted·deleted가 모두 비어 한 트리거로는 연산을 구분할 수 없고, 헤더 `operation`(§6.2)과 0행 발동 기록(E23)을 채울 수 없어 바꿨다. 각 트리거에 그 연산의 Last를 지정한다. 그 연산에 이미 사용자 Last가 있으면 지정하지 않고(`NONE`) 매니페스트에 표시한다. **First에는 두지 않는다.** 앞에서 실행된 트리거가 다음 트리거 시작 시점의 @@ROWCOUNT에 영향을 주는지 문서에 없기 때문이다(A9).
 2. 본문은 `SET NOCOUNT ON` → 헤더 1행 INSERT → 행 이미지 INSERT(deleted, inserted) 순서다(§6.2 감사 저장소).
    - 행 수는 @@ROWCOUNT가 아니라 inserted/deleted의 `COUNT_BIG(*)`로 구한다.
    - 수집 모드(FULL/KEYS)는 제어 테이블에서 읽는다.
@@ -907,7 +910,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 - 감사 트리거가 Last가 아닌 테이블
 - 동적 SQL을 쓰는 트리거
 
-**번호와 실행 의미:** 문장마다 전역 번호, (배치, 순번), 시작·끝 줄과 열을 붙인다. 문장은 하나씩 실행하고, 첫 오류에서 전체를 멈추고 롤백한다. [적용]도 같은 실행기를 쓴다. GO 분리는 ScriptDom의 배치 구분으로 하고, SP4에서 확인되지 않으면 sqlcmd 규칙("GO만 있는 줄")과 토큰 스트림으로 대신한다.
+**번호와 실행 의미:** 문장마다 전역 번호, (배치, 순번), 시작·끝 줄과 열을 붙인다. 문장은 하나씩 실행하고, 첫 오류에서 전체를 멈추고 롤백한다. [적용]도 같은 실행기를 쓴다. GO 분리는 ScriptDom의 배치 구분으로 하고, SP4에서 확인되지 않으면 sqlcmd 규칙("GO만 있는 줄")과 토큰 스트림으로 대신한다. **v1.3 반영(2026-11-06, 근거: SP4):** ScriptDom 배치 구분은 주석·문자열 안의 GO를 구분자로 보지 않고, 소문자 `go`와 뒤에 주석이 붙은 GO를 구분자로 인식했다. 그래서 sqlcmd 규칙 대체는 두지 않는다. 줄 중간의 GO(`SELECT 1 GO`)는 열 별칭으로 파싱된다. `GO 2`처럼 반복 횟수를 붙인 GO는 파싱 오류(46010)이므로 파싱 실패 규칙으로 거부된다. 오류와 문장 위치는 배치와 상관없이 스크립트 전체 기준 줄·열·오프셋이다.
 
 ### D6. 기술 스택
 

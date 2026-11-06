@@ -1,0 +1,42 @@
+{
+  "id": "CL04b",
+  "pattern": "CL04",
+  "title": "ON UPDATE CASCADE, 부모 PK 단일 행 변경 (짝 확정)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl04.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "UPDATE cl04.P SET id = 300 WHERE id = 3;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl04.P", "keyColumns": ["id"], "updated": [],
+        "deleted": [ { "key": { "id": 3 }, "causes": ["DIRECT"] } ],
+        "inserted": [ { "key": { "id": 300 }, "causes": ["DIRECT"] } ],
+        "basis": "PK 조인 순 변경(§6.2 NetChange). 1, 2는 그대로" },
+      { "table": "cl04.Ch", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [
+          { "key": { "id": 30 }, "causes": ["FK_CASCADE"], "changedColumns": ["p_id"], "after": { "p_id": 300 }, "parentKey": { "id": 300 } }
+        ],
+        "basis": "FK_cl04_Ch_P ON UPDATE CASCADE, p_id = 3인 행(시드 30)" }
+    ],
+    "firings": [
+      { "node": "F:cl04.P:UPDATE", "table": "cl04.P", "operation": "UPDATE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "pairing": "SINGLE_ROW" },
+      { "node": "F:cl04.Ch:UPDATE", "table": "cl04.Ch", "operation": "UPDATE", "rowCount": 1, "causeKind": "FK_CASCADE", "depth": 1, "pairing": "BY_PK" }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl04.P:UPDATE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl04.P:UPDATE", "child": "F:cl04.Ch:UPDATE", "kind": "FK", "name": "FK_cl04_Ch_P", "action": "CASCADE", "event": "UPDATE", "confidence": "certain", "basis": "§7.2 3단계 UPDATE CASCADE(before 3 ∈ deleted, after 300 ∈ inserted), 부모 짝 확정 -> parentRowIds 채움" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "Ch 묶음의 depth = 1", "basis": "H2 전제값, A7" }
+    ]
+  },
+  "rationale": [
+    { "claim": "행이 하나면 PK가 바뀌어도 짝이 하나로 정해진다", "basis": "§6.2 pairing SINGLE_ROW, A12" },
+    { "claim": "부모 짝이 확정되면 자식의 부모 행까지 채운다", "basis": "§7.2 3단계 'UPDATE CASCADE ... 부모 짝이 확정되면 parentRowIds까지 채운다'" }
+  ]
+}
