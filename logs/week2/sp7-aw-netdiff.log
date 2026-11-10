@@ -1,0 +1,58 @@
+# SP7 열린 트랜잭션 안 최종 차이(C12 NetDiffer) — 2026-11-10T13:00:38+09:00
+기준선: TestBaseline.BuildAdventureWorksAsync("dif") 7041 ms (원본·샌드박스·스냅샷: dbrt_dif_aw_* 전용)
+서버: 17.0.5035.5 CU10 Enterprise Developer Edition (64-bit)
+비교 대상: 사용자 테이블 71개(감사 스키마 제외), 행 760,598개, 키 종류 PK 71
+연결: 풀링 끔, SqlClient 기본 SET 옵션 + XACT_ABORT ON(트랜잭션 구간), NetDiffer 테이블당 질의 1개
+
+## 0. 시작 상태 차이(트랜잭션 없음): 0건
+
+## 1. 사용자 sp7_dml(WITHOUT LOGIN, DB 수준 SELECT·INSERT·UPDATE·DELETE만) 생성 뒤 차이(트랜잭션 없음): 2건
+  dbo.DatabaseLog INSERTED (1359) Event=CREATE_USER
+  dbo.DatabaseLog INSERTED (1360) Event=GRANT_DATABASE
+  → AW DB DDL 트리거 ddlDatabaseTriggerLog가 CREATE_USER·GRANT를 dbo.DatabaseLog에 자동 커밋으로 남긴다. 아래 '롤백 뒤 차이'의 기준은 이 상태다.
+
+## 2. DM1·DM2 대상(스냅샷에서 고름)
+  DM1: DELETE Sales.SalesOrderHeader WHERE SalesOrderID = 51178 (스냅샷 기준 연쇄 대상 SOD 3행, SOHSR 2행)
+  DM2: UPDATE Sales.SalesOrderDetail SET OrderQty = OrderQty + 1 WHERE SalesOrderDetailID = 1 (주문 43659, OrderQty 1 → 2)
+
+## 3. 실행: 가장 중 USER_NAME()=sp7_dml, DM1 영향 1행, DM2 영향 1행, REVERT 뒤 USER_NAME()=dbo, @@TRANCOUNT=1
+
+## 4. 열린 트랜잭션 안(REVERT 뒤 같은 연결) 전 테이블 NetDiffer
+  워밍업 2083 ms, 5회 1652, 1652, 1341, 1796, 3697 ms → p50 1652 ms, p95 3697 ms (최근접 순위, 5회라 p95 = 최댓값)
+
+## 5. 결과 12건(그중 사용자 생성 DDL 로그 2건 제외 → DM 결과 10건)
+  Person.Person UPDATED 1건 바뀐 열 [Demographics] 키 (1045)
+  Production.TransactionHistory INSERTED 1건 키 (213443)
+  Sales.SalesOrderDetail UPDATED 1건 바뀐 열 [OrderQty, LineTotal] 키 (43659,1)
+  Sales.SalesOrderDetail DELETED 3건 키 (51178,37751) (51178,37752) (51178,37753)
+  Sales.SalesOrderHeader UPDATED 1건 바뀐 열 [RevisionNumber, SubTotal, TotalDue] 키 (43659)
+  Sales.SalesOrderHeader DELETED 1건 키 (51178)
+  Sales.SalesOrderHeaderSalesReason DELETED 2건 키 (51178,1) (51178,2)
+
+## 6. 독립 확인
+  [MATCH] SOH DELETED 키: 기대 51178 / 실제 51178
+  [MATCH] SOD DELETED 행 수(연쇄): 기대 3 / 실제 3
+  [MATCH] SOD DELETED 키(SalesOrderDetailID): 기대 37751,37752,37753 / 실제 37751,37752,37753
+  [MATCH] SOHSR DELETED 행 수(연쇄): 기대 2 / 실제 2
+  [MATCH] SOHSR DELETED 키(SalesReasonID): 기대 1,2 / 실제 1,2
+  [MATCH] SOD UPDATED 키·OrderQty: 기대 (43659,1) 1->2 / 실제 (43659,1) 1->2
+  [MATCH] TransactionHistory INSERTED 키(트리거): 기대 213443 / 실제 213443
+  [MATCH] SOH UPDATED 키(트리거 대상 주문): 기대 43659 / 실제 43659
+  [MATCH] SOH UPDATED에 SubTotal 포함: 기대 True / 실제 True
+  [MATCH] 전 테이블 71개 독립 건수(COUNT_BIG 증감, EXCEPT 양방향) 불일치 테이블 수: 기대 0 / 실제 0
+
+## 7. ROLLBACK 뒤(@@TRANCOUNT 0) 전 테이블 NetDiffer(실패 경로와 같은 호출: 트랜잭션 없음)
+  워밍업 1884 ms, 5회 1611, 1902, 1578, 1875, 2129 ms → p50 1875 ms, p95 2129 ms (최근접 순위, 5회라 p95 = 최댓값)
+  롤백 뒤 차이 2건, 사용자 생성 직후 상태와 같음: True (DM이 남긴 차이 0)
+
+## 8. 테이블별 1회 시간 합계 1509 ms, 상위 8개:
+  Person.Person 328 ms
+  Person.Address 121 ms
+  dbo.DatabaseLog 87 ms
+  Person.Password 85 ms
+  Person.EmailAddress 70 ms
+  Sales.CreditCard 70 ms
+  Production.TransactionHistory 62 ms
+  Production.TransactionHistoryArchive 62 ms
+
+판정: 통과(모든 독립 확인 일치)

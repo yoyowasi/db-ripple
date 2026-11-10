@@ -1,0 +1,46 @@
+@baseUrl = http://127.0.0.1:5080
+
+### 샌드박스 상태
+GET {{baseUrl}}/api/sandbox
+
+### 기준선 새로 고침(202)
+POST {{baseUrl}}/api/sandbox/refresh
+
+### 분석
+POST {{baseUrl}}/api/analyze
+Content-Type: application/json
+
+{ "sql": "UPDATE Sales.SalesOrderDetail SET OrderQty = OrderQty + 1 WHERE SalesOrderDetailID = 1;" }
+
+### 미리보기
+POST {{baseUrl}}/api/previews
+Content-Type: application/json
+
+{ "sql": "DELETE FROM Sales.SalesOrderHeader WHERE SalesOrderID = 43659;", "options": { "imageCap": 100000 } }
+
+### 거부(422 기대)
+POST {{baseUrl}}/api/previews
+Content-Type: application/json
+
+{ "sql": "TRUNCATE TABLE Sales.SalesOrderDetail;" }
+
+### 결과
+GET {{baseUrl}}/api/previews/pv_00000000_0001
+
+### 행 페이지(발동 보기)
+GET {{baseUrl}}/api/previews/pv_00000000_0001/rows?view=event&offset=0&limit=100
+
+### 행 페이지(최종 차이 보기)
+GET {{baseUrl}}/api/previews/pv_00000000_0001/rows?view=net
+
+### 없는 id(404)
+GET {{baseUrl}}/api/previews/none
+
+### 취소(204)
+POST {{baseUrl}}/api/previews/pv_00000000_0001/cancel
+
+### 내보내기
+GET {{baseUrl}}/api/previews/pv_00000000_0001/export
+
+### OpenAPI(개발 환경)
+GET {{baseUrl}}/openapi/v1.json

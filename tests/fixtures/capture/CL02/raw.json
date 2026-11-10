@@ -1,0 +1,202 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "DELETE",
+        "target": "cl02.Dept",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 36
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          27,
+          28
+        ],
+        "error": null
+      },
+      "boundary": 28,
+      "imageCountAfter": 5,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 26,
+  "headers": [
+    {
+      "captureSeq": 27,
+      "tableObjectId": 1429580131,
+      "tableName": "[cl02].[Emp]",
+      "operation": "UPDATE",
+      "insertedCount": 2,
+      "deletedCount": 2,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 28,
+      "tableObjectId": 1397580017,
+      "tableName": "[cl02].[Dept]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 27,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":11}",
+      "rowJson": "{\"id\":11,\"dept_id\":1,\"name\":\"e11\"}"
+    },
+    {
+      "captureSeq": 27,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":10}",
+      "rowJson": "{\"id\":10,\"dept_id\":1,\"name\":\"e10\"}"
+    },
+    {
+      "captureSeq": 27,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":11}",
+      "rowJson": "{\"id\":11,\"dept_id\":null,\"name\":\"e11\"}"
+    },
+    {
+      "captureSeq": 27,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":10}",
+      "rowJson": "{\"id\":10,\"dept_id\":null,\"name\":\"e10\"}"
+    },
+    {
+      "captureSeq": 28,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"name\":\"d1\"}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl02.Dept",
+      "keyJson": "{\"id\":1}",
+      "rowJson": null
+    },
+    {
+      "table": "cl02.Emp",
+      "keyJson": "{\"id\":11}",
+      "rowJson": "{\"id\":11,\"dept_id\":null,\"name\":\"e11\"}"
+    },
+    {
+      "table": "cl02.Emp",
+      "keyJson": "{\"id\":10}",
+      "rowJson": "{\"id\":10,\"dept_id\":null,\"name\":\"e10\"}"
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl02.Dept",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "name": "d1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl02.Emp",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "10"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "10",
+        "dept_id": "1",
+        "name": "e10"
+      },
+      "after": {
+        "id": "10",
+        "dept_id": null,
+        "name": "e10"
+      },
+      "changedColumns": [
+        "dept_id"
+      ],
+      "explainedBy": null
+    },
+    {
+      "table": "cl02.Emp",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "11"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "11",
+        "dept_id": "1",
+        "name": "e11"
+      },
+      "after": {
+        "id": "11",
+        "dept_id": null,
+        "name": "e11"
+      },
+      "changedColumns": [
+        "dept_id"
+      ],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "capture": {
+    "imageCount": 5,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261110-1149"
+  },
+  "timings": {
+    "execute": 12,
+    "readLog": 2,
+    "reread": 9,
+    "netDiff": 27
+  }
+}

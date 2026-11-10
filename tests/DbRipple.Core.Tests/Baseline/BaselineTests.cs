@@ -92,8 +92,13 @@ public class BaselineTests
         Assert.StartsWith("master: RESTORE DATABASE [AW_Sandbox]", log[7]);
         Assert.Equal("catalog: AW_Sandbox", log[8]);
         Assert.Equal("rowcounts: AW_Sandbox", log[9]);
-        Assert.StartsWith("AW_Sandbox: SET ANSI_NULLS ON;", log[10]);
-        Assert.StartsWith("AW_Sandbox: CREATE SCHEMA audit", log[11]);
+        // 4b. 실행 사용자(Q12 수정): C9 설치 전에 샌드박스에서 만든다(DDL 트리거 부작용이 기준 스냅샷에 들어가게)
+        Assert.StartsWith("AW_Sandbox: DECLARE @ddl bit = 0;", log[10]);
+        Assert.Contains("CREATE USER [dbr_preview_user] WITHOUT LOGIN WITH DEFAULT_SCHEMA = [dbo]", log[10]);
+        Assert.Contains("GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[dbo] TO [dbr_preview_user]", log[10]);
+        Assert.Equal("rowcounts: AW_Sandbox", log[11]);
+        Assert.StartsWith("AW_Sandbox: SET ANSI_NULLS ON;", log[12]);
+        Assert.StartsWith("AW_Sandbox: CREATE SCHEMA audit", log[13]);
         var fp = log.IndexOf("fingerprint");
         Assert.Equal("rowcounts: AW_Sandbox", log[fp - 1]);
         Assert.StartsWith("AW_Sandbox: DELETE FROM audit.AuditRowImage;", log[fp - 2]); // 설치 마지막 = 감사 기록 비우기
@@ -104,7 +109,30 @@ public class BaselineTests
         Assert.Equal(new DateTimeOffset(2026, 11, 6, 9, 58, 0, TimeSpan.Zero), result.BackupCompletedAt);
         var notes = result.Install.Manifest.Notes;
         Assert.Contains(notes, n => n.StartsWith("DDL 트리거 ddlDatabaseTriggerLog가 설치 DDL(CREATE_TABLE·ALTER_TRIGGER)"));
+        Assert.Contains("DDL 트리거 ddlDatabaseTriggerLog가 실행 사용자 dbr_preview_user 준비 DDL(CREATE_USER·GRANT_DATABASE)에 발동함(C9 설치 전, Q12)", notes);
+        Assert.Contains("실행 사용자 dbr_preview_user 준비 전후 행 수가 바뀐 테이블(기준선에 포함, 원본과 다름): dbo.DatabaseLog +2행", notes);
         Assert.Contains("설치 전후 행 수가 바뀐 테이블(기준선에 포함, 원본과 다름): dbo.DatabaseLog +431행", notes);
+    }
+
+    [Fact]
+    public void Preview_user_batch_parses_is_idempotent_and_grants_dml_only_outside_audit()
+    {
+        var sql = PreviewUserSql.EnsureBatch(["Sales", "dbo", "audit", "sales", "we]ird"]);
+        Parse(sql);
+        Assert.Contains("IF USER_ID(N'dbr_preview_user') IS NULL BEGIN CREATE USER", sql); // 이미 있으면 DDL 없음
+        Assert.Contains("ON SCHEMA::[Sales]", sql);
+        Assert.Contains("ON SCHEMA::[we]]ird]", sql);
+        Assert.DoesNotContain("SCHEMA::[audit]", sql); // 감사 저장소에는 권한 없음
+        Assert.DoesNotContain("SCHEMA::[sales]", sql);  // 대소문자 무시 중복 제거
+        Assert.Contains("THROW 50000", sql);           // 역할 소속이면 실패
+        Assert.EndsWith("SELECT @ddl;\n", sql);
+    }
+
+    [Fact]
+    public void Preview_user_notes_skip_when_no_ddl_trigger_fires_and_nothing_changed()
+    {
+        var cat = new FakeSteps().Catalog with { Triggers = [new(91, "ddlTableOnly", 0, "DATABASE", false, false, "CREATE_TABLE", false, false, "x")] };
+        Assert.Empty(BaselineBuilder.PreviewUserNotes(cat, new Dictionary<string, long> { ["dbo.T"] = 5 }, new Dictionary<string, long> { ["dbo.T"] = 5 }));
     }
 
     // 서버 정렬 규칙은 끝 공백·전각·대소문자를 같은 이름으로 본다(DB_ID(N'AW_Origin ') = 원본) → 클라이언트에서 영문자·숫자·밑줄만 받는다
@@ -240,6 +268,8 @@ public class BaselineTests
                 new(90, "ddlDatabaseTriggerLog", 0, "DATABASE", false, false, "CREATE_TABLE", false, false, "CREATE TRIGGER ..."),
                 new(90, "ddlDatabaseTriggerLog", 0, "DATABASE", false, false, "ALTER_TRIGGER", false, false, "CREATE TRIGGER ..."),
                 new(90, "ddlDatabaseTriggerLog", 0, "DATABASE", false, false, "DROP_TABLE", false, false, "CREATE TRIGGER ..."),
+                new(90, "ddlDatabaseTriggerLog", 0, "DATABASE", false, false, "CREATE_USER", false, false, "CREATE TRIGGER ..."),
+                new(90, "ddlDatabaseTriggerLog", 0, "DATABASE", false, false, "GRANT_DATABASE", false, false, "CREATE TRIGGER ..."),
             ],
             [new(1, "AW_Data", "ROWS", "/d.mdf"), new(2, "AW_Log", "LOG", "/l.ldf")]);
 
@@ -260,14 +290,16 @@ public class BaselineTests
             return Task.FromResult(Catalog);
         }
 
-        // 1차(설치 전) DatabaseLog 1597행, 2차(설치 뒤) 2028행 = DDL 트리거가 431행 기록
+        // 1차(사용자 준비 전) DatabaseLog 1597행, 2차(사용자 준비 뒤) 1599행, 3차(설치 뒤) 2030행 = DDL 트리거가 2행·431행 기록
         public Task<IReadOnlyDictionary<string, long>> ReadRowCountsAsync(string database, CancellationToken ct)
         {
             Log.Add("rowcounts: " + database);
-            var after = rowCountCalls++ > 0;
-            IReadOnlyDictionary<string, long> counts = after
-                ? new Dictionary<string, long> { ["dbo.T"] = 3, ["dbo.DatabaseLog"] = 2028, ["audit.AuditHeader"] = 0 }
-                : new Dictionary<string, long> { ["dbo.T"] = 3, ["dbo.DatabaseLog"] = 1597 };
+            IReadOnlyDictionary<string, long> counts = rowCountCalls++ switch
+            {
+                0 => new Dictionary<string, long> { ["dbo.T"] = 3, ["dbo.DatabaseLog"] = 1597 },
+                1 => new Dictionary<string, long> { ["dbo.T"] = 3, ["dbo.DatabaseLog"] = 1599 },
+                _ => new Dictionary<string, long> { ["dbo.T"] = 3, ["dbo.DatabaseLog"] = 2030, ["audit.AuditHeader"] = 0 },
+            };
             return Task.FromResult(counts);
         }
 

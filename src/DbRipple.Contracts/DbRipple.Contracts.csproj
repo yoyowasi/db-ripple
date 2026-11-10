@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    2주차 공용 계약(경계 타입·인터페이스). 구현자는 고치지 않는다(바꿀 일이 생기면 오케스트레이터에 보고).
+    Core(1주차 Catalog·Capture·Baseline 타입)를 재사용하고 Core는 고치지 않는다.
+    XML 주석은 OpenAPI 설명으로도 쓰이므로 문서 파일을 만들고, 빠진 주석(CS1591)은 오류로 막는다.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DbRipple.Core\DbRipple.Core.csproj" />
+  </ItemGroup>
+
+</Project>

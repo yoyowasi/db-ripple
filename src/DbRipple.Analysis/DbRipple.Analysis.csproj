@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- C6 배치 분석기 + 트리거 본문 정적 분석. 소유: 구현자 A. 참조는 Contracts만(다른 구현자의 깨진 코드가 이 빌드를 깨지 않게). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DbRipple.Contracts\DbRipple.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Core와 같은 버전(이미 복원됨). 직접 쓰므로 명시한다. -->
+    <PackageReference Include="Microsoft.SqlServer.TransactSql.ScriptDom" Version="180.140.0" />
+  </ItemGroup>
+
+</Project>

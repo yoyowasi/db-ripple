@@ -1,0 +1,131 @@
+using DbRipple.Core.Catalog;
+
+namespace DbRipple.Contracts;
+
+/// <summary>진단 한 건(§6.4 Diagnostic, C1 줄 표시). 거부와 경고 모두 이 형식이다.</summary>
+public sealed record Diagnostic
+{
+    /// <summary>문장 전역 번호(1부터). 파싱 실패처럼 문장을 특정할 수 없으면 null.</summary>
+    public int? StatementIndex { get; init; }
+    /// <summary>스크립트 전체 기준 위치(D5 v1.3).</summary>
+    public required SourceSpan Span { get; init; }
+    /// <summary>error = 거부, warning = 경고(D5).</summary>
+    public required Severity Severity { get; init; }
+    /// <summary>규칙 ID(예 "REJECT_TRUNCATE", §6.4). 전체 목록은 AnalysisRules(열린 질문 Q3).</summary>
+    public required string RuleId { get; init; }
+    /// <summary>사용자에게 보일 설명.</summary>
+    public required string Message { get; init; }
+    /// <summary>설계 근거 ID(예 "A21", "E11"). 없으면 null.</summary>
+    public string? DocRef { get; init; }
+}
+
+/// <summary>분석기가 실행 가능으로 판정한 문장 1개(§4 C6, D5 "번호와 실행 의미"). 실행기(C10)는 Sql을 별도 명령으로 하나씩 실행한다.</summary>
+public sealed record AnalyzedStatement
+{
+    /// <summary>문장 전역 번호(1부터, §6.2 Statement.index).</summary>
+    public required int Index { get; init; }
+    /// <summary>GO 배치 번호(1부터, §6.2 Statement.batch).</summary>
+    public required int Batch { get; init; }
+    /// <summary>배치 안 순번(1부터, §6.2 Statement.position).</summary>
+    public required int Position { get; init; }
+    /// <summary>INSERT/UPDATE/DELETE(D5 허용 목록).</summary>
+    public required ChangeOperation Kind { get; init; }
+    /// <summary>직접 대상 테이블 "스키마.테이블". 스키마를 생략한 이름의 해석 규칙은 열린 질문 Q4.</summary>
+    public required string Target { get; init; }
+    /// <summary>스크립트 전체 기준 위치.</summary>
+    public required SourceSpan Span { get; init; }
+    /// <summary>실행할 문장 원문(스크립트에서 오프셋으로 잘라낸 부분, 끝 세미콜론 포함 여부는 C6이 정함).</summary>
+    public required string Sql { get; init; }
+    /// <summary>문장 안 비결정 함수(GETDATE·NEWID 등)로 값이 정해지는 직접 대상 열(E1, RowChange.volatile STATEMENT_FUNCTION). 없으면 빈 배열.</summary>
+    public IReadOnlyList<string> NondeterministicColumns { get; init; } = [];
+}
+
+/// <summary>
+/// C6 결과(§4 C6 `AnalysisResult{statements[], rejects[], warnings[]}`, §6.4 POST /api/analyze). 거부가 하나라도 있으면 전체를 실행하지 않는다(D5).
+/// </summary>
+public sealed record AnalysisResult
+{
+    /// <summary>파싱된 문장(거부가 있어도 파싱된 것은 담는다).</summary>
+    public IReadOnlyList<AnalyzedStatement> Statements { get; init; } = [];
+    /// <summary>거부(Severity = error). 파싱 실패도 여기 들어간다.</summary>
+    public IReadOnlyList<Diagnostic> Rejects { get; init; } = [];
+    /// <summary>경고(Severity = warning, D5 "경고(실행은 함)").</summary>
+    public IReadOnlyList<Diagnostic> Warnings { get; init; } = [];
+    /// <summary>편집기 줄 표시용 전체 진단(Rejects 다음 Warnings). §6.4 "Diagnostic[]".</summary>
+    public IReadOnlyList<Diagnostic> Diagnostics => [.. Rejects, .. Warnings];
+    /// <summary>실행 가능 여부(거부 0개, 문장 1개 이상). 빈 스크립트의 처리는 열린 질문 Q5.</summary>
+    public bool IsAccepted => Rejects.Count == 0 && Statements.Count > 0;
+}
+
+/// <summary>
+/// 트리거 1개의 본문 정적 분석 결과(§4 C7 "트리거 본문 정적 분석", §7.2 4단계, D5 외부 부작용 거부, E1·E8).
+/// 2주차에 C6(Analysis 프로젝트)이 Core DbCatalog.Triggers의 Definition을 ScriptDom으로 분석해 만든다(재사용 후보: spikes/dotnet/Sp4.ScriptDom.Tests/TriggerAnalyzer.cs).
+/// </summary>
+public sealed record TriggerStaticInfo
+{
+    /// <summary>트리거 "스키마.이름".</summary>
+    public required string Trigger { get; init; }
+    /// <summary>트리거 개체 ID(sys.triggers.object_id).</summary>
+    public required int ObjectId { get; init; }
+    /// <summary>부모 테이블 "스키마.테이블"(DDL 트리거는 대상이 아니다).</summary>
+    public required string Table { get; init; }
+    /// <summary>발동 이벤트(INSERT/UPDATE/DELETE).</summary>
+    public IReadOnlyList<ChangeOperation> Events { get; init; } = [];
+    /// <summary>INSTEAD OF 여부(A5, §7.2 5단계).</summary>
+    public required bool IsInsteadOf { get; init; }
+    /// <summary>비활성 트리거(E22: 발동 후보에서 뺀다).</summary>
+    public required bool IsDisabled { get; init; }
+    /// <summary>암호화·CLR이라 본문을 읽지 못함(쓰기 대상 미상 → 동적 SQL처럼 모든 테이블 후보로 볼지는 열린 질문 Q6).</summary>
+    public required bool IsEncrypted { get; init; }
+    /// <summary>감사 트리거(dbr_audit_ 접두, C9 설치). 원인 후보에서 뺀다(§7.2 4단계 "감사 트리거 제외").</summary>
+    public required bool IsAuditTrigger { get; init; }
+    /// <summary>정적 쓰기 대상 테이블 "스키마.테이블"(INSERT/UPDATE/DELETE/MERGE 대상, 별칭·CTE·테이블 변수·#임시 제외, §7.2 4단계).</summary>
+    public IReadOnlyList<string> WriteTargets { get; init; } = [];
+    /// <summary>
+    /// 쓰기 대상을 알 수 없음(Q6: 암호화·CLR이라 본문이 없거나 본문 파싱 실패). true면 WriteTargets는 비어 있고 의미가 없으며,
+    /// 그 트리거가 낸 후보는 ambiguous 이하다(C13). 동적 SQL만 있는 트리거는 false(WriteTargets는 정적으로 보인 대상, HasDynamicSql로 따로 표시).
+    /// C6(TriggerAnalyzer)이 채운다. 2026-11-10 통합 때 추가(비파괴, 기본 false).
+    /// </summary>
+    public bool WriteTargetsUnknown { get; init; }
+    /// <summary>동적 SQL(EXEC 문자열, sp_executesql, EXEC @var). 있으면 모든 테이블에 쓸 수 있다고 본다(§7.2 4단계, E8).</summary>
+    public required bool HasDynamicSql { get; init; }
+    /// <summary>ROLLBACK 포함(E13 거부 후보 표시).</summary>
+    public required bool HasRollback { get; init; }
+    /// <summary>
+    /// ROLLBACK이 아닌 트랜잭션 제어(COMMIT, BEGIN TRAN, SAVE TRAN) 포함. 트리거의 COMMIT은 미리보기 트랜잭션을 확정해 샌드박스에 변경을 남기므로
+    /// 그 트리거가 붙은 테이블의 DML은 거부한다(AnalysisRules.RejectTriggerTransactionControl). 2026-11-10 통합 검토 때 추가(비파괴, 기본 false).
+    /// </summary>
+    public bool HasTransactionControl { get; init; }
+    /// <summary>외부 부작용 표시(msdb, 4부분 이름, OPENQUERY/OPENROWSET, xp_). 하나라도 있으면 그 테이블 대상 DML은 거부(D5, E18).</summary>
+    public IReadOnlyList<string> ExternalSideEffects { get; init; } = [];
+    /// <summary>호출하는 저장 프로시저 이름(쓰기 대상 추적 범위 밖, 정보용).</summary>
+    public IReadOnlyList<string> ProcedureCalls { get; init; } = [];
+    /// <summary>본문의 비결정 함수로 값이 정해지는 (테이블, 열)(E1 → RowChange.volatile TRIGGER_GETDATE).</summary>
+    public IReadOnlyList<TableColumn> NondeterministicWrites { get; init; } = [];
+}
+
+/// <summary>테이블의 열 하나.</summary>
+public sealed record TableColumn
+{
+    /// <summary>"스키마.테이블".</summary>
+    public required string Table { get; init; }
+    /// <summary>열 이름.</summary>
+    public required string Column { get; init; }
+}
+
+/// <summary>C6 배치 분석기(§4 C6). D5 허용 목록 판정, GO 배치·문장 나누기, 위치·경고 계산.</summary>
+public interface IBatchAnalyzer
+{
+    /// <summary>
+    /// §4 `Analyze(sql)`. baseline은 카탈로그에 기대는 D5 규칙(기반 사용자 테이블인지, 외부 부작용 트리거가 붙은 대상, 감사 트리거가 Last가 아닌 대상,
+    /// 동적 SQL 트리거 경고)을 판정하려고 받는다. 판정할 수 없으면 닫힌 쪽(거부)으로 정한다. 예외를 던지지 않고 거부로 돌려준다(입력 오류는 결과다).
+    /// </summary>
+    AnalysisResult Analyze(string sql, BaselineContext baseline);
+}
+
+/// <summary>C6 트리거 본문 정적 분석기(§4 C7의 정적 분석 부분, 2주차 C6 담당).</summary>
+public interface ITriggerAnalyzer
+{
+    /// <summary>카탈로그의 DML 트리거(테이블 부모)마다 1개. 감사 트리거도 IsAuditTrigger=true로 포함한다. 파싱 실패한 트리거는 HasDynamicSql=true처럼 보수적으로 표시한다.</summary>
+    IReadOnlyList<TriggerStaticInfo> Analyze(DbCatalog catalog);
+}

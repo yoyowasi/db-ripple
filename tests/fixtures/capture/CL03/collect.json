@@ -1,0 +1,119 @@
+{
+  "firings": [
+    {
+      "id": "f-29",
+      "captureSeq": 29,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl03.Product",
+      "operation": "UPDATE",
+      "rowCount": 2,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-30",
+      "captureSeq": 30,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl03.Category",
+      "operation": "DELETE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-29-1",
+      "firingId": "f-29",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "10"
+        ]
+      },
+      "before": {
+        "id": "10",
+        "category_id": "1"
+      },
+      "after": {
+        "id": "10",
+        "category_id": "0"
+      },
+      "changedColumns": [
+        "category_id"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-29-2",
+      "firingId": "f-29",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "11"
+        ]
+      },
+      "before": {
+        "id": "11",
+        "category_id": "1"
+      },
+      "after": {
+        "id": "11",
+        "category_id": "0"
+      },
+      "changedColumns": [
+        "category_id"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-30-1",
+      "firingId": "f-30",
+      "operation": "DELETE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "name": "c1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [],
+  "rereadDifferences": []
+}

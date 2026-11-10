@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    C5 REST API(minimal API, OpenAPI, ProblemDetails) 엔드포인트 라이브러리. 소유: 구현자 E.
+    참조는 Contracts만이다. 구현체 조립(Host)과 분리해 다른 구현자의 깨진 코드가 이 빌드·테스트를 깨지 않게 한다.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DbRipple.Contracts\DbRipple.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

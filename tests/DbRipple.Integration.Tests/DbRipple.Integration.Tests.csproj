@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 2주차 통합(D3): 진짜 구현(C6·C10·C11·C12·C13·C14·SandboxManager)으로 파이프라인을 끝까지 돌린다. 통합 테스트 DB 접두 dbrt_int_. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DbRipple.Analysis\DbRipple.Analysis.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Attribution\DbRipple.Attribution.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Diff\DbRipple.Diff.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Execution\DbRipple.Execution.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Preview\DbRipple.Preview.csproj" />
+    <ProjectReference Include="..\DbRipple.TestSupport\DbRipple.TestSupport.csproj" />
+  </ItemGroup>
+
+</Project>

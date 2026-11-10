@@ -1,0 +1,12 @@
+run_id,system,case_id,pattern,database,repeat,preview_id,status_expected,status_actual,status_match,error_expected,error_actual,statements_total,statements_status_match,oracle_vs_hand_keys_match,raw_batch_match,analyze_ms,execute_ms,read_log_ms,reread_ms,net_diff_ms,resolve_ms,serialize_ms,oracle_execute_ms,record_path
+eval-20261110-135700,preview,CL01,CL01,CascadeLab,1,pv_20261110_d0df70d8,ok,ok,true,,,1,1,true,true,9,140,10,33,429,94,181,30,records\CL01-r1.json
+eval-20261110-135700,preview,CL02,CL02,CascadeLab,1,pv_20261110_06da2526,ok,ok,true,,,1,1,true,true,0,36,2,8,40,10,0,12,records\CL02-r1.json
+eval-20261110-135700,preview,CL03,CL03,CascadeLab,1,pv_20261110_d0bfa63a,ok,ok,true,,,1,1,true,true,0,45,3,9,29,1,0,16,records\CL03-r1.json
+eval-20261110-135700,preview,CL03b,CL03,CascadeLab,1,pv_20261110_39e898e7,failed,failed,true,547,547,1,1,true,true,0,23,0,0,25,1,1,15,records\CL03b-r1.json
+eval-20261110-135700,preview,CL04,CL04,CascadeLab,1,pv_20261110_2a10697d,ok,ok,true,,,1,1,true,true,2,43,2,9,29,3,0,15,records\CL04-r1.json
+eval-20261110-135700,preview,CL04b,CL04,CascadeLab,1,pv_20261110_6be83e56,ok,ok,true,,,1,1,true,true,0,34,3,3,41,0,0,4,records\CL04b-r1.json
+eval-20261110-135700,preview,CL05,CL05,CascadeLab,1,pv_20261110_4a572627,ok,ok,true,,,1,1,true,true,0,101,2,26,43,0,0,46,records\CL05-r1.json
+eval-20261110-135700,preview,CL06,CL06,CascadeLab,1,pv_20261110_c91c16e1,ok,ok,true,,,1,1,true,true,0,76,3,17,49,13,1,16,records\CL06-r1.json
+eval-20261110-135700,preview,CL07,CL07,CascadeLab,1,pv_20261110_a7167d5a,ok,ok,true,,,1,1,true,true,2,100,3,23,36,1,0,26,records\CL07-r1.json
+eval-20261110-135700,preview,CL08a,CL08,CascadeLab,1,pv_20261110_1220f960,ok,ok,true,,,1,1,true,true,0,32,2,3,30,2,0,12,records\CL08a-r1.json
+eval-20261110-135700,preview,CL08b,CL08,CascadeLab_RT,1,pv_20261110_957b3a70,ok,ok,true,,,1,1,true,true,0,75,3,4,9,1,0,24,records\CL08b-r1.json

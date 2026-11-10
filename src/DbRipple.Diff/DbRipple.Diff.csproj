@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- C12 최종 차이 계산기(제품 전용, 평가 하네스와 코드 공유 금지 §10.3). 소유: 구현자 C. 참조는 Contracts만. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DbRipple.Diff.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DbRipple.Contracts\DbRipple.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,106 @@
+{
+  "firings": [
+    {
+      "id": "f-47",
+      "captureSeq": 47,
+      "statementIndex": 1,
+      "depth": 2,
+      "table": "cl08.Acct",
+      "operation": "UPDATE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-48",
+      "captureSeq": 48,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl08.Acct",
+      "operation": "UPDATE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-47-1",
+      "firingId": "f-47",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "bal": "110",
+        "touched": "0"
+      },
+      "after": {
+        "id": "1",
+        "bal": "110",
+        "touched": "1"
+      },
+      "changedColumns": [
+        "touched"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-48-1",
+      "firingId": "f-48",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "bal": "100",
+        "touched": "0"
+      },
+      "after": {
+        "id": "1",
+        "bal": "110",
+        "touched": "0"
+      },
+      "changedColumns": [
+        "bal"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [
+    {
+      "childFiringId": "f-47",
+      "candidateParentFiringIds": [
+        "f-48"
+      ],
+      "confidenceCap": "inferred"
+    }
+  ],
+  "rereadDifferences": []
+}

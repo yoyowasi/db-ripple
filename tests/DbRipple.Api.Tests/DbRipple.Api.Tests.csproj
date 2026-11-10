@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- C5·C14·파이프라인 테스트. 소유: 구현자 E. 통합 테스트 DB 접두 dbrt_api_. 제품 컴포넌트 대신 가짜 서비스를 쓴다. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DbRipple.Api\DbRipple.Api.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Preview\DbRipple.Preview.csproj" />
+    <ProjectReference Include="..\DbRipple.TestSupport\DbRipple.TestSupport.csproj" />
+  </ItemGroup>
+
+</Project>

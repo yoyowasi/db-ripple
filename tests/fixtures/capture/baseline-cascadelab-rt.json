@@ -1,0 +1,465 @@
+{
+  "originDb": "dbrt_exe_clrt_79addb9b",
+  "sandboxDb": "dbrt_exe_clrt_79addb9b_sbx",
+  "snapshotDb": "dbrt_exe_clrt_79addb9b_base",
+  "backupFinishedAt": "2026-11-10T11:49:22.1132829+09:00",
+  "fingerprint": {
+    "productVersion": "17.0.5035.5",
+    "edition": "Enterprise Developer Edition (64-bit)",
+    "compatibilityLevel": 170,
+    "isRecursiveTriggersOn": true,
+    "nestedTriggers": 1,
+    "disallowResultsFromTriggers": 0,
+    "sessionOptions": 5432,
+    "collation": "SQL_Latin1_General_CP1_CI_AS"
+  },
+  "fingerprintMatch": true,
+  "catalog": {
+    "tables": [
+      {
+        "objectId": 1637580872,
+        "schema": "audit",
+        "name": "AuditControl",
+        "temporal": "None",
+        "isMemoryOptimized": false,
+        "owner": "dbo"
+      },
+      {
+        "objectId": 1541580530,
+        "schema": "audit",
+        "name": "AuditHeader",
+        "temporal": "None",
+        "isMemoryOptimized": false,
+        "owner": "dbo"
+      },
+      {
+        "objectId": 1605580758,
+        "schema": "audit",
+        "name": "AuditRowImage",
+        "temporal": "None",
+        "isMemoryOptimized": false,
+        "owner": "dbo"
+      },
+      {
+        "objectId": 1221579390,
+        "schema": "cl08",
+        "name": "Acct",
+        "temporal": "None",
+        "isMemoryOptimized": false,
+        "owner": "dbo"
+      }
+    ],
+    "columns": [
+      {
+        "objectId": 1221579390,
+        "columnId": 1,
+        "name": "id",
+        "systemTypeName": "int",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1221579390,
+        "columnId": 2,
+        "name": "bal",
+        "systemTypeName": "int",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1221579390,
+        "columnId": 3,
+        "name": "touched",
+        "systemTypeName": "int",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": "((0))",
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1541580530,
+        "columnId": 1,
+        "name": "captureSeq",
+        "systemTypeName": "bigint",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1541580530,
+        "columnId": 2,
+        "name": "tableObjectId",
+        "systemTypeName": "int",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1541580530,
+        "columnId": 3,
+        "name": "tableName",
+        "systemTypeName": "nvarchar",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1541580530,
+        "columnId": 4,
+        "name": "operation",
+        "systemTypeName": "char",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1541580530,
+        "columnId": 5,
+        "name": "insertedCount",
+        "systemTypeName": "bigint",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1541580530,
+        "columnId": 6,
+        "name": "deletedCount",
+        "systemTypeName": "bigint",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1541580530,
+        "columnId": 7,
+        "name": "nestLevel",
+        "systemTypeName": "int",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1541580530,
+        "columnId": 8,
+        "name": "tranCount",
+        "systemTypeName": "int",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1541580530,
+        "columnId": 9,
+        "name": "imageMode",
+        "systemTypeName": "varchar",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1605580758,
+        "columnId": 1,
+        "name": "captureSeq",
+        "systemTypeName": "bigint",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1605580758,
+        "columnId": 2,
+        "name": "imageKind",
+        "systemTypeName": "varchar",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1605580758,
+        "columnId": 3,
+        "name": "ordinal",
+        "systemTypeName": "int",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1605580758,
+        "columnId": 4,
+        "name": "keyJson",
+        "systemTypeName": "nvarchar",
+        "isUserClrType": false,
+        "isNullable": true,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1605580758,
+        "columnId": 5,
+        "name": "rowJson",
+        "systemTypeName": "nvarchar",
+        "isUserClrType": false,
+        "isNullable": true,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1637580872,
+        "columnId": 1,
+        "name": "id",
+        "systemTypeName": "tinyint",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1637580872,
+        "columnId": 2,
+        "name": "mode",
+        "systemTypeName": "varchar",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      },
+      {
+        "objectId": 1637580872,
+        "columnId": 3,
+        "name": "cap",
+        "systemTypeName": "bigint",
+        "isUserClrType": false,
+        "isNullable": false,
+        "isComputed": false,
+        "isIdentity": false,
+        "isRowVersion": false,
+        "defaultDefinition": null,
+        "hasNondeterministicDefault": false
+      }
+    ],
+    "keyIndexes": [
+      {
+        "objectId": 1221579390,
+        "indexId": 1,
+        "indexName": "PK_cl08_Acct",
+        "isPrimaryKey": true,
+        "isUnique": true,
+        "keyOrdinal": 1,
+        "column": "id",
+        "isNullable": false
+      },
+      {
+        "objectId": 1541580530,
+        "indexId": 1,
+        "indexName": "PK_AuditHeader",
+        "isPrimaryKey": true,
+        "isUnique": true,
+        "keyOrdinal": 1,
+        "column": "captureSeq",
+        "isNullable": false
+      },
+      {
+        "objectId": 1605580758,
+        "indexId": 1,
+        "indexName": "PK_AuditRowImage",
+        "isPrimaryKey": true,
+        "isUnique": true,
+        "keyOrdinal": 1,
+        "column": "captureSeq",
+        "isNullable": false
+      },
+      {
+        "objectId": 1605580758,
+        "indexId": 1,
+        "indexName": "PK_AuditRowImage",
+        "isPrimaryKey": true,
+        "isUnique": true,
+        "keyOrdinal": 2,
+        "column": "imageKind",
+        "isNullable": false
+      },
+      {
+        "objectId": 1605580758,
+        "indexId": 1,
+        "indexName": "PK_AuditRowImage",
+        "isPrimaryKey": true,
+        "isUnique": true,
+        "keyOrdinal": 3,
+        "column": "ordinal",
+        "isNullable": false
+      },
+      {
+        "objectId": 1637580872,
+        "indexId": 1,
+        "indexName": "PK_AuditControl",
+        "isPrimaryKey": true,
+        "isUnique": true,
+        "keyOrdinal": 1,
+        "column": "id",
+        "isNullable": false
+      }
+    ],
+    "foreignKeys": [],
+    "triggers": [
+      {
+        "objectId": 1733581214,
+        "name": "dbr_audit_Acct_D",
+        "parentId": 1221579390,
+        "parentClass": "OBJECT_OR_COLUMN",
+        "isInsteadOf": false,
+        "isDisabled": false,
+        "event": "DELETE",
+        "isFirst": false,
+        "isLast": true,
+        "definition": "CREATE TRIGGER [cl08].[dbr_audit_Acct_D] ON [cl08].[Acct]\nAFTER DELETE\nAS\nBEGIN\n    SET NOCOUNT ON;\n    DECLARE @dbr_seq bigint, @dbr_mode varchar(4);\n    SET @dbr_seq = NEXT VALUE FOR audit.CaptureSeq;\n    SELECT @dbr_mode = mode FROM audit.AuditControl WHERE id = 1;\n    SET @dbr_mode = ISNULL(@dbr_mode, 'FULL');\n    INSERT INTO audit.AuditHeader (captureSeq, tableObjectId, tableName, operation, insertedCount, deletedCount, nestLevel, tranCount, imageMode)\n    SELECT @dbr_seq, 1221579390, N'[cl08].[Acct]', 'D', (SELECT COUNT_BIG(*) FROM inserted), (SELECT COUNT_BIG(*) FROM deleted), TRIGGER_NESTLEVEL(), @@TRANCOUNT, @dbr_mode;\n    INSERT INTO audit.AuditRowImage (captureSeq, imageKind, ordinal, keyJson, rowJson)\n    SELECT @dbr_seq, 'DELETED', ROW_NUMBER() OVER (ORDER BY (SELECT NULL)),\n        (SELECT d.[id] AS [id] FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES),\n        CASE WHEN @dbr_mode = 'KEYS' THEN NULL ELSE (SELECT d.[id] AS [id], d.[bal] AS [bal], d.[touched] AS [touched] FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES) END\n    FROM deleted AS d;\nEND;\n",
+        "isEncrypted": false
+      },
+      {
+        "objectId": 1701581100,
+        "name": "dbr_audit_Acct_I",
+        "parentId": 1221579390,
+        "parentClass": "OBJECT_OR_COLUMN",
+        "isInsteadOf": false,
+        "isDisabled": false,
+        "event": "INSERT",
+        "isFirst": false,
+        "isLast": true,
+        "definition": "CREATE TRIGGER [cl08].[dbr_audit_Acct_I] ON [cl08].[Acct]\nAFTER INSERT\nAS\nBEGIN\n    SET NOCOUNT ON;\n    DECLARE @dbr_seq bigint, @dbr_mode varchar(4);\n    SET @dbr_seq = NEXT VALUE FOR audit.CaptureSeq;\n    SELECT @dbr_mode = mode FROM audit.AuditControl WHERE id = 1;\n    SET @dbr_mode = ISNULL(@dbr_mode, 'FULL');\n    INSERT INTO audit.AuditHeader (captureSeq, tableObjectId, tableName, operation, insertedCount, deletedCount, nestLevel, tranCount, imageMode)\n    SELECT @dbr_seq, 1221579390, N'[cl08].[Acct]', 'I', (SELECT COUNT_BIG(*) FROM inserted), (SELECT COUNT_BIG(*) FROM deleted), TRIGGER_NESTLEVEL(), @@TRANCOUNT, @dbr_mode;\n    INSERT INTO audit.AuditRowImage (captureSeq, imageKind, ordinal, keyJson, rowJson)\n    SELECT @dbr_seq, 'INSERTED', ROW_NUMBER() OVER (ORDER BY (SELECT NULL)),\n        (SELECT i.[id] AS [id] FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES),\n        CASE WHEN @dbr_mode = 'KEYS' THEN NULL ELSE (SELECT i.[id] AS [id], i.[bal] AS [bal], i.[touched] AS [touched] FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES) END\n    FROM inserted AS i;\nEND;\n",
+        "isEncrypted": false
+      },
+      {
+        "objectId": 1717581157,
+        "name": "dbr_audit_Acct_U",
+        "parentId": 1221579390,
+        "parentClass": "OBJECT_OR_COLUMN",
+        "isInsteadOf": false,
+        "isDisabled": false,
+        "event": "UPDATE",
+        "isFirst": false,
+        "isLast": true,
+        "definition": "CREATE TRIGGER [cl08].[dbr_audit_Acct_U] ON [cl08].[Acct]\nAFTER UPDATE\nAS\nBEGIN\n    SET NOCOUNT ON;\n    DECLARE @dbr_seq bigint, @dbr_mode varchar(4);\n    SET @dbr_seq = NEXT VALUE FOR audit.CaptureSeq;\n    SELECT @dbr_mode = mode FROM audit.AuditControl WHERE id = 1;\n    SET @dbr_mode = ISNULL(@dbr_mode, 'FULL');\n    INSERT INTO audit.AuditHeader (captureSeq, tableObjectId, tableName, operation, insertedCount, deletedCount, nestLevel, tranCount, imageMode)\n    SELECT @dbr_seq, 1221579390, N'[cl08].[Acct]', 'U', (SELECT COUNT_BIG(*) FROM inserted), (SELECT COUNT_BIG(*) FROM deleted), TRIGGER_NESTLEVEL(), @@TRANCOUNT, @dbr_mode;\n    INSERT INTO audit.AuditRowImage (captureSeq, imageKind, ordinal, keyJson, rowJson)\n    SELECT @dbr_seq, 'DELETED', ROW_NUMBER() OVER (ORDER BY (SELECT NULL)),\n        (SELECT d.[id] AS [id] FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES),\n        CASE WHEN @dbr_mode = 'KEYS' THEN NULL ELSE (SELECT d.[id] AS [id], d.[bal] AS [bal], d.[touched] AS [touched] FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES) END\n    FROM deleted AS d;\n    INSERT INTO audit.AuditRowImage (captureSeq, imageKind, ordinal, keyJson, rowJson)\n    SELECT @dbr_seq, 'INSERTED', ROW_NUMBER() OVER (ORDER BY (SELECT NULL)),\n        (SELECT i.[id] AS [id] FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES),\n        CASE WHEN @dbr_mode = 'KEYS' THEN NULL ELSE (SELECT i.[id] AS [id], i.[bal] AS [bal], i.[touched] AS [touched] FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES) END\n    FROM inserted AS i;\nEND;\n",
+        "isEncrypted": false
+      },
+      {
+        "objectId": 1269579561,
+        "name": "trg_Acct_upd",
+        "parentId": 1221579390,
+        "parentClass": "OBJECT_OR_COLUMN",
+        "isInsteadOf": false,
+        "isDisabled": false,
+        "event": "UPDATE",
+        "isFirst": false,
+        "isLast": false,
+        "definition": "\nCREATE TRIGGER cl08.trg_Acct_upd ON cl08.Acct AFTER UPDATE AS\nBEGIN\n    SET NOCOUNT ON;\n    IF NOT EXISTS (SELECT 1 FROM inserted WHERE touched < 3) RETURN;\n    UPDATE a\n    SET touched = a.touched + 1\n    FROM cl08.Acct AS a\n    INNER JOIN inserted AS i ON a.id = i.id\n    WHERE i.touched < 3;\nEND;\n",
+        "isEncrypted": false
+      }
+    ],
+    "files": [
+      {
+        "fileId": 1,
+        "logicalName": "dbrt_exe_clrt_79addb9b",
+        "typeDesc": "ROWS",
+        "physicalName": "/var/opt/mssql/data/dbrt_exe_clrt_79addb9b_sbx_dbrt_exe_clrt_79addb9b.mdf"
+      },
+      {
+        "fileId": 2,
+        "logicalName": "dbrt_exe_clrt_79addb9b_log",
+        "typeDesc": "LOG",
+        "physicalName": "/var/opt/mssql/data/dbrt_exe_clrt_79addb9b_sbx_dbrt_exe_clrt_79addb9b_log.ldf"
+      }
+    ]
+  },
+  "triggers": [],
+  "manifest": {
+    "version": "m-20261110-1149",
+    "tables": [
+      {
+        "table": "cl08.Acct",
+        "covered": true,
+        "auditOrder": {
+          "insert": "LAST",
+          "update": "LAST",
+          "delete": "LAST"
+        },
+        "unobservableColumns": [],
+        "volatileColumns": []
+      }
+    ],
+    "excludedTables": [],
+    "notes": []
+  }
+}

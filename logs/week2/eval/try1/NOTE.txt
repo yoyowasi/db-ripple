@@ -1,0 +1,2 @@
+Reconstruction UNPAIRED 수정 전 실행, CL04 cap fn 6의 증거.
+최종 결과가 아니다. 고친 뒤 실행은 logs/week2/eval/eval-* 폴더를 본다.

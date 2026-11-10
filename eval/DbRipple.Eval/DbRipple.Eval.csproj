@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- C16 평가 하네스 핵심: 독립 해시 비교기와 자체 검증, 오라클, 평가 훅, M1·M2, CSV. 소유: 구현자 F. 설계 §10.3 독립성: 제품 컴포넌트(Diff 등)를 참조하지 않고 Contracts만 참조한다(Eval.Tests가 검사). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DbRipple.Contracts\DbRipple.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

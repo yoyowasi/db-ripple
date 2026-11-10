@@ -1,0 +1,338 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "DELETE",
+        "target": "cl05.P",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 33
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          35,
+          39
+        ],
+        "error": null
+      },
+      "boundary": 39,
+      "imageCountAfter": 7,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 34,
+  "headers": [
+    {
+      "captureSeq": 35,
+      "tableObjectId": 1925581898,
+      "tableName": "[cl05].[Y2]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 36,
+      "tableObjectId": 1877581727,
+      "tableName": "[cl05].[Y]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 37,
+      "tableObjectId": 1829581556,
+      "tableName": "[cl05].[X2]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 2,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 38,
+      "tableObjectId": 1781581385,
+      "tableName": "[cl05].[X]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 2,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 39,
+      "tableObjectId": 1749581271,
+      "tableName": "[cl05].[P]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 35,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":300}",
+      "rowJson": "{\"id\":300,\"y_id\":30}"
+    },
+    {
+      "captureSeq": 36,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":30}",
+      "rowJson": "{\"id\":30,\"p_id\":1}"
+    },
+    {
+      "captureSeq": 37,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":110}",
+      "rowJson": "{\"id\":110,\"x_id\":11}"
+    },
+    {
+      "captureSeq": 37,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":100}",
+      "rowJson": "{\"id\":100,\"x_id\":10}"
+    },
+    {
+      "captureSeq": 38,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":11}",
+      "rowJson": "{\"id\":11,\"p_id\":1}"
+    },
+    {
+      "captureSeq": 38,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":10}",
+      "rowJson": "{\"id\":10,\"p_id\":1}"
+    },
+    {
+      "captureSeq": 39,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl05.P",
+      "keyJson": "{\"id\":1}",
+      "rowJson": null
+    },
+    {
+      "table": "cl05.X",
+      "keyJson": "{\"id\":11}",
+      "rowJson": null
+    },
+    {
+      "table": "cl05.X",
+      "keyJson": "{\"id\":10}",
+      "rowJson": null
+    },
+    {
+      "table": "cl05.X2",
+      "keyJson": "{\"id\":110}",
+      "rowJson": null
+    },
+    {
+      "table": "cl05.X2",
+      "keyJson": "{\"id\":100}",
+      "rowJson": null
+    },
+    {
+      "table": "cl05.Y",
+      "keyJson": "{\"id\":30}",
+      "rowJson": null
+    },
+    {
+      "table": "cl05.Y2",
+      "keyJson": "{\"id\":300}",
+      "rowJson": null
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl05.P",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl05.X",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "10"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "10",
+        "p_id": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl05.X",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "11"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "11",
+        "p_id": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl05.X2",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "100"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "100",
+        "x_id": "10"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl05.X2",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "110"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "110",
+        "x_id": "11"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl05.Y",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "30"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "30",
+        "p_id": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl05.Y2",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "300"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "300",
+        "y_id": "30"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "capture": {
+    "imageCount": 7,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261110-1149"
+  },
+  "timings": {
+    "execute": 102,
+    "readLog": 2,
+    "reread": 26,
+    "netDiff": 20
+  }
+}

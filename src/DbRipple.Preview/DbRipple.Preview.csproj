@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 미리보기 파이프라인(§5.2 조립) + 샌드박스 관리자 실행 시점 측면(C8). 소유: 구현자 E. 참조는 Contracts만(구현체는 Host·Eval.Cli가 조립). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DbRipple.Contracts\DbRipple.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

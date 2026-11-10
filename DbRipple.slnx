@@ -1,13 +1,34 @@
 <Solution>
+  <Folder Name="/eval/">
+    <Project Path="eval/DbRipple.Eval/DbRipple.Eval.csproj" />
+    <Project Path="eval/DbRipple.Eval.Cli/DbRipple.Eval.Cli.csproj" />
+    <Project Path="eval/DbRipple.Eval.Tests/DbRipple.Eval.Tests.csproj" />
+  </Folder>
   <Folder Name="/spikes/" />
   <Folder Name="/spikes/dotnet/">
     <Project Path="spikes/dotnet/Sp4.ScriptDom.Tests/Sp4.ScriptDom.Tests.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/DbRipple.Analysis/DbRipple.Analysis.csproj" />
+    <Project Path="src/DbRipple.Api/DbRipple.Api.csproj" />
+    <Project Path="src/DbRipple.Attribution/DbRipple.Attribution.csproj" />
     <Project Path="src/DbRipple.Cli/DbRipple.Cli.csproj" />
+    <Project Path="src/DbRipple.Contracts/DbRipple.Contracts.csproj" />
     <Project Path="src/DbRipple.Core/DbRipple.Core.csproj" />
+    <Project Path="src/DbRipple.Diff/DbRipple.Diff.csproj" />
+    <Project Path="src/DbRipple.Execution/DbRipple.Execution.csproj" />
+    <Project Path="src/DbRipple.Host/DbRipple.Host.csproj" />
+    <Project Path="src/DbRipple.Preview/DbRipple.Preview.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/DbRipple.Analysis.Tests/DbRipple.Analysis.Tests.csproj" />
+    <Project Path="tests/DbRipple.Api.Tests/DbRipple.Api.Tests.csproj" />
+    <Project Path="tests/DbRipple.Attribution.Tests/DbRipple.Attribution.Tests.csproj" />
     <Project Path="tests/DbRipple.Core.Tests/DbRipple.Core.Tests.csproj" />
+    <Project Path="tests/DbRipple.Diff.Tests/DbRipple.Diff.Tests.csproj" />
+    <Project Path="tests/DbRipple.Execution.Tests/DbRipple.Execution.Tests.csproj" />
+    <Project Path="tests/DbRipple.Integration.Tests/DbRipple.Integration.Tests.csproj" />
+    <Project Path="tests/DbRipple.TestSupport/DbRipple.TestSupport.csproj" />
+    <Project Path="tests/DbRipple.TestSupport.Tests/DbRipple.TestSupport.Tests.csproj" />
   </Folder>
 </Solution>

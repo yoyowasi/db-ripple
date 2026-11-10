@@ -103,6 +103,9 @@ public class BaselineIntegrationTests
             Assert.Contains("DDL 트리거 ddlLog가 설치 DDL(CREATE_SCHEMA·CREATE_SEQUENCE·CREATE_TABLE·CREATE_TRIGGER·ALTER_TRIGGER)에 발동함(ALTER_TRIGGER는 sp_settriggerorder)", notes);
             // 스키마 1 + SEQUENCE 1 + 감사 테이블 3 + 트리거 2×3 + sp_settriggerorder 2×3 = 17
             Assert.Contains("설치 전후 행 수가 바뀐 테이블(기준선에 포함, 원본과 다름): dbo.DdlLog +17행", notes);
+            // 실행 사용자 준비(Q12 수정, C9 설치 전): CREATE_USER 1 + GRANT(dbo 스키마) 1 = 2
+            Assert.Contains("DDL 트리거 ddlLog가 실행 사용자 dbr_preview_user 준비 DDL(CREATE_USER·GRANT_DATABASE)에 발동함(C9 설치 전, Q12)", notes);
+            Assert.Contains("실행 사용자 dbr_preview_user 준비 전후 행 수가 바뀐 테이블(기준선에 포함, 원본과 다름): dbo.DdlLog +2행", notes);
             Assert.Equal(2, r.Install.Manifest.Tables.Count);
 
             await using var c = await TestSql.OpenAsync(sb);
@@ -113,14 +116,19 @@ public class BaselineIntegrationTests
                 SELECT COUNT(*) FROM sys.triggers AS tr JOIN sys.trigger_events AS te ON te.object_id = tr.object_id
                 WHERE tr.name LIKE N'dbr[_]audit[_]%' AND te.is_last = 1 AND te.is_first = 0;
                 """));
-            Assert.Equal(17, await TestSql.ScalarAsync<int>(c, "SELECT COUNT(*) FROM dbo.DdlLog;"));
+            Assert.Equal(19, await TestSql.ScalarAsync<int>(c, "SELECT COUNT(*) FROM dbo.DdlLog;"));
+            Assert.Equal(1, await TestSql.ScalarAsync<int>(c, "SELECT COUNT(*) FROM dbo.DdlLog WHERE EventType = N'CREATE_USER';"));
+            // 이미 있으면 DDL 없음(실행기의 멱등 확인이 DDL 트리거를 다시 발동하지 않는다)
+            Assert.False(await TestSql.ScalarAsync<bool>(c, PreviewUserSql.EnsureBatch(["dbo"])));
+            Assert.Equal(19, await TestSql.ScalarAsync<int>(c, "SELECT COUNT(*) FROM dbo.DdlLog;"));
 
             await using var m = await TestSql.OpenAsync("master");
             Assert.Equal(sb, await TestSql.ScalarAsync<string>(m, $"SELECT DB_NAME(source_database_id) FROM sys.databases WHERE name = N'{ss}';"));
             Assert.Equal("ONLINE/MULTI_USER", await TestSql.ScalarAsync<string>(m, $"SELECT state_desc + N'/' + user_access_desc FROM sys.databases WHERE name = N'{sb}';"));
             await using var s = await TestSql.OpenAsync(ss);
             Assert.Equal(2, await TestSql.ScalarAsync<int>(s, "SELECT COUNT(*) FROM dbo.T;"));
-            Assert.Equal(17, await TestSql.ScalarAsync<int>(s, "SELECT COUNT(*) FROM dbo.DdlLog;"));
+            Assert.Equal(19, await TestSql.ScalarAsync<int>(s, "SELECT COUNT(*) FROM dbo.DdlLog;"));
+            Assert.Equal(1, await TestSql.ScalarAsync<int>(s, "SELECT COUNT(*) FROM sys.database_principals WHERE name = N'dbr_preview_user';")); // 스냅샷에 사용자 포함
             Assert.Equal(0L, await TestSql.ScalarAsync<long>(s, "SELECT COUNT_BIG(*) FROM audit.AuditHeader;"));
         }
     }

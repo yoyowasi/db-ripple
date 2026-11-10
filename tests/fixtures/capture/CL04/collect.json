@@ -1,0 +1,224 @@
+{
+  "firings": [
+    {
+      "id": "f-31",
+      "captureSeq": 31,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl04.Ch",
+      "operation": "UPDATE",
+      "rowCount": 3,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-32",
+      "captureSeq": 32,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl04.P",
+      "operation": "UPDATE",
+      "rowCount": 2,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-31-1",
+      "firingId": "f-31",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "10"
+        ]
+      },
+      "before": {
+        "id": "10",
+        "p_id": "1"
+      },
+      "after": {
+        "id": "10",
+        "p_id": "101"
+      },
+      "changedColumns": [
+        "p_id"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-31-2",
+      "firingId": "f-31",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "11"
+        ]
+      },
+      "before": {
+        "id": "11",
+        "p_id": "1"
+      },
+      "after": {
+        "id": "11",
+        "p_id": "101"
+      },
+      "changedColumns": [
+        "p_id"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-31-3",
+      "firingId": "f-31",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "20"
+        ]
+      },
+      "before": {
+        "id": "20",
+        "p_id": "2"
+      },
+      "after": {
+        "id": "20",
+        "p_id": "102"
+      },
+      "changedColumns": [
+        "p_id"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-32-1",
+      "firingId": "f-32",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "name": "p1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "UNPAIRED",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-32-2",
+      "firingId": "f-32",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "before": {
+        "id": "2",
+        "name": "p2"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "UNPAIRED",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-32-3",
+      "firingId": "f-32",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "101"
+        ]
+      },
+      "before": null,
+      "after": {
+        "id": "101",
+        "name": "p1"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "UNPAIRED",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-32-4",
+      "firingId": "f-32",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "102"
+        ]
+      },
+      "before": null,
+      "after": {
+        "id": "102",
+        "name": "p2"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "UNPAIRED",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [],
+  "rereadDifferences": []
+}

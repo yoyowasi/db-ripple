@@ -1,0 +1,198 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "DELETE",
+        "target": "cl03.Category",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 40
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          29,
+          30
+        ],
+        "error": null
+      },
+      "boundary": 30,
+      "imageCountAfter": 5,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 28,
+  "headers": [
+    {
+      "captureSeq": 29,
+      "tableObjectId": 1509580416,
+      "tableName": "[cl03].[Product]",
+      "operation": "UPDATE",
+      "insertedCount": 2,
+      "deletedCount": 2,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 30,
+      "tableObjectId": 1477580302,
+      "tableName": "[cl03].[Category]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 29,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":11}",
+      "rowJson": "{\"id\":11,\"category_id\":1}"
+    },
+    {
+      "captureSeq": 29,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":10}",
+      "rowJson": "{\"id\":10,\"category_id\":1}"
+    },
+    {
+      "captureSeq": 29,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":11}",
+      "rowJson": "{\"id\":11,\"category_id\":0}"
+    },
+    {
+      "captureSeq": 29,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":10}",
+      "rowJson": "{\"id\":10,\"category_id\":0}"
+    },
+    {
+      "captureSeq": 30,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"name\":\"c1\"}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl03.Category",
+      "keyJson": "{\"id\":1}",
+      "rowJson": null
+    },
+    {
+      "table": "cl03.Product",
+      "keyJson": "{\"id\":11}",
+      "rowJson": "{\"id\":11,\"category_id\":0}"
+    },
+    {
+      "table": "cl03.Product",
+      "keyJson": "{\"id\":10}",
+      "rowJson": "{\"id\":10,\"category_id\":0}"
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl03.Category",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "name": "c1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl03.Product",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "10"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "10",
+        "category_id": "1"
+      },
+      "after": {
+        "id": "10",
+        "category_id": "0"
+      },
+      "changedColumns": [
+        "category_id"
+      ],
+      "explainedBy": null
+    },
+    {
+      "table": "cl03.Product",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "11"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "11",
+        "category_id": "1"
+      },
+      "after": {
+        "id": "11",
+        "category_id": "0"
+      },
+      "changedColumns": [
+        "category_id"
+      ],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "capture": {
+    "imageCount": 5,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261110-1149"
+  },
+  "timings": {
+    "execute": 42,
+    "readLog": 3,
+    "reread": 10,
+    "netDiff": 26
+  }
+}

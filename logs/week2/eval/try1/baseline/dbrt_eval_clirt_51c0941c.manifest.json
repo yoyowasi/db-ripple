@@ -1,0 +1,18 @@
+{
+  "version": "m-20261110-1316",
+  "tables": [
+    {
+      "table": "cl08.Acct",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    }
+  ],
+  "excludedTables": [],
+  "notes": []
+}

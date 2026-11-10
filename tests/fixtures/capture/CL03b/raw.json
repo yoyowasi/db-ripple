@@ -1,0 +1,51 @@
+{
+  "status": "failed",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "DELETE",
+        "target": "cl03.Grp",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 35
+        },
+        "status": "failed",
+        "rowsAffected": null,
+        "captureSeqRange": null,
+        "error": {
+          "errorNumber": 547,
+          "message": "The DELETE statement conflicted with the FOREIGN KEY constraint \"FK_cl03_Item_Grp\". The conflict occurred in database \"dbrt_exe_cl_68d49226_sbx\", table \"cl03.Grp\", column 'id'.",
+          "procedure": null,
+          "isToolFault": false
+        }
+      },
+      "boundary": null,
+      "imageCountAfter": 0,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 30,
+  "headers": [],
+  "images": [],
+  "rereads": [],
+  "netChanges": [],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "capture": {
+    "imageCount": 0,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261110-1149"
+  },
+  "timings": {
+    "execute": 23,
+    "readLog": 0,
+    "reread": 0,
+    "netDiff": 139
+  }
+}

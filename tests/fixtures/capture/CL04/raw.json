@@ -1,0 +1,342 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "UPDATE",
+        "target": "cl04.P",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 52
+        },
+        "status": "ok",
+        "rowsAffected": 2,
+        "captureSeqRange": [
+          31,
+          32
+        ],
+        "error": null
+      },
+      "boundary": 32,
+      "imageCountAfter": 10,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 30,
+  "headers": [
+    {
+      "captureSeq": 31,
+      "tableObjectId": 1701581100,
+      "tableName": "[cl04].[Ch]",
+      "operation": "UPDATE",
+      "insertedCount": 3,
+      "deletedCount": 3,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 32,
+      "tableObjectId": 1669580986,
+      "tableName": "[cl04].[P]",
+      "operation": "UPDATE",
+      "insertedCount": 2,
+      "deletedCount": 2,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 31,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":20}",
+      "rowJson": "{\"id\":20,\"p_id\":2}"
+    },
+    {
+      "captureSeq": 31,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":11}",
+      "rowJson": "{\"id\":11,\"p_id\":1}"
+    },
+    {
+      "captureSeq": 31,
+      "imageKind": "DELETED",
+      "ordinal": 3,
+      "keyJson": "{\"id\":10}",
+      "rowJson": "{\"id\":10,\"p_id\":1}"
+    },
+    {
+      "captureSeq": 31,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":20}",
+      "rowJson": "{\"id\":20,\"p_id\":102}"
+    },
+    {
+      "captureSeq": 31,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":11}",
+      "rowJson": "{\"id\":11,\"p_id\":101}"
+    },
+    {
+      "captureSeq": 31,
+      "imageKind": "INSERTED",
+      "ordinal": 3,
+      "keyJson": "{\"id\":10}",
+      "rowJson": "{\"id\":10,\"p_id\":101}"
+    },
+    {
+      "captureSeq": 32,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":2}",
+      "rowJson": "{\"id\":2,\"name\":\"p2\"}"
+    },
+    {
+      "captureSeq": 32,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"name\":\"p1\"}"
+    },
+    {
+      "captureSeq": 32,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":102}",
+      "rowJson": "{\"id\":102,\"name\":\"p2\"}"
+    },
+    {
+      "captureSeq": 32,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":101}",
+      "rowJson": "{\"id\":101,\"name\":\"p1\"}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl04.Ch",
+      "keyJson": "{\"id\":20}",
+      "rowJson": "{\"id\":20,\"p_id\":102}"
+    },
+    {
+      "table": "cl04.Ch",
+      "keyJson": "{\"id\":11}",
+      "rowJson": "{\"id\":11,\"p_id\":101}"
+    },
+    {
+      "table": "cl04.Ch",
+      "keyJson": "{\"id\":10}",
+      "rowJson": "{\"id\":10,\"p_id\":101}"
+    },
+    {
+      "table": "cl04.P",
+      "keyJson": "{\"id\":2}",
+      "rowJson": null
+    },
+    {
+      "table": "cl04.P",
+      "keyJson": "{\"id\":1}",
+      "rowJson": null
+    },
+    {
+      "table": "cl04.P",
+      "keyJson": "{\"id\":102}",
+      "rowJson": "{\"id\":102,\"name\":\"p2\"}"
+    },
+    {
+      "table": "cl04.P",
+      "keyJson": "{\"id\":101}",
+      "rowJson": "{\"id\":101,\"name\":\"p1\"}"
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl04.Ch",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "10"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "10",
+        "p_id": "1"
+      },
+      "after": {
+        "id": "10",
+        "p_id": "101"
+      },
+      "changedColumns": [
+        "p_id"
+      ],
+      "explainedBy": null
+    },
+    {
+      "table": "cl04.Ch",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "11"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "11",
+        "p_id": "1"
+      },
+      "after": {
+        "id": "11",
+        "p_id": "101"
+      },
+      "changedColumns": [
+        "p_id"
+      ],
+      "explainedBy": null
+    },
+    {
+      "table": "cl04.Ch",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "20"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "20",
+        "p_id": "2"
+      },
+      "after": {
+        "id": "20",
+        "p_id": "102"
+      },
+      "changedColumns": [
+        "p_id"
+      ],
+      "explainedBy": null
+    },
+    {
+      "table": "cl04.P",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "name": "p1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl04.P",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "2",
+        "name": "p2"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl04.P",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "101"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "101",
+        "name": "p1"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl04.P",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "102"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "102",
+        "name": "p2"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "capture": {
+    "imageCount": 10,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261110-1149"
+  },
+  "timings": {
+    "execute": 43,
+    "readLog": 2,
+    "reread": 9,
+    "netDiff": 15
+  }
+}

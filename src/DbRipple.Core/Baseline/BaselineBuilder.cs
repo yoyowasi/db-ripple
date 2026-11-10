@@ -44,10 +44,14 @@ public static class BaselineBuilder
         if (catalog.Tables.FirstOrDefault(t => string.Equals(t.Schema, AuditTriggerGenerator.StoreSchema, StringComparison.OrdinalIgnoreCase)) is { } clash)
             throw new InvalidOperationException($"샌드박스에 이미 {clash.Schema} 스키마 테이블({clash.Schema}.{clash.Name})이 있음: 감사 저장소 스키마(§6.2)와 겹쳐 설치하지 않음");
         var before = await s.ReadRowCountsAsync(o.Sandbox, ct);
-        var plan = AuditTriggerGenerator.Generate(catalog.ToCaptureInput(), clock());     // 5
+        // 4b. 실행 사용자(Q12 수정): DDL 트리거가 CREATE USER·GRANT에 남기는 자동 커밋 행이 기준 스냅샷에 들어가도록 C9 설치 전에 만든다.
+        var input = catalog.ToCaptureInput();
+        await s.ExecuteAsync(o.Sandbox, PreviewUserSql.EnsureBatch(input.Select(t => t.Schema)), ct);
+        var afterUser = await s.ReadRowCountsAsync(o.Sandbox, ct);
+        var plan = AuditTriggerGenerator.Generate(input, clock());                           // 5
         foreach (var b in plan.Batches) await s.ExecuteAsync(o.Sandbox, b.Sql, ct);
         var after = await s.ReadRowCountsAsync(o.Sandbox, ct);
-        plan = plan with { Manifest = plan.Manifest with { Notes = [.. plan.Manifest.Notes, .. InstallNotes(catalog, before, after)] } };
+        plan = plan with { Manifest = plan.Manifest with { Notes = [.. plan.Manifest.Notes, .. PreviewUserNotes(catalog, before, afterUser), .. InstallNotes(catalog, afterUser, after)] } };
         var match = await s.FingerprintMatchesAsync(o.Source, o.Sandbox, ct);             // 6
         var dataFiles = catalog.Files.Where(f => f.TypeDesc == "ROWS").Select(f => f.LogicalName);
         await s.ExecuteAsync(Master, BaselineSql.CreateSnapshot(o.Snapshot, o.Sandbox, dataFiles), ct); // 7
@@ -98,16 +102,35 @@ public static class BaselineBuilder
     /// <summary>설치 DDL의 부작용 기록: 그 DDL에 발동하는 DDL 트리거와, 설치 전후 행 수가 바뀐 기존 테이블.</summary>
     public static IEnumerable<string> InstallNotes(DbCatalog c, IReadOnlyDictionary<string, long> before, IReadOnlyDictionary<string, long> after)
     {
+        foreach (var (name, events) in FiringDdlTriggers(c, InstallDdlEvents))
+            yield return $"DDL 트리거 {name}가 설치 DDL({string.Join("·", events)})에 발동함(ALTER_TRIGGER는 sp_settriggerorder)";
+        if (ChangedTables(before, after) is { } changed)
+            yield return $"설치 전후 행 수가 바뀐 테이블(기준선에 포함, 원본과 다름): {changed}";
+    }
+
+    /// <summary>실행 사용자 준비(4b, Q12)의 부작용 기록: CREATE USER·GRANT에 발동하는 DDL 트리거와, 준비 전후 행 수가 바뀐 기존 테이블(AW: dbo.DatabaseLog).</summary>
+    public static IEnumerable<string> PreviewUserNotes(DbCatalog c, IReadOnlyDictionary<string, long> before, IReadOnlyDictionary<string, long> after)
+    {
+        foreach (var (name, events) in FiringDdlTriggers(c, PreviewUserSql.DdlEvents))
+            yield return $"DDL 트리거 {name}가 실행 사용자 {PreviewUserSql.UserName} 준비 DDL({string.Join("·", events)})에 발동함(C9 설치 전, Q12)";
+        if (ChangedTables(before, after) is { } changed)
+            yield return $"실행 사용자 {PreviewUserSql.UserName} 준비 전후 행 수가 바뀐 테이블(기준선에 포함, 원본과 다름): {changed}";
+    }
+
+    static IEnumerable<(string Name, List<string> Events)> FiringDdlTriggers(DbCatalog c, IReadOnlyList<string> ddlEvents)
+    {
         foreach (var g in c.Triggers.Where(t => t.ParentClass == "DATABASE" && !t.IsDisabled).GroupBy(t => t.Name, StringComparer.Ordinal))
         {
-            var events = InstallDdlEvents.Where(e => g.Any(t => string.Equals(t.Event, e, StringComparison.OrdinalIgnoreCase))).ToList();
-            if (events.Count > 0)
-                yield return $"DDL 트리거 {g.Key}가 설치 DDL({string.Join("·", events)})에 발동함(ALTER_TRIGGER는 sp_settriggerorder)";
+            var events = ddlEvents.Where(e => g.Any(t => string.Equals(t.Event, e, StringComparison.OrdinalIgnoreCase))).ToList();
+            if (events.Count > 0) yield return (g.Key, events);
         }
+    }
+
+    static string? ChangedTables(IReadOnlyDictionary<string, long> before, IReadOnlyDictionary<string, long> after)
+    {
         var changed = before.Where(kv => after.TryGetValue(kv.Key, out var n) && n != kv.Value)
             .OrderBy(kv => kv.Key, StringComparer.Ordinal)
             .Select(kv => $"{kv.Key} {after[kv.Key] - kv.Value:+#;-#}행").ToList();
-        if (changed.Count > 0)
-            yield return $"설치 전후 행 수가 바뀐 테이블(기준선에 포함, 원본과 다름): {string.Join(", ", changed)}";
+        return changed.Count > 0 ? string.Join(", ", changed) : null;
     }
 }

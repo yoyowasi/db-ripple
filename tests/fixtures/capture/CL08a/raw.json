@@ -1,0 +1,137 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "UPDATE",
+        "target": "cl08.Acct",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 50
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          47,
+          48
+        ],
+        "error": null
+      },
+      "boundary": 48,
+      "imageCountAfter": 4,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 46,
+  "headers": [
+    {
+      "captureSeq": 47,
+      "tableObjectId": 130099504,
+      "tableName": "[cl08].[Acct]",
+      "operation": "UPDATE",
+      "insertedCount": 1,
+      "deletedCount": 1,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 48,
+      "tableObjectId": 130099504,
+      "tableName": "[cl08].[Acct]",
+      "operation": "UPDATE",
+      "insertedCount": 1,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 47,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"bal\":110,\"touched\":0}"
+    },
+    {
+      "captureSeq": 47,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"bal\":110,\"touched\":1}"
+    },
+    {
+      "captureSeq": 48,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"bal\":100,\"touched\":0}"
+    },
+    {
+      "captureSeq": 48,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"bal\":110,\"touched\":0}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl08.Acct",
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"bal\":110,\"touched\":1}"
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl08.Acct",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "bal": "100",
+        "touched": "0"
+      },
+      "after": {
+        "id": "1",
+        "bal": "110",
+        "touched": "1"
+      },
+      "changedColumns": [
+        "bal",
+        "touched"
+      ],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "capture": {
+    "imageCount": 4,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261110-1149"
+  },
+  "timings": {
+    "execute": 9,
+    "readLog": 2,
+    "reread": 1,
+    "netDiff": 10
+  }
+}

@@ -1,0 +1,433 @@
+using System.Text.RegularExpressions;
+using DbRipple.Contracts;
+using DbRipple.Core.Catalog;
+using Microsoft.SqlServer.TransactSql.ScriptDom;
+
+namespace DbRipple.Analysis;
+
+/// <summary>
+/// C6 배치 분석기(§4 C6, D5). ScriptDom(TSql170Parser, SP4)으로 파싱·배치 분리·허용 목록 판정·위치 계산을 한다.
+/// <list type="bullet">
+/// <item>GO 분리는 ScriptDom 배치 구분(주석·문자열 안 GO 무시, 소문자·뒤 주석 GO 인식). `GO 2`는 REJECT_GO_COUNT. 줄 중간의 GO는 별칭으로 파싱된다(SP4).</item>
+/// <item>배치 번호는 문장이 있는 배치만 1부터 센다(빈 배치는 건너뜀). 문장 번호는 스크립트 전체 기준 1부터, 위치(position)는 배치 안 1부터.</item>
+/// <item>문장 원문(Sql)은 스크립트에서 StartOffset·FragmentLength로 잘라낸다(끝 세미콜론은 사용자가 쓴 경우만 포함, 앞 주석·공백은 제외, WITH 절 포함).</item>
+/// <item>위치는 스크립트 전체 기준 1부터의 줄·열이고 끝 열은 마지막 문자를 포함한다.</item>
+/// <item>스키마를 생략한 이름은 실행 사용자의 기본 스키마 dbo로 해석한다(Q4).</item>
+/// <item>빈 스크립트·주석뿐인 스크립트는 거부 + REJECT_EMPTY_SCRIPT 진단 1개(Q5).</item>
+/// <item>파싱 오류가 있으면 오류마다 진단을 내고, 오류 구간과 겹치지 않는 문장만 나머지 규칙으로 분석한다.</item>
+/// <item>DML 문장은 다른 이유로 거부되더라도 대상 이름이 정해지면 Statements에 담는다(편집기 표시용). 실행은 IsAccepted가 한다.</item>
+/// <item>거부 진단은 (문장, 규칙)당 1개이고 첫 발생 위치를 쓴다. 예외는 던지지 않고 REJECT_ANALYSIS_ERROR로 돌려준다.</item>
+/// </list>
+/// </summary>
+public sealed class BatchAnalyzer : IBatchAnalyzer
+{
+    /// <summary>스키마 생략 이름의 기본 스키마(Q4, Q12).</summary>
+    public const string DefaultSchema = "dbo";
+
+    static readonly Regex GoWithCount = new(@"^\s*GO\s+\S", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    /// <inheritdoc />
+    public AnalysisResult Analyze(string sql, BaselineContext baseline)
+    {
+        sql ??= "";
+        try
+        {
+            return new Run(sql, baseline).Execute();
+        }
+        catch (Exception ex)
+        {
+            var lines = new LineIndex(sql);
+            return new AnalysisResult
+            {
+                Rejects =
+                [
+                    new Diagnostic
+                    {
+                        StatementIndex = null,
+                        Span = lines.Span(0, Math.Max(1, sql.Length)),
+                        Severity = Severity.Error,
+                        RuleId = AnalysisRules.RejectAnalysisError,
+                        Message = $"분석 중 내부 오류가 나서 닫힌 쪽으로 거부합니다: {ex.GetType().Name}",
+                        DocRef = "D5",
+                    },
+                ],
+            };
+        }
+    }
+
+    sealed class Run(string sql, BaselineContext baseline)
+    {
+        readonly LineIndex lines = new(sql);
+        readonly TableResolver resolver = new(baseline.Catalog);
+        readonly List<Diagnostic> rejects = [];
+        readonly List<Diagnostic> warnings = [];
+        readonly List<AnalyzedStatement> statements = [];
+
+        public AnalysisResult Execute()
+        {
+            var fragment = SqlSyntax.Parse(sql, out var errors);
+            foreach (var e in errors) rejects.Add(ParseErrorDiagnostic(e));
+
+            var script = fragment as TSqlScript;
+            var index = 0;
+            var batchNo = 0;
+            if (script != null)
+            {
+                foreach (var batch in script.Batches)
+                {
+                    var stmts = batch.Statements.Where(s => !OverlapsError(s, errors)).ToList();
+                    if (stmts.Count == 0) continue;
+                    batchNo++;
+                    var position = 0;
+                    foreach (var s in stmts)
+                    {
+                        index++;
+                        position++;
+                        AnalyzeStatement(s, index, batchNo, position);
+                    }
+                }
+            }
+            if (errors.Count == 0 && index == 0) rejects.Add(EmptyDiagnostic());
+
+            return new AnalysisResult
+            {
+                Statements = statements,
+                Rejects = Order(rejects),
+                Warnings = Order(warnings),
+            };
+        }
+
+        static List<Diagnostic> Order(List<Diagnostic> list) =>
+            list.OrderBy(d => d.Span.StartLine).ThenBy(d => d.Span.StartColumn).ThenBy(d => d.RuleId, StringComparer.Ordinal).ToList();
+
+        // ---- 스크립트 수준 ----
+
+        Diagnostic ParseErrorDiagnostic(ParseError e)
+        {
+            var isGoCount = GoWithCount.IsMatch(lines.LineText(e.Offset));
+            return new Diagnostic
+            {
+                StatementIndex = null,
+                Span = lines.TokenSpanAt(e.Offset),
+                Severity = Severity.Error,
+                RuleId = isGoCount ? AnalysisRules.RejectGoCount : AnalysisRules.RejectParseError,
+                Message = isGoCount
+                    ? "GO에 반복 횟수(GO n)를 붙일 수 없습니다. GO만 한 줄에 쓰세요."
+                    : $"구문 오류({e.Line}줄 {e.Column}열): {e.Message}",
+                DocRef = "D5",
+            };
+        }
+
+        Diagnostic EmptyDiagnostic() => new()
+        {
+            StatementIndex = null,
+            Span = lines.Span(0, Math.Max(1, sql.Length)),
+            Severity = Severity.Error,
+            RuleId = AnalysisRules.RejectEmptyScript,
+            Message = "실행할 문장이 없습니다(빈 스크립트이거나 주석뿐입니다).",
+            DocRef = "D5",
+        };
+
+        static bool OverlapsError(TSqlStatement s, IList<ParseError> errors)
+        {
+            var end = s.StartOffset + s.FragmentLength;
+            return errors.Any(e => e.Offset >= s.StartOffset && e.Offset <= end);
+        }
+
+        // ---- 문장 ----
+
+        void Reject(string rule, string message, string docRef, int index, SourceSpan span) =>
+            rejects.Add(new Diagnostic { StatementIndex = index, Span = span, Severity = Severity.Error, RuleId = rule, Message = message, DocRef = docRef });
+
+        void Warn(string rule, string message, string docRef, int index, SourceSpan span) =>
+            warnings.Add(new Diagnostic { StatementIndex = index, Span = span, Severity = Severity.Warning, RuleId = rule, Message = message, DocRef = docRef });
+
+        void AnalyzeStatement(TSqlStatement s, int index, int batch, int position)
+        {
+            var span = lines.Span(s);
+            if (s is not DataModificationStatement dml || dml is MergeStatement)
+            {
+                var (rule, message, doc) = Classify(s);
+                Reject(rule, message, doc, index, span);
+                return;
+            }
+
+            ChangeOperation kind;
+            TSqlFragment spec;
+            TableReference? targetRef;
+            FromClause? from = null;
+            switch (dml)
+            {
+                case InsertStatement i: kind = ChangeOperation.Insert; spec = i.InsertSpecification; targetRef = i.InsertSpecification.Target; break;
+                case UpdateStatement u: kind = ChangeOperation.Update; spec = u.UpdateSpecification; targetRef = u.UpdateSpecification.Target; from = u.UpdateSpecification.FromClause; break;
+                case DeleteStatement d: kind = ChangeOperation.Delete; spec = d.DeleteSpecification; targetRef = d.DeleteSpecification.Target; from = d.DeleteSpecification.FromClause; break;
+                default:
+                    var (rule, message, doc) = Classify(s);
+                    Reject(rule, message, doc, index, span);
+                    return;
+            }
+
+            // 1) 문장 안 금지 구문
+            var scan = new DmlScan(lines);
+            dml.Accept(scan);
+            foreach (var f in scan.Findings) Reject(f.Rule, f.Message, f.DocRef, index, f.Span);
+
+            // 2) 대상 테이블
+            string? target = null;
+            CatalogTable? table = null;
+            NamedTableReference? targetNode = null;
+            if (targetRef is NamedTableReference nt)
+            {
+                targetNode = SqlSyntax.ResolveAlias(nt, from);
+                var so = targetNode.SchemaObject;
+                var isExternalName = so.ServerIdentifier != null || so.DatabaseIdentifier != null;
+                var isTemp = so.BaseIdentifier.Value.StartsWith('#');
+                if (!isExternalName && !isTemp) // 이 둘은 DmlScan이 이미 거부했다
+                {
+                    var isCte = so.SchemaIdentifier == null && dml.WithCtesAndXmlNamespaces?.CommonTableExpressions
+                        .Any(c => c.ExpressionName.Value.Equals(so.BaseIdentifier.Value, StringComparison.OrdinalIgnoreCase)) == true;
+                    (target, table) = resolver.Resolve(so, DefaultSchema);
+                    var targetSpan = lines.Span(targetNode);
+                    if (isCte)
+                        Reject(AnalysisRules.RejectTargetNotUserTable, $"CTE '{so.BaseIdentifier.Value}'를 대상으로 하는 {Verb(kind)}는 지원하지 않습니다. 기반 테이블을 직접 지정하세요.", "D5", index, targetSpan);
+                    else if (table is null)
+                        Reject(AnalysisRules.RejectTargetNotUserTable, $"'{target}'은(는) 기반 사용자 테이블이 아닙니다(뷰·동의어·없는 이름 포함).", "D5", index, targetSpan);
+                    else if (table.Schema.Equals("audit", StringComparison.OrdinalIgnoreCase))
+                        Reject(AnalysisRules.RejectCaptureStore, $"'{target}'은(는) 변경 수집 장치의 저장소입니다. 사용자 문장의 대상이 될 수 없습니다.", "D5", index, targetSpan);
+                    else
+                        CheckTargetTriggers(target, table, kind, index, lines.Span(targetNode));
+                    if (isCte) target = null; // CTE 이름은 테이블 이름이 아니다
+                }
+            }
+
+            // 3) 경고: TOP, 비결정 함수
+            CheckTop(dml, spec, kind, index, span);
+            var nondeterminism = SqlSyntax.FindNondeterminism(dml);
+            var nondeterministicColumns = kind == ChangeOperation.Delete
+                ? []
+                : SqlSyntax.NondeterministicColumns(spec, () => SqlSyntax.InsertableColumns(baseline.Catalog, table));
+            if (table is not null)
+            {
+                var canonical = baseline.Catalog.Columns.Where(c => c.ObjectId == table.ObjectId).Select(c => c.Name).ToList();
+                nondeterministicColumns = nondeterministicColumns
+                    .Select(c => canonical.FirstOrDefault(k => k.Equals(c, StringComparison.OrdinalIgnoreCase)) ?? c).ToList();
+            }
+            if (nondeterminism.Count > 0)
+            {
+                var names = nondeterminism.Select(n => n.Name).Distinct().ToList();
+                Warn(AnalysisRules.WarnNondeterministicFunction,
+                    $"문장 안 비결정 함수({string.Join(", ", names)})가 있어 실행마다 값이 달라질 수 있습니다." +
+                    (nondeterministicColumns.Count > 0 ? $" 영향 열: {string.Join(", ", nondeterministicColumns)}." : ""),
+                    "E1", index, lines.Span(nondeterminism[0].Node));
+            }
+
+            if (target is null) return; // 이름을 정할 수 없는 대상(임시 테이블, 변수, 다른 DB, CTE): 이미 거부됨
+            statements.Add(new AnalyzedStatement
+            {
+                Index = index,
+                Batch = batch,
+                Position = position,
+                Kind = kind,
+                Target = target,
+                Span = span,
+                Sql = sql.Substring(s.StartOffset, s.FragmentLength),
+                NondeterministicColumns = nondeterministicColumns,
+            });
+        }
+
+        static string Verb(ChangeOperation k) => k switch { ChangeOperation.Insert => "INSERT", ChangeOperation.Update => "UPDATE", _ => "DELETE" };
+
+        void CheckTop(DataModificationStatement dml, TSqlFragment spec, ChangeOperation kind, int index, SourceSpan span)
+        {
+            TSqlFragment? offender = null;
+            // UPDATE·DELETE(·INSERT) 자체의 TOP은 ORDER BY를 붙일 수 없다.
+            switch (spec)
+            {
+                case UpdateSpecification { TopRowFilter: { } t }: offender = t; break;
+                case DeleteSpecification { TopRowFilter: { } t }: offender = t; break;
+                case InsertSpecification { TopRowFilter: { } t }: offender = t; break;
+            }
+            // 그 밖에 하위 쿼리의 TOP(ORDER BY 없음)
+            offender ??= new TopFinder().Find(dml);
+            if (offender is null) return;
+            Warn(AnalysisRules.WarnTopWithoutOrder,
+                $"ORDER BY 없는 TOP이 붙은 {Verb(kind)}는 어느 행이 선택될지 정해져 있지 않아 실행마다 결과가 달라질 수 있습니다.",
+                "D5", index, lines.Span(offender));
+        }
+
+        sealed class TopFinder : TSqlFragmentVisitor
+        {
+            TSqlFragment? found;
+            public TSqlFragment? Find(TSqlFragment f) { f.Accept(this); return found; }
+            public override void Visit(QuerySpecification n)
+            {
+                if (found == null && n.TopRowFilter != null && n.OrderByClause == null) found = n.TopRowFilter;
+            }
+        }
+
+        /// <summary>대상 테이블에 붙은 트리거와 감사 순서로 판정하는 D5 규칙(거부 3종, 경고 2종).</summary>
+        void CheckTargetTriggers(string target, CatalogTable table, ChangeOperation kind, int index, SourceSpan span)
+        {
+            var firing = baseline.Triggers
+                .Where(t => t.Table.Equals(target, StringComparison.OrdinalIgnoreCase) && !t.IsDisabled && !t.IsAuditTrigger && t.Events.Contains(kind))
+                .ToList();
+
+            foreach (var t in firing.Where(t => t.IsEncrypted))
+                Reject(AnalysisRules.RejectTriggerOpaque,
+                    $"{target}에 본문을 읽을 수 없는(암호화·CLR) 트리거 {t.Trigger}가 있어 외부 부작용을 배제할 수 없습니다.", "E18", index, span);
+
+            foreach (var t in firing.Where(t => !t.IsEncrypted && t.ExternalSideEffects.Count > 0))
+            {
+                var unparsed = t.ExternalSideEffects.Contains(TriggerAnalyzer.UnparsedMarker);
+                Reject(AnalysisRules.RejectTriggerExternalEffect,
+                    unparsed
+                        ? $"{target}의 트리거 {t.Trigger}의 본문을 분석하지 못해 외부 부작용을 배제할 수 없습니다."
+                        : $"{target}의 트리거 {t.Trigger}에 외부 부작용({string.Join(", ", t.ExternalSideEffects)})이 있어 샌드박스에서 재현하면 실제 부작용이 생길 수 있습니다.",
+                    "E18", index, span);
+            }
+
+            foreach (var t in firing.Where(t => t.HasTransactionControl))
+                Reject(AnalysisRules.RejectTriggerTransactionControl,
+                    $"{target}의 트리거 {t.Trigger}가 COMMIT·BEGIN TRAN·SAVE TRAN을 해서 미리보기 트랜잭션이 확정될 수 있습니다(롤백으로 되돌릴 수 없음).",
+                    "E13", index, span);
+
+            var dynamic = firing.FirstOrDefault(t => !t.IsEncrypted && t.HasDynamicSql && !t.ExternalSideEffects.Contains(TriggerAnalyzer.UnparsedMarker));
+            if (dynamic is not null)
+                Warn(AnalysisRules.WarnTriggerDynamicSql,
+                    $"{target}의 트리거 {dynamic.Trigger}가 동적 SQL을 써서 모든 테이블에 쓸 수 있는 것으로 봅니다. 원인 귀속 확신도가 낮아지고, 다른 DB에 쓰는 동적 SQL은 감지하지 못합니다.",
+                    "E8", index, span);
+
+            var manifest = baseline.Manifest.Tables.FirstOrDefault(m => m.Table.Equals(target, StringComparison.OrdinalIgnoreCase));
+            if (manifest is not null)
+            {
+                var order = kind switch
+                {
+                    ChangeOperation.Insert => manifest.AuditOrder.Insert,
+                    ChangeOperation.Update => manifest.AuditOrder.Update,
+                    _ => manifest.AuditOrder.Delete,
+                };
+                if (!string.Equals(order, DbRipple.Core.Capture.CaptureManifest.Last, StringComparison.OrdinalIgnoreCase))
+                    Warn(AnalysisRules.WarnAuditNotLast,
+                        $"{target}의 {Verb(kind)}에는 사용자 Last 트리거가 있어 감사 트리거를 Last로 둘 수 없습니다. 이 테이블에서 발동한 트리거의 원인 귀속은 ambiguous 이하가 됩니다.",
+                        "E15", index, span);
+            }
+        }
+
+        // ---- 허용 목록 밖 문장 분류 ----
+
+        static readonly HashSet<string> TransactionTypes = ["BeginTransactionStatement", "CommitTransactionStatement", "RollbackTransactionStatement", "SaveTransactionStatement"];
+        static readonly HashSet<string> SetTypes =
+        [
+            "PredicateSetStatement", "SetIdentityInsertStatement", "SetRowCountStatement", "SetTextSizeStatement", "SetTransactionIsolationLevelStatement",
+            "SetOffsetsStatement", "SetStatisticsStatement", "SetErrorLevelStatement", "SetFipsFlaggerCommand", "SetCommandStatement", "SetUserStatement",
+        ];
+        static readonly HashSet<string> FlowTypes =
+        [
+            "DeclareVariableStatement", "DeclareTableVariableStatement", "SetVariableStatement", "IfStatement", "WhileStatement", "BeginEndBlockStatement",
+            "BeginEndAtomicBlockStatement", "TryCatchStatement", "ReturnStatement", "GoToStatement", "LabelStatement", "BreakStatement", "ContinueStatement",
+            "ThrowStatement", "RaiseErrorStatement", "PrintStatement", "AssignmentSetClause",
+        ];
+        static readonly HashSet<string> AdminTypes =
+        [
+            "WaitForStatement", "DbccStatement", "BackupDatabaseStatement", "BackupTransactionLogStatement", "BackupStatement", "RestoreStatement",
+            "KillStatement", "ShutdownStatement", "CheckpointStatement", "ReconfigureStatement", "BulkInsertBase",
+        ];
+        static readonly HashSet<string> OtherDdlTypes = ["UpdateStatisticsStatement", "EnableDisableTriggerStatement", "RenameEntityStatement", "MoveConversationStatement"];
+
+        static (string Rule, string Message, string DocRef) Classify(TSqlStatement s)
+        {
+            var type = s.GetType().Name;
+            if (s is MergeStatement)
+                return (AnalysisRules.RejectMerge, "MERGE는 액션별 발동과 MERGE 전체 @@ROWCOUNT 처리가 필요해 지원하지 않습니다. INSERT/UPDATE/DELETE로 나눠 쓰세요.", "E12");
+            if (s is TruncateTableStatement)
+                return (AnalysisRules.RejectTruncate, "TRUNCATE는 DELETE 트리거를 발동하지 않아 미리보기할 수 없습니다.", "A21");
+            if (type is "BulkInsertStatement" or "InsertBulkStatement")
+                return (AnalysisRules.RejectBulkInsert, "BULK INSERT는 트리거가 발동하지 않을 수 있어 미리보기할 수 없습니다.", "A21");
+            if (TransactionTypes.Contains(type))
+                return (AnalysisRules.RejectTransactionControl, "트랜잭션 제어문은 쓸 수 없습니다. 도구가 트랜잭션을 소유하고 끝에 롤백합니다.", "D5");
+            if (type == "UseStatement")
+                return (AnalysisRules.RejectUse, "USE는 쓸 수 없습니다. 샌드박스 DB가 고정되어 있습니다.", "D5");
+            if (SetTypes.Contains(type))
+                return (AnalysisRules.RejectSetOption, "SET 옵션은 쓸 수 없습니다. 도구가 세션 옵션을 고정합니다.", "D5");
+            if (s is ExecuteStatement)
+                return (AnalysisRules.RejectExec, "EXEC·sp_executesql은 문장별 실행으로 의미가 바뀌어 지원하지 않습니다.", "E9");
+            if (FlowTypes.Contains(type))
+                return (AnalysisRules.RejectVariableOrFlow, "변수와 제어 흐름(DECLARE, SET @v, IF, WHILE, TRY...CATCH, BEGIN...END 등)은 지원하지 않습니다. 문장을 하나씩 쓰세요.", "E9");
+            if (AdminTypes.Contains(type))
+                return (AnalysisRules.RejectAdminCommand, $"{type.Replace("Statement", "")} 같은 관리 명령은 범위 밖입니다.", "D5");
+            if (s is SelectStatement { Into: not null })
+                return (AnalysisRules.RejectSelectInto, "SELECT ... INTO는 테이블을 만드는 DDL이라 미리보기할 수 없습니다.", "A16");
+            if (s is SelectStatement)
+                return (AnalysisRules.RejectNotAllowed, "SELECT는 변경 미리보기 대상이 아닙니다. 허용되는 문장은 INSERT, UPDATE, DELETE뿐입니다.", "D5");
+            if (type.StartsWith("Create", StringComparison.Ordinal) || type.StartsWith("Alter", StringComparison.Ordinal)
+                || type.StartsWith("Drop", StringComparison.Ordinal) || OtherDdlTypes.Contains(type))
+                return (AnalysisRules.RejectDdl, "DDL은 미리보기할 수 없습니다. 스키마를 바꾸면 트랜잭션 제약과 DDL 트리거 반응이 달라집니다.", "E10");
+            return (AnalysisRules.RejectNotAllowed, $"허용되지 않는 문장({type.Replace("Statement", "")})입니다. 허용되는 문장은 INSERT, UPDATE, DELETE뿐입니다.", "D5");
+        }
+    }
+
+    /// <summary>허용 DML 안에서 거부 대상 구문(OUTPUT, 외부 행 집합, 변수, 임시·변수 테이블, 3·4부분 이름 등)을 찾는다. 규칙당 첫 발생만 남긴다.</summary>
+    sealed class DmlScan(LineIndex lines) : TSqlFragmentVisitor
+    {
+        public readonly List<(string Rule, string Message, string DocRef, SourceSpan Span)> Findings = [];
+        readonly HashSet<string> seen = [];
+
+        void Add(string rule, string message, string doc, TSqlFragment node)
+        {
+            if (seen.Add(rule)) Findings.Add((rule, message, doc, lines.Span(node)));
+        }
+
+        public override void Visit(OutputClause n) => Add(AnalysisRules.RejectOutput, "OUTPUT 절은 샌드박스의 감사 트리거 때문에 원본과 달리 실패할 수 있어 지원하지 않습니다. OUTPUT 없이 미리보기하세요.", "E11", n);
+        public override void Visit(OutputIntoClause n) => Add(AnalysisRules.RejectOutput, "OUTPUT 절은 샌드박스의 감사 트리거 때문에 원본과 달리 실패할 수 있어 지원하지 않습니다. OUTPUT 없이 미리보기하세요.", "E11", n);
+
+        const string ExternalRowsetMessage = "OPENROWSET·OPENDATASOURCE·OPENQUERY는 샌드박스 밖의 원본을 읽어 재현이 보장되지 않아 지원하지 않습니다.";
+        public override void Visit(OpenRowsetTableReference n) => Add(AnalysisRules.RejectExternalRowset, ExternalRowsetMessage, "D5", n);
+        public override void Visit(OpenQueryTableReference n) => Add(AnalysisRules.RejectExternalRowset, ExternalRowsetMessage, "D5", n);
+        public override void Visit(AdHocTableReference n) => Add(AnalysisRules.RejectExternalRowset, ExternalRowsetMessage, "D5", n);
+        public override void Visit(BulkOpenRowset n) => Add(AnalysisRules.RejectExternalRowset, ExternalRowsetMessage, "D5", n);
+
+        public override void Visit(TableHint n)
+        {
+            if (n.HintKind == TableHintKind.IgnoreTriggers)
+                Add(AnalysisRules.RejectIgnoreTriggers, "IGNORE_TRIGGERS 힌트는 트리거를 건너뛰어 변경 수집이 깨지므로 쓸 수 없습니다.", "D5", n);
+        }
+
+        public override void Visit(NamedTableReference n)
+        {
+            var so = n.SchemaObject;
+            if (so.ServerIdentifier != null || so.DatabaseIdentifier != null)
+                Add(AnalysisRules.RejectCrossDatabase, $"3·4부분 이름 '{SqlSyntax.Name(so)}'은 샌드박스 밖의 상태라 쓸 수 없습니다. 스키마.이름만 쓰세요.", "A18", n);
+            else if (so.BaseIdentifier.Value.StartsWith('#'))
+                Add(AnalysisRules.RejectTempOrTableVariable, "#임시 테이블은 지원하지 않습니다.", "D5", n);
+        }
+
+        public override void Visit(SchemaObjectFunctionTableReference n)
+        {
+            var so = n.SchemaObject;
+            if (so.ServerIdentifier != null || so.DatabaseIdentifier != null)
+                Add(AnalysisRules.RejectCrossDatabase, $"3·4부분 이름 '{SqlSyntax.Name(so)}'은 샌드박스 밖의 상태라 쓸 수 없습니다.", "A18", n);
+        }
+
+        public override void Visit(FunctionCall n)
+        {
+            if (n.CallTarget is MultiPartIdentifierCallTarget { MultiPartIdentifier.Identifiers.Count: >= 2 })
+                Add(AnalysisRules.RejectCrossDatabase, "3·4부분 이름 함수 호출은 샌드박스 밖의 상태라 쓸 수 없습니다.", "A18", n);
+        }
+
+        public override void Visit(NextValueForExpression n)
+        {
+            var so = n.SequenceName;
+            if (so.ServerIdentifier != null || so.DatabaseIdentifier != null)
+                Add(AnalysisRules.RejectCrossDatabase, $"3·4부분 이름 '{SqlSyntax.Name(so)}'은 샌드박스 밖의 상태라 쓸 수 없습니다.", "A18", n);
+        }
+
+        public override void Visit(VariableTableReference n) => Add(AnalysisRules.RejectTempOrTableVariable, "테이블 변수는 지원하지 않습니다.", "D5", n);
+        public override void Visit(VariableReference n) => Add(AnalysisRules.RejectVariableOrFlow, "변수(@v)는 지원하지 않습니다. 값을 직접 쓰세요.", "E9", n);
+        public override void Visit(GlobalVariableExpression n) => Add(AnalysisRules.RejectVariableOrFlow, "전역 변수(@@...)는 문장별 실행으로 의미가 바뀌어 지원하지 않습니다.", "E9", n);
+        public override void Visit(ExecuteInsertSource n) => Add(AnalysisRules.RejectExec, "INSERT ... EXEC는 지원하지 않습니다.", "E9", n);
+        public override void Visit(WhereClause n)
+        {
+            if (n.Cursor != null) Add(AnalysisRules.RejectNotAllowed, "WHERE CURRENT OF(커서)는 지원하지 않습니다.", "D5", n);
+        }
+    }
+}

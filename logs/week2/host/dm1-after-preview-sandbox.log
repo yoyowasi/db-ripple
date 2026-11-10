@@ -1,0 +1,11 @@
+# logs/week2/host/dm1-independent-check.sql db=AW_Sandbox part=0 at=2026-11-10T13:24:20.7574821+09:00 elapsedSec=0.88 exit=0
+t n
+- -
+SOD 12
+SOHSR 0
+preview_user
+------------
+1
+databaselog_create_user
+-----------------------
+1

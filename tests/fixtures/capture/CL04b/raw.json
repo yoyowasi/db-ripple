@@ -1,0 +1,186 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "UPDATE",
+        "target": "cl04.P",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 41
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          33,
+          34
+        ],
+        "error": null
+      },
+      "boundary": 34,
+      "imageCountAfter": 4,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 32,
+  "headers": [
+    {
+      "captureSeq": 33,
+      "tableObjectId": 1701581100,
+      "tableName": "[cl04].[Ch]",
+      "operation": "UPDATE",
+      "insertedCount": 1,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 34,
+      "tableObjectId": 1669580986,
+      "tableName": "[cl04].[P]",
+      "operation": "UPDATE",
+      "insertedCount": 1,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 33,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":30}",
+      "rowJson": "{\"id\":30,\"p_id\":3}"
+    },
+    {
+      "captureSeq": 33,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":30}",
+      "rowJson": "{\"id\":30,\"p_id\":300}"
+    },
+    {
+      "captureSeq": 34,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":3}",
+      "rowJson": "{\"id\":3,\"name\":\"p3\"}"
+    },
+    {
+      "captureSeq": 34,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":300}",
+      "rowJson": "{\"id\":300,\"name\":\"p3\"}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl04.Ch",
+      "keyJson": "{\"id\":30}",
+      "rowJson": "{\"id\":30,\"p_id\":300}"
+    },
+    {
+      "table": "cl04.P",
+      "keyJson": "{\"id\":3}",
+      "rowJson": null
+    },
+    {
+      "table": "cl04.P",
+      "keyJson": "{\"id\":300}",
+      "rowJson": "{\"id\":300,\"name\":\"p3\"}"
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl04.Ch",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "30"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "30",
+        "p_id": "3"
+      },
+      "after": {
+        "id": "30",
+        "p_id": "300"
+      },
+      "changedColumns": [
+        "p_id"
+      ],
+      "explainedBy": null
+    },
+    {
+      "table": "cl04.P",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "3"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "3",
+        "name": "p3"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl04.P",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "300"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "300",
+        "name": "p3"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "capture": {
+    "imageCount": 4,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261110-1149"
+  },
+  "timings": {
+    "execute": 34,
+    "readLog": 2,
+    "reread": 4,
+    "netDiff": 19
+  }
+}

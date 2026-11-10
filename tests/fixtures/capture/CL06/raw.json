@@ -1,0 +1,252 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "DELETE",
+        "target": "cl06.Ord",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 35
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          40,
+          42
+        ],
+        "error": null
+      },
+      "boundary": 42,
+      "imageCountAfter": 5,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 39,
+  "headers": [
+    {
+      "captureSeq": 40,
+      "tableObjectId": 2053582354,
+      "tableName": "[cl06].[LineLog]",
+      "operation": "INSERT",
+      "insertedCount": 2,
+      "deletedCount": 0,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 41,
+      "tableObjectId": 2005582183,
+      "tableName": "[cl06].[Line]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 2,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 42,
+      "tableObjectId": 1973582069,
+      "tableName": "[cl06].[Ord]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 40,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"line_id\":10}",
+      "rowJson": "{\"line_id\":10,\"action\":\"D\"}"
+    },
+    {
+      "captureSeq": 40,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"line_id\":11}",
+      "rowJson": "{\"line_id\":11,\"action\":\"D\"}"
+    },
+    {
+      "captureSeq": 41,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":11}",
+      "rowJson": "{\"id\":11,\"ord_id\":1,\"qty\":3}"
+    },
+    {
+      "captureSeq": 41,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":10}",
+      "rowJson": "{\"id\":10,\"ord_id\":1,\"qty\":5}"
+    },
+    {
+      "captureSeq": 42,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl06.Line",
+      "keyJson": "{\"id\":11}",
+      "rowJson": null
+    },
+    {
+      "table": "cl06.Line",
+      "keyJson": "{\"id\":10}",
+      "rowJson": null
+    },
+    {
+      "table": "cl06.LineLog",
+      "keyJson": "{\"line_id\":10}",
+      "rowJson": "{\"line_id\":10,\"action\":\"D\"}"
+    },
+    {
+      "table": "cl06.LineLog",
+      "keyJson": "{\"line_id\":11}",
+      "rowJson": "{\"line_id\":11,\"action\":\"D\"}"
+    },
+    {
+      "table": "cl06.Ord",
+      "keyJson": "{\"id\":1}",
+      "rowJson": null
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl06.Line",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "10"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "10",
+        "ord_id": "1",
+        "qty": "5"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl06.Line",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "11"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "11",
+        "ord_id": "1",
+        "qty": "3"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl06.LineLog",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "line_id"
+        ],
+        "values": [
+          "10"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "line_id": "10",
+        "action": "D"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl06.LineLog",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "line_id"
+        ],
+        "values": [
+          "11"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "line_id": "11",
+        "action": "D"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl06.Ord",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "capture": {
+    "imageCount": 5,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261110-1149"
+  },
+  "timings": {
+    "execute": 14,
+    "readLog": 2,
+    "reread": 5,
+    "netDiff": 23
+  }
+}

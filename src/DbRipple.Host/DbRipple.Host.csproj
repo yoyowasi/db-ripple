@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    API 호스트(조립 루트). 구현체를 조립하므로 모든 컴포넌트를 참조한다 → 컴포넌트 하나라도 깨지면 이 프로젝트만 깨진다(통합 단계 전용).
+    소유: 구현자 E. 개발 중 실행은 scripts\env.ps1을 점 소싱한 같은 PowerShell 명령에서 이 프로젝트를 dotnet run 한다.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DbRipple.Api\DbRipple.Api.csproj" />
+    <ProjectReference Include="..\DbRipple.Preview\DbRipple.Preview.csproj" />
+    <ProjectReference Include="..\DbRipple.Analysis\DbRipple.Analysis.csproj" />
+    <ProjectReference Include="..\DbRipple.Execution\DbRipple.Execution.csproj" />
+    <ProjectReference Include="..\DbRipple.Diff\DbRipple.Diff.csproj" />
+    <ProjectReference Include="..\DbRipple.Attribution\DbRipple.Attribution.csproj" />
+  </ItemGroup>
+
+</Project>

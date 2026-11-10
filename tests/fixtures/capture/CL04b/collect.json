@@ -1,0 +1,94 @@
+{
+  "firings": [
+    {
+      "id": "f-33",
+      "captureSeq": 33,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl04.Ch",
+      "operation": "UPDATE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-34",
+      "captureSeq": 34,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl04.P",
+      "operation": "UPDATE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-33-1",
+      "firingId": "f-33",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "30"
+        ]
+      },
+      "before": {
+        "id": "30",
+        "p_id": "3"
+      },
+      "after": {
+        "id": "30",
+        "p_id": "300"
+      },
+      "changedColumns": [
+        "p_id"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-34-1",
+      "firingId": "f-34",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "300"
+        ]
+      },
+      "before": {
+        "id": "3",
+        "name": "p3"
+      },
+      "after": {
+        "id": "300",
+        "name": "p3"
+      },
+      "changedColumns": [
+        "id"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "SINGLE_ROW",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [],
+  "rereadDifferences": []
+}

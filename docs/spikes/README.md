@@ -14,7 +14,8 @@
 | SP5 | FILELISTONLY, 전체 텍스트, 백업·복원·스냅샷 시간 | 통과(2026-11-10) | DB 실측(컨테이너) | [SP5.md](SP5.md) |
 | SP6 | FOR JSON 형식 변환 | 일부 깨짐(2026-11-10): float 정밀도, 공간 Z/M, money=숫자 → §6.1 규칙 수정, C9 반영 | DB 실측(컨테이너) | [SP6.md](SP6.md) |
 | SP10 | 트랜잭션 안 EXECUTE AS/REVERT, 소유권 체인 | 성립(2026-11-10). doomed면 ROLLBACK 뒤 REVERT | DB 실측(컨테이너) | [SP10.md](SP10.md) |
-| SP7~SP9 | 2·3주차 | 범위 밖 | — | — |
+| SP7 | 열린 트랜잭션 안 최종 차이(정확성, AW 전 테이블 시간) | 통과(2026-11-10, 2회): 독립 확인 10/10, p50 1.55~1.65초·p95 2.03~3.70초 | DB 실측(컨테이너) | [SP7.md](SP7.md) |
+| SP8~SP9 | 3주차 | 범위 밖 | — | — |
 
 2026-11-06에는 작업 PC에 Docker Desktop·WSL이 없어 SP4만 실행했다. 2026-11-10에 Docker를 설치하고 나머지를 실측했다. 준비 절차는 [../dev-setup.md](../dev-setup.md)에 있다. 설계 반영은 [../architecture.md](../architecture.md) v1.3에서 "v1.3"으로 표시한 곳이다.
 

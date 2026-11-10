@@ -53,3 +53,16 @@
 ## 정정
 
 손 정답과 오라클이 다르면 사례 파일을 바로 고치지 말고, 원인(문서 해석 오류인지 정답 오류인지)을 기록한 뒤 고친다(§10.3).
+
+### 2026-11-10: firings[].pairing 6건 (2주차 통합, 사례 파일은 아직 고치지 않음)
+
+| 사례 | 묶음 | 손 정답 | 정정 |
+|---|---|---|---|
+| CL07 | `F:cl07.D:UPDATE` | SINGLE_ROW | BY_PK |
+| CL08a | `F:cl08.Acct:UPDATE#1` | SINGLE_ROW | BY_PK |
+| CL08b | `F:cl08.Acct:UPDATE#1`~`#4` | SINGLE_ROW | BY_PK |
+
+- **원인:** 정답 오류. 모두 한 행이고 PK가 바뀌지 않은 UPDATE다. 수집기 규칙(설계 §4 v1.4 C11, Q11)은 키가 그대로면 행 수와 상관없이 BY_PK이고, SINGLE_ROW는 키가 바뀌었거나 키 없는 테이블의 한 행 묶음에만 쓴다. 손 정답 안에서도 같은 모양인 CL07 `F:cl07.A:UPDATE`와 CL04b `F:cl04.Ch:UPDATE`는 BY_PK로 적혀 있어 엇갈린다. CL04b `F:cl04.P:UPDATE`(PK 3→300, 한 행)의 SINGLE_ROW는 규칙과 맞으므로 그대로 둔다.
+- **영향:** M1·M2와 순 변경에는 영향이 없다(pairing은 묶음 표시 항목).
+- **증거:** 실DB 수집기 출력(Execution.Tests CascadeLab 회귀, `logs/week2/eval/eval-20261110-132555/records/`의 rowChanges[].pairing).
+- **남은 일(3주차):** 사례 파일에 `corrections[]`를 더해 고치고, `tests/DbRipple.Execution.Tests/CascadeLabTests.cs`의 `PairingOverrides`를 지운다.

@@ -1,0 +1,210 @@
+{
+  "firings": [
+    {
+      "id": "f-5",
+      "captureSeq": 5,
+      "statementIndex": 1,
+      "depth": 4,
+      "table": "cl08.Acct",
+      "operation": "UPDATE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-6",
+      "captureSeq": 6,
+      "statementIndex": 1,
+      "depth": 3,
+      "table": "cl08.Acct",
+      "operation": "UPDATE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-7",
+      "captureSeq": 7,
+      "statementIndex": 1,
+      "depth": 2,
+      "table": "cl08.Acct",
+      "operation": "UPDATE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-8",
+      "captureSeq": 8,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl08.Acct",
+      "operation": "UPDATE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-5-1",
+      "firingId": "f-5",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "bal": "110",
+        "touched": "2"
+      },
+      "after": {
+        "id": "1",
+        "bal": "110",
+        "touched": "3"
+      },
+      "changedColumns": [
+        "touched"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-6-1",
+      "firingId": "f-6",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "bal": "110",
+        "touched": "1"
+      },
+      "after": {
+        "id": "1",
+        "bal": "110",
+        "touched": "2"
+      },
+      "changedColumns": [
+        "touched"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-7-1",
+      "firingId": "f-7",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "bal": "110",
+        "touched": "0"
+      },
+      "after": {
+        "id": "1",
+        "bal": "110",
+        "touched": "1"
+      },
+      "changedColumns": [
+        "touched"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-8-1",
+      "firingId": "f-8",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "bal": "100",
+        "touched": "0"
+      },
+      "after": {
+        "id": "1",
+        "bal": "110",
+        "touched": "0"
+      },
+      "changedColumns": [
+        "bal"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [
+    {
+      "childFiringId": "f-5",
+      "candidateParentFiringIds": [
+        "f-6"
+      ],
+      "confidenceCap": "inferred"
+    },
+    {
+      "childFiringId": "f-6",
+      "candidateParentFiringIds": [
+        "f-7"
+      ],
+      "confidenceCap": "inferred"
+    },
+    {
+      "childFiringId": "f-7",
+      "candidateParentFiringIds": [
+        "f-8"
+      ],
+      "confidenceCap": "inferred"
+    }
+  ],
+  "rereadDifferences": []
+}

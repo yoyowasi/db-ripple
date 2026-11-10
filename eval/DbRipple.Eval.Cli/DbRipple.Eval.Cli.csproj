@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    평가 실행 CLI(조립 루트): 제품 파이프라인(블랙박스)과 하네스(DbRipple.Eval)를 조립한다. 모든 제품 컴포넌트를 참조하므로 통합 단계 전용이다.
+    소유: 구현자 F. 하네스의 비교·지표 코드는 DbRipple.Eval에만 둔다(이 프로젝트에 비교 로직을 두지 않는다, §10.3).
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DbRipple.Eval\DbRipple.Eval.csproj" />
+    <!-- 전용 원본 시드(cascadelab/sql)와 dbrt_eval_ DB 이름·정리 규칙만 쓴다(비교·지표는 DbRipple.Eval). -->
+    <ProjectReference Include="..\..\tests\DbRipple.TestSupport\DbRipple.TestSupport.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Preview\DbRipple.Preview.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Analysis\DbRipple.Analysis.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Execution\DbRipple.Execution.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Diff\DbRipple.Diff.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Attribution\DbRipple.Attribution.csproj" />
+  </ItemGroup>
+
+</Project>

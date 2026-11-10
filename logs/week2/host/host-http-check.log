@@ -1,0 +1,32 @@
+2주차 통합 Host 확인 (2026-11-10, 127.0.0.1:5080, dotnet run --project src\DbRipple.Host, 콘텐츠 루트 src\DbRipple.Host)
+조립: 진짜 C6·C10·C11·C12·C13·C14·SandboxManager, ExecuteAsUser = dbr_preview_user, 평가 모드 아님. 매니페스트 .data\aw-baseline\manifest.json(저장소 밖).
+
+1. GET  /api/sandbox                       200 state=error(새 매니페스트 경로에 기준선 없음), locked=false
+2. POST /api/sandbox/refresh               202 → GET /api/sandbox 200 state=building
+3. GET  /api/sandbox (구축 끝)              200 state=ready, baselineAt=2026-11-10T13:23:12+09:00, fingerprintMatch=true, manifest{coveredTables=71, excludedTables=0, auditNotLast=0}
+   매니페스트 notes:
+   - DDL 트리거 ddlDatabaseTriggerLog가 실행 사용자 dbr_preview_user 준비 DDL(CREATE_USER·GRANT_DATABASE)에 발동함(C9 설치 전, Q12)
+   - 실행 사용자 dbr_preview_user 준비 전후 행 수가 바뀐 테이블(기준선에 포함, 원본과 다름): dbo.DatabaseLog +7행   (CREATE USER 1 + 스키마 GRANT 6)
+   - DDL 트리거 ddlDatabaseTriggerLog가 설치 DDL(CREATE_SCHEMA·CREATE_SEQUENCE·CREATE_TABLE·CREATE_TRIGGER·ALTER_TRIGGER)에 발동함
+   - 설치 전후 행 수가 바뀐 테이블(기준선에 포함, 원본과 다름): dbo.DatabaseLog +431행
+4. POST /api/previews DM1 "DELETE FROM Sales.SalesOrderHeader WHERE SalesOrderID = 43659;"   200, 약 2.9초
+   status=ok, 문장 1 ok rowsAffected=1, capture{imageCount=13, cap=100000, truncated=false}
+   netSummary: Sales.SalesOrderDetail deleted 12, Sales.SalesOrderHeader deleted 1, residuals 0, residualCommitted 0, warnings 0
+   firings: SOH DELETE 1(DIRECT certain), SOD DELETE 12(FK_CASCADE certain), SOH UPDATE 0행·Person.Person UPDATE 0행(깊이 2, TRIGGER inferred: SOD 트리거가 0행 UPDATE)
+   timingsMs: analyze 16, execute 706, readLog 14, reread 101, netDiff 1349, resolve 111, serialize 196
+   graph: 노드 8, 간선 7. statement label(고친 뒤 재확인) "DELETE FROM Sales.SalesOrderHeader WHERE SalesOrderID = 43659"
+   독립 확인(dm1-independent-check.log, 기준 스냅샷 읽기): SOD 12행, SOHSR 0행, dbr_preview_user 1, DatabaseLog CREATE_USER 행 1
+   미리보기 뒤: GET /api/sandbox state=ready(오염 아님), 샌드박스 SOD 43659 = 12행(dm1-after-preview-sandbox.log)
+5. GET  /api/previews/{id}/rows?view=event&offset=0&limit=5    200 total=13, rows 5 (rc-15-1 SOD DELETE 전체 행 before)
+   GET  /api/previews/{id}/rows?view=net&offset=10&limit=5     200 total=13, rows 3
+   GET  /api/previews/{id}/rows?view=event&limit=5000          400 errors.limit ["1..1000"]
+   GET  /api/previews/{id}                                     200
+   GET  /api/previews/{id}/export                              200
+6. POST /api/previews/{id}/cancel                              204 → GET /api/previews/{id} 404 → 다시 cancel 404
+7. POST /api/previews "TRUNCATE TABLE Sales.SalesOrderDetail;"  422 type=https://example.local/problems/rejected, rejects[{statementIndex 1, ruleId REJECT_TRUNCATE, span 1:1-1:38}]
+8. Host 재시작 뒤 GET /api/sandbox 200 state=ready(.data 매니페스트에서 기존 기준선 읽음), DM1 다시 200 ok, cancel 204. Host 끔.
+
+9. 검토 반영 뒤(프로시저를 부르는 트리거 = 쓰기 대상 미상) DM1 다시: 200 ok, netSummary 같음(SOD deleted 12, SOH deleted 1)
+   SOD DELETE 12 FK_CASCADE certain → inferred (iduSalesOrderDetail이 CATCH에서 dbo.uspLogError를 불러 SOD 쓰기 경합으로 침)
+   SOH UPDATE 0행·Person.Person UPDATE 0행 TRIGGER inferred → ambiguous(후보 Sales.iduSalesOrderDetail), WRITES 간선 ambiguous
+   SOH DELETE DIRECT certain 그대로. cancel 204, 상태 ready. Host 끔.
