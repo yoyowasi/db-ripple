@@ -1,0 +1,19 @@
+# spikes\sql\sp5-5-restore-with-snapshot-raw.sql db=master part=0 at=2026-11-10T08:45:55.2045621+09:00 elapsedSec=2.61 exit=0
+Processed 25544 pages for database 'AW_Origin', file 'AdventureWorks' on file 1.
+Processed 2 pages for database 'AW_Origin', file 'AdventureWorks_log' on file 1.
+BACKUP DATABASE successfully processed 25546 pages in 0.186 seconds (1072.979 MB/sec).
+Processed 25544 pages for database 'AW_SnapTest', file 'AdventureWorks' on file 1.
+Processed 2 pages for database 'AW_SnapTest', file 'AdventureWorks_log' on file 1.
+RESTORE DATABASE successfully processed 25546 pages in 0.209 seconds (954.900 MB/sec).
+Msg 5094, Level 16, State 2, Server 31e30d944dca, Line 2
+The operation cannot be performed on a database with database snapshots or active DBCC replicas.
+Msg 3013, Level 16, State 1, Server 31e30d944dca, Line 2
+RESTORE DATABASE is terminating abnormally.
+Processed 25544 pages for database 'AW_SnapTest', file 'AdventureWorks' on file 1.
+Processed 2 pages for database 'AW_SnapTest', file 'AdventureWorks_log' on file 1.
+RESTORE DATABASE successfully processed 25546 pages in 0.185 seconds (1078.779 MB/sec).
+name state_desc
+---- ----------
+AW_SnapTest ONLINE
+
+(1 rows affected)

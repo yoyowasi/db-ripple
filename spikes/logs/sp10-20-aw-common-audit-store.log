@@ -1,0 +1,12 @@
+# spikes\sql\common_audit_store.sql db=AW_SpikeB part=0 at=2026-11-10T09:19:59.6493203+09:00 elapsedSec=0.87 exit=0
+  CREATE_SCHEMA - audit.audit
+  CREATE_SEQUENCE - audit.CaptureSeq
+  CREATE_TABLE - audit.AuditHeader
+  CREATE_TABLE - audit.AuditRowImage
+  CREATE_TABLE - audit.AuditControl
+schemaName objectName type_desc ownerName
+---------- ---------- --------- ---------
+audit AuditControl USER_TABLE dbo
+audit AuditHeader USER_TABLE dbo
+audit AuditRowImage USER_TABLE dbo
+audit CaptureSeq SEQUENCE_OBJECT dbo

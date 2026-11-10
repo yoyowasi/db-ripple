@@ -1,0 +1,7 @@
+# spikes\sql\common_audit_store.sql db=SpikeLab_SP2 part=0 at=2026-11-10T09:29:54.1590154+09:00 elapsedSec=0.77 exit=0
+schemaName objectName type_desc ownerName
+---------- ---------- --------- ---------
+audit AuditControl USER_TABLE dbo
+audit AuditHeader USER_TABLE dbo
+audit AuditRowImage USER_TABLE dbo
+audit CaptureSeq SEQUENCE_OBJECT dbo

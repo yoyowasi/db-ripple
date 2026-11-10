@@ -1,4 +1,5 @@
 /* SP6 — 형식별 FOR JSON 직렬화: (A) 변환 없이, (B) §6.1 변환, (C) OPENJSON 왕복, (D) text/ntext/image 트리거 참조(오류 311 시점) */
+SET QUOTED_IDENTIFIER ON;   /* sqlcmd 기본값은 OFF → (C)의 xml .value()가 1934로 실패(2026-11-10 1차 실행) */
 USE master;
 GO
 IF DB_ID(N'SpikeLab_SP6') IS NOT NULL BEGIN ALTER DATABASE SpikeLab_SP6 SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE SpikeLab_SP6; END
@@ -54,17 +55,23 @@ DECLARE @j nvarchar(max) = (
            CONVERT(nvarchar(4000), cVariant) AS cVariant, CONVERT(nvarchar(128), SQL_VARIANT_PROPERTY(cVariant, 'BaseType')) AS [cVariant@type],
            cBit, cNvar
     FROM dbo.Types ORDER BY Id FOR JSON PATH, INCLUDE_NULL_VALUES);
-SELECT 'B_converted_json' AS part, @j AS json, ISJSON(@j) AS isJson;
+SELECT 'B_converted_json' AS part, LEN(@j) AS jsonLen, ISJSON(@j) AS isJson;
+/* sqlcmd 표시폭(256자)에 잘리지 않게 행·키별로 남긴다 */
+SELECT 'B_converted_kv' AS part, r.[key] AS rowIdx, kv.[key], kv.value, kv.type
+FROM OPENJSON(@j) AS r CROSS APPLY OPENJSON(r.value) AS kv ORDER BY CONVERT(int, r.[key]);
 SELECT 'C_roundtrip' AS part, t.Id, v.col, v.same
 FROM dbo.Types AS t
 JOIN OPENJSON(@j) WITH (Id int, cXml nvarchar(max), cHier nvarchar(4000), cGeog nvarchar(max), [cGeog@srid] int '$."cGeog@srid"',
-        cGeom nvarchar(max), cMoney money, cSmallMoney smallmoney, cVarbin varchar(max), cBin varchar(max), cRv varchar(100),
-        cDto datetimeoffset(7), cDt2 datetime2(7), cTime time(7), cDec nvarchar(100), cBig nvarchar(40), cFloat float, cReal real,
+        cGeom nvarchar(max), [cGeom@srid] int '$."cGeom@srid"', cMoney money, cSmallMoney smallmoney, cVarbin varchar(max), cBin varchar(max), cRv varchar(100),
+        cDto datetimeoffset(7), cDt2 datetime2(7), cTime time(7), cDec nvarchar(100), cBig nvarchar(40),
+        cFloatRaw nvarchar(40) '$.cFloat',   /* float로 바로 읽으면 최댓값에서 8115로 SELECT 전체가 실패(2차 실행) → 원문으로 읽고 TRY_CONVERT */
+        cReal real, cRealRaw nvarchar(40) '$.cReal',
         cGuid uniqueidentifier, cBit bit, cNvar nvarchar(100)) AS o ON o.Id = t.Id
 CROSS APPLY (VALUES
     ('xml',       CASE WHEN (t.cXml IS NULL AND o.cXml IS NULL) OR CONVERT(nvarchar(max), t.cXml) = o.cXml THEN 1 ELSE 0 END),
     ('hierarchyid', CASE WHEN (t.cHier IS NULL AND o.cHier IS NULL) OR t.cHier = hierarchyid::Parse(o.cHier) THEN 1 ELSE 0 END),
     ('geography', CASE WHEN (t.cGeog IS NULL AND o.cGeog IS NULL) OR t.cGeog.STEquals(geography::STGeomFromText(o.cGeog, o.[cGeog@srid])) = 1 THEN 1 ELSE 0 END),
+    ('geometry',  CASE WHEN (t.cGeom IS NULL AND o.cGeom IS NULL) OR t.cGeom.STEquals(geometry::STGeomFromText(o.cGeom, o.[cGeom@srid])) = 1 THEN 1 ELSE 0 END),
     ('money',     CASE WHEN (t.cMoney IS NULL AND o.cMoney IS NULL) OR t.cMoney = o.cMoney THEN 1 ELSE 0 END),
     ('smallmoney', CASE WHEN (t.cSmallMoney IS NULL AND o.cSmallMoney IS NULL) OR t.cSmallMoney = o.cSmallMoney THEN 1 ELSE 0 END),
     ('varbinary', CASE WHEN (t.cVarbin IS NULL AND o.cVarbin IS NULL) OR t.cVarbin = CAST(N'' AS xml).value('xs:base64Binary(sql:column("o.cVarbin"))', 'varbinary(max)') THEN 1 ELSE 0 END),
@@ -73,15 +80,20 @@ CROSS APPLY (VALUES
     ('datetimeoffset', CASE WHEN (t.cDto IS NULL AND o.cDto IS NULL) OR (t.cDto = o.cDto AND DATEPART(TZOFFSET, t.cDto) = DATEPART(TZOFFSET, o.cDto)) THEN 1 ELSE 0 END),
     ('datetime2', CASE WHEN (t.cDt2 IS NULL AND o.cDt2 IS NULL) OR t.cDt2 = o.cDt2 THEN 1 ELSE 0 END),
     ('time',      CASE WHEN (t.cTime IS NULL AND o.cTime IS NULL) OR t.cTime = o.cTime THEN 1 ELSE 0 END),
-    ('decimal(38,10) 원문', CASE WHEN (t.cDec IS NULL AND o.cDec IS NULL) OR CONVERT(nvarchar(100), t.cDec) = o.cDec THEN 1 ELSE 0 END),
-    ('bigint 원문', CASE WHEN (t.cBig IS NULL AND o.cBig IS NULL) OR CONVERT(nvarchar(40), t.cBig) = o.cBig THEN 1 ELSE 0 END),
-    ('float',     CASE WHEN (t.cFloat IS NULL AND o.cFloat IS NULL) OR t.cFloat = o.cFloat THEN 1 ELSE 0 END),
+    (N'decimal(38,10) 원문', CASE WHEN (t.cDec IS NULL AND o.cDec IS NULL) OR CONVERT(nvarchar(100), t.cDec) = o.cDec THEN 1 ELSE 0 END),
+    (N'bigint 원문', CASE WHEN (t.cBig IS NULL AND o.cBig IS NULL) OR CONVERT(nvarchar(40), t.cBig) = o.cBig THEN 1 ELSE 0 END),
+    ('float',     CASE WHEN (t.cFloat IS NULL AND o.cFloatRaw IS NULL) OR t.cFloat = TRY_CONVERT(float, o.cFloatRaw) THEN 1 ELSE 0 END),
     ('real',      CASE WHEN (t.cReal IS NULL AND o.cReal IS NULL) OR t.cReal = o.cReal THEN 1 ELSE 0 END),
     ('uniqueidentifier', CASE WHEN (t.cGuid IS NULL AND o.cGuid IS NULL) OR t.cGuid = o.cGuid THEN 1 ELSE 0 END),
     ('bit',       CASE WHEN (t.cBit IS NULL AND o.cBit IS NULL) OR t.cBit = o.cBit THEN 1 ELSE 0 END),
     ('nvarchar',  CASE WHEN (t.cNvar IS NULL AND o.cNvar IS NULL) OR t.cNvar = o.cNvar COLLATE Latin1_General_100_BIN2 THEN 1 ELSE 0 END)
 ) AS v (col, same)
 ORDER BY t.Id, v.col;
+/* float·real 원문과 17자리 표기(스타일 3) 대조 */
+SELECT 'C_float_text' AS part, t.Id, o.cFloatRaw AS jsonFloat, CONVERT(varchar(30), t.cFloat, 3) AS float17,
+       TRY_CONVERT(float, o.cFloatRaw) AS reparsed, o.cRealRaw AS jsonReal, CONVERT(varchar(30), t.cReal, 3) AS real9
+FROM dbo.Types AS t JOIN OPENJSON(@j) WITH (Id int, cFloatRaw nvarchar(40) '$.cFloat', cRealRaw nvarchar(40) '$.cReal') AS o ON o.Id = t.Id
+ORDER BY t.Id;
 /* srid 속성 이름 확인: 숫자로 나오는가, '@'가 특별 취급되는가 */
 SELECT 'B_srid_attr' AS part, [key], value, type FROM OPENJSON(JSON_QUERY(@j, '$[0]')) WHERE [key] LIKE N'%@%';
 GO

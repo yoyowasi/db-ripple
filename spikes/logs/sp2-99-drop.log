@@ -1,0 +1,2 @@
+# spikes\sql\sp2_99_drop.sql db=master part=0 at=2026-11-10T09:30:18.3697127+09:00 elapsedSec=1.27 exit=0
+Changed database context to 'master'.

@@ -157,12 +157,103 @@ public class AuditTriggerGeneratorTests
         var plan = AuditTriggerGenerator.Generate([Orders()], Now);
         var sql = Trigger(plan, "Sales.SalesOrderHeader", "I");
         Assert.Contains("i.[Org].ToString() AS [Org]", sql);
-        Assert.Contains("i.[Spot].STAsText() AS [Spot]", sql);
+        // SP6: STAsText()는 Z/M을 버리므로 ToString()
+        Assert.Contains("i.[Spot].ToString() AS [Spot]", sql);
         Assert.Contains("i.[Spot].STSrid AS [Spot@srid]", sql);
-        Assert.Contains("i.[Shape].STAsText() AS [Shape]", sql);
+        Assert.Contains("i.[Shape].ToString() AS [Shape]", sql);
+        Assert.DoesNotContain("STAsText", sql);
         Assert.Contains("CONVERT(nvarchar(max), i.[Doc]) AS [Doc]", sql);
         Assert.Contains("FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES", sql);
         Assert.Contains("CASE WHEN @dbr_mode = 'KEYS' THEN NULL ELSE", sql);
+    }
+
+    // SP6: FOR JSON 기본 출력은 float 16자리·real 8자리라 값이 바뀜 → 스타일 3 문자열
+    [Fact]
+    public void Float_real_and_sql_variant_are_lossless()
+    {
+        var t = Heap() with { Columns = [new("a", "int"), new("f", "float"), new("r", "real"), new("v", "sql_variant")] };
+        var sql = Trigger(AuditTriggerGenerator.Generate([t], Now), "dbo.Heap", "I");
+        Assert.Contains("CONVERT(varchar(30), i.[f], 3) AS [f]", sql);
+        Assert.Contains("CONVERT(varchar(30), CONVERT(float, i.[r]), 3) AS [r]", sql);
+        Assert.Contains("CASE WHEN SQL_VARIANT_PROPERTY(i.[v], 'BaseType') IN ('float', 'real') THEN CONVERT(sql_variant, CONVERT(varchar(30), CONVERT(float, i.[v]), 3)) ELSE i.[v] END AS [v]", sql);
+        Assert.Contains("CONVERT(nvarchar(128), SQL_VARIANT_PROPERTY(i.[v], 'BaseType')) AS [v@type]", sql);
+        Assert.Contains("i.[a] AS [a]", sql);
+    }
+
+    // SP6: '.'이 든 열은 중첩 객체가 되고, 생성 속성(@srid/@type)과 같은 이름의 열은 CREATE TRIGGER 13601
+    [Fact]
+    public void Json_key_conflicts_are_dropped_from_row_json_and_reported()
+    {
+        var t = new TableInfo("dbo", "Odd", 5,
+            [new("id", "int"), new("b.c", "int"), new("g", "geography"), new("g@srid", "int"), new("v", "sql_variant"), new("V@TYPE", "int")],
+            PrimaryKey: ["id"]);
+        var plan = AuditTriggerGenerator.Generate([t], Now);
+        var sql = Trigger(plan, "dbo.Odd", "U");
+        Assert.DoesNotContain("[b.c]", sql);
+        Assert.DoesNotContain("i.[g@srid]", sql);
+        Assert.DoesNotContain("i.[V@TYPE]", sql);
+        Assert.Contains("i.[g].STSrid AS [g@srid]", sql);
+        Assert.Contains("AS [v@type]", sql);
+        var m = plan.Manifest.Tables.Single();
+        Assert.Equal(["b.c", "g@srid", "V@TYPE"], m.UnobservableColumns);
+        Assert.Contains(plan.Manifest.Notes, n => n.Contains("dbo.Odd.b.c") && n.Contains("JSON_KEY_DOT"));
+        Assert.Contains(plan.Manifest.Notes, n => n.Contains("dbo.Odd.g@srid") && n.Contains("JSON_KEY_CONFLICT"));
+        Assert.Empty(plan.Manifest.ExcludedTables);
+    }
+
+    [Fact]
+    public void Json_key_conflict_in_key_excludes_table()
+    {
+        var t = new TableInfo("dbo", "DotKey", 6, [new("k.x", "int"), new("v", "int")], PrimaryKey: ["k.x"]);
+        var plan = AuditTriggerGenerator.Generate([t, Heap()], Now);
+        Assert.Equal(new ExcludedTable("dbo.DotKey", "JSON_KEY_CONFLICT"), Assert.Single(plan.Manifest.ExcludedTables));
+        Assert.DoesNotContain(plan.Batches, b => b.Sql.Contains("[DotKey]"));
+    }
+
+    // 이미 설치된 DB에서 계획을 만들면 audit 테이블에 감사 트리거가 붙어 감사 INSERT가 재귀한다 → 저장소(audit + 알려진 3개 이름)는 조용히 뺀다.
+    // 그 밖의 audit/Audit 스키마 테이블은 저장소가 아니므로 사유와 함께 제외 목록에 남긴다(대소문자 무시 DB에서 CREATE SCHEMA audit와 겹침)
+    [Fact]
+    public void Capture_store_tables_are_never_targets_and_other_audit_schema_tables_are_excluded_with_reason()
+    {
+        var store = new TableInfo("audit", "AuditHeader", 8, [new("captureSeq", "bigint")], PrimaryKey: ["captureSeq"]);
+        var control = store with { Name = "AuditControl", ObjectId = 10 };
+        var mixedCase = store with { Schema = "Audit", Name = "AuditRowImage", ObjectId = 9 };
+        var userAudit = store with { Name = "Orders", ObjectId = 11 };
+        var plan = AuditTriggerGenerator.Generate([store, control, mixedCase, userAudit, Heap()], Now);
+        Assert.Equal("dbo.Heap", Assert.Single(plan.Manifest.Tables).Table);
+        Assert.Equal([new ExcludedTable("Audit.AuditRowImage", "AUDIT_SCHEMA_CONFLICT"), new ExcludedTable("audit.Orders", "AUDIT_SCHEMA_CONFLICT")], plan.Manifest.ExcludedTables);
+        Assert.DoesNotContain(plan.Batches, b => b.Label.StartsWith("trigger audit.", StringComparison.OrdinalIgnoreCase) || b.Sql.Contains(" ON [audit].", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(plan.Manifest.Notes, n => n.Contains("audit 스키마") && n.Contains("2개"));
+        Assert.True(AuditTriggerGenerator.IsCaptureStore(store));
+        Assert.False(AuditTriggerGenerator.IsCaptureStore(mixedCase));
+        Assert.False(AuditTriggerGenerator.IsCaptureStore(userAudit));
+    }
+
+    // SP10: 트리거 소유자 = 테이블 소유자 ≠ dbo면 dbo 소유 audit 쓰기에서 소유권 체인이 끊겨 사용자 문장이 229로 실패
+    [Fact]
+    public void Tables_not_owned_by_dbo_are_excluded()
+    {
+        var owned = Heap() with { Schema = "o", Name = "Owned", Owner = "app_owner" };
+        var dboUpper = Heap() with { Name = "Upper", Owner = "DBO" };
+        var plan = AuditTriggerGenerator.Generate([owned, dboUpper], Now);
+        Assert.Equal(new ExcludedTable("o.Owned", "OWNER_NOT_DBO"), Assert.Single(plan.Manifest.ExcludedTables));
+        Assert.Equal("dbo.Upper", Assert.Single(plan.Manifest.Tables).Table);
+        Assert.DoesNotContain(plan.Batches, b => b.Sql.Contains("[o].[Owned]"));
+    }
+
+    [Fact]
+    public void Plan_fixes_session_options_first_and_empties_store_last()
+    {
+        var plan = AuditTriggerGenerator.Generate([Orders(), Heap()], Now);
+        Assert.Equal("session", plan.Batches[0].Label);
+        Assert.Contains("SET QUOTED_IDENTIFIER ON;", plan.Batches[0].Sql);
+        Assert.Contains("SET ANSI_NULLS ON;", plan.Batches[0].Sql);
+        Assert.Equal("schema", plan.Batches[1].Label);
+        var reset = plan.Batches[^1];
+        Assert.Equal("reset", reset.Label);
+        Assert.Equal("DELETE FROM audit.AuditRowImage;\nDELETE FROM audit.AuditHeader;", reset.Sql);
+        Assert.DoesNotContain("SEQUENCE", reset.Sql, StringComparison.OrdinalIgnoreCase); // 순번은 재설정하지 않는다
+        Assert.True(plan.Batches.ToList().FindLastIndex(b => b.Label.StartsWith("order ") || b.Label.StartsWith("trigger ")) < plan.Batches.Count - 1);
     }
 
     [Fact]

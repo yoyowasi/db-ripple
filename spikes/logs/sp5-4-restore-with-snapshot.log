@@ -1,0 +1,10 @@
+# spikes\sql\sp5-4-restore-with-snapshot.sql db=master part=0 at=2026-11-10T08:45:34.6096756+09:00 elapsedSec=2.18 exit=0
+Processed 25552 pages for database 'AW_Origin', file 'AdventureWorks' on file 1.
+Processed 2 pages for database 'AW_Origin', file 'AdventureWorks_log' on file 1.
+BACKUP DATABASE successfully processed 25554 pages in 0.333 seconds (599.509 MB/sec).
+Processed 25552 pages for database 'AW_SnapTest', file 'AdventureWorks' on file 1.
+Processed 2 pages for database 'AW_SnapTest', file 'AdventureWorks_log' on file 1.
+RESTORE DATABASE successfully processed 25554 pages in 0.149 seconds (1339.843 MB/sec).
+Result ErrNo ErrMsg
+------ ----- ------
+RESTORE_REJECTED 3013 RESTORE DATABASE is terminating abnormally.

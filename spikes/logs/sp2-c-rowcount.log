@@ -1,0 +1,12 @@
+# spikes\sql\sp2c_rowcount.ps1 db=SpikeLab_SP2 driver=System.Data.SqlClient(PowerShell 5.1) at=2026-11-10T09:30:06.0627343+09:00 elapsedSec=0.55 exit=0
+
+Case                                                RecordsAffected
+----                                                ---------------
+Plain 3 rows                                                      3
+Audited 3 rows                                                    3
+Audited 0 rows                                                    0
+Par cascade                                                       1
+Last5 3 rows (trigger NOCOUNT ON, last stmt 5 rows)               3
+NoCnt 3 rows (trigger without NOCOUNT, +2 rows)                   5
+
+

@@ -1,0 +1,5 @@
+# scripts\restore-aw-origin.ps1 at=2026-11-10T08:44:54.5162923+09:00 exit=0 elapsedSec=9
+08:44:52.707 FILELISTONLY: AdventureWorks(D,1), AdventureWorks_log(L,2)
+08:44:52.866 [master] 12ms IF DB_ID(N'AW_Origin') IS NOT NULL ALTER DATABASE [AW_Origin] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+08:44:54.401 [master] 1,412ms RESTORE DATABASE [AW_Origin] FROM DISK = N'/var/opt/mssql/backup/AdventureWorks2025.bak' WITH MOVE N'AdventureWorks' TO …
+AW_Origin 복원 완료

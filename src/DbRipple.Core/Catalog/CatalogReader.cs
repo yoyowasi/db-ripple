@@ -13,7 +13,7 @@ public static class CatalogReader
     {
         if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync(ct);
         var tables = await Read(conn, CatalogQueries.Tables, r => new CatalogTable(
-            r.GetInt32(0), r.GetString(1), r.GetString(2), (TemporalType)r.GetByte(3), r.GetBoolean(4)), ct);
+            r.GetInt32(0), r.GetString(1), r.GetString(2), (TemporalType)r.GetByte(3), r.GetBoolean(4), r.IsDBNull(5) ? "" : r.GetString(5)), ct);
         var columns = await Read(conn, CatalogQueries.Columns, r => new CatalogColumn(
             r.GetInt32(0), r.GetInt32(1), r.GetString(2), r.GetString(3), r.GetBoolean(4),
             r.GetBoolean(5), r.GetBoolean(6), r.GetBoolean(7), r.GetBoolean(8), r.IsDBNull(9) ? null : r.GetString(9)), ct);

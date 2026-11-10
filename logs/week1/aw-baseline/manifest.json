@@ -1,0 +1,1482 @@
+{
+  "version": "m-20261110-1014",
+  "tables": [
+    {
+      "table": "HumanResources.Department",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "DepartmentID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "HumanResources.Employee",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "OrganizationLevel",
+          "reason": "COMPUTED"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "HumanResources.EmployeeDepartmentHistory",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "HumanResources.EmployeePayHistory",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "HumanResources.JobCandidate",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "JobCandidateID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "HumanResources.Shift",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ShiftID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Person.Address",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "AddressID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Person.AddressType",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "AddressTypeID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Person.BusinessEntity",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "BusinessEntityID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Person.BusinessEntityAddress",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Person.BusinessEntityContact",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Person.ContactType",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ContactTypeID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Person.CountryRegion",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Person.EmailAddress",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "EmailAddressID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Person.Password",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Person.Person",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Person.PersonPhone",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Person.PhoneNumberType",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "PhoneNumberTypeID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Person.StateProvince",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "StateProvinceID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.BillOfMaterials",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "BillOfMaterialsID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "StartDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.Culture",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.Document",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "DocumentLevel",
+          "reason": "COMPUTED"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.Illustration",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "IllustrationID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.Location",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "LocationID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.Product",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ProductID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.ProductCategory",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ProductCategoryID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.ProductCostHistory",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.ProductDescription",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ProductDescriptionID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.ProductDocument",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.ProductInventory",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.ProductListPriceHistory",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.ProductModel",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ProductModelID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.ProductModelIllustration",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.ProductModelProductDescriptionCulture",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.ProductPhoto",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ProductPhotoID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.ProductProductPhoto",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.ProductReview",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ProductReviewID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ReviewDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.ProductSubcategory",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ProductSubcategoryID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.ScrapReason",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ScrapReasonID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.TransactionHistory",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "TransactionID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "TransactionDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.TransactionHistoryArchive",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "TransactionDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.UnitMeasure",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.WorkOrder",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "WorkOrderID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "StockedQty",
+          "reason": "COMPUTED"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Production.WorkOrderRouting",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Purchasing.ProductVendor",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Purchasing.PurchaseOrderDetail",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "PurchaseOrderDetailID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "LineTotal",
+          "reason": "COMPUTED"
+        },
+        {
+          "column": "StockedQty",
+          "reason": "COMPUTED"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Purchasing.PurchaseOrderHeader",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "PurchaseOrderID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "OrderDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "TotalDue",
+          "reason": "COMPUTED"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Purchasing.ShipMethod",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ShipMethodID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Purchasing.Vendor",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.CountryRegionCurrency",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.CreditCard",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "CreditCardID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.Currency",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.CurrencyRate",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "CurrencyRateID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.Customer",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "CustomerID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "AccountNumber",
+          "reason": "COMPUTED"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.PersonCreditCard",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.SalesOrderDetail",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "SalesOrderDetailID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "LineTotal",
+          "reason": "COMPUTED"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.SalesOrderHeader",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "SalesOrderID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "OrderDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "SalesOrderNumber",
+          "reason": "COMPUTED"
+        },
+        {
+          "column": "TotalDue",
+          "reason": "COMPUTED"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.SalesOrderHeaderSalesReason",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.SalesPerson",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.SalesPersonQuotaHistory",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.SalesReason",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "SalesReasonID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.SalesTaxRate",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "SalesTaxRateID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.SalesTerritory",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "TerritoryID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.SalesTerritoryHistory",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.ShoppingCartItem",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ShoppingCartItemID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "DateCreated",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.SpecialOffer",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "SpecialOfferID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.SpecialOfferProduct",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "Sales.Store",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "rowguid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "dbo.AWBuildVersion",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "SystemInformationID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ModifiedDate",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "dbo.DatabaseLog",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "DatabaseLogID",
+          "reason": "IDENTITY"
+        }
+      ]
+    },
+    {
+      "table": "dbo.ErrorLog",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "ErrorLogID",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "ErrorTime",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    }
+  ],
+  "excludedTables": [],
+  "notes": [
+    "DDL 트리거 ddlDatabaseTriggerLog가 설치 DDL(CREATE_SCHEMA·CREATE_SEQUENCE·CREATE_TABLE·CREATE_TRIGGER·ALTER_TRIGGER)에 발동함(ALTER_TRIGGER는 sp_settriggerorder)",
+    "설치 전후 행 수가 바뀐 테이블(기준선에 포함, 원본과 다름): dbo.DatabaseLog +431행"
+  ]
+}

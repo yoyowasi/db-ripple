@@ -1,0 +1,118 @@
+# dbripple "baseline" "build" "--source" "CascadeLab" "--sandbox" "CascadeLab_Sandbox" "--snapshot" "CascadeLab_Sandbox_base" "--backup" "/var/opt/mssql/backup/CascadeLab_baseline.bak" "--out" "logs/week1/cascadelab-baseline" at=2026-11-10T09:10:45.6190668+09:00 elapsedSec=15.89 exit=0
+09:10:30.932 [master] 120ms IF DB_ID(N'CascadeLab_Sandbox_base') IS NOT NULL DROP DATABASE [CascadeLab_Sandbox_base];
+09:10:31.424 [master] 303ms BACKUP DATABASE [CascadeLab] TO DISK = N'/var/opt/mssql/backup/CascadeLab_baseline.bak' WITH COPY_ONLY, INIT;
+09:10:31.653 FILELISTONLY: CascadeLab(D,1), CascadeLab_log(L,2)
+09:10:33.467 [master] 1,649ms IF DB_ID(N'CascadeLab_Sandbox') IS NOT NULL ALTER DATABASE [CascadeLab_Sandbox] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+09:10:34.432 [master] 786ms RESTORE DATABASE [CascadeLab_Sandbox] FROM DISK = N'/var/opt/mssql/backup/CascadeLab_baseline.bak' WITH MOVE N'CascadeLa…
+09:10:35.193 [CascadeLab_Sandbox] 5ms CREATE SCHEMA audit AUTHORIZATION dbo;
+09:10:35.334 [CascadeLab_Sandbox] 9ms CREATE SEQUENCE audit.CaptureSeq AS bigint START WITH 1 INCREMENT BY 1;
+09:10:35.478 [CascadeLab_Sandbox] 12ms CREATE TABLE audit.AuditHeader (
+09:10:35.619 [CascadeLab_Sandbox] 9ms CREATE TABLE audit.AuditRowImage (
+09:10:35.770 [CascadeLab_Sandbox] 18ms CREATE TABLE audit.AuditControl (
+09:10:35.915 [CascadeLab_Sandbox] 11ms CREATE TRIGGER [cl01].[dbr_audit_A_I] ON [cl01].[A]
+09:10:36.055 [CascadeLab_Sandbox] 8ms CREATE TRIGGER [cl01].[dbr_audit_A_U] ON [cl01].[A]
+09:10:36.201 [CascadeLab_Sandbox] 13ms CREATE TRIGGER [cl01].[dbr_audit_A_D] ON [cl01].[A]
+09:10:36.370 [CascadeLab_Sandbox] 40ms EXEC sys.sp_settriggerorder @triggername = N'[cl01].[dbr_audit_A_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:36.503 [CascadeLab_Sandbox] 8ms CREATE TRIGGER [cl01].[dbr_audit_B_I] ON [cl01].[B]
+09:10:36.632 [CascadeLab_Sandbox] 9ms CREATE TRIGGER [cl01].[dbr_audit_B_U] ON [cl01].[B]
+09:10:36.774 [CascadeLab_Sandbox] 8ms CREATE TRIGGER [cl01].[dbr_audit_B_D] ON [cl01].[B]
+09:10:36.913 [CascadeLab_Sandbox] 14ms EXEC sys.sp_settriggerorder @triggername = N'[cl01].[dbr_audit_B_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:37.058 [CascadeLab_Sandbox] 8ms CREATE TRIGGER [cl01].[dbr_audit_C_I] ON [cl01].[C]
+09:10:37.190 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl01].[dbr_audit_C_U] ON [cl01].[C]
+09:10:37.330 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl01].[dbr_audit_C_D] ON [cl01].[C]
+09:10:37.479 [CascadeLab_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[cl01].[dbr_audit_C_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:37.601 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl01].[dbr_audit_D_I] ON [cl01].[D]
+09:10:37.716 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl01].[dbr_audit_D_U] ON [cl01].[D]
+09:10:37.831 [CascadeLab_Sandbox] 8ms CREATE TRIGGER [cl01].[dbr_audit_D_D] ON [cl01].[D]
+09:10:37.939 [CascadeLab_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[cl01].[dbr_audit_D_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:38.047 [CascadeLab_Sandbox] 9ms CREATE TRIGGER [cl02].[dbr_audit_Dept_I] ON [cl02].[Dept]
+09:10:38.151 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl02].[dbr_audit_Dept_U] ON [cl02].[Dept]
+09:10:38.256 [CascadeLab_Sandbox] 9ms CREATE TRIGGER [cl02].[dbr_audit_Dept_D] ON [cl02].[Dept]
+09:10:38.360 [CascadeLab_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[cl02].[dbr_audit_Dept_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:38.459 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl02].[dbr_audit_Emp_I] ON [cl02].[Emp]
+09:10:38.560 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl02].[dbr_audit_Emp_U] ON [cl02].[Emp]
+09:10:38.656 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl02].[dbr_audit_Emp_D] ON [cl02].[Emp]
+09:10:38.766 [CascadeLab_Sandbox] 20ms EXEC sys.sp_settriggerorder @triggername = N'[cl02].[dbr_audit_Emp_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:38.862 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl03].[dbr_audit_Category_I] ON [cl03].[Category]
+09:10:38.953 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl03].[dbr_audit_Category_U] ON [cl03].[Category]
+09:10:39.053 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl03].[dbr_audit_Category_D] ON [cl03].[Category]
+09:10:39.162 [CascadeLab_Sandbox] 9ms EXEC sys.sp_settriggerorder @triggername = N'[cl03].[dbr_audit_Category_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:39.255 [CascadeLab_Sandbox] 9ms CREATE TRIGGER [cl03].[dbr_audit_Grp_I] ON [cl03].[Grp]
+09:10:39.356 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl03].[dbr_audit_Grp_U] ON [cl03].[Grp]
+09:10:39.456 [CascadeLab_Sandbox] 8ms CREATE TRIGGER [cl03].[dbr_audit_Grp_D] ON [cl03].[Grp]
+09:10:39.562 [CascadeLab_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[cl03].[dbr_audit_Grp_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:39.665 [CascadeLab_Sandbox] 8ms CREATE TRIGGER [cl03].[dbr_audit_Item_I] ON [cl03].[Item]
+09:10:39.769 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl03].[dbr_audit_Item_U] ON [cl03].[Item]
+09:10:39.876 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl03].[dbr_audit_Item_D] ON [cl03].[Item]
+09:10:39.979 [CascadeLab_Sandbox] 12ms EXEC sys.sp_settriggerorder @triggername = N'[cl03].[dbr_audit_Item_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:40.072 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl03].[dbr_audit_Product_I] ON [cl03].[Product]
+09:10:40.162 [CascadeLab_Sandbox] 5ms CREATE TRIGGER [cl03].[dbr_audit_Product_U] ON [cl03].[Product]
+09:10:40.253 [CascadeLab_Sandbox] 8ms CREATE TRIGGER [cl03].[dbr_audit_Product_D] ON [cl03].[Product]
+09:10:40.347 [CascadeLab_Sandbox] 9ms EXEC sys.sp_settriggerorder @triggername = N'[cl03].[dbr_audit_Product_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:40.433 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl04].[dbr_audit_Ch_I] ON [cl04].[Ch]
+09:10:40.519 [CascadeLab_Sandbox] 5ms CREATE TRIGGER [cl04].[dbr_audit_Ch_U] ON [cl04].[Ch]
+09:10:40.604 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl04].[dbr_audit_Ch_D] ON [cl04].[Ch]
+09:10:40.688 [CascadeLab_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[cl04].[dbr_audit_Ch_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:40.769 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl04].[dbr_audit_P_I] ON [cl04].[P]
+09:10:40.864 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl04].[dbr_audit_P_U] ON [cl04].[P]
+09:10:40.950 [CascadeLab_Sandbox] 8ms CREATE TRIGGER [cl04].[dbr_audit_P_D] ON [cl04].[P]
+09:10:41.044 [CascadeLab_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[cl04].[dbr_audit_P_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:41.125 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl05].[dbr_audit_P_I] ON [cl05].[P]
+09:10:41.214 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl05].[dbr_audit_P_U] ON [cl05].[P]
+09:10:41.297 [CascadeLab_Sandbox] 8ms CREATE TRIGGER [cl05].[dbr_audit_P_D] ON [cl05].[P]
+09:10:41.384 [CascadeLab_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[cl05].[dbr_audit_P_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:41.473 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl05].[dbr_audit_X_I] ON [cl05].[X]
+09:10:41.550 [CascadeLab_Sandbox] 5ms CREATE TRIGGER [cl05].[dbr_audit_X_U] ON [cl05].[X]
+09:10:41.627 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl05].[dbr_audit_X_D] ON [cl05].[X]
+09:10:41.706 [CascadeLab_Sandbox] 9ms EXEC sys.sp_settriggerorder @triggername = N'[cl05].[dbr_audit_X_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:41.788 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl05].[dbr_audit_X2_I] ON [cl05].[X2]
+09:10:41.868 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl05].[dbr_audit_X2_U] ON [cl05].[X2]
+09:10:41.941 [CascadeLab_Sandbox] 5ms CREATE TRIGGER [cl05].[dbr_audit_X2_D] ON [cl05].[X2]
+09:10:42.019 [CascadeLab_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[cl05].[dbr_audit_X2_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:42.096 [CascadeLab_Sandbox] 8ms CREATE TRIGGER [cl05].[dbr_audit_Y_I] ON [cl05].[Y]
+09:10:42.167 [CascadeLab_Sandbox] 5ms CREATE TRIGGER [cl05].[dbr_audit_Y_U] ON [cl05].[Y]
+09:10:42.243 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl05].[dbr_audit_Y_D] ON [cl05].[Y]
+09:10:42.331 [CascadeLab_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[cl05].[dbr_audit_Y_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:42.436 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl05].[dbr_audit_Y2_I] ON [cl05].[Y2]
+09:10:42.522 [CascadeLab_Sandbox] 8ms CREATE TRIGGER [cl05].[dbr_audit_Y2_U] ON [cl05].[Y2]
+09:10:42.598 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl05].[dbr_audit_Y2_D] ON [cl05].[Y2]
+09:10:42.674 [CascadeLab_Sandbox] 12ms EXEC sys.sp_settriggerorder @triggername = N'[cl05].[dbr_audit_Y2_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:42.745 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl06].[dbr_audit_Line_I] ON [cl06].[Line]
+09:10:42.821 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl06].[dbr_audit_Line_U] ON [cl06].[Line]
+09:10:42.900 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl06].[dbr_audit_Line_D] ON [cl06].[Line]
+09:10:42.978 [CascadeLab_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[cl06].[dbr_audit_Line_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:43.050 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl06].[dbr_audit_LineLog_I] ON [cl06].[LineLog]
+09:10:43.123 [CascadeLab_Sandbox] 5ms CREATE TRIGGER [cl06].[dbr_audit_LineLog_U] ON [cl06].[LineLog]
+09:10:43.195 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl06].[dbr_audit_LineLog_D] ON [cl06].[LineLog]
+09:10:43.278 [CascadeLab_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[cl06].[dbr_audit_LineLog_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:43.347 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl06].[dbr_audit_Ord_I] ON [cl06].[Ord]
+09:10:43.431 [CascadeLab_Sandbox] 8ms CREATE TRIGGER [cl06].[dbr_audit_Ord_U] ON [cl06].[Ord]
+09:10:43.503 [CascadeLab_Sandbox] 5ms CREATE TRIGGER [cl06].[dbr_audit_Ord_D] ON [cl06].[Ord]
+09:10:43.579 [CascadeLab_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[cl06].[dbr_audit_Ord_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:43.654 [CascadeLab_Sandbox] 5ms CREATE TRIGGER [cl07].[dbr_audit_A_I] ON [cl07].[A]
+09:10:43.738 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl07].[dbr_audit_A_U] ON [cl07].[A]
+09:10:43.818 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl07].[dbr_audit_A_D] ON [cl07].[A]
+09:10:43.915 [CascadeLab_Sandbox] 17ms EXEC sys.sp_settriggerorder @triggername = N'[cl07].[dbr_audit_A_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:44.024 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl07].[dbr_audit_B_I] ON [cl07].[B]
+09:10:44.132 [CascadeLab_Sandbox] 9ms CREATE TRIGGER [cl07].[dbr_audit_B_U] ON [cl07].[B]
+09:10:44.230 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl07].[dbr_audit_B_D] ON [cl07].[B]
+09:10:44.323 [CascadeLab_Sandbox] 20ms EXEC sys.sp_settriggerorder @triggername = N'[cl07].[dbr_audit_B_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:44.418 [CascadeLab_Sandbox] 10ms CREATE TRIGGER [cl07].[dbr_audit_C_I] ON [cl07].[C]
+09:10:44.492 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl07].[dbr_audit_C_U] ON [cl07].[C]
+09:10:44.570 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl07].[dbr_audit_C_D] ON [cl07].[C]
+09:10:44.658 [CascadeLab_Sandbox] 13ms EXEC sys.sp_settriggerorder @triggername = N'[cl07].[dbr_audit_C_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:44.738 [CascadeLab_Sandbox] 7ms CREATE TRIGGER [cl07].[dbr_audit_D_I] ON [cl07].[D]
+09:10:44.829 [CascadeLab_Sandbox] 9ms CREATE TRIGGER [cl07].[dbr_audit_D_U] ON [cl07].[D]
+09:10:44.922 [CascadeLab_Sandbox] 5ms CREATE TRIGGER [cl07].[dbr_audit_D_D] ON [cl07].[D]
+09:10:45.002 [CascadeLab_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[cl07].[dbr_audit_D_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:45.073 [CascadeLab_Sandbox] 5ms CREATE TRIGGER [cl08].[dbr_audit_Acct_I] ON [cl08].[Acct]
+09:10:45.147 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl08].[dbr_audit_Acct_U] ON [cl08].[Acct]
+09:10:45.217 [CascadeLab_Sandbox] 6ms CREATE TRIGGER [cl08].[dbr_audit_Acct_D] ON [cl08].[Acct]
+09:10:45.287 [CascadeLab_Sandbox] 9ms EXEC sys.sp_settriggerorder @triggername = N'[cl08].[dbr_audit_Acct_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:45.556 [master] 105ms CREATE DATABASE [CascadeLab_Sandbox_base] ON (NAME = [CascadeLab], FILENAME = N'/var/opt/mssql/data/CascadeLab_Sandbox_b…
+기준 시각(백업 완료): 2026-11-10T09:10:31.4253187+09:00
+원본 지문: Fingerprint { ProductVersion = 17.0.5035.5, Edition = Enterprise Developer Edition (64-bit), CompatibilityLevel = 170, IsRecursiveTriggersOn = False, NestedTriggers = 1, DisallowResultsFromTriggers = 0, SessionOptions = 5432, Collation = SQL_Latin1_General_CP1_CI_AS }
+샌드박스 지문: Fingerprint { ProductVersion = 17.0.5035.5, Edition = Enterprise Developer Edition (64-bit), CompatibilityLevel = 170, IsRecursiveTriggersOn = False, NestedTriggers = 1, DisallowResultsFromTriggers = 0, SessionOptions = 5432, Collation = SQL_Latin1_General_CP1_CI_AS }
+fingerprintMatch=True
+매니페스트 m-20261110-0910: 대상 25개, 제외 0개, auditNotLast 0개, 배치 105개
+총 소요: 15.6s

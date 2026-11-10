@@ -1,0 +1,286 @@
+# CascadeLab.Verify oracle 2026-11-10T09:05:39.6156005+09:00
+env: productVersion="17.0.5035.5"; productUpdateLevel="CU10"; edition="Enterprise Developer Edition (64-bit)"; nestedTriggers=1; disallowResultsFromTriggers=0; sessionOptions=5432; xactAbort=0; db:CascadeLab={is_recursive_triggers_on=false, compatibility_level=170, is_read_committed_snapshot_on=false, snapshot_isolation_state_desc="OFF", collation_name="SQL_Latin1_General_CP1_CI_AS"}; db:CascadeLab_RT={is_recursive_triggers_on=true, compatibility_level=170, is_read_committed_snapshot_on=false, snapshot_isolation_state_desc="OFF", collation_name="SQL_Latin1_General_CP1_CI_AS"}
+seed digest: CascadeLab=6E605145E7235F14, CascadeLab_RT=78EF7DC7082C7A41
+
+== CL01 (CL01-cascade-4.json) db=CascadeLab verdict=MATCH judged=21 match=21 mismatch=0 observed=0
+   stmt 1: DELETE FROM cl01.A WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl01.A: I0[] U0[] D1[{"id":1}]
+   net cl01.B: I0[] U0[] D2[{"id":10} {"id":11}]
+   net cl01.C: I0[] U0[] D3[{"id":100} {"id":101} {"id":110}]
+   net cl01.D: I0[] U0[] D3[{"id":1000} {"id":1001} {"id":1100}]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl01.A keyColumns: exp=id act=id
+   [MATCH] cl01.A inserted: exp=[] act=[]
+   [MATCH] cl01.A updated: exp=[] act=[]
+   [MATCH] cl01.A deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl01.B keyColumns: exp=id act=id
+   [MATCH] cl01.B inserted: exp=[] act=[]
+   [MATCH] cl01.B updated: exp=[] act=[]
+   [MATCH] cl01.B deleted: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] cl01.C keyColumns: exp=id act=id
+   [MATCH] cl01.C inserted: exp=[] act=[]
+   [MATCH] cl01.C updated: exp=[] act=[]
+   [MATCH] cl01.C deleted: exp=[{"id":100}, {"id":101}, {"id":110}] act=[{"id":100}, {"id":101}, {"id":110}]
+   [MATCH] cl01.D keyColumns: exp=id act=id
+   [MATCH] cl01.D inserted: exp=[] act=[]
+   [MATCH] cl01.D updated: exp=[] act=[]
+   [MATCH] cl01.D deleted: exp=[{"id":1000}, {"id":1001}, {"id":1100}] act=[{"id":1000}, {"id":1001}, {"id":1100}]
+
+== CL02 (CL02-set-null.json) db=CascadeLab verdict=MATCH judged=17 match=17 mismatch=0 observed=0
+   stmt 1: DELETE FROM cl02.Dept WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl02.Dept: I0[] U0[] D1[{"id":1}]
+   net cl02.Emp: I0[] U2[{"id":10}(dept_id) {"id":11}(dept_id)] D0[]
+     cl02.Emp {"id":10}: dept_id 1->null
+     cl02.Emp {"id":11}: dept_id 1->null
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl02.Dept keyColumns: exp=id act=id
+   [MATCH] cl02.Dept inserted: exp=[] act=[]
+   [MATCH] cl02.Dept updated: exp=[] act=[]
+   [MATCH] cl02.Dept deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl02.Emp keyColumns: exp=id act=id
+   [MATCH] cl02.Emp inserted: exp=[] act=[]
+   [MATCH] cl02.Emp updated: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] cl02.Emp deleted: exp=[] act=[]
+   [MATCH] cl02.Emp {"id":10} changedColumns: exp=[dept_id] act=[dept_id]
+   [MATCH] cl02.Emp {"id":10} after.dept_id: exp=null act=null
+   [MATCH] cl02.Emp {"id":11} changedColumns: exp=[dept_id] act=[dept_id]
+   [MATCH] cl02.Emp {"id":11} after.dept_id: exp=null act=null
+
+== CL03 (CL03-set-default.json) db=CascadeLab verdict=MATCH judged=19 match=19 mismatch=0 observed=0
+   stmt 1: DELETE FROM cl03.Category WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl03.Category: I0[] U0[] D1[{"id":1}]
+   net cl03.Product: I0[] U2[{"id":10}(category_id) {"id":11}(category_id)] D0[]
+     cl03.Product {"id":10}: category_id 1->0
+     cl03.Product {"id":11}: category_id 1->0
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl03.Category keyColumns: exp=id act=id
+   [MATCH] cl03.Category inserted: exp=[] act=[]
+   [MATCH] cl03.Category updated: exp=[] act=[]
+   [MATCH] cl03.Category deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl03.Product keyColumns: exp=id act=id
+   [MATCH] cl03.Product inserted: exp=[] act=[]
+   [MATCH] cl03.Product updated: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] cl03.Product deleted: exp=[] act=[]
+   [MATCH] cl03.Product {"id":10} changedColumns: exp=[category_id] act=[category_id]
+   [MATCH] cl03.Product {"id":10} after.category_id: exp=0 act=0
+   [MATCH] cl03.Product {"id":11} changedColumns: exp=[category_id] act=[category_id]
+   [MATCH] cl03.Product {"id":11} after.category_id: exp=0 act=0
+   [MATCH] cl03.Grp 변경 0(정답에 없는 같은 패턴 스키마 테이블): exp=I0 U0 D0 act=I0 U0 D0
+   [MATCH] cl03.Item 변경 0(정답에 없는 같은 패턴 스키마 테이블): exp=I0 U0 D0 act=I0 U0 D0
+
+== CL03b (CL03b-set-default-missing.json) db=CascadeLab verdict=MATCH judged=15 match=15 mismatch=0 observed=0
+   stmt 1: DELETE FROM cl03.Grp WHERE id = 1;
+     status=failed rowsAffected=- tranCountAfter=1 xactStateAfter=1
+     error 547 class=16 state=0 line=1: The DELETE statement conflicted with the FOREIGN KEY constraint "FK_cl03_Item_Grp". The conflict occurred in database "CascadeLab", table "cl03.Grp", column 'id'.
+     error 3621 class=0 state=0 line=1: The statement has been terminated.
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=failed act=failed
+   [MATCH] errorNumber: exp=547 act=547  (수집한 오류: 547(class 16), 3621(class 0))
+   [MATCH] statement 1 status: exp=failed act=failed
+   [MATCH] cl03.Grp keyColumns: exp=id act=id
+   [MATCH] cl03.Grp inserted: exp=[] act=[]
+   [MATCH] cl03.Grp updated: exp=[] act=[]
+   [MATCH] cl03.Grp deleted: exp=[] act=[]
+   [MATCH] cl03.Item keyColumns: exp=id act=id
+   [MATCH] cl03.Item inserted: exp=[] act=[]
+   [MATCH] cl03.Item updated: exp=[] act=[]
+   [MATCH] cl03.Item deleted: exp=[] act=[]
+   [MATCH] cl03.Category 변경 0(정답에 없는 같은 패턴 스키마 테이블): exp=I0 U0 D0 act=I0 U0 D0
+   [MATCH] cl03.Product 변경 0(정답에 없는 같은 패턴 스키마 테이블): exp=I0 U0 D0 act=I0 U0 D0
+
+== CL04 (CL04-update-cascade-pk.json) db=CascadeLab verdict=MATCH judged=19 match=19 mismatch=0 observed=0
+   stmt 1: UPDATE cl04.P SET id = id + 100 WHERE id IN (1, 2);
+     status=ok rowsAffected=2 tranCountAfter=1 xactStateAfter=1
+   net cl04.Ch: I0[] U3[{"id":10}(p_id) {"id":11}(p_id) {"id":20}(p_id)] D0[]
+   net cl04.P: I2[{"id":101} {"id":102}] U0[] D2[{"id":1} {"id":2}]
+     cl04.Ch {"id":10}: p_id 1->101
+     cl04.Ch {"id":11}: p_id 1->101
+     cl04.Ch {"id":20}: p_id 2->102
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl04.P keyColumns: exp=id act=id
+   [MATCH] cl04.P inserted: exp=[{"id":101}, {"id":102}] act=[{"id":101}, {"id":102}]
+   [MATCH] cl04.P updated: exp=[] act=[]
+   [MATCH] cl04.P deleted: exp=[{"id":1}, {"id":2}] act=[{"id":1}, {"id":2}]
+   [MATCH] cl04.Ch keyColumns: exp=id act=id
+   [MATCH] cl04.Ch inserted: exp=[] act=[]
+   [MATCH] cl04.Ch updated: exp=[{"id":10}, {"id":11}, {"id":20}] act=[{"id":10}, {"id":11}, {"id":20}]
+   [MATCH] cl04.Ch deleted: exp=[] act=[]
+   [MATCH] cl04.Ch {"id":10} changedColumns: exp=[p_id] act=[p_id]
+   [MATCH] cl04.Ch {"id":10} after.p_id: exp=101 act=101
+   [MATCH] cl04.Ch {"id":11} changedColumns: exp=[p_id] act=[p_id]
+   [MATCH] cl04.Ch {"id":11} after.p_id: exp=101 act=101
+   [MATCH] cl04.Ch {"id":20} changedColumns: exp=[p_id] act=[p_id]
+   [MATCH] cl04.Ch {"id":20} after.p_id: exp=102 act=102
+
+== CL04b (CL04b-update-cascade-single.json) db=CascadeLab verdict=MATCH judged=15 match=15 mismatch=0 observed=0
+   stmt 1: UPDATE cl04.P SET id = 300 WHERE id = 3;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl04.Ch: I0[] U1[{"id":30}(p_id)] D0[]
+   net cl04.P: I1[{"id":300}] U0[] D1[{"id":3}]
+     cl04.Ch {"id":30}: p_id 3->300
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl04.P keyColumns: exp=id act=id
+   [MATCH] cl04.P inserted: exp=[{"id":300}] act=[{"id":300}]
+   [MATCH] cl04.P updated: exp=[] act=[]
+   [MATCH] cl04.P deleted: exp=[{"id":3}] act=[{"id":3}]
+   [MATCH] cl04.Ch keyColumns: exp=id act=id
+   [MATCH] cl04.Ch inserted: exp=[] act=[]
+   [MATCH] cl04.Ch updated: exp=[{"id":30}] act=[{"id":30}]
+   [MATCH] cl04.Ch deleted: exp=[] act=[]
+   [MATCH] cl04.Ch {"id":30} changedColumns: exp=[p_id] act=[p_id]
+   [MATCH] cl04.Ch {"id":30} after.p_id: exp=300 act=300
+
+== CL05 (CL05-two-chains.json) db=CascadeLab verdict=MATCH judged=25 match=25 mismatch=0 observed=0
+   stmt 1: DELETE FROM cl05.P WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl05.P: I0[] U0[] D1[{"id":1}]
+   net cl05.X: I0[] U0[] D2[{"id":10} {"id":11}]
+   net cl05.X2: I0[] U0[] D2[{"id":100} {"id":110}]
+   net cl05.Y: I0[] U0[] D1[{"id":30}]
+   net cl05.Y2: I0[] U0[] D1[{"id":300}]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl05.P keyColumns: exp=id act=id
+   [MATCH] cl05.P inserted: exp=[] act=[]
+   [MATCH] cl05.P updated: exp=[] act=[]
+   [MATCH] cl05.P deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl05.X keyColumns: exp=id act=id
+   [MATCH] cl05.X inserted: exp=[] act=[]
+   [MATCH] cl05.X updated: exp=[] act=[]
+   [MATCH] cl05.X deleted: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] cl05.X2 keyColumns: exp=id act=id
+   [MATCH] cl05.X2 inserted: exp=[] act=[]
+   [MATCH] cl05.X2 updated: exp=[] act=[]
+   [MATCH] cl05.X2 deleted: exp=[{"id":100}, {"id":110}] act=[{"id":100}, {"id":110}]
+   [MATCH] cl05.Y keyColumns: exp=id act=id
+   [MATCH] cl05.Y inserted: exp=[] act=[]
+   [MATCH] cl05.Y updated: exp=[] act=[]
+   [MATCH] cl05.Y deleted: exp=[{"id":30}] act=[{"id":30}]
+   [MATCH] cl05.Y2 keyColumns: exp=id act=id
+   [MATCH] cl05.Y2 inserted: exp=[] act=[]
+   [MATCH] cl05.Y2 updated: exp=[] act=[]
+   [MATCH] cl05.Y2 deleted: exp=[{"id":300}] act=[{"id":300}]
+
+== CL06 (CL06-cascade-target-trigger.json) db=CascadeLab verdict=MATCH judged=17 match=17 mismatch=0 observed=0
+   stmt 1: DELETE FROM cl06.Ord WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl06.Line: I0[] U0[] D2[{"id":10} {"id":11}]
+   net cl06.LineLog: I2[{"line_id":10} {"line_id":11}] U0[] D0[]
+   net cl06.Ord: I0[] U0[] D1[{"id":1}]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl06.Ord keyColumns: exp=id act=id
+   [MATCH] cl06.Ord inserted: exp=[] act=[]
+   [MATCH] cl06.Ord updated: exp=[] act=[]
+   [MATCH] cl06.Ord deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl06.Line keyColumns: exp=id act=id
+   [MATCH] cl06.Line inserted: exp=[] act=[]
+   [MATCH] cl06.Line updated: exp=[] act=[]
+   [MATCH] cl06.Line deleted: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] cl06.LineLog keyColumns: exp=line_id act=line_id
+   [MATCH] cl06.LineLog inserted: exp=[{"line_id":10}, {"line_id":11}] act=[{"line_id":10}, {"line_id":11}]
+   [MATCH] cl06.LineLog updated: exp=[] act=[]
+   [MATCH] cl06.LineLog deleted: exp=[] act=[]
+
+== CL07 (CL07-trigger-chain-3.json) db=CascadeLab verdict=MATCH judged=25 match=25 mismatch=0 observed=0
+   stmt 1: UPDATE cl07.A SET v = v + 1 WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl07.A: I0[] U1[{"id":1}(v)] D0[]
+   net cl07.B: I0[] U2[{"id":10}(total) {"id":11}(total)] D0[]
+   net cl07.C: I2[{"b_id":10} {"b_id":11}] U0[] D0[]
+   net cl07.D: I0[] U1[{"id":1}(cnt)] D0[]
+     cl07.A {"id":1}: v 0->1
+     cl07.B {"id":10}: total 0->1
+     cl07.B {"id":11}: total 0->1
+     cl07.D {"id":1}: cnt 0->2
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl07.A keyColumns: exp=id act=id
+   [MATCH] cl07.A inserted: exp=[] act=[]
+   [MATCH] cl07.A updated: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl07.A deleted: exp=[] act=[]
+   [MATCH] cl07.A {"id":1} changedColumns: exp=[v] act=[v]
+   [MATCH] cl07.B keyColumns: exp=id act=id
+   [MATCH] cl07.B inserted: exp=[] act=[]
+   [MATCH] cl07.B updated: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] cl07.B deleted: exp=[] act=[]
+   [MATCH] cl07.B {"id":10} changedColumns: exp=[total] act=[total]
+   [MATCH] cl07.B {"id":11} changedColumns: exp=[total] act=[total]
+   [MATCH] cl07.C keyColumns: exp=b_id act=b_id
+   [MATCH] cl07.C inserted: exp=[{"b_id":10}, {"b_id":11}] act=[{"b_id":10}, {"b_id":11}]
+   [MATCH] cl07.C updated: exp=[] act=[]
+   [MATCH] cl07.C deleted: exp=[] act=[]
+   [MATCH] cl07.D keyColumns: exp=id act=id
+   [MATCH] cl07.D inserted: exp=[] act=[]
+   [MATCH] cl07.D updated: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl07.D deleted: exp=[] act=[]
+   [MATCH] cl07.D {"id":1} changedColumns: exp=[cnt] act=[cnt]
+
+== CL08a (CL08a-self-update-rt-off.json) db=CascadeLab verdict=MATCH judged=11 match=11 mismatch=0 observed=0
+   stmt 1: UPDATE cl08.Acct SET bal = bal + 10 WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl08.Acct: I0[] U1[{"id":1}(bal,touched)] D0[]
+     cl08.Acct {"id":1}: bal 100->110, touched 0->1
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl08.Acct keyColumns: exp=id act=id
+   [MATCH] cl08.Acct inserted: exp=[] act=[]
+   [MATCH] cl08.Acct updated: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl08.Acct deleted: exp=[] act=[]
+   [MATCH] cl08.Acct {"id":1} changedColumns: exp=[bal, touched] act=[bal, touched]
+   [MATCH] cl08.Acct {"id":1} after.touched: exp=1 act=1
+
+== CL08b (CL08b-self-update-rt-on.json) db=CascadeLab_RT verdict=MATCH judged=11 match=11 mismatch=0 observed=0
+   stmt 1: UPDATE cl08.Acct SET bal = bal + 10 WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl08.Acct: I0[] U1[{"id":1}(bal,touched)] D0[]
+     cl08.Acct {"id":1}: bal 100->110, touched 0->3
+   [MATCH] env: 시작 상태 = 시드 상태: exp=78EF7DC7082C7A41 act=78EF7DC7082C7A41
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=78EF7DC7082C7A41 act=78EF7DC7082C7A41
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl08.Acct keyColumns: exp=id act=id
+   [MATCH] cl08.Acct inserted: exp=[] act=[]
+   [MATCH] cl08.Acct updated: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl08.Acct deleted: exp=[] act=[]
+   [MATCH] cl08.Acct {"id":1} changedColumns: exp=[bal, touched] act=[bal, touched]
+   [MATCH] cl08.Acct {"id":1} after.touched: exp=3 act=3
+
+summary: MATCH 11 (사례 11개)

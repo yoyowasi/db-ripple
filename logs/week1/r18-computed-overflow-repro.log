@@ -1,0 +1,26 @@
+# logs\week1\r18-computed-overflow-repro.sql db=master part=0 at=2026-11-10T10:08:15.7185308+09:00 elapsedSec=1.39 exit=0
+Changed database context to 'dbr_r18'.
+
+(2 rows affected)
+
+(1 rows affected)
+phase result rowsAffected
+----- ------ ------------
+no_audit OK 1
+
+(1 rows affected)
+
+(0 rows affected)
+phase result errNo errProc errMsg xactState
+----- ------ ----- ------- ------ ---------
+with_audit FAILED 8115 dbr_audit_T_U Arithmetic overflow error converting expression to data type int. -1
+
+(1 rows affected)
+
+(1 rows affected)
+phase auditRows
+----- ---------
+with_audit_ok_row 1
+
+(1 rows affected)
+Changed database context to 'master'.

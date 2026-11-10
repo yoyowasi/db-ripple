@@ -1,0 +1,7 @@
+# spikes\sql\sp1_00_create_db.sql db=master part=0 at=2026-11-10T09:11:36.3080858+09:00 elapsedSec=1.4 exit=0
+Changed database context to 'master'.
+name is_recursive_triggers_on compatibility_level nestedTriggers productVersion
+---- ------------------------ ------------------- -------------- --------------
+SpikeLab_SP1 0 170 1 17.0.5035.5
+
+(1 rows affected)

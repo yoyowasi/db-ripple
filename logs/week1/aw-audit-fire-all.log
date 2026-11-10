@@ -1,0 +1,22 @@
+# logs\week1\aw-audit-fire-all.sql db=AW_Sandbox part=0 at=2026-11-10T09:33:20.2804600+09:00 elapsedSec=0.88 exit=0
+sessionQI
+---------
+1
+
+(1 rows affected)
+phase tables errors hdrI hdrU hdrD zeroRowHdr images imagesWithRow badJson rowcountNot1
+----- ------ ------ ---- ---- ---- ---------- ------ ------------- ------- ------------
+A 71 0 71 71 69 211 0 0 0 0
+B 71 0 0 80 0 5 150 150 0 1
+tbl phase err
+--- ----- ---
+tbl hdrI hdrU hdrD zeroRowHdr
+--- ---- ---- ---- ----------
+[HumanResources].[Employee] 1 1 0 2
+[Purchasing].[Vendor] 1 1 0 2
+tbl rc hdrI hdrU hdrD images imagesWithRow
+--- -- ---- ---- ---- ------ -------------
+[dbo].[ErrorLog] 0 0 1 0 0 0
+errorLogRows
+------------
+0

@@ -1,0 +1,18 @@
+# cascadelab\verification\sql\quoted-identifier-check.sql db=master part=0 at=2026-11-10T09:09:48.9895237+09:00 elapsedSec=1.22 exit=0
+what quoted_identifier ansi_nulls
+---- ----------------- ----------
+session 1 1
+session_id db status program_name command
+---------- -- ------ ------------ -------
+Changed database context to 'CascadeLab'.
+db sch obj type_desc uses_quoted_identifier uses_ansi_nulls
+-- --- --- --------- ---------------------- ---------------
+CascadeLab cl06 trg_Line_del SQL_TRIGGER 1 1
+CascadeLab cl07 trg_A_upd SQL_TRIGGER 1 1
+CascadeLab cl07 trg_B_upd SQL_TRIGGER 1 1
+CascadeLab cl07 trg_C_ins SQL_TRIGGER 1 1
+CascadeLab cl08 trg_Acct_upd SQL_TRIGGER 1 1
+Changed database context to 'CascadeLab_RT'.
+db sch obj type_desc uses_quoted_identifier uses_ansi_nulls
+-- --- --- --------- ---------------------- ---------------
+CascadeLab_RT cl08 trg_Acct_upd SQL_TRIGGER 1 1

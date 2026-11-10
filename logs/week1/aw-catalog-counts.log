@@ -1,0 +1,77 @@
+# A24 재확인 - AW_Origin(AdventureWorks2025.bak 복원), 2026-11-10. 증거 범위: DB 읽기 전용(AW_Origin 변경 없음).
+# 1부 = C7 카탈로그 수치(dbripple catalog stats --database AW_Origin), 2부 = sys.* 직접 집계(C7 코드를 거치지 않은 독립 대조). 두 결과의 수치는 모두 같다.
+# 설계 A24 값 -> 실측
+#  사용자 테이블: (A24에 값 없음) -> 71
+#  FK: 90 -> 90 (비활성 0, 신뢰 안 됨 0)
+#  ON DELETE: CASCADE 2(SalesOrderHeader->SalesOrderDetail, SalesOrderHeader->SalesOrderHeaderSalesReason) -> 같음. CASCADE 2, NO_ACTION 88, SET_NULL·SET_DEFAULT 0
+#  ON UPDATE: (A24는 언급 없음) -> NO_ACTION 90(참조 동작 0)
+#  DML 트리거: 10(AFTER 8, INSTEAD OF DELETE 2) -> 같음. INSTEAD OF = HumanResources.Employee.dEmployee, Purchasing.Vendor.dVendor. First/Last 지정 0, 비활성 0
+#  DDL 트리거: 1 -> 1(ddlDatabaseTriggerLog, DDL_DATABASE_LEVEL_EVENTS 이벤트 158개, 설치 DDL 5종 CREATE_SCHEMA·CREATE_SEQUENCE·CREATE_TABLE·CREATE_TRIGGER·ALTER_TRIGGER 모두 포함)
+#  PK 없는 테이블: A24 "dbo.DatabaseLog는 PK 없는 힙" -> 설계와 다름. PK 없는 테이블 0. 힙 2개(dbo.DatabaseLog, Production.ProductProductPhoto)는 둘 다 비클러스터형 PK가 있다
+#  기타: temporal 0, 메모리 최적화 0(감사 제외 대상 없음), 뷰 20(뷰 트리거 0), 테이블이 있는 스키마 6개 모두 dbo 소유(OWNER_NOT_DBO 제외 없음)
+
+## 1부: C7 카탈로그
+# dbripple "catalog" "stats" "--database" "AW_Origin" at=2026-11-10T09:30:47.3767184+09:00 elapsedSec=0.64 exit=0
+[AW_Origin] C7 카탈로그 수치
+사용자 테이블: 71
+FK: 90(비활성 0, 신뢰 안 됨 0)
+ON DELETE: CASCADE 2, NO_ACTION 88
+ON UPDATE: NO_ACTION 90
+  참조 동작: FK_SalesOrderDetail_SalesOrderHeader_SalesOrderID: Sales.SalesOrderDetail → Sales.SalesOrderHeader ON DELETE CASCADE, ON UPDATE NO_ACTION
+  참조 동작: FK_SalesOrderHeaderSalesReason_SalesOrderHeader_SalesOrderID: Sales.SalesOrderHeaderSalesReason → Sales.SalesOrderHeader ON DELETE CASCADE, ON UPDATE NO_ACTION
+DML 트리거: 10(AFTER 8, INSTEAD OF 2)
+  HumanResources.Employee.dEmployee: INSTEAD OF DELETE
+  Person.Person.iuPerson: AFTER INSERT, UPDATE
+  Production.WorkOrder.iWorkOrder: AFTER INSERT
+  Production.WorkOrder.uWorkOrder: AFTER UPDATE
+  Purchasing.PurchaseOrderDetail.iPurchaseOrderDetail: AFTER INSERT
+  Purchasing.PurchaseOrderDetail.uPurchaseOrderDetail: AFTER UPDATE
+  Purchasing.PurchaseOrderHeader.uPurchaseOrderHeader: AFTER UPDATE
+  Purchasing.Vendor.dVendor: INSTEAD OF DELETE
+  Sales.SalesOrderDetail.iduSalesOrderDetail: AFTER INSERT, UPDATE, DELETE
+  Sales.SalesOrderHeader.uSalesOrderHeader: AFTER UPDATE
+DDL 트리거(데이터베이스): 1 — ddlDatabaseTriggerLog
+PK 없는 테이블: 0
+데이터 파일(ROWS): 1
+
+## 2부: sys.* 직접 집계
+# logs\week1\aw-catalog-counts.sql db=AW_Origin part=0 at=2026-11-10T09:33:21.1818983+09:00 elapsedSec=0.89 exit=0
+db userTables fks disabledFks untrustedFks afterTriggers insteadOfTriggers ddlTriggers tablesWithoutPk heaps temporalTables memoryOptimizedTables views viewTriggers
+-- ---------- --- ----------- ------------ ------------- ----------------- ----------- --------------- ----- -------------- --------------------- ----- ------------
+AW_Origin 71 90 0 0 8 2 1 0 2 0 0 20 0
+side action fks
+---- ------ ---
+ON DELETE CASCADE 2
+ON DELETE NO_ACTION 88
+ON UPDATE NO_ACTION 90
+fk child parent onDelete onUpdate
+-- ----- ------ -------- --------
+FK_SalesOrderDetail_SalesOrderHeader_SalesOrderID Sales.SalesOrderDetail Sales.SalesOrderHeader CASCADE NO_ACTION
+FK_SalesOrderHeaderSalesReason_SalesOrderHeader_SalesOrderID Sales.SalesOrderHeaderSalesReason Sales.SalesOrderHeader CASCADE NO_ACTION
+tbl trg kind events anyFirst anyLast disabled
+--- --- ---- ------ -------- ------- --------
+HumanResources.Employee dEmployee INSTEAD OF DELETE 0 0 0
+Person.Person iuPerson AFTER INSERT,UPDATE 0 0 0
+Production.WorkOrder iWorkOrder AFTER INSERT 0 0 0
+Production.WorkOrder uWorkOrder AFTER UPDATE 0 0 0
+Purchasing.PurchaseOrderDetail iPurchaseOrderDetail AFTER INSERT 0 0 0
+Purchasing.PurchaseOrderDetail uPurchaseOrderDetail AFTER UPDATE 0 0 0
+Purchasing.PurchaseOrderHeader uPurchaseOrderHeader AFTER UPDATE 0 0 0
+Purchasing.Vendor dVendor INSTEAD OF DELETE 0 0 0
+Sales.SalesOrderDetail iduSalesOrderDetail AFTER INSERT,UPDATE,DELETE 0 0 0
+Sales.SalesOrderHeader uSalesOrderHeader AFTER UPDATE 0 0 0
+ddlTrigger disabled eventRows eventGroup installEventsCovered
+---------- -------- --------- ---------- --------------------
+ddlDatabaseTriggerLog 0 158 DDL_DATABASE_LEVEL_EVENTS 5
+heapTable pkName pkType
+--------- ------ ------
+dbo.DatabaseLog PK_DatabaseLog_DatabaseLogID NONCLUSTERED
+Production.ProductProductPhoto PK_ProductProductPhoto_ProductID_ProductPhotoID NONCLUSTERED
+sch owner tables
+--- ----- ------
+dbo dbo 3
+HumanResources dbo 6
+Person dbo 13
+Production dbo 25
+Purchasing dbo 5
+Sales dbo 19

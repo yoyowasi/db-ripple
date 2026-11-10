@@ -1,0 +1,17 @@
+# spikes\sql\sp2_05_trigger_order.sql db=CascadeLab_RT_Sandbox part=0 at=2026-11-10T09:28:14.0840635+09:00 elapsedSec=0.72 exit=0
+db tableName evt firstTrigger lastTrigger afterTriggers auditOrder
+-- --------- --- ------------ ----------- ------------- ----------
+CascadeLab_RT_Sandbox cl08.Acct DELETE NULL dbr_audit_Acct_D 1 LAST 가능
+CascadeLab_RT_Sandbox cl08.Acct INSERT NULL dbr_audit_Acct_I 1 LAST 가능
+CascadeLab_RT_Sandbox cl08.Acct UPDATE NULL dbr_audit_Acct_U 2 LAST 가능
+
+(3 rows affected)
+db tableName insteadOfTrigger evt
+-- --------- ---------------- ---
+
+(0 rows affected)
+db is_recursive_triggers_on
+-- ------------------------
+CascadeLab_RT_Sandbox 1
+
+(1 rows affected)

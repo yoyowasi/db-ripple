@@ -1,0 +1,8 @@
+# spikes\sql\sp10_10_run.sql db=SpikeLab_SP10 part=2 at=2026-11-10T09:08:36.9144295+09:00 elapsedSec=2.03 exit=1
+Changed database context to 'SpikeLab_SP10'.
+
+(1 rows affected)
+
+(1 rows affected)
+Msg 3930, Level 16, State 1, Server 31e30d944dca, Line 45
+The current transaction cannot be committed and cannot support operations that write to the log file. Roll back the transaction.

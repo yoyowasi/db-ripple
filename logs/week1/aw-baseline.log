@@ -1,0 +1,306 @@
+# dbripple "baseline" "build" "--source" "AW_Origin" "--sandbox" "AW_Sandbox" "--snapshot" "AW_Sandbox_base" "--backup" "/var/opt/mssql/backup/AW_Origin_baseline.bak" "--out" "logs/week1/aw-baseline" at=2026-11-10T09:29:18.7472769+09:00 elapsedSec=4.98 exit=0
+09:29:14.269 [master] 42ms IF DB_ID(N'AW_Sandbox_base') IS NOT NULL
+09:29:14.487 [master] 213ms BACKUP DATABASE [AW_Origin] TO DISK = N'/var/opt/mssql/backup/AW_Origin_baseline.bak' WITH COPY_ONLY, INIT;
+09:29:14.513 FILELISTONLY: AdventureWorks(D,1), AdventureWorks_log(L,2)
+09:29:14.598 [master] 84ms IF DB_ID(N'AW_Sandbox') IS NOT NULL ALTER DATABASE [AW_Sandbox] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+09:29:15.064 [master] 461ms RESTORE DATABASE [AW_Sandbox] FROM DISK = N'/var/opt/mssql/backup/AW_Origin_baseline.bak' WITH MOVE N'AdventureWorks' TO…
+09:29:15.438 [AW_Sandbox] 2ms SET ANSI_NULLS ON;
+09:29:15.455 [AW_Sandbox] 17ms CREATE SCHEMA audit AUTHORIZATION dbo;
+09:29:15.461 [AW_Sandbox] 6ms CREATE SEQUENCE audit.CaptureSeq AS bigint START WITH 1 INCREMENT BY 1;
+09:29:15.470 [AW_Sandbox] 8ms CREATE TABLE audit.AuditHeader (
+09:29:15.476 [AW_Sandbox] 6ms CREATE TABLE audit.AuditRowImage (
+09:29:15.485 [AW_Sandbox] 9ms CREATE TABLE audit.AuditControl (
+09:29:15.493 [AW_Sandbox] 8ms CREATE TRIGGER [HumanResources].[dbr_audit_Department_I] ON [HumanResources].[Department]
+09:29:15.499 [AW_Sandbox] 6ms CREATE TRIGGER [HumanResources].[dbr_audit_Department_U] ON [HumanResources].[Department]
+09:29:15.504 [AW_Sandbox] 5ms CREATE TRIGGER [HumanResources].[dbr_audit_Department_D] ON [HumanResources].[Department]
+09:29:15.525 [AW_Sandbox] 21ms EXEC sys.sp_settriggerorder @triggername = N'[HumanResources].[dbr_audit_Department_I]', @order = N'Last', @stmttype = N…
+09:29:15.535 [AW_Sandbox] 10ms CREATE TRIGGER [HumanResources].[dbr_audit_Employee_I] ON [HumanResources].[Employee]
+09:29:15.544 [AW_Sandbox] 8ms CREATE TRIGGER [HumanResources].[dbr_audit_Employee_U] ON [HumanResources].[Employee]
+09:29:15.551 [AW_Sandbox] 7ms CREATE TRIGGER [HumanResources].[dbr_audit_Employee_D] ON [HumanResources].[Employee]
+09:29:15.561 [AW_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[HumanResources].[dbr_audit_Employee_I]', @order = N'Last', @stmttype = N'I…
+09:29:15.566 [AW_Sandbox] 5ms CREATE TRIGGER [HumanResources].[dbr_audit_EmployeeDepartmentHistory_I] ON [HumanResources].[EmployeeDepartmentHistory]
+09:29:15.571 [AW_Sandbox] 5ms CREATE TRIGGER [HumanResources].[dbr_audit_EmployeeDepartmentHistory_U] ON [HumanResources].[EmployeeDepartmentHistory]
+09:29:15.576 [AW_Sandbox] 5ms CREATE TRIGGER [HumanResources].[dbr_audit_EmployeeDepartmentHistory_D] ON [HumanResources].[EmployeeDepartmentHistory]
+09:29:15.586 [AW_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[HumanResources].[dbr_audit_EmployeeDepartmentHistory_I]', @order = N'Last'…
+09:29:15.591 [AW_Sandbox] 5ms CREATE TRIGGER [HumanResources].[dbr_audit_EmployeePayHistory_I] ON [HumanResources].[EmployeePayHistory]
+09:29:15.596 [AW_Sandbox] 5ms CREATE TRIGGER [HumanResources].[dbr_audit_EmployeePayHistory_U] ON [HumanResources].[EmployeePayHistory]
+09:29:15.601 [AW_Sandbox] 5ms CREATE TRIGGER [HumanResources].[dbr_audit_EmployeePayHistory_D] ON [HumanResources].[EmployeePayHistory]
+09:29:15.610 [AW_Sandbox] 9ms EXEC sys.sp_settriggerorder @triggername = N'[HumanResources].[dbr_audit_EmployeePayHistory_I]', @order = N'Last', @stmt…
+09:29:15.615 [AW_Sandbox] 5ms CREATE TRIGGER [HumanResources].[dbr_audit_JobCandidate_I] ON [HumanResources].[JobCandidate]
+09:29:15.621 [AW_Sandbox] 6ms CREATE TRIGGER [HumanResources].[dbr_audit_JobCandidate_U] ON [HumanResources].[JobCandidate]
+09:29:15.627 [AW_Sandbox] 6ms CREATE TRIGGER [HumanResources].[dbr_audit_JobCandidate_D] ON [HumanResources].[JobCandidate]
+09:29:15.636 [AW_Sandbox] 9ms EXEC sys.sp_settriggerorder @triggername = N'[HumanResources].[dbr_audit_JobCandidate_I]', @order = N'Last', @stmttype =…
+09:29:15.641 [AW_Sandbox] 5ms CREATE TRIGGER [HumanResources].[dbr_audit_Shift_I] ON [HumanResources].[Shift]
+09:29:15.645 [AW_Sandbox] 4ms CREATE TRIGGER [HumanResources].[dbr_audit_Shift_U] ON [HumanResources].[Shift]
+09:29:15.650 [AW_Sandbox] 5ms CREATE TRIGGER [HumanResources].[dbr_audit_Shift_D] ON [HumanResources].[Shift]
+09:29:15.659 [AW_Sandbox] 8ms EXEC sys.sp_settriggerorder @triggername = N'[HumanResources].[dbr_audit_Shift_I]', @order = N'Last', @stmttype = N'INSE…
+09:29:15.666 [AW_Sandbox] 7ms CREATE TRIGGER [Person].[dbr_audit_Address_I] ON [Person].[Address]
+09:29:15.673 [AW_Sandbox] 7ms CREATE TRIGGER [Person].[dbr_audit_Address_U] ON [Person].[Address]
+09:29:15.680 [AW_Sandbox] 7ms CREATE TRIGGER [Person].[dbr_audit_Address_D] ON [Person].[Address]
+09:29:15.689 [AW_Sandbox] 9ms EXEC sys.sp_settriggerorder @triggername = N'[Person].[dbr_audit_Address_I]', @order = N'Last', @stmttype = N'INSERT';
+09:29:15.695 [AW_Sandbox] 5ms CREATE TRIGGER [Person].[dbr_audit_AddressType_I] ON [Person].[AddressType]
+09:29:15.700 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_AddressType_U] ON [Person].[AddressType]
+09:29:15.705 [AW_Sandbox] 5ms CREATE TRIGGER [Person].[dbr_audit_AddressType_D] ON [Person].[AddressType]
+09:29:15.715 [AW_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[Person].[dbr_audit_AddressType_I]', @order = N'Last', @stmttype = N'INSERT…
+09:29:15.719 [AW_Sandbox] 4ms CREATE TRIGGER [Person].[dbr_audit_BusinessEntity_I] ON [Person].[BusinessEntity]
+09:29:15.725 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_BusinessEntity_U] ON [Person].[BusinessEntity]
+09:29:15.732 [AW_Sandbox] 7ms CREATE TRIGGER [Person].[dbr_audit_BusinessEntity_D] ON [Person].[BusinessEntity]
+09:29:15.741 [AW_Sandbox] 9ms EXEC sys.sp_settriggerorder @triggername = N'[Person].[dbr_audit_BusinessEntity_I]', @order = N'Last', @stmttype = N'INS…
+09:29:15.748 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_BusinessEntityAddress_I] ON [Person].[BusinessEntityAddress]
+09:29:15.754 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_BusinessEntityAddress_U] ON [Person].[BusinessEntityAddress]
+09:29:15.761 [AW_Sandbox] 7ms CREATE TRIGGER [Person].[dbr_audit_BusinessEntityAddress_D] ON [Person].[BusinessEntityAddress]
+09:29:15.771 [AW_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[Person].[dbr_audit_BusinessEntityAddress_I]', @order = N'Last', @stmttype …
+09:29:15.777 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_BusinessEntityContact_I] ON [Person].[BusinessEntityContact]
+09:29:15.784 [AW_Sandbox] 8ms CREATE TRIGGER [Person].[dbr_audit_BusinessEntityContact_U] ON [Person].[BusinessEntityContact]
+09:29:15.792 [AW_Sandbox] 8ms CREATE TRIGGER [Person].[dbr_audit_BusinessEntityContact_D] ON [Person].[BusinessEntityContact]
+09:29:15.804 [AW_Sandbox] 12ms EXEC sys.sp_settriggerorder @triggername = N'[Person].[dbr_audit_BusinessEntityContact_I]', @order = N'Last', @stmttype …
+09:29:15.811 [AW_Sandbox] 7ms CREATE TRIGGER [Person].[dbr_audit_ContactType_I] ON [Person].[ContactType]
+09:29:15.816 [AW_Sandbox] 5ms CREATE TRIGGER [Person].[dbr_audit_ContactType_U] ON [Person].[ContactType]
+09:29:15.821 [AW_Sandbox] 5ms CREATE TRIGGER [Person].[dbr_audit_ContactType_D] ON [Person].[ContactType]
+09:29:15.831 [AW_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[Person].[dbr_audit_ContactType_I]', @order = N'Last', @stmttype = N'INSERT…
+09:29:15.836 [AW_Sandbox] 5ms CREATE TRIGGER [Person].[dbr_audit_CountryRegion_I] ON [Person].[CountryRegion]
+09:29:15.841 [AW_Sandbox] 5ms CREATE TRIGGER [Person].[dbr_audit_CountryRegion_U] ON [Person].[CountryRegion]
+09:29:15.846 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_CountryRegion_D] ON [Person].[CountryRegion]
+09:29:15.856 [AW_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[Person].[dbr_audit_CountryRegion_I]', @order = N'Last', @stmttype = N'INSE…
+09:29:15.862 [AW_Sandbox] 5ms CREATE TRIGGER [Person].[dbr_audit_EmailAddress_I] ON [Person].[EmailAddress]
+09:29:15.868 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_EmailAddress_U] ON [Person].[EmailAddress]
+09:29:15.874 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_EmailAddress_D] ON [Person].[EmailAddress]
+09:29:15.895 [AW_Sandbox] 21ms EXEC sys.sp_settriggerorder @triggername = N'[Person].[dbr_audit_EmailAddress_I]', @order = N'Last', @stmttype = N'INSER…
+09:29:15.901 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_Password_I] ON [Person].[Password]
+09:29:15.907 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_Password_U] ON [Person].[Password]
+09:29:15.912 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_Password_D] ON [Person].[Password]
+09:29:15.922 [AW_Sandbox] 9ms EXEC sys.sp_settriggerorder @triggername = N'[Person].[dbr_audit_Password_I]', @order = N'Last', @stmttype = N'INSERT';
+09:29:15.928 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_Person_I] ON [Person].[Person]
+09:29:15.933 [AW_Sandbox] 5ms CREATE TRIGGER [Person].[dbr_audit_Person_U] ON [Person].[Person]
+09:29:15.939 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_Person_D] ON [Person].[Person]
+09:29:15.949 [AW_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[Person].[dbr_audit_Person_I]', @order = N'Last', @stmttype = N'INSERT';
+09:29:15.956 [AW_Sandbox] 7ms CREATE TRIGGER [Person].[dbr_audit_PersonPhone_I] ON [Person].[PersonPhone]
+09:29:15.962 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_PersonPhone_U] ON [Person].[PersonPhone]
+09:29:15.967 [AW_Sandbox] 5ms CREATE TRIGGER [Person].[dbr_audit_PersonPhone_D] ON [Person].[PersonPhone]
+09:29:15.980 [AW_Sandbox] 13ms EXEC sys.sp_settriggerorder @triggername = N'[Person].[dbr_audit_PersonPhone_I]', @order = N'Last', @stmttype = N'INSERT…
+09:29:15.987 [AW_Sandbox] 7ms CREATE TRIGGER [Person].[dbr_audit_PhoneNumberType_I] ON [Person].[PhoneNumberType]
+09:29:15.994 [AW_Sandbox] 7ms CREATE TRIGGER [Person].[dbr_audit_PhoneNumberType_U] ON [Person].[PhoneNumberType]
+09:29:16.001 [AW_Sandbox] 6ms CREATE TRIGGER [Person].[dbr_audit_PhoneNumberType_D] ON [Person].[PhoneNumberType]
+09:29:16.015 [AW_Sandbox] 14ms EXEC sys.sp_settriggerorder @triggername = N'[Person].[dbr_audit_PhoneNumberType_I]', @order = N'Last', @stmttype = N'IN…
+09:29:16.022 [AW_Sandbox] 7ms CREATE TRIGGER [Person].[dbr_audit_StateProvince_I] ON [Person].[StateProvince]
+09:29:16.031 [AW_Sandbox] 8ms CREATE TRIGGER [Person].[dbr_audit_StateProvince_U] ON [Person].[StateProvince]
+09:29:16.039 [AW_Sandbox] 8ms CREATE TRIGGER [Person].[dbr_audit_StateProvince_D] ON [Person].[StateProvince]
+09:29:16.052 [AW_Sandbox] 13ms EXEC sys.sp_settriggerorder @triggername = N'[Person].[dbr_audit_StateProvince_I]', @order = N'Last', @stmttype = N'INSE…
+09:29:16.060 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_BillOfMaterials_I] ON [Production].[BillOfMaterials]
+09:29:16.067 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_BillOfMaterials_U] ON [Production].[BillOfMaterials]
+09:29:16.073 [AW_Sandbox] 6ms CREATE TRIGGER [Production].[dbr_audit_BillOfMaterials_D] ON [Production].[BillOfMaterials]
+09:29:16.087 [AW_Sandbox] 14ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_BillOfMaterials_I]', @order = N'Last', @stmttype = …
+09:29:16.092 [AW_Sandbox] 5ms CREATE TRIGGER [Production].[dbr_audit_Culture_I] ON [Production].[Culture]
+09:29:16.098 [AW_Sandbox] 5ms CREATE TRIGGER [Production].[dbr_audit_Culture_U] ON [Production].[Culture]
+09:29:16.103 [AW_Sandbox] 5ms CREATE TRIGGER [Production].[dbr_audit_Culture_D] ON [Production].[Culture]
+09:29:16.113 [AW_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_Culture_I]', @order = N'Last', @stmttype = N'INSERT…
+09:29:16.122 [AW_Sandbox] 9ms CREATE TRIGGER [Production].[dbr_audit_Document_I] ON [Production].[Document]
+09:29:16.132 [AW_Sandbox] 9ms CREATE TRIGGER [Production].[dbr_audit_Document_U] ON [Production].[Document]
+09:29:16.140 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_Document_D] ON [Production].[Document]
+09:29:16.151 [AW_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_Document_I]', @order = N'Last', @stmttype = N'INSER…
+09:29:16.158 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_Illustration_I] ON [Production].[Illustration]
+09:29:16.164 [AW_Sandbox] 6ms CREATE TRIGGER [Production].[dbr_audit_Illustration_U] ON [Production].[Illustration]
+09:29:16.169 [AW_Sandbox] 5ms CREATE TRIGGER [Production].[dbr_audit_Illustration_D] ON [Production].[Illustration]
+09:29:16.179 [AW_Sandbox] 9ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_Illustration_I]', @order = N'Last', @stmttype = N'I…
+09:29:16.185 [AW_Sandbox] 6ms CREATE TRIGGER [Production].[dbr_audit_Location_I] ON [Production].[Location]
+09:29:16.193 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_Location_U] ON [Production].[Location]
+09:29:16.201 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_Location_D] ON [Production].[Location]
+09:29:16.217 [AW_Sandbox] 16ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_Location_I]', @order = N'Last', @stmttype = N'INSER…
+09:29:16.225 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_Product_I] ON [Production].[Product]
+09:29:16.234 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_Product_U] ON [Production].[Product]
+09:29:16.242 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_Product_D] ON [Production].[Product]
+09:29:16.254 [AW_Sandbox] 12ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_Product_I]', @order = N'Last', @stmttype = N'INSERT…
+09:29:16.262 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_ProductCategory_I] ON [Production].[ProductCategory]
+09:29:16.269 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductCategory_U] ON [Production].[ProductCategory]
+09:29:16.275 [AW_Sandbox] 6ms CREATE TRIGGER [Production].[dbr_audit_ProductCategory_D] ON [Production].[ProductCategory]
+09:29:16.287 [AW_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_ProductCategory_I]', @order = N'Last', @stmttype = …
+09:29:16.294 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductCostHistory_I] ON [Production].[ProductCostHistory]
+09:29:16.302 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_ProductCostHistory_U] ON [Production].[ProductCostHistory]
+09:29:16.309 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductCostHistory_D] ON [Production].[ProductCostHistory]
+09:29:16.323 [AW_Sandbox] 14ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_ProductCostHistory_I]', @order = N'Last', @stmttype…
+09:29:16.330 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductDescription_I] ON [Production].[ProductDescription]
+09:29:16.339 [AW_Sandbox] 9ms CREATE TRIGGER [Production].[dbr_audit_ProductDescription_U] ON [Production].[ProductDescription]
+09:29:16.347 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_ProductDescription_D] ON [Production].[ProductDescription]
+09:29:16.364 [AW_Sandbox] 17ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_ProductDescription_I]', @order = N'Last', @stmttype…
+09:29:16.373 [AW_Sandbox] 9ms CREATE TRIGGER [Production].[dbr_audit_ProductDocument_I] ON [Production].[ProductDocument]
+09:29:16.383 [AW_Sandbox] 10ms CREATE TRIGGER [Production].[dbr_audit_ProductDocument_U] ON [Production].[ProductDocument]
+09:29:16.393 [AW_Sandbox] 10ms CREATE TRIGGER [Production].[dbr_audit_ProductDocument_D] ON [Production].[ProductDocument]
+09:29:16.417 [AW_Sandbox] 23ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_ProductDocument_I]', @order = N'Last', @stmttype = …
+09:29:16.426 [AW_Sandbox] 9ms CREATE TRIGGER [Production].[dbr_audit_ProductInventory_I] ON [Production].[ProductInventory]
+09:29:16.436 [AW_Sandbox] 10ms CREATE TRIGGER [Production].[dbr_audit_ProductInventory_U] ON [Production].[ProductInventory]
+09:29:16.443 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductInventory_D] ON [Production].[ProductInventory]
+09:29:16.455 [AW_Sandbox] 12ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_ProductInventory_I]', @order = N'Last', @stmttype =…
+09:29:16.462 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductListPriceHistory_I] ON [Production].[ProductListPriceHistory]
+09:29:16.469 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductListPriceHistory_U] ON [Production].[ProductListPriceHistory]
+09:29:16.476 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductListPriceHistory_D] ON [Production].[ProductListPriceHistory]
+09:29:16.489 [AW_Sandbox] 13ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_ProductListPriceHistory_I]', @order = N'Last', @stm…
+09:29:16.498 [AW_Sandbox] 9ms CREATE TRIGGER [Production].[dbr_audit_ProductModel_I] ON [Production].[ProductModel]
+09:29:16.506 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_ProductModel_U] ON [Production].[ProductModel]
+09:29:16.513 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductModel_D] ON [Production].[ProductModel]
+09:29:16.525 [AW_Sandbox] 12ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_ProductModel_I]', @order = N'Last', @stmttype = N'I…
+09:29:16.532 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductModelIllustration_I] ON [Production].[ProductModelIllustration]
+09:29:16.540 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_ProductModelIllustration_U] ON [Production].[ProductModelIllustration]
+09:29:16.547 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductModelIllustration_D] ON [Production].[ProductModelIllustration]
+09:29:16.563 [AW_Sandbox] 15ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_ProductModelIllustration_I]', @order = N'Last', @st…
+09:29:16.569 [AW_Sandbox] 6ms CREATE TRIGGER [Production].[dbr_audit_ProductModelProductDescriptionCulture_I] ON [Production].[ProductModelProductDesc…
+09:29:16.576 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductModelProductDescriptionCulture_U] ON [Production].[ProductModelProductDesc…
+09:29:16.581 [AW_Sandbox] 6ms CREATE TRIGGER [Production].[dbr_audit_ProductModelProductDescriptionCulture_D] ON [Production].[ProductModelProductDesc…
+09:29:16.593 [AW_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_ProductModelProductDescriptionCulture_I]', @order =…
+09:29:16.599 [AW_Sandbox] 6ms CREATE TRIGGER [Production].[dbr_audit_ProductPhoto_I] ON [Production].[ProductPhoto]
+09:29:16.605 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductPhoto_U] ON [Production].[ProductPhoto]
+09:29:16.613 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductPhoto_D] ON [Production].[ProductPhoto]
+09:29:16.626 [AW_Sandbox] 13ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_ProductPhoto_I]', @order = N'Last', @stmttype = N'I…
+09:29:16.632 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductProductPhoto_I] ON [Production].[ProductProductPhoto]
+09:29:16.640 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductProductPhoto_U] ON [Production].[ProductProductPhoto]
+09:29:16.650 [AW_Sandbox] 10ms CREATE TRIGGER [Production].[dbr_audit_ProductProductPhoto_D] ON [Production].[ProductProductPhoto]
+09:29:16.667 [AW_Sandbox] 17ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_ProductProductPhoto_I]', @order = N'Last', @stmttyp…
+09:29:16.675 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_ProductReview_I] ON [Production].[ProductReview]
+09:29:16.682 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_ProductReview_U] ON [Production].[ProductReview]
+09:29:16.689 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_ProductReview_D] ON [Production].[ProductReview]
+09:29:16.703 [AW_Sandbox] 13ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_ProductReview_I]', @order = N'Last', @stmttype = N'…
+09:29:16.711 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_ProductSubcategory_I] ON [Production].[ProductSubcategory]
+09:29:16.720 [AW_Sandbox] 10ms CREATE TRIGGER [Production].[dbr_audit_ProductSubcategory_U] ON [Production].[ProductSubcategory]
+09:29:16.729 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_ProductSubcategory_D] ON [Production].[ProductSubcategory]
+09:29:16.743 [AW_Sandbox] 15ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_ProductSubcategory_I]', @order = N'Last', @stmttype…
+09:29:16.755 [AW_Sandbox] 11ms CREATE TRIGGER [Production].[dbr_audit_ScrapReason_I] ON [Production].[ScrapReason]
+09:29:16.765 [AW_Sandbox] 10ms CREATE TRIGGER [Production].[dbr_audit_ScrapReason_U] ON [Production].[ScrapReason]
+09:29:16.774 [AW_Sandbox] 9ms CREATE TRIGGER [Production].[dbr_audit_ScrapReason_D] ON [Production].[ScrapReason]
+09:29:16.793 [AW_Sandbox] 18ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_ScrapReason_I]', @order = N'Last', @stmttype = N'IN…
+09:29:16.801 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_TransactionHistory_I] ON [Production].[TransactionHistory]
+09:29:16.809 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_TransactionHistory_U] ON [Production].[TransactionHistory]
+09:29:16.817 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_TransactionHistory_D] ON [Production].[TransactionHistory]
+09:29:16.829 [AW_Sandbox] 12ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_TransactionHistory_I]', @order = N'Last', @stmttype…
+09:29:16.837 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_TransactionHistoryArchive_I] ON [Production].[TransactionHistoryArchive]
+09:29:16.844 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_TransactionHistoryArchive_U] ON [Production].[TransactionHistoryArchive]
+09:29:16.851 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_TransactionHistoryArchive_D] ON [Production].[TransactionHistoryArchive]
+09:29:16.869 [AW_Sandbox] 17ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_TransactionHistoryArchive_I]', @order = N'Last', @s…
+09:29:16.877 [AW_Sandbox] 9ms CREATE TRIGGER [Production].[dbr_audit_UnitMeasure_I] ON [Production].[UnitMeasure]
+09:29:16.885 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_UnitMeasure_U] ON [Production].[UnitMeasure]
+09:29:16.892 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_UnitMeasure_D] ON [Production].[UnitMeasure]
+09:29:16.909 [AW_Sandbox] 17ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_UnitMeasure_I]', @order = N'Last', @stmttype = N'IN…
+09:29:16.917 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_WorkOrder_I] ON [Production].[WorkOrder]
+09:29:16.924 [AW_Sandbox] 6ms CREATE TRIGGER [Production].[dbr_audit_WorkOrder_U] ON [Production].[WorkOrder]
+09:29:16.930 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_WorkOrder_D] ON [Production].[WorkOrder]
+09:29:16.942 [AW_Sandbox] 12ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_WorkOrder_I]', @order = N'Last', @stmttype = N'INSE…
+09:29:16.949 [AW_Sandbox] 7ms CREATE TRIGGER [Production].[dbr_audit_WorkOrderRouting_I] ON [Production].[WorkOrderRouting]
+09:29:16.958 [AW_Sandbox] 9ms CREATE TRIGGER [Production].[dbr_audit_WorkOrderRouting_U] ON [Production].[WorkOrderRouting]
+09:29:16.966 [AW_Sandbox] 8ms CREATE TRIGGER [Production].[dbr_audit_WorkOrderRouting_D] ON [Production].[WorkOrderRouting]
+09:29:16.978 [AW_Sandbox] 12ms EXEC sys.sp_settriggerorder @triggername = N'[Production].[dbr_audit_WorkOrderRouting_I]', @order = N'Last', @stmttype =…
+09:29:16.985 [AW_Sandbox] 6ms CREATE TRIGGER [Purchasing].[dbr_audit_ProductVendor_I] ON [Purchasing].[ProductVendor]
+09:29:16.992 [AW_Sandbox] 7ms CREATE TRIGGER [Purchasing].[dbr_audit_ProductVendor_U] ON [Purchasing].[ProductVendor]
+09:29:16.998 [AW_Sandbox] 6ms CREATE TRIGGER [Purchasing].[dbr_audit_ProductVendor_D] ON [Purchasing].[ProductVendor]
+09:29:17.012 [AW_Sandbox] 14ms EXEC sys.sp_settriggerorder @triggername = N'[Purchasing].[dbr_audit_ProductVendor_I]', @order = N'Last', @stmttype = N'…
+09:29:17.019 [AW_Sandbox] 7ms CREATE TRIGGER [Purchasing].[dbr_audit_PurchaseOrderDetail_I] ON [Purchasing].[PurchaseOrderDetail]
+09:29:17.025 [AW_Sandbox] 7ms CREATE TRIGGER [Purchasing].[dbr_audit_PurchaseOrderDetail_U] ON [Purchasing].[PurchaseOrderDetail]
+09:29:17.033 [AW_Sandbox] 8ms CREATE TRIGGER [Purchasing].[dbr_audit_PurchaseOrderDetail_D] ON [Purchasing].[PurchaseOrderDetail]
+09:29:17.045 [AW_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[Purchasing].[dbr_audit_PurchaseOrderDetail_I]', @order = N'Last', @stmttyp…
+09:29:17.051 [AW_Sandbox] 6ms CREATE TRIGGER [Purchasing].[dbr_audit_PurchaseOrderHeader_I] ON [Purchasing].[PurchaseOrderHeader]
+09:29:17.060 [AW_Sandbox] 9ms CREATE TRIGGER [Purchasing].[dbr_audit_PurchaseOrderHeader_U] ON [Purchasing].[PurchaseOrderHeader]
+09:29:17.066 [AW_Sandbox] 6ms CREATE TRIGGER [Purchasing].[dbr_audit_PurchaseOrderHeader_D] ON [Purchasing].[PurchaseOrderHeader]
+09:29:17.081 [AW_Sandbox] 15ms EXEC sys.sp_settriggerorder @triggername = N'[Purchasing].[dbr_audit_PurchaseOrderHeader_I]', @order = N'Last', @stmttyp…
+09:29:17.090 [AW_Sandbox] 8ms CREATE TRIGGER [Purchasing].[dbr_audit_ShipMethod_I] ON [Purchasing].[ShipMethod]
+09:29:17.096 [AW_Sandbox] 6ms CREATE TRIGGER [Purchasing].[dbr_audit_ShipMethod_U] ON [Purchasing].[ShipMethod]
+09:29:17.102 [AW_Sandbox] 6ms CREATE TRIGGER [Purchasing].[dbr_audit_ShipMethod_D] ON [Purchasing].[ShipMethod]
+09:29:17.113 [AW_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[Purchasing].[dbr_audit_ShipMethod_I]', @order = N'Last', @stmttype = N'INS…
+09:29:17.120 [AW_Sandbox] 7ms CREATE TRIGGER [Purchasing].[dbr_audit_Vendor_I] ON [Purchasing].[Vendor]
+09:29:17.127 [AW_Sandbox] 7ms CREATE TRIGGER [Purchasing].[dbr_audit_Vendor_U] ON [Purchasing].[Vendor]
+09:29:17.134 [AW_Sandbox] 6ms CREATE TRIGGER [Purchasing].[dbr_audit_Vendor_D] ON [Purchasing].[Vendor]
+09:29:17.145 [AW_Sandbox] 12ms EXEC sys.sp_settriggerorder @triggername = N'[Purchasing].[dbr_audit_Vendor_I]', @order = N'Last', @stmttype = N'INSERT'…
+09:29:17.152 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_CountryRegionCurrency_I] ON [Sales].[CountryRegionCurrency]
+09:29:17.160 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_CountryRegionCurrency_U] ON [Sales].[CountryRegionCurrency]
+09:29:17.166 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_CountryRegionCurrency_D] ON [Sales].[CountryRegionCurrency]
+09:29:17.179 [AW_Sandbox] 13ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_CountryRegionCurrency_I]', @order = N'Last', @stmttype =…
+09:29:17.184 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_CreditCard_I] ON [Sales].[CreditCard]
+09:29:17.190 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_CreditCard_U] ON [Sales].[CreditCard]
+09:29:17.196 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_CreditCard_D] ON [Sales].[CreditCard]
+09:29:17.207 [AW_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_CreditCard_I]', @order = N'Last', @stmttype = N'INSERT';
+09:29:17.212 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_Currency_I] ON [Sales].[Currency]
+09:29:17.220 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_Currency_U] ON [Sales].[Currency]
+09:29:17.226 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_Currency_D] ON [Sales].[Currency]
+09:29:17.237 [AW_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_Currency_I]', @order = N'Last', @stmttype = N'INSERT';
+09:29:17.243 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_CurrencyRate_I] ON [Sales].[CurrencyRate]
+09:29:17.248 [AW_Sandbox] 5ms CREATE TRIGGER [Sales].[dbr_audit_CurrencyRate_U] ON [Sales].[CurrencyRate]
+09:29:17.254 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_CurrencyRate_D] ON [Sales].[CurrencyRate]
+09:29:17.265 [AW_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_CurrencyRate_I]', @order = N'Last', @stmttype = N'INSERT…
+09:29:17.273 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_Customer_I] ON [Sales].[Customer]
+09:29:17.279 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_Customer_U] ON [Sales].[Customer]
+09:29:17.285 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_Customer_D] ON [Sales].[Customer]
+09:29:17.302 [AW_Sandbox] 16ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_Customer_I]', @order = N'Last', @stmttype = N'INSERT';
+09:29:17.308 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_PersonCreditCard_I] ON [Sales].[PersonCreditCard]
+09:29:17.315 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_PersonCreditCard_U] ON [Sales].[PersonCreditCard]
+09:29:17.321 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_PersonCreditCard_D] ON [Sales].[PersonCreditCard]
+09:29:17.334 [AW_Sandbox] 12ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_PersonCreditCard_I]', @order = N'Last', @stmttype = N'IN…
+09:29:17.341 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_SalesOrderDetail_I] ON [Sales].[SalesOrderDetail]
+09:29:17.350 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_SalesOrderDetail_U] ON [Sales].[SalesOrderDetail]
+09:29:17.356 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_SalesOrderDetail_D] ON [Sales].[SalesOrderDetail]
+09:29:17.367 [AW_Sandbox] 10ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_SalesOrderDetail_I]', @order = N'Last', @stmttype = N'IN…
+09:29:17.375 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_SalesOrderHeader_I] ON [Sales].[SalesOrderHeader]
+09:29:17.385 [AW_Sandbox] 10ms CREATE TRIGGER [Sales].[dbr_audit_SalesOrderHeader_U] ON [Sales].[SalesOrderHeader]
+09:29:17.392 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_SalesOrderHeader_D] ON [Sales].[SalesOrderHeader]
+09:29:17.406 [AW_Sandbox] 14ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_SalesOrderHeader_I]', @order = N'Last', @stmttype = N'IN…
+09:29:17.416 [AW_Sandbox] 10ms CREATE TRIGGER [Sales].[dbr_audit_SalesOrderHeaderSalesReason_I] ON [Sales].[SalesOrderHeaderSalesReason]
+09:29:17.433 [AW_Sandbox] 17ms CREATE TRIGGER [Sales].[dbr_audit_SalesOrderHeaderSalesReason_U] ON [Sales].[SalesOrderHeaderSalesReason]
+09:29:17.440 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_SalesOrderHeaderSalesReason_D] ON [Sales].[SalesOrderHeaderSalesReason]
+09:29:17.454 [AW_Sandbox] 14ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_SalesOrderHeaderSalesReason_I]', @order = N'Last', @stmt…
+09:29:17.462 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_SalesPerson_I] ON [Sales].[SalesPerson]
+09:29:17.469 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_SalesPerson_U] ON [Sales].[SalesPerson]
+09:29:17.477 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_SalesPerson_D] ON [Sales].[SalesPerson]
+09:29:17.490 [AW_Sandbox] 12ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_SalesPerson_I]', @order = N'Last', @stmttype = N'INSERT'…
+09:29:17.496 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_SalesPersonQuotaHistory_I] ON [Sales].[SalesPersonQuotaHistory]
+09:29:17.503 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_SalesPersonQuotaHistory_U] ON [Sales].[SalesPersonQuotaHistory]
+09:29:17.509 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_SalesPersonQuotaHistory_D] ON [Sales].[SalesPersonQuotaHistory]
+09:29:17.520 [AW_Sandbox] 11ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_SalesPersonQuotaHistory_I]', @order = N'Last', @stmttype…
+09:29:17.527 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_SalesReason_I] ON [Sales].[SalesReason]
+09:29:17.535 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_SalesReason_U] ON [Sales].[SalesReason]
+09:29:17.541 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_SalesReason_D] ON [Sales].[SalesReason]
+09:29:17.553 [AW_Sandbox] 12ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_SalesReason_I]', @order = N'Last', @stmttype = N'INSERT'…
+09:29:17.561 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_SalesTaxRate_I] ON [Sales].[SalesTaxRate]
+09:29:17.571 [AW_Sandbox] 10ms CREATE TRIGGER [Sales].[dbr_audit_SalesTaxRate_U] ON [Sales].[SalesTaxRate]
+09:29:17.581 [AW_Sandbox] 10ms CREATE TRIGGER [Sales].[dbr_audit_SalesTaxRate_D] ON [Sales].[SalesTaxRate]
+09:29:17.599 [AW_Sandbox] 19ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_SalesTaxRate_I]', @order = N'Last', @stmttype = N'INSERT…
+09:29:17.608 [AW_Sandbox] 9ms CREATE TRIGGER [Sales].[dbr_audit_SalesTerritory_I] ON [Sales].[SalesTerritory]
+09:29:17.616 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_SalesTerritory_U] ON [Sales].[SalesTerritory]
+09:29:17.623 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_SalesTerritory_D] ON [Sales].[SalesTerritory]
+09:29:17.640 [AW_Sandbox] 16ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_SalesTerritory_I]', @order = N'Last', @stmttype = N'INSE…
+09:29:17.647 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_SalesTerritoryHistory_I] ON [Sales].[SalesTerritoryHistory]
+09:29:17.660 [AW_Sandbox] 12ms CREATE TRIGGER [Sales].[dbr_audit_SalesTerritoryHistory_U] ON [Sales].[SalesTerritoryHistory]
+09:29:17.668 [AW_Sandbox] 9ms CREATE TRIGGER [Sales].[dbr_audit_SalesTerritoryHistory_D] ON [Sales].[SalesTerritoryHistory]
+09:29:17.684 [AW_Sandbox] 16ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_SalesTerritoryHistory_I]', @order = N'Last', @stmttype =…
+09:29:17.692 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_ShoppingCartItem_I] ON [Sales].[ShoppingCartItem]
+09:29:17.700 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_ShoppingCartItem_U] ON [Sales].[ShoppingCartItem]
+09:29:17.707 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_ShoppingCartItem_D] ON [Sales].[ShoppingCartItem]
+09:29:17.721 [AW_Sandbox] 15ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_ShoppingCartItem_I]', @order = N'Last', @stmttype = N'IN…
+09:29:17.731 [AW_Sandbox] 10ms CREATE TRIGGER [Sales].[dbr_audit_SpecialOffer_I] ON [Sales].[SpecialOffer]
+09:29:17.738 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_SpecialOffer_U] ON [Sales].[SpecialOffer]
+09:29:17.745 [AW_Sandbox] 6ms CREATE TRIGGER [Sales].[dbr_audit_SpecialOffer_D] ON [Sales].[SpecialOffer]
+09:29:17.757 [AW_Sandbox] 12ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_SpecialOffer_I]', @order = N'Last', @stmttype = N'INSERT…
+09:29:17.764 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_SpecialOfferProduct_I] ON [Sales].[SpecialOfferProduct]
+09:29:17.773 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_SpecialOfferProduct_U] ON [Sales].[SpecialOfferProduct]
+09:29:17.780 [AW_Sandbox] 7ms CREATE TRIGGER [Sales].[dbr_audit_SpecialOfferProduct_D] ON [Sales].[SpecialOfferProduct]
+09:29:17.794 [AW_Sandbox] 14ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_SpecialOfferProduct_I]', @order = N'Last', @stmttype = N…
+09:29:17.802 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_Store_I] ON [Sales].[Store]
+09:29:17.810 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_Store_U] ON [Sales].[Store]
+09:29:17.818 [AW_Sandbox] 8ms CREATE TRIGGER [Sales].[dbr_audit_Store_D] ON [Sales].[Store]
+09:29:17.831 [AW_Sandbox] 13ms EXEC sys.sp_settriggerorder @triggername = N'[Sales].[dbr_audit_Store_I]', @order = N'Last', @stmttype = N'INSERT';
+09:29:17.838 [AW_Sandbox] 7ms CREATE TRIGGER [dbo].[dbr_audit_AWBuildVersion_I] ON [dbo].[AWBuildVersion]
+09:29:17.845 [AW_Sandbox] 7ms CREATE TRIGGER [dbo].[dbr_audit_AWBuildVersion_U] ON [dbo].[AWBuildVersion]
+09:29:17.852 [AW_Sandbox] 7ms CREATE TRIGGER [dbo].[dbr_audit_AWBuildVersion_D] ON [dbo].[AWBuildVersion]
+09:29:17.867 [AW_Sandbox] 15ms EXEC sys.sp_settriggerorder @triggername = N'[dbo].[dbr_audit_AWBuildVersion_I]', @order = N'Last', @stmttype = N'INSERT…
+09:29:17.895 [AW_Sandbox] 28ms CREATE TRIGGER [dbo].[dbr_audit_DatabaseLog_I] ON [dbo].[DatabaseLog]
+09:29:17.921 [AW_Sandbox] 26ms CREATE TRIGGER [dbo].[dbr_audit_DatabaseLog_U] ON [dbo].[DatabaseLog]
+09:29:17.952 [AW_Sandbox] 31ms CREATE TRIGGER [dbo].[dbr_audit_DatabaseLog_D] ON [dbo].[DatabaseLog]
+09:29:18.014 [AW_Sandbox] 62ms EXEC sys.sp_settriggerorder @triggername = N'[dbo].[dbr_audit_DatabaseLog_I]', @order = N'Last', @stmttype = N'INSERT';
+09:29:18.022 [AW_Sandbox] 8ms CREATE TRIGGER [dbo].[dbr_audit_ErrorLog_I] ON [dbo].[ErrorLog]
+09:29:18.030 [AW_Sandbox] 8ms CREATE TRIGGER [dbo].[dbr_audit_ErrorLog_U] ON [dbo].[ErrorLog]
+09:29:18.038 [AW_Sandbox] 7ms CREATE TRIGGER [dbo].[dbr_audit_ErrorLog_D] ON [dbo].[ErrorLog]
+09:29:18.051 [AW_Sandbox] 14ms EXEC sys.sp_settriggerorder @triggername = N'[dbo].[dbr_audit_ErrorLog_I]', @order = N'Last', @stmttype = N'INSERT';
+09:29:18.060 [AW_Sandbox] 9ms DELETE FROM audit.AuditRowImage;
+09:29:18.657 [master] 419ms CREATE DATABASE [AW_Sandbox_base] ON (NAME = [AdventureWorks], FILENAME = N'/var/opt/mssql/data/AW_Sandbox_base_Adventur…
+기준 시각(백업 완료): 2026-11-10T09:29:14.4874850+09:00
+원본 지문: Fingerprint { ProductVersion = 17.0.5035.5, Edition = Enterprise Developer Edition (64-bit), CompatibilityLevel = 170, IsRecursiveTriggersOn = False, NestedTriggers = 1, DisallowResultsFromTriggers = 0, SessionOptions = 5432, Collation = SQL_Latin1_General_CP1_CI_AS }
+샌드박스 지문: Fingerprint { ProductVersion = 17.0.5035.5, Edition = Enterprise Developer Edition (64-bit), CompatibilityLevel = 170, IsRecursiveTriggersOn = False, NestedTriggers = 1, DisallowResultsFromTriggers = 0, SessionOptions = 5432, Collation = SQL_Latin1_General_CP1_CI_AS }
+fingerprintMatch=True
+매니페스트 m-20261110-0929: 대상 71개, 제외 0개, auditNotLast 0개, 배치 291개
+  note: DDL 트리거 ddlDatabaseTriggerLog가 설치 DDL(CREATE_SCHEMA·CREATE_SEQUENCE·CREATE_TABLE·CREATE_TRIGGER·ALTER_TRIGGER)에 발동함(ALTER_TRIGGER는 sp_settriggerorder)
+  note: 설치 전후 행 수가 바뀐 테이블(기준선에 포함, 원본과 다름): dbo.DatabaseLog +431행
+총 소요: 4.8s

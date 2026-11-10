@@ -1,0 +1,76 @@
+# 기준선 가드 확인(2026-11-10): 서버에 SQL을 보내지 않는 경로만(--dry-run, 이름 규칙 거부). 각 줄 '>'는 명령, 이어지는 줄은 출력, exit는 종료 코드
+> dbripple "baseline" "build" "--source" "AW_Origin" "--sandbox" "AW_Origin " "--snapshot" "AW_Sandbox_base" "--backup" "/var/opt/mssql/backup/x.bak" "--dry-run"
+오류: 샌드박스 DB 이름 'AW_Origin '은(는) 영문자·숫자·밑줄만 쓸 수 있음
+exit=1
+
+> dbripple "baseline" "build" "--source" "AW_Origin" "--sandbox" "ＡＷ_Origin" "--snapshot" "AW_Sandbox_base" "--backup" "/var/opt/mssql/backup/x.bak" "--dry-run"
+오류: 샌드박스 DB 이름 'ＡＷ_Origin'은(는) 영문자·숫자·밑줄만 쓸 수 있음
+exit=1
+
+> dbripple "baseline" "build" "--source" "AW_Origin" "--sandbox" "AW_Sandbox" "--snapshot" "model " "--backup" "/var/opt/mssql/backup/x.bak" "--dry-run"
+오류: 스냅샷 DB 이름 'model '은(는) 영문자·숫자·밑줄만 쓸 수 있음
+exit=1
+
+> dbripple "baseline" "build" "--source" "AW_Origin" "--sandbox" "aw_origin" "--snapshot" "AW_Sandbox_base" "--backup" "/var/opt/mssql/backup/x.bak" "--dry-run"
+오류: 원본·샌드박스·스냅샷 이름은 서로 달라야 함: AW_Origin, aw_origin, AW_Sandbox_base
+exit=1
+
+> dbripple "baseline" "build" "--source" "AW_Origin" "--sandbox" "AW_Sandbox" "--snapshot" "AW_Sandbox_base" "--backup" "/var/opt/mssql/backup/x.bak" "--timeout" "0" "--dry-run"
+오류: --timeout은 양의 정수(초)여야 함: 0
+exit=1
+
+> dbripple "restore" "--backup" "/var/opt/mssql/backup/x.bak" "--database" "AW_Origin "
+오류: 복원 대상 DB 이름 'AW_Origin '은(는) 영문자·숫자·밑줄만 쓸 수 있음
+exit=1
+
+> dbripple "restore" "--backup" "/var/opt/mssql/backup/x.bak" "--database" "ＡＷ_Origin"
+오류: 복원 대상 DB 이름 'ＡＷ_Origin'은(는) 영문자·숫자·밑줄만 쓸 수 있음
+exit=1
+
+> dbripple "baseline" "build" "--source" "AW_Origin" "--sandbox" "AW_Sandbox" "--snapshot" "AW_Sandbox_base" "--backup" "/var/opt/mssql/backup/AW_Origin_baseline.bak" "--dry-run"
+-- [master] 사전 검사
+IF DB_ID(N'AW_Origin') IS NULL
+    THROW 50010, N'원본 DB AW_Origin가 없음', 1;
+IF (DB_NAME(DB_ID(N'AW_Origin')) COLLATE Latin1_General_BIN2 <> N'AW_Origin' OR DATALENGTH(DB_NAME(DB_ID(N'AW_Origin'))) <> DATALENGTH(N'AW_Origin'))
+    THROW 50011, N'원본 이름 AW_Origin를 서버가 다른 이름의 DB로 해석함(정확한 이름을 쓸 것)', 1;
+IF DB_ID(N'AW_Origin') <= 4
+   OR NOT EXISTS (SELECT 1 FROM sys.databases WHERE database_id = DB_ID(N'AW_Origin') AND source_database_id IS NULL AND state_desc = N'ONLINE')
+    THROW 50012, N'원본 AW_Origin는 ONLINE 상태의 사용자 DB여야 함(시스템 DB·스냅샷 불가)', 1;
+IF DB_ID(N'AW_Sandbox') IS NOT NULL
+   AND (DB_ID(N'AW_Sandbox') <= 4
+        OR (DB_NAME(DB_ID(N'AW_Sandbox')) COLLATE Latin1_General_BIN2 <> N'AW_Sandbox' OR DATALENGTH(DB_NAME(DB_ID(N'AW_Sandbox'))) <> DATALENGTH(N'AW_Sandbox'))
+        OR EXISTS (SELECT 1 FROM sys.databases WHERE database_id = DB_ID(N'AW_Sandbox') AND source_database_id IS NOT NULL) OR DB_ID(N'AW_Sandbox') = DB_ID(N'AW_Origin'))
+    THROW 50013, N'복원 대상 AW_Sandbox가 시스템 DB·스냅샷·원본(AW_Origin)이거나 서버가 다른 이름의 DB로 해석함', 1;
+IF DB_ID(N'AW_Sandbox_base') IS NOT NULL
+   AND ((DB_NAME(DB_ID(N'AW_Sandbox_base')) COLLATE Latin1_General_BIN2 <> N'AW_Sandbox_base' OR DATALENGTH(DB_NAME(DB_ID(N'AW_Sandbox_base'))) <> DATALENGTH(N'AW_Sandbox_base'))
+        OR NOT EXISTS (SELECT 1 FROM sys.databases WHERE database_id = DB_ID(N'AW_Sandbox_base') AND source_database_id = DB_ID(N'AW_Sandbox')))
+    THROW 50014, N'스냅샷 이름 AW_Sandbox_base의 DB가 AW_Sandbox의 스냅샷이 아니거나 서버가 다른 이름으로 해석함', 1;
+-- [AW_Origin] 원본 스키마 검사(읽기만)
+IF SCHEMA_ID(N'audit') IS NOT NULL
+    THROW 50030, N'원본 AW_Origin에 이미 audit 스키마가 있음: 감사 저장소 스키마(§6.2)와 겹치므로 기준선을 만들지 않음', 1;
+-- [master] 1
+IF DB_ID(N'AW_Sandbox_base') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = N'AW_Sandbox_base' AND source_database_id = DB_ID(N'AW_Sandbox'))
+        THROW 50001, N'AW_Sandbox_base은(는) AW_Sandbox의 스냅샷이 아니므로 지우지 않음', 1;
+    DROP DATABASE [AW_Sandbox_base];
+END;
+-- [master] 2
+BACKUP DATABASE [AW_Origin] TO DISK = N'/var/opt/mssql/backup/AW_Origin_baseline.bak' WITH COPY_ONLY, INIT;
+-- [master] 3
+IF DB_ID(N'AW_Sandbox') IS NOT NULL
+   AND (DB_ID(N'AW_Sandbox') <= 4
+        OR (DB_NAME(DB_ID(N'AW_Sandbox')) COLLATE Latin1_General_BIN2 <> N'AW_Sandbox' OR DATALENGTH(DB_NAME(DB_ID(N'AW_Sandbox'))) <> DATALENGTH(N'AW_Sandbox'))
+        OR EXISTS (SELECT 1 FROM sys.databases WHERE database_id = DB_ID(N'AW_Sandbox') AND source_database_id IS NOT NULL) OR DB_ID(N'AW_Sandbox') = DB_ID(N'AW_Origin'))
+    THROW 50013, N'복원 대상 AW_Sandbox가 시스템 DB·스냅샷·원본(AW_Origin)이거나 서버가 다른 이름의 DB로 해석함', 1;
+RESTORE FILELISTONLY FROM DISK = N'/var/opt/mssql/backup/AW_Origin_baseline.bak';
+IF DB_ID(N'AW_Sandbox') IS NOT NULL
+BEGIN
+    IF (SELECT state_desc FROM sys.databases WHERE database_id = DB_ID(N'AW_Sandbox')) <> N'ONLINE'
+        DROP DATABASE [AW_Sandbox];
+    ELSE
+        ALTER DATABASE [AW_Sandbox] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+END;
+-- 이후: RESTORE … WITH MOVE, REPLACE(실패 시 MULTI_USER 복구) → 카탈로그 → 행 수 → 설치 → 행 수 → 환경 지문 → CREATE DATABASE … AS SNAPSHOT OF
+exit=0
+

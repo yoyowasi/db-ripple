@@ -1,0 +1,22 @@
+# dbripple "baseline" "build" "--source" "CascadeLab_RT" "--sandbox" "CascadeLab_RT_Sandbox" "--snapshot" "CascadeLab_RT_Sandbox_base" "--backup" "/var/opt/mssql/backup/CascadeLab_RT_baseline.bak" "--out" "logs/week1/cascadelab-rt-baseline" at=2026-11-10T09:10:57.3074303+09:00 elapsedSec=2.5 exit=0
+09:10:55.205 [master] 14ms IF DB_ID(N'CascadeLab_RT_Sandbox_base') IS NOT NULL DROP DATABASE [CascadeLab_RT_Sandbox_base];
+09:10:55.370 [master] 81ms BACKUP DATABASE [CascadeLab_RT] TO DISK = N'/var/opt/mssql/backup/CascadeLab_RT_baseline.bak' WITH COPY_ONLY, INIT;
+09:10:55.461 FILELISTONLY: CascadeLab_RT(D,1), CascadeLab_RT_log(L,2)
+09:10:55.537 [master] 2ms IF DB_ID(N'CascadeLab_RT_Sandbox') IS NOT NULL ALTER DATABASE [CascadeLab_RT_Sandbox] SET SINGLE_USER WITH ROLLBACK IMME…
+09:10:55.965 [master] 355ms RESTORE DATABASE [CascadeLab_RT_Sandbox] FROM DISK = N'/var/opt/mssql/backup/CascadeLab_RT_baseline.bak' WITH MOVE N'Cas…
+09:10:56.323 [CascadeLab_RT_Sandbox] 7ms CREATE SCHEMA audit AUTHORIZATION dbo;
+09:10:56.405 [CascadeLab_RT_Sandbox] 6ms CREATE SEQUENCE audit.CaptureSeq AS bigint START WITH 1 INCREMENT BY 1;
+09:10:56.478 [CascadeLab_RT_Sandbox] 7ms CREATE TABLE audit.AuditHeader (
+09:10:56.556 [CascadeLab_RT_Sandbox] 6ms CREATE TABLE audit.AuditRowImage (
+09:10:56.641 [CascadeLab_RT_Sandbox] 12ms CREATE TABLE audit.AuditControl (
+09:10:56.713 [CascadeLab_RT_Sandbox] 8ms CREATE TRIGGER [cl08].[dbr_audit_Acct_I] ON [cl08].[Acct]
+09:10:56.796 [CascadeLab_RT_Sandbox] 8ms CREATE TRIGGER [cl08].[dbr_audit_Acct_U] ON [cl08].[Acct]
+09:10:56.869 [CascadeLab_RT_Sandbox] 6ms CREATE TRIGGER [cl08].[dbr_audit_Acct_D] ON [cl08].[Acct]
+09:10:56.970 [CascadeLab_RT_Sandbox] 27ms EXEC sys.sp_settriggerorder @triggername = N'[cl08].[dbr_audit_Acct_I]', @order = N'Last', @stmttype = N'INSERT';
+09:10:57.237 [master] 98ms CREATE DATABASE [CascadeLab_RT_Sandbox_base] ON (NAME = [CascadeLab_RT], FILENAME = N'/var/opt/mssql/data/CascadeLab_RT_…
+기준 시각(백업 완료): 2026-11-10T09:10:55.3710499+09:00
+원본 지문: Fingerprint { ProductVersion = 17.0.5035.5, Edition = Enterprise Developer Edition (64-bit), CompatibilityLevel = 170, IsRecursiveTriggersOn = True, NestedTriggers = 1, DisallowResultsFromTriggers = 0, SessionOptions = 5432, Collation = SQL_Latin1_General_CP1_CI_AS }
+샌드박스 지문: Fingerprint { ProductVersion = 17.0.5035.5, Edition = Enterprise Developer Edition (64-bit), CompatibilityLevel = 170, IsRecursiveTriggersOn = True, NestedTriggers = 1, DisallowResultsFromTriggers = 0, SessionOptions = 5432, Collation = SQL_Latin1_General_CP1_CI_AS }
+fingerprintMatch=True
+매니페스트 m-20261110-0910: 대상 1개, 제외 0개, auditNotLast 0개, 배치 9개
+총 소요: 2.4s

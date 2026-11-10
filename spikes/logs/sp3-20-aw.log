@@ -1,0 +1,61 @@
+# spikes\sql\sp3_20_aw.sql db=AW_SpikeA part=0 at=2026-11-10T09:05:44.5625411+09:00 elapsedSec=1.75 exit=0
+Changed database context to 'AW_SpikeA'.
+db is_recursive_triggers_on compatibility_level nestedTriggers sessionQuotedIdentifier
+-- ------------------------ ------------------- -------------- -----------------------
+AW_Origin 0 170 1 1
+AW_SpikeA 0 170 1 1
+uSalesOrderHeader_revisionPart
+------------------------------
+IF NOT UPDATE([Status])
+        BEGIN
+            UPDATE [Sales].[SalesOrderHeader]
+            SET [Sales].[SalesOrderHeader].[RevisionNumber] =
+                [Sales].[SalesOrderHeader].[RevisionNumber] + 1
+            WHERE [Sales].[SalesOrderHeader].[SalesOrderID] IN
+                (SELECT inserted.[SalesOrderID] FRO
+  CREATE_TRIGGER - Sales.dbr_audit_SalesOrderHeader_U
+  ALTER_TRIGGER - Sales.dbr_audit_SalesOrderHeader_U
+triggerName evt is_first is_last is_disabled quotedIdentOn
+----------- --- -------- ------- ----------- -------------
+dbr_audit_SalesOrderHeader_U UPDATE 0 1 0 1
+uSalesOrderHeader UPDATE 0 0 0 1
+Changed database context to 'master'.
+snapshotDdl
+-----------
+CREATE DATABASE AW_SpikeA_snap ON (NAME = [AdventureWorks], FILENAME = N'/var/opt/mssql/data/AW_SpikeA_snap_AdventureWorks.ss') AS SNAPSHOT OF AW_SpikeA;
+name sourceDb state_desc is_read_only
+---- -------- ---------- ------------
+AW_SpikeA_snap AW_SpikeA ONLINE 1
+Changed database context to 'AW_SpikeA'.
+Warning: Null value is eliminated by an aggregate or other SET operation.
+mode_ salesOrderId rowsAffected errorNumber tranCountAtSnapshotRead tranCountAfterRollback
+----- ------------ ------------ ----------- ----------------------- ----------------------
+AW 43659 1 NULL 1 0
+mode_ pos captureSeq nestLevel insertedCount deletedCount tranCount beforeRev beforeComment afterRev afterComment
+----- --- ---------- --------- ------------- ------------ --------- --------- ------------- -------- ------------
+AW 1 1 2 1 1 2 10 sp3 11 sp3
+AW 2 2 1 1 1 2 10 NULL 10 sp3
+src RevisionNumber Comment ModifiedDate
+--- -------------- ------- ------------
+snapshot(기준) 10 NULL 2022-06-06 00:00:00.000
+reread(롤백 전) 11 sp3 2022-06-06 00:00:00.000
+mode_ auditHeaders nestedHeaders snapshotRev lastAuditAfterRev nestedAuditAfterRev rereadRev finalDiffRev netDiffRowsCurExceptSnap netDiffRowsSnapExceptCur netDiffRowsOtherKeys verdict
+----- ------------ ------------- ----------- ----------------- ------------------- --------- ------------ ------------------------ ------------------------ -------------------- -------
+AW 2 1 10 10 11 11 10->11 1 1 0 CAPTURED
+revAfterRollback commentAfterRollback snapshotRev auditHeadersAfterRollback
+---------------- -------------------- ----------- -------------------------
+10 NULL 10 0
+Changed database context to 'master'.
+Changed database context to 'AW_SpikeA'.
+  DROP_TRIGGER - Sales.dbr_audit_SalesOrderHeader_U
+  DROP_TABLE - audit.AuditRowImage
+  DROP_TABLE - audit.AuditHeader
+  DROP_TABLE - audit.AuditControl
+  DROP_SEQUENCE - audit.CaptureSeq
+  DROP_SCHEMA - audit.audit
+snapshotDbId_null_expected auditSchema_null_expected auditTriggers_0_expected recursiveTriggersOn
+-------------------------- ------------------------- ------------------------ -------------------
+NULL NULL 0 0
+triggerName evt is_first is_last
+----------- --- -------- -------
+uSalesOrderHeader UPDATE 0 0

@@ -15,31 +15,30 @@
     "changes": [
       { "table": "cl08.Acct", "keyColumns": ["id"], "inserted": [], "deleted": [],
         "updated": [
-          { "key": { "id": 1 }, "causes": ["DIRECT", { "oneOf": ["TRIGGER", "SAME_TABLE_TRIGGER"], "ref": "OO1" }],
+          { "key": { "id": 1 }, "causes": ["DIRECT", "TRIGGER"],
             "changedColumns": ["bal", "touched"], "after": { "touched": 1 } }
         ],
         "basis": "문장이 bal을, trg_Acct_upd가 touched를 1회 바꾼다. OFF라 trg_Acct_upd는 자기 자신을 다시 발동하지 않으므로 touched = 1(A8, 직접 재귀 금지). id 2는 그대로" }
     ],
     "firings": [
-      { "node": "F:cl08.Acct:UPDATE#1", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "pairing": "SINGLE_ROW" }
+      { "node": "F:cl08.Acct:UPDATE#1", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "pairing": "SINGLE_ROW" },
+      { "node": "F:cl08.Acct:UPDATE#2", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2 }
     ],
     "edges": [
       { "statementIndex": 1, "parent": "S", "child": "F:cl08.Acct:UPDATE#1", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
-      { "statementIndex": 1, "parent": "F:cl08.Acct:UPDATE#1", "child": "T:cl08.trg_Acct_upd#1", "kind": "FIRES", "name": "cl08.trg_Acct_upd", "confidence": "inferred", "basis": "§6.3 FIRES, §7.3" }
+      { "statementIndex": 1, "parent": "F:cl08.Acct:UPDATE#1", "child": "T:cl08.trg_Acct_upd#1", "kind": "FIRES", "name": "cl08.trg_Acct_upd", "confidence": "inferred", "basis": "§6.3 FIRES, §7.3" },
+      { "statementIndex": 1, "parent": "T:cl08.trg_Acct_upd#1", "child": "F:cl08.Acct:UPDATE#2", "kind": "WRITES", "name": "cl08.trg_Acct_upd", "confidence": "inferred", "basis": "OO1 확정(대안 a): SP3 CAPTURED, CascadeLab 감사 대조" }
     ],
-    "observedOnly": [
-      { "id": "OO1", "what": "트리거 안 UPDATE(touched 0 -> 1)가 감사 트리거를 발동하는지",
-        "alternatives": [
-          { "label": "a. 감사 발동", "firings": [ { "node": "F:cl08.Acct:UPDATE#2", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2 } ],
-            "edges": [ { "statementIndex": 1, "parent": "T:cl08.trg_Acct_upd#1", "child": "F:cl08.Acct:UPDATE#2", "kind": "WRITES", "name": "cl08.trg_Acct_upd", "confidence": "inferred" } ] },
-          { "label": "b. 감사 미발동 -> 잔차", "residuals": [ { "node": "R:cl08.Acct", "category": "SAME_TABLE_TRIGGER", "changedColumns": ["touched"] } ],
-            "edges": [ { "statementIndex": 1, "parent": "T:cl08.trg_Acct_upd#1", "child": "R:cl08.Acct", "kind": "RESIDUAL", "name": "cl08.trg_Acct_upd", "confidence": "inferred" } ] }
-        ],
-        "basis": "A8은 OFF가 막는 범위를 '직접 재귀'로만 적는다. 감사 트리거는 다른 트리거라 문서 문자 그대로면 a다. 설계 E14·DM2는 같은 상황을 잔차(b)로 다룬다. 둘 중 어느 쪽인지는 문서로 정해지지 않으므로 SP3·월요일 실측으로 정한다" }
+    "observedOnly": [],
+    "corrections": [
+      { "date": "2026-11-10", "item": "OO1(트리거 안 UPDATE가 감사 트리거를 발동하는지)", "before": "대안 a(감사 발동)·b(감사 미발동 → SAME_TABLE_TRIGGER 잔차) 미정",
+        "after": "a로 확정: firings에 F:cl08.Acct:UPDATE#2(깊이 2), edges에 WRITES, causes를 DIRECT·TRIGGER로",
+        "evidence": "spikes/logs/sp3-10-mini-part2.log OFF 16~17·20행(CAPTURED), cascadelab/verification/logs/audit-2026-11-10.txt(Acct:U:2:1 < Acct:U:1:1, 5회 같음)",
+        "cause": "문서 해석: A8 문구대로(직접 재귀만 막음) a가 맞다. 설계 E14·DM2의 잔차 가정(b)은 실측과 다름(설계 v1.3에서 고침)" }
     ]
   },
   "rationale": [
-    { "claim": "순 변경(키 1개, 바뀐 열 bal·touched, touched = 1)은 a·b 어느 쪽이든 같다", "basis": "§6.2 NetChange는 최종 상태 기준" },
-    { "claim": "b라면 감사 after의 touched(0)와 재조회 값(1)이 달라 REREAD + SAME_TABLE_TRIGGER 잔차가 된다", "basis": "§7.2 6단계, §6.2 finalAfterSource" }
+    { "claim": "순 변경(키 1개, 바뀐 열 bal·touched, touched = 1)은 감사 발동 여부와 상관없이 같다", "basis": "§6.2 NetChange는 최종 상태 기준" },
+    { "claim": "바깥 묶음(깊이 1)의 inserted 이미지 touched는 0이고 최종값 1은 깊이 2 묶음에 있다. 최종 after는 전위 순서 마지막 묶음(깊이 2)에서 얻는다", "basis": "§7.2 6단계(v1.3), cascadelab/verification/report-2026-11-10.md 불일치와 원인 1" }
   ]
 }

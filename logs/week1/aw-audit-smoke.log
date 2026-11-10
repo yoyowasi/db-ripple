@@ -1,0 +1,55 @@
+# logs\week1\aw-audit-smoke.sql db=AW_Sandbox part=0 at=2026-11-10T09:33:19.3805844+09:00 elapsedSec=0.79 exit=0
+db sessionQI tranCountBefore headersBefore mode updSalesOrderDetailID orderQtyBefore delSalesOrderID sohDetails sohReasons
+-- --------- --------------- ------------- ---- --------------------- -------------- --------------- ---------- ----------
+AW_Sandbox 1 0 0 FULL 353 1 51176 2 1
+rowcountAfterUpdate rowcountAfterDelete boundary0 boundary1
+------------------- ------------------- --------- ---------
+1 1 0 349
+stmt captureSeq tableName operation insertedCount deletedCount nestLevel tranCount imageMode images
+---- ---------- --------- --------- ------------- ------------ --------- --------- --------- ------
+1 338 [Production].[TransactionHistory] I 1 0 2 2 FULL 1
+1 339 [Person].[Person] U 0 0 3 2 FULL 0
+1 340 [Person].[Person] U 0 0 3 2 FULL 0
+1 341 [Person].[Person] U 1 1 2 2 FULL 2
+1 342 [Sales].[SalesOrderHeader] U 1 1 3 2 FULL 2
+1 343 [Sales].[SalesPerson] U 0 0 3 2 FULL 0
+1 344 [Sales].[SalesTerritory] U 0 0 3 2 FULL 0
+1 345 [Sales].[SalesOrderHeader] U 1 1 2 2 FULL 2
+1 346 [Person].[Person] U 0 0 3 2 FULL 0
+1 347 [Person].[Person] U 0 0 3 2 FULL 0
+1 348 [Person].[Person] U 1 1 2 2 FULL 2
+1 349 [Sales].[SalesOrderDetail] U 1 1 1 2 FULL 2
+2 350 [Sales].[SalesOrderHeaderSalesReason] D 0 1 1 2 FULL 1
+2 351 [Sales].[SalesOrderHeader] U 0 0 2 2 FULL 0
+2 352 [Person].[Person] U 0 0 2 2 FULL 0
+2 353 [Sales].[SalesOrderDetail] D 0 2 1 2 FULL 2
+2 354 [Sales].[SalesOrderHeader] D 0 1 1 2 FULL 1
+stmt imageKind images withRowJson validJson
+---- --------- ------ ----------- ---------
+1 DELETED 5 5 5
+1 INSERTED 6 6 6
+2 DELETED 4 4 4
+totalImages
+-----------
+15
+captureSeq imageKind ordinal keyJson orderQty lineTotal rowJsonLength
+---------- --------- ------- ------- -------- --------- -------------
+349 DELETED 1 {"SalesOrderID":43697,"SalesOrderDetailID":353} 1 3578.270000 283
+349 INSERTED 1 {"SalesOrderID":43697,"SalesOrderDetailID":353} 2 7156.540000 283
+{"SalesOrderID":43697,"SalesOrderDetailID":353,"CarrierTrackingNumber":null,"OrderQty":2,"ProductID":749,"SpecialOfferID":1,"UnitPrice":3578.2700,"UnitPriceDiscount":0.0000,"LineTotal":7156.540000,"rowguid":"CA258BF8-1F52-4AE6-8E8F-5439AE0C9509","ModifiedDate":"2022-05-30T00:00:00"}
+key value jsonType
+--- ----- --------
+SalesOrderID 43697 number
+SalesOrderDetailID 353 number
+CarrierTrackingNumber NULL null
+OrderQty 2 number
+ProductID 749 number
+SpecialOfferID 1 number
+UnitPrice 3578.2700 number
+UnitPriceDiscount 0.0000 number
+LineTotal 7156.540000 number
+rowguid CA258BF8-1F52-4AE6-8E8F-5439AE0C9509 string
+ModifiedDate 2022-05-30T00:00:00 string
+tranCountAfter headersAfterRollback imagesAfterRollback orderQtyAfterRollback sohRowAfterRollback errorLogRows captureSeqCurrent
+-------------- -------------------- ------------------- --------------------- ------------------- ------------ -----------------
+0 0 0 1 1 0 354

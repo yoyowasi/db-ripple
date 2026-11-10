@@ -1,0 +1,3261 @@
+{
+  "Mode": "audit",
+  "StartedAt": "2026-11-10T10:18:46.6792110+09:00",
+  "Tool": "cascadelab/verification/CascadeLab.Verify",
+  "Env": {
+    "productVersion": "17.0.5035.5",
+    "productUpdateLevel": "CU10",
+    "edition": "Enterprise Developer Edition (64-bit)",
+    "nestedTriggers": 1,
+    "disallowResultsFromTriggers": 0,
+    "sessionOptions": 5432,
+    "xactAbort": 0,
+    "db:CascadeLab": {
+      "is_recursive_triggers_on": false,
+      "compatibility_level": 170,
+      "is_read_committed_snapshot_on": false,
+      "snapshot_isolation_state_desc": "OFF",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS"
+    },
+    "db:CascadeLab_RT": {
+      "is_recursive_triggers_on": true,
+      "compatibility_level": 170,
+      "is_read_committed_snapshot_on": false,
+      "snapshot_isolation_state_desc": "OFF",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS"
+    },
+    "db:CascadeLab_Sandbox": {
+      "is_recursive_triggers_on": false,
+      "compatibility_level": 170,
+      "is_read_committed_snapshot_on": false,
+      "snapshot_isolation_state_desc": "OFF",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS"
+    },
+    "db:CascadeLab_RT_Sandbox": {
+      "is_recursive_triggers_on": true,
+      "compatibility_level": 170,
+      "is_read_committed_snapshot_on": false,
+      "snapshot_isolation_state_desc": "OFF",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS"
+    }
+  },
+  "SeedDigest": {
+    "CascadeLab_Sandbox": "6E605145E7235F14",
+    "CascadeLab": "6E605145E7235F14",
+    "CascadeLab_RT_Sandbox": "78EF7DC7082C7A41",
+    "CascadeLab_RT": "78EF7DC7082C7A41"
+  },
+  "EnvChecks": [
+    {
+      "Item": "env: CascadeLab_Sandbox 데이터 = CascadeLab 데이터(감사 스키마 제외 디지스트)",
+      "Expected": "6E605145E7235F14",
+      "Actual": "6E605145E7235F14",
+      "Verdict": "MATCH"
+    },
+    {
+      "Item": "env: RECURSIVE_TRIGGERS CascadeLab = CascadeLab_Sandbox",
+      "Expected": "false",
+      "Actual": "false",
+      "Verdict": "MATCH"
+    },
+    {
+      "Item": "env: CascadeLab_RT_Sandbox 데이터 = CascadeLab_RT 데이터(감사 스키마 제외 디지스트)",
+      "Expected": "78EF7DC7082C7A41",
+      "Actual": "78EF7DC7082C7A41",
+      "Verdict": "MATCH"
+    },
+    {
+      "Item": "env: RECURSIVE_TRIGGERS CascadeLab_RT = CascadeLab_RT_Sandbox",
+      "Expected": "true",
+      "Actual": "true",
+      "Verdict": "MATCH"
+    }
+  ],
+  "Cases": [
+    {
+      "Id": "CL01",
+      "CaseFile": "CL01-cascade-4.json",
+      "Database": "CascadeLab_Sandbox",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "DELETE FROM cl01.A WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl01.A",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":1}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl01.B",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":10}",
+            "{\"id\":11}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl01.C",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":100}",
+            "{\"id\":101}",
+            "{\"id\":110}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl01.D",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":1000}",
+            "{\"id\":1001}",
+            "{\"id\":1100}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.A keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.A inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.A updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.A deleted",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.B keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.B inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.B updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.B deleted",
+          "Expected": "[{\"id\":10}, {\"id\":11}]",
+          "Actual": "[{\"id\":10}, {\"id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.C keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.C inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.C updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.C deleted",
+          "Expected": "[{\"id\":100}, {\"id\":101}, {\"id\":110}]",
+          "Actual": "[{\"id\":100}, {\"id\":101}, {\"id\":110}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.D keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.D inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.D updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl01.D deleted",
+          "Expected": "[{\"id\":1000}, {\"id\":1001}, {\"id\":1100}]",
+          "Actual": "[{\"id\":1000}, {\"id\":1001}, {\"id\":1100}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: 롤백 뒤 감사 헤더가 경계로 돌아감",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl01.D:DELETE (table, op, rowCount)",
+          "Expected": "cl01.D DELETE 3",
+          "Actual": "cl01.D DELETE 3",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 261, inserted 0, deleted 3"
+        },
+        {
+          "Item": "firing F:cl01.D:DELETE depth (FK 연쇄 경로, H2 전제값)",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED"
+        },
+        {
+          "Item": "firing F:cl01.C:DELETE (table, op, rowCount)",
+          "Expected": "cl01.C DELETE 3",
+          "Actual": "cl01.C DELETE 3",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 262, inserted 0, deleted 3"
+        },
+        {
+          "Item": "firing F:cl01.C:DELETE depth (FK 연쇄 경로, H2 전제값)",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED"
+        },
+        {
+          "Item": "firing F:cl01.B:DELETE (table, op, rowCount)",
+          "Expected": "cl01.B DELETE 2",
+          "Actual": "cl01.B DELETE 2",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 263, inserted 0, deleted 2"
+        },
+        {
+          "Item": "firing F:cl01.B:DELETE depth (FK 연쇄 경로, H2 전제값)",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED"
+        },
+        {
+          "Item": "firing F:cl01.A:DELETE (table, op, rowCount)",
+          "Expected": "cl01.A DELETE 1",
+          "Actual": "cl01.A DELETE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 264, inserted 0, deleted 1"
+        },
+        {
+          "Item": "firing F:cl01.A:DELETE depth",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "반복 5회: 순서·순 변경 문자열 종류 수",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED",
+          "Note": "M4 맛보기. captureSeq 값 자체는 빼고 비교"
+        }
+      ],
+      "Firings": [
+        {
+          "Seq": 261,
+          "Table": "cl01.D",
+          "Operation": "DELETE",
+          "InsertedCount": 0,
+          "DeletedCount": 3,
+          "RowCount": 3,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":1100} row={\"id\":1100,\"c_id\":110}",
+            "DELETED key={\"id\":1001} row={\"id\":1001,\"c_id\":101}",
+            "DELETED key={\"id\":1000} row={\"id\":1000,\"c_id\":100}"
+          ],
+          "Label": "261:cl01.D:D:d1:r3"
+        },
+        {
+          "Seq": 262,
+          "Table": "cl01.C",
+          "Operation": "DELETE",
+          "InsertedCount": 0,
+          "DeletedCount": 3,
+          "RowCount": 3,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":110} row={\"id\":110,\"b_id\":11}",
+            "DELETED key={\"id\":101} row={\"id\":101,\"b_id\":10}",
+            "DELETED key={\"id\":100} row={\"id\":100,\"b_id\":10}"
+          ],
+          "Label": "262:cl01.C:D:d1:r3"
+        },
+        {
+          "Seq": 263,
+          "Table": "cl01.B",
+          "Operation": "DELETE",
+          "InsertedCount": 0,
+          "DeletedCount": 2,
+          "RowCount": 2,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":11} row={\"id\":11,\"a_id\":1}",
+            "DELETED key={\"id\":10} row={\"id\":10,\"a_id\":1}"
+          ],
+          "Label": "263:cl01.B:D:d1:r2"
+        },
+        {
+          "Seq": 264,
+          "Table": "cl01.A",
+          "Operation": "DELETE",
+          "InsertedCount": 0,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":1} row={\"id\":1,\"name\":\"a1\"}"
+          ],
+          "Label": "264:cl01.A:D:d1:r1"
+        }
+      ],
+      "CaptureOrder": "261:cl01.D:D:d1:r3 < 262:cl01.C:D:d1:r3 < 263:cl01.B:D:d1:r2 < 264:cl01.A:D:d1:r1",
+      "RepeatRuns": [
+        "run1: status=ok err=null order=cl01.D:D:d1:r3 < cl01.C:D:d1:r3 < cl01.B:D:d1:r2 < cl01.A:D:d1:r1 net=cl01.A I0[] U0[] D1[{\"id\":1}]; cl01.B I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl01.C I0[] U0[] D3[{\"id\":100} {\"id\":101} {\"id\":110}]; cl01.D I0[] U0[] D3[{\"id\":1000} {\"id\":1001} {\"id\":1100}]",
+        "run2: status=ok err=null order=cl01.D:D:d1:r3 < cl01.C:D:d1:r3 < cl01.B:D:d1:r2 < cl01.A:D:d1:r1 net=cl01.A I0[] U0[] D1[{\"id\":1}]; cl01.B I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl01.C I0[] U0[] D3[{\"id\":100} {\"id\":101} {\"id\":110}]; cl01.D I0[] U0[] D3[{\"id\":1000} {\"id\":1001} {\"id\":1100}]",
+        "run3: status=ok err=null order=cl01.D:D:d1:r3 < cl01.C:D:d1:r3 < cl01.B:D:d1:r2 < cl01.A:D:d1:r1 net=cl01.A I0[] U0[] D1[{\"id\":1}]; cl01.B I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl01.C I0[] U0[] D3[{\"id\":100} {\"id\":101} {\"id\":110}]; cl01.D I0[] U0[] D3[{\"id\":1000} {\"id\":1001} {\"id\":1100}]",
+        "run4: status=ok err=null order=cl01.D:D:d1:r3 < cl01.C:D:d1:r3 < cl01.B:D:d1:r2 < cl01.A:D:d1:r1 net=cl01.A I0[] U0[] D1[{\"id\":1}]; cl01.B I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl01.C I0[] U0[] D3[{\"id\":100} {\"id\":101} {\"id\":110}]; cl01.D I0[] U0[] D3[{\"id\":1000} {\"id\":1001} {\"id\":1100}]",
+        "run5: status=ok err=null order=cl01.D:D:d1:r3 < cl01.C:D:d1:r3 < cl01.B:D:d1:r2 < cl01.A:D:d1:r1 net=cl01.A I0[] U0[] D1[{\"id\":1}]; cl01.B I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl01.C I0[] U0[] D3[{\"id\":100} {\"id\":101} {\"id\":110}]; cl01.D I0[] U0[] D3[{\"id\":1000} {\"id\":1001} {\"id\":1100}]"
+      ],
+      "AuditTriggers": [
+        "A DELETE dbr_audit_A_D LAST",
+        "A INSERT dbr_audit_A_I LAST",
+        "A UPDATE dbr_audit_A_U LAST",
+        "B DELETE dbr_audit_B_D LAST",
+        "B INSERT dbr_audit_B_I LAST",
+        "B UPDATE dbr_audit_B_U LAST",
+        "C DELETE dbr_audit_C_D LAST",
+        "C INSERT dbr_audit_C_I LAST",
+        "C UPDATE dbr_audit_C_U LAST",
+        "D DELETE dbr_audit_D_D LAST",
+        "D INSERT dbr_audit_D_I LAST",
+        "D UPDATE dbr_audit_D_U LAST"
+      ]
+    },
+    {
+      "Id": "CL02",
+      "CaseFile": "CL02-set-null.json",
+      "Database": "CascadeLab_Sandbox",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "DELETE FROM cl02.Dept WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl02.Dept",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":1}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl02.Emp",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":10}",
+              "ChangedColumns": [
+                "dept_id"
+              ],
+              "Before": {
+                "dept_id": 1
+              },
+              "After": {
+                "dept_id": null
+              }
+            },
+            {
+              "Key": "{\"id\":11}",
+              "ChangedColumns": [
+                "dept_id"
+              ],
+              "Before": {
+                "dept_id": 1
+              },
+              "After": {
+                "dept_id": null
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl02.Dept keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl02.Dept inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl02.Dept updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl02.Dept deleted",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl02.Emp keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl02.Emp inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl02.Emp updated",
+          "Expected": "[{\"id\":10}, {\"id\":11}]",
+          "Actual": "[{\"id\":10}, {\"id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl02.Emp deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl02.Emp {\"id\":10} changedColumns",
+          "Expected": "[dept_id]",
+          "Actual": "[dept_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl02.Emp {\"id\":10} after.dept_id",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl02.Emp {\"id\":11} changedColumns",
+          "Expected": "[dept_id]",
+          "Actual": "[dept_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl02.Emp {\"id\":11} after.dept_id",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: 롤백 뒤 감사 헤더가 경계로 돌아감",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl02.Emp:UPDATE (table, op, rowCount)",
+          "Expected": "cl02.Emp UPDATE 2",
+          "Actual": "cl02.Emp UPDATE 2",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 281, inserted 2, deleted 2"
+        },
+        {
+          "Item": "firing F:cl02.Emp:UPDATE depth (FK 연쇄 경로, H2 전제값)",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED"
+        },
+        {
+          "Item": "firing F:cl02.Dept:DELETE (table, op, rowCount)",
+          "Expected": "cl02.Dept DELETE 1",
+          "Actual": "cl02.Dept DELETE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 282, inserted 0, deleted 1"
+        },
+        {
+          "Item": "firing F:cl02.Dept:DELETE depth",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "반복 5회: 순서·순 변경 문자열 종류 수",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED",
+          "Note": "M4 맛보기. captureSeq 값 자체는 빼고 비교"
+        }
+      ],
+      "Firings": [
+        {
+          "Seq": 281,
+          "Table": "cl02.Emp",
+          "Operation": "UPDATE",
+          "InsertedCount": 2,
+          "DeletedCount": 2,
+          "RowCount": 2,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":11} row={\"id\":11,\"dept_id\":1,\"name\":\"e11\"}",
+            "DELETED key={\"id\":10} row={\"id\":10,\"dept_id\":1,\"name\":\"e10\"}",
+            "INSERTED key={\"id\":11} row={\"id\":11,\"dept_id\":null,\"name\":\"e11\"}",
+            "INSERTED key={\"id\":10} row={\"id\":10,\"dept_id\":null,\"name\":\"e10\"}"
+          ],
+          "Label": "281:cl02.Emp:U:d1:r2"
+        },
+        {
+          "Seq": 282,
+          "Table": "cl02.Dept",
+          "Operation": "DELETE",
+          "InsertedCount": 0,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":1} row={\"id\":1,\"name\":\"d1\"}"
+          ],
+          "Label": "282:cl02.Dept:D:d1:r1"
+        }
+      ],
+      "CaptureOrder": "281:cl02.Emp:U:d1:r2 < 282:cl02.Dept:D:d1:r1",
+      "RepeatRuns": [
+        "run1: status=ok err=null order=cl02.Emp:U:d1:r2 < cl02.Dept:D:d1:r1 net=cl02.Dept I0[] U0[] D1[{\"id\":1}]; cl02.Emp I0[] U2[{\"id\":10}(dept_id) {\"id\":11}(dept_id)] D0[]",
+        "run2: status=ok err=null order=cl02.Emp:U:d1:r2 < cl02.Dept:D:d1:r1 net=cl02.Dept I0[] U0[] D1[{\"id\":1}]; cl02.Emp I0[] U2[{\"id\":10}(dept_id) {\"id\":11}(dept_id)] D0[]",
+        "run3: status=ok err=null order=cl02.Emp:U:d1:r2 < cl02.Dept:D:d1:r1 net=cl02.Dept I0[] U0[] D1[{\"id\":1}]; cl02.Emp I0[] U2[{\"id\":10}(dept_id) {\"id\":11}(dept_id)] D0[]",
+        "run4: status=ok err=null order=cl02.Emp:U:d1:r2 < cl02.Dept:D:d1:r1 net=cl02.Dept I0[] U0[] D1[{\"id\":1}]; cl02.Emp I0[] U2[{\"id\":10}(dept_id) {\"id\":11}(dept_id)] D0[]",
+        "run5: status=ok err=null order=cl02.Emp:U:d1:r2 < cl02.Dept:D:d1:r1 net=cl02.Dept I0[] U0[] D1[{\"id\":1}]; cl02.Emp I0[] U2[{\"id\":10}(dept_id) {\"id\":11}(dept_id)] D0[]"
+      ],
+      "AuditTriggers": [
+        "Dept DELETE dbr_audit_Dept_D LAST",
+        "Dept INSERT dbr_audit_Dept_I LAST",
+        "Dept UPDATE dbr_audit_Dept_U LAST",
+        "Emp DELETE dbr_audit_Emp_D LAST",
+        "Emp INSERT dbr_audit_Emp_I LAST",
+        "Emp UPDATE dbr_audit_Emp_U LAST"
+      ]
+    },
+    {
+      "Id": "CL03",
+      "CaseFile": "CL03-set-default.json",
+      "Database": "CascadeLab_Sandbox",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "DELETE FROM cl03.Category WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl03.Category",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":1}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl03.Product",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":10}",
+              "ChangedColumns": [
+                "category_id"
+              ],
+              "Before": {
+                "category_id": 1
+              },
+              "After": {
+                "category_id": 0
+              }
+            },
+            {
+              "Key": "{\"id\":11}",
+              "ChangedColumns": [
+                "category_id"
+              ],
+              "Before": {
+                "category_id": 1
+              },
+              "After": {
+                "category_id": 0
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Category keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Category inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Category updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Category deleted",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Product keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Product inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Product updated",
+          "Expected": "[{\"id\":10}, {\"id\":11}]",
+          "Actual": "[{\"id\":10}, {\"id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Product deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Product {\"id\":10} changedColumns",
+          "Expected": "[category_id]",
+          "Actual": "[category_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Product {\"id\":10} after.category_id",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Product {\"id\":11} changedColumns",
+          "Expected": "[category_id]",
+          "Actual": "[category_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Product {\"id\":11} after.category_id",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Grp 변경 0(정답에 없는 같은 패턴 스키마 테이블)",
+          "Expected": "I0 U0 D0",
+          "Actual": "I0 U0 D0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Item 변경 0(정답에 없는 같은 패턴 스키마 테이블)",
+          "Expected": "I0 U0 D0",
+          "Actual": "I0 U0 D0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: 롤백 뒤 감사 헤더가 경계로 돌아감",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl03.Product:UPDATE (table, op, rowCount)",
+          "Expected": "cl03.Product UPDATE 2",
+          "Actual": "cl03.Product UPDATE 2",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 291, inserted 2, deleted 2"
+        },
+        {
+          "Item": "firing F:cl03.Product:UPDATE depth (FK 연쇄 경로, H2 전제값)",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED"
+        },
+        {
+          "Item": "firing F:cl03.Category:DELETE (table, op, rowCount)",
+          "Expected": "cl03.Category DELETE 1",
+          "Actual": "cl03.Category DELETE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 292, inserted 0, deleted 1"
+        },
+        {
+          "Item": "firing F:cl03.Category:DELETE depth",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "반복 5회: 순서·순 변경 문자열 종류 수",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED",
+          "Note": "M4 맛보기. captureSeq 값 자체는 빼고 비교"
+        }
+      ],
+      "Firings": [
+        {
+          "Seq": 291,
+          "Table": "cl03.Product",
+          "Operation": "UPDATE",
+          "InsertedCount": 2,
+          "DeletedCount": 2,
+          "RowCount": 2,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":11} row={\"id\":11,\"category_id\":1}",
+            "DELETED key={\"id\":10} row={\"id\":10,\"category_id\":1}",
+            "INSERTED key={\"id\":11} row={\"id\":11,\"category_id\":0}",
+            "INSERTED key={\"id\":10} row={\"id\":10,\"category_id\":0}"
+          ],
+          "Label": "291:cl03.Product:U:d1:r2"
+        },
+        {
+          "Seq": 292,
+          "Table": "cl03.Category",
+          "Operation": "DELETE",
+          "InsertedCount": 0,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":1} row={\"id\":1,\"name\":\"c1\"}"
+          ],
+          "Label": "292:cl03.Category:D:d1:r1"
+        }
+      ],
+      "CaptureOrder": "291:cl03.Product:U:d1:r2 < 292:cl03.Category:D:d1:r1",
+      "RepeatRuns": [
+        "run1: status=ok err=null order=cl03.Product:U:d1:r2 < cl03.Category:D:d1:r1 net=cl03.Category I0[] U0[] D1[{\"id\":1}]; cl03.Product I0[] U2[{\"id\":10}(category_id) {\"id\":11}(category_id)] D0[]",
+        "run2: status=ok err=null order=cl03.Product:U:d1:r2 < cl03.Category:D:d1:r1 net=cl03.Category I0[] U0[] D1[{\"id\":1}]; cl03.Product I0[] U2[{\"id\":10}(category_id) {\"id\":11}(category_id)] D0[]",
+        "run3: status=ok err=null order=cl03.Product:U:d1:r2 < cl03.Category:D:d1:r1 net=cl03.Category I0[] U0[] D1[{\"id\":1}]; cl03.Product I0[] U2[{\"id\":10}(category_id) {\"id\":11}(category_id)] D0[]",
+        "run4: status=ok err=null order=cl03.Product:U:d1:r2 < cl03.Category:D:d1:r1 net=cl03.Category I0[] U0[] D1[{\"id\":1}]; cl03.Product I0[] U2[{\"id\":10}(category_id) {\"id\":11}(category_id)] D0[]",
+        "run5: status=ok err=null order=cl03.Product:U:d1:r2 < cl03.Category:D:d1:r1 net=cl03.Category I0[] U0[] D1[{\"id\":1}]; cl03.Product I0[] U2[{\"id\":10}(category_id) {\"id\":11}(category_id)] D0[]"
+      ],
+      "AuditTriggers": [
+        "Category DELETE dbr_audit_Category_D LAST",
+        "Category INSERT dbr_audit_Category_I LAST",
+        "Category UPDATE dbr_audit_Category_U LAST",
+        "Grp DELETE dbr_audit_Grp_D LAST",
+        "Grp INSERT dbr_audit_Grp_I LAST",
+        "Grp UPDATE dbr_audit_Grp_U LAST",
+        "Item DELETE dbr_audit_Item_D LAST",
+        "Item INSERT dbr_audit_Item_I LAST",
+        "Item UPDATE dbr_audit_Item_U LAST",
+        "Product DELETE dbr_audit_Product_D LAST",
+        "Product INSERT dbr_audit_Product_I LAST",
+        "Product UPDATE dbr_audit_Product_U LAST"
+      ]
+    },
+    {
+      "Id": "CL03b",
+      "CaseFile": "CL03b-set-default-missing.json",
+      "Database": "CascadeLab_Sandbox",
+      "Verdict": "MATCH",
+      "Status": "failed",
+      "ErrorNumber": 547,
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "DELETE FROM cl03.Grp WHERE id = 1;",
+          "Status": "failed",
+          "ErrorNumber": 547,
+          "Errors": [
+            {
+              "Number": 547,
+              "Class": 16,
+              "State": 0,
+              "Line": 1,
+              "Message": "The DELETE statement conflicted with the FOREIGN KEY constraint \"FK_cl03_Item_Grp\". The conflict occurred in database \"CascadeLab_Sandbox\", table \"cl03.Grp\", column 'id'."
+            },
+            {
+              "Number": 3621,
+              "Class": 0,
+              "State": 0,
+              "Line": 1,
+              "Message": "The statement has been terminated."
+            }
+          ],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox status",
+          "Expected": "failed",
+          "Actual": "failed",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox errorNumber",
+          "Expected": "547",
+          "Actual": "547",
+          "Verdict": "MATCH",
+          "Note": "수집한 오류: 547(class 16), 3621(class 0)"
+        },
+        {
+          "Item": "sandbox statement 1 status",
+          "Expected": "failed",
+          "Actual": "failed",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Grp keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Grp inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Grp updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Grp deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Item keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Item inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Item updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Item deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Category 변경 0(정답에 없는 같은 패턴 스키마 테이블)",
+          "Expected": "I0 U0 D0",
+          "Actual": "I0 U0 D0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl03.Product 변경 0(정답에 없는 같은 패턴 스키마 테이블)",
+          "Expected": "I0 U0 D0",
+          "Actual": "I0 U0 D0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: 롤백 뒤 감사 헤더가 경계로 돌아감",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "반복 5회: 순서·순 변경 문자열 종류 수",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED",
+          "Note": "M4 맛보기. captureSeq 값 자체는 빼고 비교"
+        }
+      ],
+      "Firings": [],
+      "CaptureOrder": "",
+      "RepeatRuns": [
+        "run1: status=failed err=547 order= net=",
+        "run2: status=failed err=547 order= net=",
+        "run3: status=failed err=547 order= net=",
+        "run4: status=failed err=547 order= net=",
+        "run5: status=failed err=547 order= net="
+      ],
+      "AuditTriggers": [
+        "Category DELETE dbr_audit_Category_D LAST",
+        "Category INSERT dbr_audit_Category_I LAST",
+        "Category UPDATE dbr_audit_Category_U LAST",
+        "Grp DELETE dbr_audit_Grp_D LAST",
+        "Grp INSERT dbr_audit_Grp_I LAST",
+        "Grp UPDATE dbr_audit_Grp_U LAST",
+        "Item DELETE dbr_audit_Item_D LAST",
+        "Item INSERT dbr_audit_Item_I LAST",
+        "Item UPDATE dbr_audit_Item_U LAST",
+        "Product DELETE dbr_audit_Product_D LAST",
+        "Product INSERT dbr_audit_Product_I LAST",
+        "Product UPDATE dbr_audit_Product_U LAST"
+      ]
+    },
+    {
+      "Id": "CL04",
+      "CaseFile": "CL04-update-cascade-pk.json",
+      "Database": "CascadeLab_Sandbox",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "UPDATE cl04.P SET id = id + 100 WHERE id IN (1, 2);",
+          "Status": "ok",
+          "RowsAffected": 2,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl04.Ch",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":10}",
+              "ChangedColumns": [
+                "p_id"
+              ],
+              "Before": {
+                "p_id": 1
+              },
+              "After": {
+                "p_id": 101
+              }
+            },
+            {
+              "Key": "{\"id\":11}",
+              "ChangedColumns": [
+                "p_id"
+              ],
+              "Before": {
+                "p_id": 1
+              },
+              "After": {
+                "p_id": 101
+              }
+            },
+            {
+              "Key": "{\"id\":20}",
+              "ChangedColumns": [
+                "p_id"
+              ],
+              "Before": {
+                "p_id": 2
+              },
+              "After": {
+                "p_id": 102
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl04.P",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [
+            "{\"id\":101}",
+            "{\"id\":102}"
+          ],
+          "Deleted": [
+            "{\"id\":1}",
+            "{\"id\":2}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.P keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.P inserted",
+          "Expected": "[{\"id\":101}, {\"id\":102}]",
+          "Actual": "[{\"id\":101}, {\"id\":102}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.P updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.P deleted",
+          "Expected": "[{\"id\":1}, {\"id\":2}]",
+          "Actual": "[{\"id\":1}, {\"id\":2}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch updated",
+          "Expected": "[{\"id\":10}, {\"id\":11}, {\"id\":20}]",
+          "Actual": "[{\"id\":10}, {\"id\":11}, {\"id\":20}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch {\"id\":10} changedColumns",
+          "Expected": "[p_id]",
+          "Actual": "[p_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch {\"id\":10} after.p_id",
+          "Expected": "101",
+          "Actual": "101",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch {\"id\":11} changedColumns",
+          "Expected": "[p_id]",
+          "Actual": "[p_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch {\"id\":11} after.p_id",
+          "Expected": "101",
+          "Actual": "101",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch {\"id\":20} changedColumns",
+          "Expected": "[p_id]",
+          "Actual": "[p_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch {\"id\":20} after.p_id",
+          "Expected": "102",
+          "Actual": "102",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: 롤백 뒤 감사 헤더가 경계로 돌아감",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl04.Ch:UPDATE (table, op, rowCount)",
+          "Expected": "cl04.Ch UPDATE 3",
+          "Actual": "cl04.Ch UPDATE 3",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 301, inserted 3, deleted 3"
+        },
+        {
+          "Item": "firing F:cl04.Ch:UPDATE depth (FK 연쇄 경로, H2 전제값)",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED"
+        },
+        {
+          "Item": "firing F:cl04.P:UPDATE (table, op, rowCount)",
+          "Expected": "cl04.P UPDATE 2",
+          "Actual": "cl04.P UPDATE 2",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 302, inserted 2, deleted 2"
+        },
+        {
+          "Item": "firing F:cl04.P:UPDATE depth",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "반복 5회: 순서·순 변경 문자열 종류 수",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED",
+          "Note": "M4 맛보기. captureSeq 값 자체는 빼고 비교"
+        }
+      ],
+      "Firings": [
+        {
+          "Seq": 301,
+          "Table": "cl04.Ch",
+          "Operation": "UPDATE",
+          "InsertedCount": 3,
+          "DeletedCount": 3,
+          "RowCount": 3,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":20} row={\"id\":20,\"p_id\":2}",
+            "DELETED key={\"id\":11} row={\"id\":11,\"p_id\":1}",
+            "DELETED key={\"id\":10} row={\"id\":10,\"p_id\":1}",
+            "INSERTED key={\"id\":20} row={\"id\":20,\"p_id\":102}",
+            "INSERTED key={\"id\":11} row={\"id\":11,\"p_id\":101}",
+            "INSERTED key={\"id\":10} row={\"id\":10,\"p_id\":101}"
+          ],
+          "Label": "301:cl04.Ch:U:d1:r3"
+        },
+        {
+          "Seq": 302,
+          "Table": "cl04.P",
+          "Operation": "UPDATE",
+          "InsertedCount": 2,
+          "DeletedCount": 2,
+          "RowCount": 2,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":2} row={\"id\":2,\"name\":\"p2\"}",
+            "DELETED key={\"id\":1} row={\"id\":1,\"name\":\"p1\"}",
+            "INSERTED key={\"id\":102} row={\"id\":102,\"name\":\"p2\"}",
+            "INSERTED key={\"id\":101} row={\"id\":101,\"name\":\"p1\"}"
+          ],
+          "Label": "302:cl04.P:U:d1:r2"
+        }
+      ],
+      "CaptureOrder": "301:cl04.Ch:U:d1:r3 < 302:cl04.P:U:d1:r2",
+      "RepeatRuns": [
+        "run1: status=ok err=null order=cl04.Ch:U:d1:r3 < cl04.P:U:d1:r2 net=cl04.Ch I0[] U3[{\"id\":10}(p_id) {\"id\":11}(p_id) {\"id\":20}(p_id)] D0[]; cl04.P I2[{\"id\":101} {\"id\":102}] U0[] D2[{\"id\":1} {\"id\":2}]",
+        "run2: status=ok err=null order=cl04.Ch:U:d1:r3 < cl04.P:U:d1:r2 net=cl04.Ch I0[] U3[{\"id\":10}(p_id) {\"id\":11}(p_id) {\"id\":20}(p_id)] D0[]; cl04.P I2[{\"id\":101} {\"id\":102}] U0[] D2[{\"id\":1} {\"id\":2}]",
+        "run3: status=ok err=null order=cl04.Ch:U:d1:r3 < cl04.P:U:d1:r2 net=cl04.Ch I0[] U3[{\"id\":10}(p_id) {\"id\":11}(p_id) {\"id\":20}(p_id)] D0[]; cl04.P I2[{\"id\":101} {\"id\":102}] U0[] D2[{\"id\":1} {\"id\":2}]",
+        "run4: status=ok err=null order=cl04.Ch:U:d1:r3 < cl04.P:U:d1:r2 net=cl04.Ch I0[] U3[{\"id\":10}(p_id) {\"id\":11}(p_id) {\"id\":20}(p_id)] D0[]; cl04.P I2[{\"id\":101} {\"id\":102}] U0[] D2[{\"id\":1} {\"id\":2}]",
+        "run5: status=ok err=null order=cl04.Ch:U:d1:r3 < cl04.P:U:d1:r2 net=cl04.Ch I0[] U3[{\"id\":10}(p_id) {\"id\":11}(p_id) {\"id\":20}(p_id)] D0[]; cl04.P I2[{\"id\":101} {\"id\":102}] U0[] D2[{\"id\":1} {\"id\":2}]"
+      ],
+      "AuditTriggers": [
+        "Ch DELETE dbr_audit_Ch_D LAST",
+        "Ch INSERT dbr_audit_Ch_I LAST",
+        "Ch UPDATE dbr_audit_Ch_U LAST",
+        "P DELETE dbr_audit_P_D LAST",
+        "P INSERT dbr_audit_P_I LAST",
+        "P UPDATE dbr_audit_P_U LAST"
+      ]
+    },
+    {
+      "Id": "CL04b",
+      "CaseFile": "CL04b-update-cascade-single.json",
+      "Database": "CascadeLab_Sandbox",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "UPDATE cl04.P SET id = 300 WHERE id = 3;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl04.Ch",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":30}",
+              "ChangedColumns": [
+                "p_id"
+              ],
+              "Before": {
+                "p_id": 3
+              },
+              "After": {
+                "p_id": 300
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl04.P",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [
+            "{\"id\":300}"
+          ],
+          "Deleted": [
+            "{\"id\":3}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.P keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.P inserted",
+          "Expected": "[{\"id\":300}]",
+          "Actual": "[{\"id\":300}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.P updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.P deleted",
+          "Expected": "[{\"id\":3}]",
+          "Actual": "[{\"id\":3}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch updated",
+          "Expected": "[{\"id\":30}]",
+          "Actual": "[{\"id\":30}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch {\"id\":30} changedColumns",
+          "Expected": "[p_id]",
+          "Actual": "[p_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl04.Ch {\"id\":30} after.p_id",
+          "Expected": "300",
+          "Actual": "300",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: 롤백 뒤 감사 헤더가 경계로 돌아감",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl04.Ch:UPDATE (table, op, rowCount)",
+          "Expected": "cl04.Ch UPDATE 1",
+          "Actual": "cl04.Ch UPDATE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 311, inserted 1, deleted 1"
+        },
+        {
+          "Item": "firing F:cl04.Ch:UPDATE depth (FK 연쇄 경로, H2 전제값)",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED"
+        },
+        {
+          "Item": "firing F:cl04.P:UPDATE (table, op, rowCount)",
+          "Expected": "cl04.P UPDATE 1",
+          "Actual": "cl04.P UPDATE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 312, inserted 1, deleted 1"
+        },
+        {
+          "Item": "firing F:cl04.P:UPDATE depth",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "반복 5회: 순서·순 변경 문자열 종류 수",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED",
+          "Note": "M4 맛보기. captureSeq 값 자체는 빼고 비교"
+        }
+      ],
+      "Firings": [
+        {
+          "Seq": 311,
+          "Table": "cl04.Ch",
+          "Operation": "UPDATE",
+          "InsertedCount": 1,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":30} row={\"id\":30,\"p_id\":3}",
+            "INSERTED key={\"id\":30} row={\"id\":30,\"p_id\":300}"
+          ],
+          "Label": "311:cl04.Ch:U:d1:r1"
+        },
+        {
+          "Seq": 312,
+          "Table": "cl04.P",
+          "Operation": "UPDATE",
+          "InsertedCount": 1,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":3} row={\"id\":3,\"name\":\"p3\"}",
+            "INSERTED key={\"id\":300} row={\"id\":300,\"name\":\"p3\"}"
+          ],
+          "Label": "312:cl04.P:U:d1:r1"
+        }
+      ],
+      "CaptureOrder": "311:cl04.Ch:U:d1:r1 < 312:cl04.P:U:d1:r1",
+      "RepeatRuns": [
+        "run1: status=ok err=null order=cl04.Ch:U:d1:r1 < cl04.P:U:d1:r1 net=cl04.Ch I0[] U1[{\"id\":30}(p_id)] D0[]; cl04.P I1[{\"id\":300}] U0[] D1[{\"id\":3}]",
+        "run2: status=ok err=null order=cl04.Ch:U:d1:r1 < cl04.P:U:d1:r1 net=cl04.Ch I0[] U1[{\"id\":30}(p_id)] D0[]; cl04.P I1[{\"id\":300}] U0[] D1[{\"id\":3}]",
+        "run3: status=ok err=null order=cl04.Ch:U:d1:r1 < cl04.P:U:d1:r1 net=cl04.Ch I0[] U1[{\"id\":30}(p_id)] D0[]; cl04.P I1[{\"id\":300}] U0[] D1[{\"id\":3}]",
+        "run4: status=ok err=null order=cl04.Ch:U:d1:r1 < cl04.P:U:d1:r1 net=cl04.Ch I0[] U1[{\"id\":30}(p_id)] D0[]; cl04.P I1[{\"id\":300}] U0[] D1[{\"id\":3}]",
+        "run5: status=ok err=null order=cl04.Ch:U:d1:r1 < cl04.P:U:d1:r1 net=cl04.Ch I0[] U1[{\"id\":30}(p_id)] D0[]; cl04.P I1[{\"id\":300}] U0[] D1[{\"id\":3}]"
+      ],
+      "AuditTriggers": [
+        "Ch DELETE dbr_audit_Ch_D LAST",
+        "Ch INSERT dbr_audit_Ch_I LAST",
+        "Ch UPDATE dbr_audit_Ch_U LAST",
+        "P DELETE dbr_audit_P_D LAST",
+        "P INSERT dbr_audit_P_I LAST",
+        "P UPDATE dbr_audit_P_U LAST"
+      ]
+    },
+    {
+      "Id": "CL05",
+      "CaseFile": "CL05-two-chains.json",
+      "Database": "CascadeLab_Sandbox",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "DELETE FROM cl05.P WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl05.P",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":1}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl05.X",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":10}",
+            "{\"id\":11}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl05.X2",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":100}",
+            "{\"id\":110}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl05.Y",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":30}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl05.Y2",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":300}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.P keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.P inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.P updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.P deleted",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.X keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.X inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.X updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.X deleted",
+          "Expected": "[{\"id\":10}, {\"id\":11}]",
+          "Actual": "[{\"id\":10}, {\"id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.X2 keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.X2 inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.X2 updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.X2 deleted",
+          "Expected": "[{\"id\":100}, {\"id\":110}]",
+          "Actual": "[{\"id\":100}, {\"id\":110}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.Y keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.Y inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.Y updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.Y deleted",
+          "Expected": "[{\"id\":30}]",
+          "Actual": "[{\"id\":30}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.Y2 keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.Y2 inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.Y2 updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl05.Y2 deleted",
+          "Expected": "[{\"id\":300}]",
+          "Actual": "[{\"id\":300}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: 롤백 뒤 감사 헤더가 경계로 돌아감",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl05.Y2:DELETE (table, op, rowCount)",
+          "Expected": "cl05.Y2 DELETE 1",
+          "Actual": "cl05.Y2 DELETE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 321, inserted 0, deleted 1"
+        },
+        {
+          "Item": "firing F:cl05.Y2:DELETE depth (FK 연쇄 경로, H2 전제값)",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED"
+        },
+        {
+          "Item": "firing F:cl05.Y:DELETE (table, op, rowCount)",
+          "Expected": "cl05.Y DELETE 1",
+          "Actual": "cl05.Y DELETE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 322, inserted 0, deleted 1"
+        },
+        {
+          "Item": "firing F:cl05.Y:DELETE depth (FK 연쇄 경로, H2 전제값)",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED"
+        },
+        {
+          "Item": "firing F:cl05.X2:DELETE (table, op, rowCount)",
+          "Expected": "cl05.X2 DELETE 2",
+          "Actual": "cl05.X2 DELETE 2",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 323, inserted 0, deleted 2"
+        },
+        {
+          "Item": "firing F:cl05.X2:DELETE depth (FK 연쇄 경로, H2 전제값)",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED"
+        },
+        {
+          "Item": "firing F:cl05.X:DELETE (table, op, rowCount)",
+          "Expected": "cl05.X DELETE 2",
+          "Actual": "cl05.X DELETE 2",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 324, inserted 0, deleted 2"
+        },
+        {
+          "Item": "firing F:cl05.X:DELETE depth (FK 연쇄 경로, H2 전제값)",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED"
+        },
+        {
+          "Item": "firing F:cl05.P:DELETE (table, op, rowCount)",
+          "Expected": "cl05.P DELETE 1",
+          "Actual": "cl05.P DELETE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 325, inserted 0, deleted 1"
+        },
+        {
+          "Item": "firing F:cl05.P:DELETE depth",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "반복 5회: 순서·순 변경 문자열 종류 수",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED",
+          "Note": "M4 맛보기. captureSeq 값 자체는 빼고 비교"
+        }
+      ],
+      "Firings": [
+        {
+          "Seq": 321,
+          "Table": "cl05.Y2",
+          "Operation": "DELETE",
+          "InsertedCount": 0,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":300} row={\"id\":300,\"y_id\":30}"
+          ],
+          "Label": "321:cl05.Y2:D:d1:r1"
+        },
+        {
+          "Seq": 322,
+          "Table": "cl05.Y",
+          "Operation": "DELETE",
+          "InsertedCount": 0,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":30} row={\"id\":30,\"p_id\":1}"
+          ],
+          "Label": "322:cl05.Y:D:d1:r1"
+        },
+        {
+          "Seq": 323,
+          "Table": "cl05.X2",
+          "Operation": "DELETE",
+          "InsertedCount": 0,
+          "DeletedCount": 2,
+          "RowCount": 2,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":110} row={\"id\":110,\"x_id\":11}",
+            "DELETED key={\"id\":100} row={\"id\":100,\"x_id\":10}"
+          ],
+          "Label": "323:cl05.X2:D:d1:r2"
+        },
+        {
+          "Seq": 324,
+          "Table": "cl05.X",
+          "Operation": "DELETE",
+          "InsertedCount": 0,
+          "DeletedCount": 2,
+          "RowCount": 2,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":11} row={\"id\":11,\"p_id\":1}",
+            "DELETED key={\"id\":10} row={\"id\":10,\"p_id\":1}"
+          ],
+          "Label": "324:cl05.X:D:d1:r2"
+        },
+        {
+          "Seq": 325,
+          "Table": "cl05.P",
+          "Operation": "DELETE",
+          "InsertedCount": 0,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":1} row={\"id\":1}"
+          ],
+          "Label": "325:cl05.P:D:d1:r1"
+        }
+      ],
+      "CaptureOrder": "321:cl05.Y2:D:d1:r1 < 322:cl05.Y:D:d1:r1 < 323:cl05.X2:D:d1:r2 < 324:cl05.X:D:d1:r2 < 325:cl05.P:D:d1:r1",
+      "RepeatRuns": [
+        "run1: status=ok err=null order=cl05.Y2:D:d1:r1 < cl05.Y:D:d1:r1 < cl05.X2:D:d1:r2 < cl05.X:D:d1:r2 < cl05.P:D:d1:r1 net=cl05.P I0[] U0[] D1[{\"id\":1}]; cl05.X I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl05.X2 I0[] U0[] D2[{\"id\":100} {\"id\":110}]; cl05.Y I0[] U0[] D1[{\"id\":30}]; cl05.Y2 I0[] U0[] D1[{\"id\":300}]",
+        "run2: status=ok err=null order=cl05.Y2:D:d1:r1 < cl05.Y:D:d1:r1 < cl05.X2:D:d1:r2 < cl05.X:D:d1:r2 < cl05.P:D:d1:r1 net=cl05.P I0[] U0[] D1[{\"id\":1}]; cl05.X I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl05.X2 I0[] U0[] D2[{\"id\":100} {\"id\":110}]; cl05.Y I0[] U0[] D1[{\"id\":30}]; cl05.Y2 I0[] U0[] D1[{\"id\":300}]",
+        "run3: status=ok err=null order=cl05.Y2:D:d1:r1 < cl05.Y:D:d1:r1 < cl05.X2:D:d1:r2 < cl05.X:D:d1:r2 < cl05.P:D:d1:r1 net=cl05.P I0[] U0[] D1[{\"id\":1}]; cl05.X I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl05.X2 I0[] U0[] D2[{\"id\":100} {\"id\":110}]; cl05.Y I0[] U0[] D1[{\"id\":30}]; cl05.Y2 I0[] U0[] D1[{\"id\":300}]",
+        "run4: status=ok err=null order=cl05.Y2:D:d1:r1 < cl05.Y:D:d1:r1 < cl05.X2:D:d1:r2 < cl05.X:D:d1:r2 < cl05.P:D:d1:r1 net=cl05.P I0[] U0[] D1[{\"id\":1}]; cl05.X I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl05.X2 I0[] U0[] D2[{\"id\":100} {\"id\":110}]; cl05.Y I0[] U0[] D1[{\"id\":30}]; cl05.Y2 I0[] U0[] D1[{\"id\":300}]",
+        "run5: status=ok err=null order=cl05.Y2:D:d1:r1 < cl05.Y:D:d1:r1 < cl05.X2:D:d1:r2 < cl05.X:D:d1:r2 < cl05.P:D:d1:r1 net=cl05.P I0[] U0[] D1[{\"id\":1}]; cl05.X I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl05.X2 I0[] U0[] D2[{\"id\":100} {\"id\":110}]; cl05.Y I0[] U0[] D1[{\"id\":30}]; cl05.Y2 I0[] U0[] D1[{\"id\":300}]"
+      ],
+      "AuditTriggers": [
+        "P DELETE dbr_audit_P_D LAST",
+        "P INSERT dbr_audit_P_I LAST",
+        "P UPDATE dbr_audit_P_U LAST",
+        "X DELETE dbr_audit_X_D LAST",
+        "X INSERT dbr_audit_X_I LAST",
+        "X UPDATE dbr_audit_X_U LAST",
+        "X2 DELETE dbr_audit_X2_D LAST",
+        "X2 INSERT dbr_audit_X2_I LAST",
+        "X2 UPDATE dbr_audit_X2_U LAST",
+        "Y DELETE dbr_audit_Y_D LAST",
+        "Y INSERT dbr_audit_Y_I LAST",
+        "Y UPDATE dbr_audit_Y_U LAST",
+        "Y2 DELETE dbr_audit_Y2_D LAST",
+        "Y2 INSERT dbr_audit_Y2_I LAST",
+        "Y2 UPDATE dbr_audit_Y2_U LAST"
+      ]
+    },
+    {
+      "Id": "CL06",
+      "CaseFile": "CL06-cascade-target-trigger.json",
+      "Database": "CascadeLab_Sandbox",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "DELETE FROM cl06.Ord WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl06.Line",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":10}",
+            "{\"id\":11}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl06.LineLog",
+          "KeyColumns": [
+            "line_id"
+          ],
+          "Inserted": [
+            "{\"line_id\":10}",
+            "{\"line_id\":11}"
+          ],
+          "Deleted": [],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl06.Ord",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":1}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl06.Ord keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl06.Ord inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl06.Ord updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl06.Ord deleted",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl06.Line keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl06.Line inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl06.Line updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl06.Line deleted",
+          "Expected": "[{\"id\":10}, {\"id\":11}]",
+          "Actual": "[{\"id\":10}, {\"id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl06.LineLog keyColumns",
+          "Expected": "line_id",
+          "Actual": "line_id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl06.LineLog inserted",
+          "Expected": "[{\"line_id\":10}, {\"line_id\":11}]",
+          "Actual": "[{\"line_id\":10}, {\"line_id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl06.LineLog updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl06.LineLog deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: 롤백 뒤 감사 헤더가 경계로 돌아감",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl06.LineLog:INSERT (table, op, rowCount)",
+          "Expected": "cl06.LineLog INSERT 2",
+          "Actual": "cl06.LineLog INSERT 2",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 346, inserted 2, deleted 0"
+        },
+        {
+          "Item": "firing F:cl06.LineLog:INSERT depth (FK 연쇄 경로, H2 전제값)",
+          "Expected": "2",
+          "Actual": "2",
+          "Verdict": "OBSERVED"
+        },
+        {
+          "Item": "firing F:cl06.Line:DELETE (table, op, rowCount)",
+          "Expected": "cl06.Line DELETE 2",
+          "Actual": "cl06.Line DELETE 2",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 347, inserted 0, deleted 2"
+        },
+        {
+          "Item": "firing F:cl06.Line:DELETE depth (FK 연쇄 경로, H2 전제값)",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED"
+        },
+        {
+          "Item": "firing F:cl06.Ord:DELETE (table, op, rowCount)",
+          "Expected": "cl06.Ord DELETE 1",
+          "Actual": "cl06.Ord DELETE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 348, inserted 0, deleted 1"
+        },
+        {
+          "Item": "firing F:cl06.Ord:DELETE depth",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "반복 5회: 순서·순 변경 문자열 종류 수",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED",
+          "Note": "M4 맛보기. captureSeq 값 자체는 빼고 비교"
+        }
+      ],
+      "Firings": [
+        {
+          "Seq": 346,
+          "Table": "cl06.LineLog",
+          "Operation": "INSERT",
+          "InsertedCount": 2,
+          "DeletedCount": 0,
+          "RowCount": 2,
+          "NestLevel": 2,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "INSERTED key={\"line_id\":10} row={\"line_id\":10,\"action\":\"D\"}",
+            "INSERTED key={\"line_id\":11} row={\"line_id\":11,\"action\":\"D\"}"
+          ],
+          "Label": "346:cl06.LineLog:I:d2:r2"
+        },
+        {
+          "Seq": 347,
+          "Table": "cl06.Line",
+          "Operation": "DELETE",
+          "InsertedCount": 0,
+          "DeletedCount": 2,
+          "RowCount": 2,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":11} row={\"id\":11,\"ord_id\":1,\"qty\":3}",
+            "DELETED key={\"id\":10} row={\"id\":10,\"ord_id\":1,\"qty\":5}"
+          ],
+          "Label": "347:cl06.Line:D:d1:r2"
+        },
+        {
+          "Seq": 348,
+          "Table": "cl06.Ord",
+          "Operation": "DELETE",
+          "InsertedCount": 0,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":1} row={\"id\":1}"
+          ],
+          "Label": "348:cl06.Ord:D:d1:r1"
+        }
+      ],
+      "CaptureOrder": "346:cl06.LineLog:I:d2:r2 < 347:cl06.Line:D:d1:r2 < 348:cl06.Ord:D:d1:r1",
+      "RepeatRuns": [
+        "run1: status=ok err=null order=cl06.LineLog:I:d2:r2 < cl06.Line:D:d1:r2 < cl06.Ord:D:d1:r1 net=cl06.Line I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl06.LineLog I2[{\"line_id\":10} {\"line_id\":11}] U0[] D0[]; cl06.Ord I0[] U0[] D1[{\"id\":1}]",
+        "run2: status=ok err=null order=cl06.LineLog:I:d2:r2 < cl06.Line:D:d1:r2 < cl06.Ord:D:d1:r1 net=cl06.Line I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl06.LineLog I2[{\"line_id\":10} {\"line_id\":11}] U0[] D0[]; cl06.Ord I0[] U0[] D1[{\"id\":1}]",
+        "run3: status=ok err=null order=cl06.LineLog:I:d2:r2 < cl06.Line:D:d1:r2 < cl06.Ord:D:d1:r1 net=cl06.Line I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl06.LineLog I2[{\"line_id\":10} {\"line_id\":11}] U0[] D0[]; cl06.Ord I0[] U0[] D1[{\"id\":1}]",
+        "run4: status=ok err=null order=cl06.LineLog:I:d2:r2 < cl06.Line:D:d1:r2 < cl06.Ord:D:d1:r1 net=cl06.Line I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl06.LineLog I2[{\"line_id\":10} {\"line_id\":11}] U0[] D0[]; cl06.Ord I0[] U0[] D1[{\"id\":1}]",
+        "run5: status=ok err=null order=cl06.LineLog:I:d2:r2 < cl06.Line:D:d1:r2 < cl06.Ord:D:d1:r1 net=cl06.Line I0[] U0[] D2[{\"id\":10} {\"id\":11}]; cl06.LineLog I2[{\"line_id\":10} {\"line_id\":11}] U0[] D0[]; cl06.Ord I0[] U0[] D1[{\"id\":1}]"
+      ],
+      "AuditTriggers": [
+        "Line DELETE dbr_audit_Line_D LAST",
+        "Line DELETE trg_Line_del NONE",
+        "Line INSERT dbr_audit_Line_I LAST",
+        "Line UPDATE dbr_audit_Line_U LAST",
+        "LineLog DELETE dbr_audit_LineLog_D LAST",
+        "LineLog INSERT dbr_audit_LineLog_I LAST",
+        "LineLog UPDATE dbr_audit_LineLog_U LAST",
+        "Ord DELETE dbr_audit_Ord_D LAST",
+        "Ord INSERT dbr_audit_Ord_I LAST",
+        "Ord UPDATE dbr_audit_Ord_U LAST"
+      ]
+    },
+    {
+      "Id": "CL07",
+      "CaseFile": "CL07-trigger-chain-3.json",
+      "Database": "CascadeLab_Sandbox",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "UPDATE cl07.A SET v = v + 1 WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl07.A",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":1}",
+              "ChangedColumns": [
+                "v"
+              ],
+              "Before": {
+                "v": 0
+              },
+              "After": {
+                "v": 1
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl07.B",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":10}",
+              "ChangedColumns": [
+                "total"
+              ],
+              "Before": {
+                "total": 0
+              },
+              "After": {
+                "total": 1
+              }
+            },
+            {
+              "Key": "{\"id\":11}",
+              "ChangedColumns": [
+                "total"
+              ],
+              "Before": {
+                "total": 0
+              },
+              "After": {
+                "total": 1
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl07.C",
+          "KeyColumns": [
+            "b_id"
+          ],
+          "Inserted": [
+            "{\"b_id\":10}",
+            "{\"b_id\":11}"
+          ],
+          "Deleted": [],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl07.D",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":1}",
+              "ChangedColumns": [
+                "cnt"
+              ],
+              "Before": {
+                "cnt": 0
+              },
+              "After": {
+                "cnt": 2
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.A keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.A inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.A updated",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.A deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.A {\"id\":1} changedColumns",
+          "Expected": "[v]",
+          "Actual": "[v]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.B keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.B inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.B updated",
+          "Expected": "[{\"id\":10}, {\"id\":11}]",
+          "Actual": "[{\"id\":10}, {\"id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.B deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.B {\"id\":10} changedColumns",
+          "Expected": "[total]",
+          "Actual": "[total]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.B {\"id\":11} changedColumns",
+          "Expected": "[total]",
+          "Actual": "[total]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.C keyColumns",
+          "Expected": "b_id",
+          "Actual": "b_id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.C inserted",
+          "Expected": "[{\"b_id\":10}, {\"b_id\":11}]",
+          "Actual": "[{\"b_id\":10}, {\"b_id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.C updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.C deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.D keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.D inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.D updated",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.D deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl07.D {\"id\":1} changedColumns",
+          "Expected": "[cnt]",
+          "Actual": "[cnt]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: 롤백 뒤 감사 헤더가 경계로 돌아감",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl07.D:UPDATE (table, op, rowCount)",
+          "Expected": "cl07.D UPDATE 1",
+          "Actual": "cl07.D UPDATE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 361, inserted 1, deleted 1"
+        },
+        {
+          "Item": "firing F:cl07.D:UPDATE depth",
+          "Expected": "4",
+          "Actual": "4",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl07.C:INSERT (table, op, rowCount)",
+          "Expected": "cl07.C INSERT 2",
+          "Actual": "cl07.C INSERT 2",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 362, inserted 2, deleted 0"
+        },
+        {
+          "Item": "firing F:cl07.C:INSERT depth",
+          "Expected": "3",
+          "Actual": "3",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl07.B:UPDATE (table, op, rowCount)",
+          "Expected": "cl07.B UPDATE 2",
+          "Actual": "cl07.B UPDATE 2",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 363, inserted 2, deleted 2"
+        },
+        {
+          "Item": "firing F:cl07.B:UPDATE depth",
+          "Expected": "2",
+          "Actual": "2",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl07.A:UPDATE (table, op, rowCount)",
+          "Expected": "cl07.A UPDATE 1",
+          "Actual": "cl07.A UPDATE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 364, inserted 1, deleted 1"
+        },
+        {
+          "Item": "firing F:cl07.A:UPDATE depth",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "반복 5회: 순서·순 변경 문자열 종류 수",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED",
+          "Note": "M4 맛보기. captureSeq 값 자체는 빼고 비교"
+        }
+      ],
+      "Firings": [
+        {
+          "Seq": 361,
+          "Table": "cl07.D",
+          "Operation": "UPDATE",
+          "InsertedCount": 1,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 4,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":1} row={\"id\":1,\"cnt\":0}",
+            "INSERTED key={\"id\":1} row={\"id\":1,\"cnt\":2}"
+          ],
+          "Label": "361:cl07.D:U:d4:r1"
+        },
+        {
+          "Seq": 362,
+          "Table": "cl07.C",
+          "Operation": "INSERT",
+          "InsertedCount": 2,
+          "DeletedCount": 0,
+          "RowCount": 2,
+          "NestLevel": 3,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "INSERTED key={\"b_id\":10} row={\"b_id\":10,\"note\":\"from B\"}",
+            "INSERTED key={\"b_id\":11} row={\"b_id\":11,\"note\":\"from B\"}"
+          ],
+          "Label": "362:cl07.C:I:d3:r2"
+        },
+        {
+          "Seq": 363,
+          "Table": "cl07.B",
+          "Operation": "UPDATE",
+          "InsertedCount": 2,
+          "DeletedCount": 2,
+          "RowCount": 2,
+          "NestLevel": 2,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":11} row={\"id\":11,\"a_id\":1,\"total\":0}",
+            "DELETED key={\"id\":10} row={\"id\":10,\"a_id\":1,\"total\":0}",
+            "INSERTED key={\"id\":11} row={\"id\":11,\"a_id\":1,\"total\":1}",
+            "INSERTED key={\"id\":10} row={\"id\":10,\"a_id\":1,\"total\":1}"
+          ],
+          "Label": "363:cl07.B:U:d2:r2"
+        },
+        {
+          "Seq": 364,
+          "Table": "cl07.A",
+          "Operation": "UPDATE",
+          "InsertedCount": 1,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":1} row={\"id\":1,\"v\":0}",
+            "INSERTED key={\"id\":1} row={\"id\":1,\"v\":1}"
+          ],
+          "Label": "364:cl07.A:U:d1:r1"
+        }
+      ],
+      "CaptureOrder": "361:cl07.D:U:d4:r1 < 362:cl07.C:I:d3:r2 < 363:cl07.B:U:d2:r2 < 364:cl07.A:U:d1:r1",
+      "RepeatRuns": [
+        "run1: status=ok err=null order=cl07.D:U:d4:r1 < cl07.C:I:d3:r2 < cl07.B:U:d2:r2 < cl07.A:U:d1:r1 net=cl07.A I0[] U1[{\"id\":1}(v)] D0[]; cl07.B I0[] U2[{\"id\":10}(total) {\"id\":11}(total)] D0[]; cl07.C I2[{\"b_id\":10} {\"b_id\":11}] U0[] D0[]; cl07.D I0[] U1[{\"id\":1}(cnt)] D0[]",
+        "run2: status=ok err=null order=cl07.D:U:d4:r1 < cl07.C:I:d3:r2 < cl07.B:U:d2:r2 < cl07.A:U:d1:r1 net=cl07.A I0[] U1[{\"id\":1}(v)] D0[]; cl07.B I0[] U2[{\"id\":10}(total) {\"id\":11}(total)] D0[]; cl07.C I2[{\"b_id\":10} {\"b_id\":11}] U0[] D0[]; cl07.D I0[] U1[{\"id\":1}(cnt)] D0[]",
+        "run3: status=ok err=null order=cl07.D:U:d4:r1 < cl07.C:I:d3:r2 < cl07.B:U:d2:r2 < cl07.A:U:d1:r1 net=cl07.A I0[] U1[{\"id\":1}(v)] D0[]; cl07.B I0[] U2[{\"id\":10}(total) {\"id\":11}(total)] D0[]; cl07.C I2[{\"b_id\":10} {\"b_id\":11}] U0[] D0[]; cl07.D I0[] U1[{\"id\":1}(cnt)] D0[]",
+        "run4: status=ok err=null order=cl07.D:U:d4:r1 < cl07.C:I:d3:r2 < cl07.B:U:d2:r2 < cl07.A:U:d1:r1 net=cl07.A I0[] U1[{\"id\":1}(v)] D0[]; cl07.B I0[] U2[{\"id\":10}(total) {\"id\":11}(total)] D0[]; cl07.C I2[{\"b_id\":10} {\"b_id\":11}] U0[] D0[]; cl07.D I0[] U1[{\"id\":1}(cnt)] D0[]",
+        "run5: status=ok err=null order=cl07.D:U:d4:r1 < cl07.C:I:d3:r2 < cl07.B:U:d2:r2 < cl07.A:U:d1:r1 net=cl07.A I0[] U1[{\"id\":1}(v)] D0[]; cl07.B I0[] U2[{\"id\":10}(total) {\"id\":11}(total)] D0[]; cl07.C I2[{\"b_id\":10} {\"b_id\":11}] U0[] D0[]; cl07.D I0[] U1[{\"id\":1}(cnt)] D0[]"
+      ],
+      "AuditTriggers": [
+        "A DELETE dbr_audit_A_D LAST",
+        "A INSERT dbr_audit_A_I LAST",
+        "A UPDATE dbr_audit_A_U LAST",
+        "A UPDATE trg_A_upd NONE",
+        "B DELETE dbr_audit_B_D LAST",
+        "B INSERT dbr_audit_B_I LAST",
+        "B UPDATE dbr_audit_B_U LAST",
+        "B UPDATE trg_B_upd NONE",
+        "C DELETE dbr_audit_C_D LAST",
+        "C INSERT dbr_audit_C_I LAST",
+        "C INSERT trg_C_ins NONE",
+        "C UPDATE dbr_audit_C_U LAST",
+        "D DELETE dbr_audit_D_D LAST",
+        "D INSERT dbr_audit_D_I LAST",
+        "D UPDATE dbr_audit_D_U LAST"
+      ]
+    },
+    {
+      "Id": "CL08a",
+      "CaseFile": "CL08a-self-update-rt-off.json",
+      "Database": "CascadeLab_Sandbox",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "UPDATE cl08.Acct SET bal = bal + 10 WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl08.Acct",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":1}",
+              "ChangedColumns": [
+                "bal",
+                "touched"
+              ],
+              "Before": {
+                "bal": 100,
+                "touched": 0
+              },
+              "After": {
+                "bal": 110,
+                "touched": 1
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl08.Acct keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl08.Acct inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl08.Acct updated",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl08.Acct deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl08.Acct {\"id\":1} changedColumns",
+          "Expected": "[bal, touched]",
+          "Actual": "[bal, touched]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl08.Acct {\"id\":1} after.touched",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: 롤백 뒤 감사 헤더가 경계로 돌아감",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl08.Acct:UPDATE#2 (table, op, rowCount)",
+          "Expected": "cl08.Acct UPDATE 1",
+          "Actual": "cl08.Acct UPDATE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 381, inserted 1, deleted 1"
+        },
+        {
+          "Item": "firing F:cl08.Acct:UPDATE#2 depth",
+          "Expected": "2",
+          "Actual": "2",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl08.Acct:UPDATE#1 (table, op, rowCount)",
+          "Expected": "cl08.Acct UPDATE 1",
+          "Actual": "cl08.Acct UPDATE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 382, inserted 1, deleted 1"
+        },
+        {
+          "Item": "firing F:cl08.Acct:UPDATE#1 depth",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "반복 5회: 순서·순 변경 문자열 종류 수",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED",
+          "Note": "M4 맛보기. captureSeq 값 자체는 빼고 비교"
+        }
+      ],
+      "Firings": [
+        {
+          "Seq": 381,
+          "Table": "cl08.Acct",
+          "Operation": "UPDATE",
+          "InsertedCount": 1,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 2,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":1} row={\"id\":1,\"bal\":110,\"touched\":0}",
+            "INSERTED key={\"id\":1} row={\"id\":1,\"bal\":110,\"touched\":1}"
+          ],
+          "Label": "381:cl08.Acct:U:d2:r1"
+        },
+        {
+          "Seq": 382,
+          "Table": "cl08.Acct",
+          "Operation": "UPDATE",
+          "InsertedCount": 1,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":1} row={\"id\":1,\"bal\":100,\"touched\":0}",
+            "INSERTED key={\"id\":1} row={\"id\":1,\"bal\":110,\"touched\":0}"
+          ],
+          "Label": "382:cl08.Acct:U:d1:r1"
+        }
+      ],
+      "CaptureOrder": "381:cl08.Acct:U:d2:r1 < 382:cl08.Acct:U:d1:r1",
+      "RepeatRuns": [
+        "run1: status=ok err=null order=cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{\"id\":1}(bal,touched)] D0[]",
+        "run2: status=ok err=null order=cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{\"id\":1}(bal,touched)] D0[]",
+        "run3: status=ok err=null order=cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{\"id\":1}(bal,touched)] D0[]",
+        "run4: status=ok err=null order=cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{\"id\":1}(bal,touched)] D0[]",
+        "run5: status=ok err=null order=cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{\"id\":1}(bal,touched)] D0[]"
+      ],
+      "AuditTriggers": [
+        "Acct DELETE dbr_audit_Acct_D LAST",
+        "Acct INSERT dbr_audit_Acct_I LAST",
+        "Acct UPDATE dbr_audit_Acct_U LAST",
+        "Acct UPDATE trg_Acct_upd NONE"
+      ]
+    },
+    {
+      "Id": "CL08b",
+      "CaseFile": "CL08b-self-update-rt-on.json",
+      "Database": "CascadeLab_RT_Sandbox",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "UPDATE cl08.Acct SET bal = bal + 10 WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl08.Acct",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":1}",
+              "ChangedColumns": [
+                "bal",
+                "touched"
+              ],
+              "Before": {
+                "bal": 100,
+                "touched": 0
+              },
+              "After": {
+                "bal": 110,
+                "touched": 3
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "78EF7DC7082C7A41",
+          "Actual": "78EF7DC7082C7A41",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "78EF7DC7082C7A41",
+          "Actual": "78EF7DC7082C7A41",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl08.Acct keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl08.Acct inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl08.Acct updated",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl08.Acct deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl08.Acct {\"id\":1} changedColumns",
+          "Expected": "[bal, touched]",
+          "Actual": "[bal, touched]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "sandbox cl08.Acct {\"id\":1} after.touched",
+          "Expected": "3",
+          "Actual": "3",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: 롤백 뒤 감사 헤더가 경계로 돌아감",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl08.Acct:UPDATE#4 (table, op, rowCount)",
+          "Expected": "cl08.Acct UPDATE 1",
+          "Actual": "cl08.Acct UPDATE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 41, inserted 1, deleted 1"
+        },
+        {
+          "Item": "firing F:cl08.Acct:UPDATE#4 depth",
+          "Expected": "4",
+          "Actual": "4",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl08.Acct:UPDATE#3 (table, op, rowCount)",
+          "Expected": "cl08.Acct UPDATE 1",
+          "Actual": "cl08.Acct UPDATE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 42, inserted 1, deleted 1"
+        },
+        {
+          "Item": "firing F:cl08.Acct:UPDATE#3 depth",
+          "Expected": "3",
+          "Actual": "3",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl08.Acct:UPDATE#2 (table, op, rowCount)",
+          "Expected": "cl08.Acct UPDATE 1",
+          "Actual": "cl08.Acct UPDATE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 43, inserted 1, deleted 1"
+        },
+        {
+          "Item": "firing F:cl08.Acct:UPDATE#2 depth",
+          "Expected": "2",
+          "Actual": "2",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "firing F:cl08.Acct:UPDATE#1 (table, op, rowCount)",
+          "Expected": "cl08.Acct UPDATE 1",
+          "Actual": "cl08.Acct UPDATE 1",
+          "Verdict": "MATCH",
+          "Note": "captureSeq 44, inserted 1, deleted 1"
+        },
+        {
+          "Item": "firing F:cl08.Acct:UPDATE#1 depth",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "반복 5회: 순서·순 변경 문자열 종류 수",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "OBSERVED",
+          "Note": "M4 맛보기. captureSeq 값 자체는 빼고 비교"
+        }
+      ],
+      "Firings": [
+        {
+          "Seq": 41,
+          "Table": "cl08.Acct",
+          "Operation": "UPDATE",
+          "InsertedCount": 1,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 4,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":1} row={\"id\":1,\"bal\":110,\"touched\":2}",
+            "INSERTED key={\"id\":1} row={\"id\":1,\"bal\":110,\"touched\":3}"
+          ],
+          "Label": "41:cl08.Acct:U:d4:r1"
+        },
+        {
+          "Seq": 42,
+          "Table": "cl08.Acct",
+          "Operation": "UPDATE",
+          "InsertedCount": 1,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 3,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":1} row={\"id\":1,\"bal\":110,\"touched\":1}",
+            "INSERTED key={\"id\":1} row={\"id\":1,\"bal\":110,\"touched\":2}"
+          ],
+          "Label": "42:cl08.Acct:U:d3:r1"
+        },
+        {
+          "Seq": 43,
+          "Table": "cl08.Acct",
+          "Operation": "UPDATE",
+          "InsertedCount": 1,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 2,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":1} row={\"id\":1,\"bal\":110,\"touched\":0}",
+            "INSERTED key={\"id\":1} row={\"id\":1,\"bal\":110,\"touched\":1}"
+          ],
+          "Label": "43:cl08.Acct:U:d2:r1"
+        },
+        {
+          "Seq": 44,
+          "Table": "cl08.Acct",
+          "Operation": "UPDATE",
+          "InsertedCount": 1,
+          "DeletedCount": 1,
+          "RowCount": 1,
+          "NestLevel": 1,
+          "TranCount": 2,
+          "ImageMode": "FULL",
+          "Images": [
+            "DELETED key={\"id\":1} row={\"id\":1,\"bal\":100,\"touched\":0}",
+            "INSERTED key={\"id\":1} row={\"id\":1,\"bal\":110,\"touched\":0}"
+          ],
+          "Label": "44:cl08.Acct:U:d1:r1"
+        }
+      ],
+      "CaptureOrder": "41:cl08.Acct:U:d4:r1 < 42:cl08.Acct:U:d3:r1 < 43:cl08.Acct:U:d2:r1 < 44:cl08.Acct:U:d1:r1",
+      "RepeatRuns": [
+        "run1: status=ok err=null order=cl08.Acct:U:d4:r1 < cl08.Acct:U:d3:r1 < cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{\"id\":1}(bal,touched)] D0[]",
+        "run2: status=ok err=null order=cl08.Acct:U:d4:r1 < cl08.Acct:U:d3:r1 < cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{\"id\":1}(bal,touched)] D0[]",
+        "run3: status=ok err=null order=cl08.Acct:U:d4:r1 < cl08.Acct:U:d3:r1 < cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{\"id\":1}(bal,touched)] D0[]",
+        "run4: status=ok err=null order=cl08.Acct:U:d4:r1 < cl08.Acct:U:d3:r1 < cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{\"id\":1}(bal,touched)] D0[]",
+        "run5: status=ok err=null order=cl08.Acct:U:d4:r1 < cl08.Acct:U:d3:r1 < cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{\"id\":1}(bal,touched)] D0[]"
+      ],
+      "AuditTriggers": [
+        "Acct DELETE dbr_audit_Acct_D LAST",
+        "Acct INSERT dbr_audit_Acct_I LAST",
+        "Acct UPDATE dbr_audit_Acct_U LAST",
+        "Acct UPDATE trg_Acct_upd NONE"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- CascadeLab 손 정답 검증 도구. 설계 §10.3 독립성: 제품 코드(src/DbRipple.*)를 참조하지 않고 DbRipple.slnx에도 넣지 않는다. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+    <!-- SqlClient 7.1.1의 전이 의존 Pkcs 9.0.18 취약성 경고(NU1902/NU1903) 회피. 제품 csproj와 같은 고정. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
+  </ItemGroup>
+
+</Project>

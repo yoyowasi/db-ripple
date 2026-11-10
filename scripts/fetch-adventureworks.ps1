@@ -1,5 +1,6 @@
 ﻿# 공식 AdventureWorks2025.bak을 .data\backup\에 받는다(약 48MB). 사용: .\scripts\fetch-adventureworks.ps1
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'  # PowerShell 5.1은 진행률 표시 때문에 큰 파일 다운로드가 매우 느려진다
 $root = Split-Path -Parent $PSScriptRoot
 $url = 'https://github.com/Microsoft/sql-server-samples/releases/download/adventureworks/AdventureWorks2025.bak'
 $dir = Join-Path $root '.data\backup'

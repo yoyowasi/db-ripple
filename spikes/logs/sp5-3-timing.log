@@ -1,0 +1,22 @@
+# spikes\sql\sp5-3-timing.sql db=master part=0 at=2026-11-10T08:45:32.3879322+09:00 elapsedSec=2.75 exit=0
+25 percent processed.
+50 percent processed.
+75 percent processed.
+100 percent processed.
+Processed 25552 pages for database 'AW_Origin', file 'AdventureWorks' on file 1.
+Processed 2 pages for database 'AW_Origin', file 'AdventureWorks_log' on file 1.
+BACKUP DATABASE successfully processed 25554 pages in 0.189 seconds (1056.278 MB/sec).
+25 percent processed.
+50 percent processed.
+75 percent processed.
+100 percent processed.
+Processed 25552 pages for database 'AW_Timing', file 'AdventureWorks' on file 1.
+Processed 2 pages for database 'AW_Timing', file 'AdventureWorks_log' on file 1.
+RESTORE DATABASE successfully processed 25554 pages in 0.184 seconds (1084.982 MB/sec).
+  CREATE_TABLE - dbo.sp5_junk
+step t0 t1 ms
+---- -- -- --
+backup_copy_only 2026-11-09 23:45:30.164 2026-11-09 23:45:30.429 265
+restore_with_move 2026-11-09 23:45:30.433 2026-11-09 23:45:31.044 611
+snapshot_create 2026-11-09 23:45:31.048 2026-11-09 23:45:31.410 362
+snapshot_revert 2026-11-09 23:45:31.628 2026-11-09 23:45:32.039 411

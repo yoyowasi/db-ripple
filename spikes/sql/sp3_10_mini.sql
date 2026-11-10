@@ -69,6 +69,11 @@ BEGIN
                 ELSE 'MISSED' END AS verdict;
 END
 GO
+/* 확인: QUOTED_IDENTIFIER OFF로 저장된 모듈(0행이어야 함. 2026-11-10 run-sql -I 이후 재실행) */
+SELECT OBJECT_SCHEMA_NAME(object_id) AS schemaName, OBJECT_NAME(object_id) AS objectName, uses_quoted_identifier FROM sys.sql_modules WHERE uses_quoted_identifier = 0;
+SELECT COUNT(*) AS modules, SUM(CASE WHEN uses_quoted_identifier = 0 THEN 1 ELSE 0 END) AS quotedIdentOff,
+       SESSIONPROPERTY('QUOTED_IDENTIFIER') AS sessionQuotedIdentifier FROM sys.sql_modules;
+GO
 ALTER DATABASE SpikeLab_SP3 SET RECURSIVE_TRIGGERS OFF;
 GO
 EXEC dbo.spike_sp3_run 'OFF';

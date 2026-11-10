@@ -21,7 +21,7 @@
       { "statementIndex": 1, "parent": "S", "child": "E:547", "kind": "BLOCKED", "name": null, "confidence": "certain", "basis": "§6.3 BLOCKED, §5.2 4번(오류 시 failed)" }
     ],
     "observedOnly": [
-      { "id": "OO1", "what": "오류 번호 547", "basis": "SET DEFAULT 결과(99)가 FK_cl03_Item_Grp를 어기므로 FK 충돌 오류가 난다. 이 경로의 번호를 밝힌 문서는 설계에 인용돼 있지 않다. 월요일 실측으로 확정" },
+      { "id": "OO1", "what": "오류 번호 547", "basis": "SET DEFAULT 결과(99)가 FK_cl03_Item_Grp를 어기므로 FK 충돌 오류가 난다. 이 경로의 번호를 밝힌 문서는 설계에 인용돼 있지 않다. 월요일 실측으로 확정", "confirmed": { "date": "2026-11-10", "value": 547, "note": "실측 547(class 16)과 함께 3621(class 0, 'The statement has been terminated.')이 오지만 정보 메시지라 판정에서 뺀다. 실패 뒤 XACT_STATE 1, 문장만 롤백(XACT_ABORT OFF)", "evidence": "cascadelab/verification/logs/oracle-2026-11-10.txt, report-2026-11-10.md" } },
       { "id": "OO2", "what": "감사 묶음 0개", "basis": "A1: AFTER 트리거는 모든 연쇄 동작과 제약 검사가 성공해야 발동한다. 문장이 롤백되므로 감사 행도 남지 않는다" }
     ]
   },

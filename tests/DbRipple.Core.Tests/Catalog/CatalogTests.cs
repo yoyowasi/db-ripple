@@ -1,19 +1,8 @@
 using DbRipple.Core.Capture;
 using DbRipple.Core.Catalog;
-using Microsoft.Data.SqlClient;
 using Microsoft.SqlServer.TransactSql.ScriptDom;
 
 namespace DbRipple.Core.Tests.Catalog;
-
-/// <summary>DBRIPPLE_SQL_CONNECTION이 없으면 건너뛰는 DB 통합 테스트.</summary>
-public sealed class SqlFactAttribute : FactAttribute
-{
-    public SqlFactAttribute()
-    {
-        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(CatalogReader.ConnectionEnvVar)))
-            Skip = $"{CatalogReader.ConnectionEnvVar} 없음";
-    }
-}
 
 public class CatalogTests
 {
@@ -49,6 +38,8 @@ public class CatalogTests
             ],
             []);
         var t = Assert.Single(cat.ToCaptureInput());
+        Assert.Equal("dbo", t.Owner);
+        Assert.Equal("app", Assert.Single((cat with { Tables = [cat.Tables[0] with { Owner = "app" }] }).ToCaptureInput()).Owner);
         Assert.Equal(["Id"], t.PrimaryKey!);
         Assert.Equal("Code", Assert.Single(t.UniqueNotNullKeys!)[0]);
         Assert.Equal([DmlOperation.Update], t.UserLast!);
@@ -58,11 +49,73 @@ public class CatalogTests
         Assert.True(cat.Triggers[1].IsEncrypted);
     }
 
-    [SqlFact]
-    public async Task Reads_catalog_from_database()
+    [Fact]
+    public void Summary_counts_objects_not_event_rows()
     {
-        await using var conn = new SqlConnection(Environment.GetEnvironmentVariable(CatalogReader.ConnectionEnvVar));
+        var cat = new DbCatalog(
+            [new(10, "Sales", "H", TemporalType.None, false), new(11, "Sales", "D", TemporalType.None, false), new(12, "dbo", "Log", TemporalType.None, false)],
+            [],
+            [new(10, 1, "PK_H", true, true, 1, "Id", false), new(11, 1, "PK_D", true, true, 1, "HId", false), new(11, 1, "PK_D", true, true, 2, "Line", false)],
+            [
+                new(20, "FK_D_H", 11, 10, "CASCADE", "NO_ACTION", false, false, 1, "HId", "Id"),
+                new(21, "FK_Log_H", 12, 10, "NO_ACTION", "NO_ACTION", true, true, 1, "HId", "Id"),
+            ],
+            [
+                new(50, "tD", 11, "OBJECT_OR_COLUMN", false, false, "INSERT", false, false, "x"),
+                new(50, "tD", 11, "OBJECT_OR_COLUMN", false, false, "UPDATE", false, true, "x"),
+                new(51, "dH", 10, "OBJECT_OR_COLUMN", true, false, "DELETE", false, false, "x"),
+                new(90, "ddl", 0, "DATABASE", false, false, "CREATE_TABLE", false, false, "x"),
+                new(90, "ddl", 0, "DATABASE", false, false, "ALTER_TABLE", false, false, "x"),
+            ],
+            [new(1, "D", "ROWS", "/d.mdf"), new(2, "L", "LOG", "/l.ldf")]);
+        var s = CatalogSummary.From(cat);
+        Assert.Equal(3, s.Tables);
+        Assert.Equal(2, s.ForeignKeys);
+        Assert.Equal(1, s.DisabledForeignKeys);
+        Assert.Equal(1, s.OnDelete["CASCADE"]);
+        Assert.Equal(2, s.OnUpdate["NO_ACTION"]);
+        Assert.Equal("FK_D_H: Sales.D → Sales.H ON DELETE CASCADE, ON UPDATE NO_ACTION", Assert.Single(s.ReferentialActions));
+        Assert.Equal((1, 1), (s.AfterTriggers, s.InsteadOfTriggers));
+        Assert.Contains("Sales.D.tD: AFTER INSERT, UPDATE Last(UPDATE)", s.DmlTriggers);
+        Assert.Equal(["ddl"], s.DdlTriggers);
+        Assert.Equal(["dbo.Log"], s.TablesWithoutPrimaryKey);
+        Assert.Equal(1, s.DataFiles);
+    }
+
+    // 설계 A24를 실제 AdventureWorks(AW_Origin, 읽기만)에서 C7로 다시 확인한다. 값이 바뀌면 A24와 기준선 가정을 다시 본다.
+    [SqlFact]
+    public async Task Reads_adventureworks_catalog_matching_A24()
+    {
+        await using var conn = await TestSql.OpenAsync("AW_Origin");
         var cat = await CatalogReader.ReadAsync(conn);
-        Assert.NotEmpty(cat.Files);
+        var s = CatalogSummary.From(cat);
+        Assert.Equal(71, s.Tables);
+        Assert.Equal(90, s.ForeignKeys);
+        Assert.Equal(new Dictionary<string, int> { ["CASCADE"] = 2, ["NO_ACTION"] = 88 }, s.OnDelete);
+        Assert.Equal(new Dictionary<string, int> { ["NO_ACTION"] = 90 }, s.OnUpdate);
+        Assert.All(s.ReferentialActions, r => Assert.Contains("→ Sales.SalesOrderHeader ON DELETE CASCADE", r));
+        Assert.Equal((8, 2), (s.AfterTriggers, s.InsteadOfTriggers));
+        Assert.Equal(["ddlDatabaseTriggerLog"], s.DdlTriggers);
+        Assert.Empty(s.TablesWithoutPrimaryKey); // A24의 "dbo.DatabaseLog는 PK 없는 힙"과 다름: 힙이지만 비클러스터형 PK가 있다
+
+        // 형식 매핑: 별칭 형식은 기저 형식, 시스템 CLR 형식은 이름 그대로(사용자 UDT 아님), rowversion·계산 열·IDENTITY
+        var cols = cat.ToCaptureInput().ToDictionary(t => t.DisplayName);
+        ColumnInfo Col(string table, string column) => cols[table].Columns.Single(c => c.Name == column);
+        Assert.Equal("nvarchar", Col("Person.Person", "FirstName").TypeName);        // dbo.Name
+        Assert.Equal("bit", Col("Person.Person", "NameStyle").TypeName);            // dbo.NameStyle
+        Assert.Equal("tinyint", Col("Sales.SalesOrderHeader", "RevisionNumber").TypeName);
+        Assert.Equal("smallint", Col("Sales.SalesOrderDetail", "OrderQty").TypeName);
+        Assert.Equal(new ColumnInfo("OrganizationNode", "hierarchyid"), Col("HumanResources.Employee", "OrganizationNode"));
+        Assert.Equal(new ColumnInfo("SpatialLocation", "geography"), Col("Person.Address", "SpatialLocation"));
+        Assert.Equal("xml", Col("Person.Person", "Demographics").TypeName);
+        Assert.True(Col("Sales.SalesOrderHeader", "SalesOrderID").IsIdentity);
+        Assert.True(Col("Sales.SalesOrderHeader", "TotalDue").IsComputed);
+        Assert.True(Col("Sales.SalesOrderHeader", "rowguid").HasNondeterministicDefault);
+        Assert.Equal(["SalesOrderID", "SalesOrderDetailID"], cols["Sales.SalesOrderDetail"].PrimaryKey!);
+        Assert.Equal(["DatabaseLogID"], cols["dbo.DatabaseLog"].PrimaryKey!);
+        Assert.All(cols.Values, t => Assert.Equal("dbo", t.Owner)); // 모든 스키마가 dbo 소유 → OWNER_NOT_DBO 제외 없음
+        Assert.All(cols.Values, t => Assert.Empty(t.UserFirst!));
+        Assert.All(cols.Values, t => Assert.Empty(t.UserLast!));
+        Assert.Equal("AdventureWorks", Assert.Single(cat.Files, f => f.TypeDesc == "ROWS").LogicalName);
     }
 }

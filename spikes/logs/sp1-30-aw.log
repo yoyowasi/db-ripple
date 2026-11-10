@@ -1,0 +1,53 @@
+# spikes\sql\sp1_30_aw_soh_delete.sql db=AW_SpikeA part=0 at=2026-11-10T09:11:49.9933020+09:00 elapsedSec=0.98 exit=0
+Changed database context to 'AW_SpikeA'.
+childTable name delete_referential_action_desc is_disabled
+---------- ---- ------------------------------ -----------
+Sales.SalesOrderDetail FK_SalesOrderDetail_SalesOrderHeader_SalesOrderID CASCADE 0
+Sales.SalesOrderHeaderSalesReason FK_SalesOrderHeaderSalesReason_SalesOrderHeader_SalesOrderID CASCADE 0
+tableName name type_desc is_first is_last is_disabled
+--------- ---- --------- -------- ------- -----------
+Sales.SalesOrderDetail iduSalesOrderDetail INSERT 0 0 0
+Sales.SalesOrderDetail iduSalesOrderDetail UPDATE 0 0 0
+Sales.SalesOrderDetail iduSalesOrderDetail DELETE 0 0 0
+Sales.SalesOrderHeader uSalesOrderHeader UPDATE 0 0 0
+name is_recursive_triggers_on
+---- ------------------------
+AW_SpikeA 0
+  CREATE_SCHEMA - audit.audit
+  CREATE_SEQUENCE - audit.CaptureSeq
+  CREATE_TABLE - audit.AuditHeader
+  CREATE_TABLE - audit.AuditRowImage
+  CREATE_TABLE - audit.AuditControl
+  CREATE_TRIGGER - Sales.dbr_audit_SalesOrderHeader_D
+  CREATE_TRIGGER - Sales.dbr_audit_SalesOrderHeader_U
+  CREATE_TRIGGER - Sales.dbr_audit_SalesOrderDetail_D
+  CREATE_TRIGGER - Sales.dbr_audit_SalesOrderHeaderSalesReason_D
+  ALTER_TRIGGER - Sales.dbr_audit_SalesOrderHeader_D
+  ALTER_TRIGGER - Sales.dbr_audit_SalesOrderHeader_U
+  ALTER_TRIGGER - Sales.dbr_audit_SalesOrderDetail_D
+  ALTER_TRIGGER - Sales.dbr_audit_SalesOrderHeaderSalesReason_D
+schemaName objectName uses_quoted_identifier
+---------- ---------- ----------------------
+modules quotedIdentOff sessionQuotedIdentifier
+------- -------------- -----------------------
+56 0 1
+salesOrderId expectDetailRows expectReasonRows
+------------ ---------------- ----------------
+43697 1 2
+rowcountAfterDelete
+-------------------
+1
+pos captureSeq tableName operation nestLevel insertedCount deletedCount tranCount imageMode
+--- ---------- --------- --------- --------- ------------- ------------ --------- ---------
+1 1 [Sales].[SalesOrderHeaderSalesReason] D 1 0 2 2 FULL
+2 2 [Sales].[SalesOrderHeader] U 2 0 0 2 FULL
+3 3 [Sales].[SalesOrderDetail] D 1 0 1 2 FULL
+4 4 [Sales].[SalesOrderHeader] D 1 0 1 2 FULL
+hyp verdict
+--- -------
+H2 HOLDS
+H1 HOLDS
+A3(참고) SOH U 0행 발동 RECORDED
+tranCountAfterRollback auditTriggerGone_null_expected
+---------------------- ------------------------------
+0 NULL

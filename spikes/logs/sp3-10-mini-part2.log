@@ -1,0 +1,28 @@
+# spikes\sql\sp3_10_mini.sql db=master part=2 at=2026-11-10T09:12:00.1039137+09:00 elapsedSec=0.98 exit=0
+Changed database context to 'SpikeLab_SP3'.
+
+(2 rows affected)
+schemaName objectName uses_quoted_identifier
+---------- ---------- ----------------------
+
+(0 rows affected)
+modules quotedIdentOff sessionQuotedIdentifier
+------- -------------- -----------------------
+5 0 1
+
+(1 rows affected)
+mode_ recursiveOn errorNumber captureSeq nestLevel insertedCount afterRev
+----- ----------- ----------- ---------- --------- ------------- --------
+OFF 0 NULL 1 2 1 1
+OFF 0 NULL 2 1 1 0
+mode_ auditHeaders nestedHeaders lastAuditAfterRev rereadRev netDiffRows verdict
+----- ------------ ------------- ----------------- --------- ----------- -------
+OFF 2 1 0 1 1 CAPTURED
+mode_ recursiveOn errorNumber captureSeq nestLevel insertedCount afterRev
+----- ----------- ----------- ---------- --------- ------------- --------
+ON 1 NULL 3 2 1 1
+ON 1 NULL 4 1 1 0
+mode_ auditHeaders nestedHeaders lastAuditAfterRev rereadRev netDiffRows verdict
+----- ------------ ------------- ----------------- --------- ----------- -------
+ON 2 1 0 1 1 CAPTURED
+Changed database context to 'master'.

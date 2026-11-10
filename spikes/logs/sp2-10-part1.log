@@ -1,0 +1,6 @@
+# spikes\sql\sp2_10_observer.sql db=master part=1 at=2026-11-10T09:29:53.3748304+09:00 elapsedSec=0.9 exit=0
+db tableName evt firstTrigger lastTrigger afterTriggers auditOrder
+-- --------- --- ------------ ----------- ------------- ----------
+
+(0 rows affected)
+Changed database context to 'master'.

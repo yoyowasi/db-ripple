@@ -1,0 +1,28 @@
+# logs\week1\aw-uworkorder-repro.sql db=AW_SpikeB part=0 at=2026-11-10T10:08:14.3146867+09:00 elapsedSec=1.09 exit=0
+db errorLogBefore
+-- --------------
+AW_SpikeB 0
+
+(1 rows affected)
+name is_nullable defaultConstraint
+---- ----------- -----------------
+ActualCost 0 NULL
+
+(1 rows affected)
+
+(0 rows affected)
+result errNo errProc errMsg xactState tranCount
+------ ----- ------- ------ --------- ---------
+UPDATE_FAILED 3609 NULL The transaction ended in the trigger. The batch has been aborted. 0 0
+
+(1 rows affected)
+errorLogAfter tranCountAfter
+------------- --------------
+1 0
+
+(1 rows affected)
+ErrorLogID ErrorNumber ErrorProcedure msg
+---------- ----------- -------------- ---
+1 515 uWorkOrder Cannot insert the value NULL into column 'ActualCost', table 'AW_SpikeB.Production.TransactionHistory'; column does not allow nulls. INSERT fails.
+
+(1 rows affected)

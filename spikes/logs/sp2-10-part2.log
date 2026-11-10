@@ -1,0 +1,41 @@
+# spikes\sql\sp2_10_observer.sql db=SpikeLab_SP2 part=2 at=2026-11-10T09:29:55.8032685+09:00 elapsedSec=0.93 exit=0
+Changed database context to 'SpikeLab_SP2'.
+
+(3 rows affected)
+
+(3 rows affected)
+
+(2 rows affected)
+
+(1 rows affected)
+
+(3 rows affected)
+
+(3 rows affected)
+
+(3 rows affected)
+chk plainVal auditedVal verdict
+--- -------- ---------- -------
+c_@@ROWCOUNT 3 3 SAME
+c_ROWCOUNT_BIG 3 3 SAME
+c_aux_last5_@@ROWCOUNT 3 3 SAME
+c_aux_last5_ROWCOUNT_BIG 3 3 SAME
+c_aux_nocount_@@ROWCOUNT 3 3 SAME
+c_aux_nocount_ROWCOUNT_BIG 3 3 SAME
+c_aux_between_triggers_@@ROWCOUNT 3 3 SAME
+d_direct_zero_row_header NULL 1 RECORDED
+d_cascade_zero_row_header NULL 0 NOT_RECORDED
+d_cascade_parent_header NULL 1 RECORDED
+d_cascade_one_row_header NULL 1 RECORDED
+e_caller_@@IDENTITY 1 1000 기대: plain=1, audited=1000 (감사가 IDENTITY를 안 바꿈)
+e_trigger_@@IDENTITY 1 1000 기대: plain=1, audited=1000 (감사가 IDENTITY를 안 바꿈)
+e_trigger_SCOPE_IDENTITY NULL NULL 기대: plain=1, audited=1000 (감사가 IDENTITY를 안 바꿈)
+chk tableName triggerName evt is_first is_last auditOrder
+--- --------- ----------- --- -------- ------- ----------
+audit_order dbo.Audited dbr_audit_Audited_U UPDATE 0 1 LAST
+audit_order dbo.Chi dbr_audit_Chi_D DELETE 0 1 LAST
+audit_order dbo.IdAudited dbr_audit_IdAudited_I INSERT 0 1 LAST
+audit_order dbo.Par dbr_audit_Par_D DELETE 0 1 LAST
+chk modules quotedIdentOff
+--- ------- --------------
+modules 12 0

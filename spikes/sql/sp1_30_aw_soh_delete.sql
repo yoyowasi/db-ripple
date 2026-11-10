@@ -1,7 +1,9 @@
-/* SP1 — AW_Sandbox: Sales.SalesOrderHeader 1건 DELETE 관찰. 감사 저장소·손 감사 트리거를 트랜잭션 안에서 만들고 끝에 ROLLBACK.
+/* SP1 — AW 복사본(AW_SpikeA, 2026-11-10 AW_Sandbox에서 변경: AW_Sandbox는 backend-3 전용): Sales.SalesOrderHeader 1건 DELETE 관찰.
+   감사 저장소·손 감사 트리거를 트랜잭션 안에서 만들고 끝에 ROLLBACK.
    사용자 트리거 본문·순서는 바꾸지 않는다. 대상 테이블에만 감사 트리거를 둔다. */
-USE AW_Sandbox;
+USE AW_SpikeA;
 GO
+SET QUOTED_IDENTIFIER ON;   /* sqlcmd 기본값은 OFF. SOH에는 계산 열 인덱스가 있어 OFF면 DELETE가 1934로 실패한다(2026-11-10 1차 실행) */
 SET NOCOUNT ON;
 SET XACT_ABORT ON;   /* 중간 오류 시 전체 롤백 */
 BEGIN TRAN;
@@ -132,6 +134,10 @@ BEGIN
     FETCH NEXT FROM c INTO @trg, @tbl, @evt;
 END
 CLOSE c; DEALLOCATE c;
+/* 확인: QUOTED_IDENTIFIER OFF로 저장된 모듈(0행이어야 함. AW 자체 모듈 포함, 2026-11-10 run-sql -I 이후 재실행) */
+SELECT OBJECT_SCHEMA_NAME(object_id) AS schemaName, OBJECT_NAME(object_id) AS objectName, uses_quoted_identifier FROM sys.sql_modules WHERE uses_quoted_identifier = 0;
+SELECT COUNT(*) AS modules, SUM(CASE WHEN uses_quoted_identifier = 0 THEN 1 ELSE 0 END) AS quotedIdentOff,
+       SESSIONPROPERTY('QUOTED_IDENTIFIER') AS sessionQuotedIdentifier FROM sys.sql_modules;
 GO
 /* 3. 실행과 관찰: 상세·사유가 모두 있는 주문 1건 */
 DECLARE @id int = (SELECT TOP (1) h.SalesOrderID FROM Sales.SalesOrderHeader AS h
@@ -153,7 +159,7 @@ SELECT v.hyp, v.verdict FROM (VALUES
                               WHERE u.captureSeq > @b AND u.operation = 'U' AND u.tableName = N'[Sales].[SalesOrderHeader]'
                                 AND u.captureSeq > (SELECT captureSeq FROM audit.AuditHeader WHERE captureSeq > @b AND operation = 'D' AND tableName = N'[Sales].[SalesOrderHeader]'))
              THEN 'HOLDS' ELSE 'BROKEN' END),
- ('A3(참고) SOH U 0행 발동', CASE WHEN EXISTS (SELECT 1 FROM audit.AuditHeader WHERE captureSeq > @b AND operation = 'U' AND insertedCount = 0) THEN 'RECORDED' ELSE 'NOT_RECORDED' END)
+ (N'A3(참고) SOH U 0행 발동', CASE WHEN EXISTS (SELECT 1 FROM audit.AuditHeader WHERE captureSeq > @b AND operation = 'U' AND insertedCount = 0) THEN 'RECORDED' ELSE 'NOT_RECORDED' END)
 ) AS v (hyp, verdict);
 GO
 ROLLBACK;

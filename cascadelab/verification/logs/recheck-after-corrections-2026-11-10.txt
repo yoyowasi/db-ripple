@@ -1,0 +1,807 @@
+# 정답 정정(CL03b OO1 확정, CL08a OO1=a) 뒤 재대조 2026-11-10T10:18:58.5869344+09:00
+## oracle
+# CascadeLab.Verify oracle 2026-11-10T10:18:41.4109420+09:00
+env: productVersion="17.0.5035.5"; productUpdateLevel="CU10"; edition="Enterprise Developer Edition (64-bit)"; nestedTriggers=1; disallowResultsFromTriggers=0; sessionOptions=5432; xactAbort=0; db:CascadeLab={is_recursive_triggers_on=false, compatibility_level=170, is_read_committed_snapshot_on=false, snapshot_isolation_state_desc="OFF", collation_name="SQL_Latin1_General_CP1_CI_AS"}; db:CascadeLab_RT={is_recursive_triggers_on=true, compatibility_level=170, is_read_committed_snapshot_on=false, snapshot_isolation_state_desc="OFF", collation_name="SQL_Latin1_General_CP1_CI_AS"}
+seed digest: CascadeLab=6E605145E7235F14, CascadeLab_RT=78EF7DC7082C7A41
+
+== CL01 (CL01-cascade-4.json) db=CascadeLab verdict=MATCH judged=21 match=21 mismatch=0 observed=0
+   stmt 1: DELETE FROM cl01.A WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl01.A: I0[] U0[] D1[{"id":1}]
+   net cl01.B: I0[] U0[] D2[{"id":10} {"id":11}]
+   net cl01.C: I0[] U0[] D3[{"id":100} {"id":101} {"id":110}]
+   net cl01.D: I0[] U0[] D3[{"id":1000} {"id":1001} {"id":1100}]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl01.A keyColumns: exp=id act=id
+   [MATCH] cl01.A inserted: exp=[] act=[]
+   [MATCH] cl01.A updated: exp=[] act=[]
+   [MATCH] cl01.A deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl01.B keyColumns: exp=id act=id
+   [MATCH] cl01.B inserted: exp=[] act=[]
+   [MATCH] cl01.B updated: exp=[] act=[]
+   [MATCH] cl01.B deleted: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] cl01.C keyColumns: exp=id act=id
+   [MATCH] cl01.C inserted: exp=[] act=[]
+   [MATCH] cl01.C updated: exp=[] act=[]
+   [MATCH] cl01.C deleted: exp=[{"id":100}, {"id":101}, {"id":110}] act=[{"id":100}, {"id":101}, {"id":110}]
+   [MATCH] cl01.D keyColumns: exp=id act=id
+   [MATCH] cl01.D inserted: exp=[] act=[]
+   [MATCH] cl01.D updated: exp=[] act=[]
+   [MATCH] cl01.D deleted: exp=[{"id":1000}, {"id":1001}, {"id":1100}] act=[{"id":1000}, {"id":1001}, {"id":1100}]
+
+== CL02 (CL02-set-null.json) db=CascadeLab verdict=MATCH judged=17 match=17 mismatch=0 observed=0
+   stmt 1: DELETE FROM cl02.Dept WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl02.Dept: I0[] U0[] D1[{"id":1}]
+   net cl02.Emp: I0[] U2[{"id":10}(dept_id) {"id":11}(dept_id)] D0[]
+     cl02.Emp {"id":10}: dept_id 1->null
+     cl02.Emp {"id":11}: dept_id 1->null
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl02.Dept keyColumns: exp=id act=id
+   [MATCH] cl02.Dept inserted: exp=[] act=[]
+   [MATCH] cl02.Dept updated: exp=[] act=[]
+   [MATCH] cl02.Dept deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl02.Emp keyColumns: exp=id act=id
+   [MATCH] cl02.Emp inserted: exp=[] act=[]
+   [MATCH] cl02.Emp updated: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] cl02.Emp deleted: exp=[] act=[]
+   [MATCH] cl02.Emp {"id":10} changedColumns: exp=[dept_id] act=[dept_id]
+   [MATCH] cl02.Emp {"id":10} after.dept_id: exp=null act=null
+   [MATCH] cl02.Emp {"id":11} changedColumns: exp=[dept_id] act=[dept_id]
+   [MATCH] cl02.Emp {"id":11} after.dept_id: exp=null act=null
+
+== CL03 (CL03-set-default.json) db=CascadeLab verdict=MATCH judged=19 match=19 mismatch=0 observed=0
+   stmt 1: DELETE FROM cl03.Category WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl03.Category: I0[] U0[] D1[{"id":1}]
+   net cl03.Product: I0[] U2[{"id":10}(category_id) {"id":11}(category_id)] D0[]
+     cl03.Product {"id":10}: category_id 1->0
+     cl03.Product {"id":11}: category_id 1->0
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl03.Category keyColumns: exp=id act=id
+   [MATCH] cl03.Category inserted: exp=[] act=[]
+   [MATCH] cl03.Category updated: exp=[] act=[]
+   [MATCH] cl03.Category deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl03.Product keyColumns: exp=id act=id
+   [MATCH] cl03.Product inserted: exp=[] act=[]
+   [MATCH] cl03.Product updated: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] cl03.Product deleted: exp=[] act=[]
+   [MATCH] cl03.Product {"id":10} changedColumns: exp=[category_id] act=[category_id]
+   [MATCH] cl03.Product {"id":10} after.category_id: exp=0 act=0
+   [MATCH] cl03.Product {"id":11} changedColumns: exp=[category_id] act=[category_id]
+   [MATCH] cl03.Product {"id":11} after.category_id: exp=0 act=0
+   [MATCH] cl03.Grp 변경 0(정답에 없는 같은 패턴 스키마 테이블): exp=I0 U0 D0 act=I0 U0 D0
+   [MATCH] cl03.Item 변경 0(정답에 없는 같은 패턴 스키마 테이블): exp=I0 U0 D0 act=I0 U0 D0
+
+== CL03b (CL03b-set-default-missing.json) db=CascadeLab verdict=MATCH judged=15 match=15 mismatch=0 observed=0
+   stmt 1: DELETE FROM cl03.Grp WHERE id = 1;
+     status=failed rowsAffected=- tranCountAfter=1 xactStateAfter=1
+     error 547 class=16 state=0 line=1: The DELETE statement conflicted with the FOREIGN KEY constraint "FK_cl03_Item_Grp". The conflict occurred in database "CascadeLab", table "cl03.Grp", column 'id'.
+     error 3621 class=0 state=0 line=1: The statement has been terminated.
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=failed act=failed
+   [MATCH] errorNumber: exp=547 act=547  (수집한 오류: 547(class 16), 3621(class 0))
+   [MATCH] statement 1 status: exp=failed act=failed
+   [MATCH] cl03.Grp keyColumns: exp=id act=id
+   [MATCH] cl03.Grp inserted: exp=[] act=[]
+   [MATCH] cl03.Grp updated: exp=[] act=[]
+   [MATCH] cl03.Grp deleted: exp=[] act=[]
+   [MATCH] cl03.Item keyColumns: exp=id act=id
+   [MATCH] cl03.Item inserted: exp=[] act=[]
+   [MATCH] cl03.Item updated: exp=[] act=[]
+   [MATCH] cl03.Item deleted: exp=[] act=[]
+   [MATCH] cl03.Category 변경 0(정답에 없는 같은 패턴 스키마 테이블): exp=I0 U0 D0 act=I0 U0 D0
+   [MATCH] cl03.Product 변경 0(정답에 없는 같은 패턴 스키마 테이블): exp=I0 U0 D0 act=I0 U0 D0
+
+== CL04 (CL04-update-cascade-pk.json) db=CascadeLab verdict=MATCH judged=19 match=19 mismatch=0 observed=0
+   stmt 1: UPDATE cl04.P SET id = id + 100 WHERE id IN (1, 2);
+     status=ok rowsAffected=2 tranCountAfter=1 xactStateAfter=1
+   net cl04.Ch: I0[] U3[{"id":10}(p_id) {"id":11}(p_id) {"id":20}(p_id)] D0[]
+   net cl04.P: I2[{"id":101} {"id":102}] U0[] D2[{"id":1} {"id":2}]
+     cl04.Ch {"id":10}: p_id 1->101
+     cl04.Ch {"id":11}: p_id 1->101
+     cl04.Ch {"id":20}: p_id 2->102
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl04.P keyColumns: exp=id act=id
+   [MATCH] cl04.P inserted: exp=[{"id":101}, {"id":102}] act=[{"id":101}, {"id":102}]
+   [MATCH] cl04.P updated: exp=[] act=[]
+   [MATCH] cl04.P deleted: exp=[{"id":1}, {"id":2}] act=[{"id":1}, {"id":2}]
+   [MATCH] cl04.Ch keyColumns: exp=id act=id
+   [MATCH] cl04.Ch inserted: exp=[] act=[]
+   [MATCH] cl04.Ch updated: exp=[{"id":10}, {"id":11}, {"id":20}] act=[{"id":10}, {"id":11}, {"id":20}]
+   [MATCH] cl04.Ch deleted: exp=[] act=[]
+   [MATCH] cl04.Ch {"id":10} changedColumns: exp=[p_id] act=[p_id]
+   [MATCH] cl04.Ch {"id":10} after.p_id: exp=101 act=101
+   [MATCH] cl04.Ch {"id":11} changedColumns: exp=[p_id] act=[p_id]
+   [MATCH] cl04.Ch {"id":11} after.p_id: exp=101 act=101
+   [MATCH] cl04.Ch {"id":20} changedColumns: exp=[p_id] act=[p_id]
+   [MATCH] cl04.Ch {"id":20} after.p_id: exp=102 act=102
+
+== CL04b (CL04b-update-cascade-single.json) db=CascadeLab verdict=MATCH judged=15 match=15 mismatch=0 observed=0
+   stmt 1: UPDATE cl04.P SET id = 300 WHERE id = 3;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl04.Ch: I0[] U1[{"id":30}(p_id)] D0[]
+   net cl04.P: I1[{"id":300}] U0[] D1[{"id":3}]
+     cl04.Ch {"id":30}: p_id 3->300
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl04.P keyColumns: exp=id act=id
+   [MATCH] cl04.P inserted: exp=[{"id":300}] act=[{"id":300}]
+   [MATCH] cl04.P updated: exp=[] act=[]
+   [MATCH] cl04.P deleted: exp=[{"id":3}] act=[{"id":3}]
+   [MATCH] cl04.Ch keyColumns: exp=id act=id
+   [MATCH] cl04.Ch inserted: exp=[] act=[]
+   [MATCH] cl04.Ch updated: exp=[{"id":30}] act=[{"id":30}]
+   [MATCH] cl04.Ch deleted: exp=[] act=[]
+   [MATCH] cl04.Ch {"id":30} changedColumns: exp=[p_id] act=[p_id]
+   [MATCH] cl04.Ch {"id":30} after.p_id: exp=300 act=300
+
+== CL05 (CL05-two-chains.json) db=CascadeLab verdict=MATCH judged=25 match=25 mismatch=0 observed=0
+   stmt 1: DELETE FROM cl05.P WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl05.P: I0[] U0[] D1[{"id":1}]
+   net cl05.X: I0[] U0[] D2[{"id":10} {"id":11}]
+   net cl05.X2: I0[] U0[] D2[{"id":100} {"id":110}]
+   net cl05.Y: I0[] U0[] D1[{"id":30}]
+   net cl05.Y2: I0[] U0[] D1[{"id":300}]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl05.P keyColumns: exp=id act=id
+   [MATCH] cl05.P inserted: exp=[] act=[]
+   [MATCH] cl05.P updated: exp=[] act=[]
+   [MATCH] cl05.P deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl05.X keyColumns: exp=id act=id
+   [MATCH] cl05.X inserted: exp=[] act=[]
+   [MATCH] cl05.X updated: exp=[] act=[]
+   [MATCH] cl05.X deleted: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] cl05.X2 keyColumns: exp=id act=id
+   [MATCH] cl05.X2 inserted: exp=[] act=[]
+   [MATCH] cl05.X2 updated: exp=[] act=[]
+   [MATCH] cl05.X2 deleted: exp=[{"id":100}, {"id":110}] act=[{"id":100}, {"id":110}]
+   [MATCH] cl05.Y keyColumns: exp=id act=id
+   [MATCH] cl05.Y inserted: exp=[] act=[]
+   [MATCH] cl05.Y updated: exp=[] act=[]
+   [MATCH] cl05.Y deleted: exp=[{"id":30}] act=[{"id":30}]
+   [MATCH] cl05.Y2 keyColumns: exp=id act=id
+   [MATCH] cl05.Y2 inserted: exp=[] act=[]
+   [MATCH] cl05.Y2 updated: exp=[] act=[]
+   [MATCH] cl05.Y2 deleted: exp=[{"id":300}] act=[{"id":300}]
+
+== CL06 (CL06-cascade-target-trigger.json) db=CascadeLab verdict=MATCH judged=17 match=17 mismatch=0 observed=0
+   stmt 1: DELETE FROM cl06.Ord WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl06.Line: I0[] U0[] D2[{"id":10} {"id":11}]
+   net cl06.LineLog: I2[{"line_id":10} {"line_id":11}] U0[] D0[]
+   net cl06.Ord: I0[] U0[] D1[{"id":1}]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl06.Ord keyColumns: exp=id act=id
+   [MATCH] cl06.Ord inserted: exp=[] act=[]
+   [MATCH] cl06.Ord updated: exp=[] act=[]
+   [MATCH] cl06.Ord deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl06.Line keyColumns: exp=id act=id
+   [MATCH] cl06.Line inserted: exp=[] act=[]
+   [MATCH] cl06.Line updated: exp=[] act=[]
+   [MATCH] cl06.Line deleted: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] cl06.LineLog keyColumns: exp=line_id act=line_id
+   [MATCH] cl06.LineLog inserted: exp=[{"line_id":10}, {"line_id":11}] act=[{"line_id":10}, {"line_id":11}]
+   [MATCH] cl06.LineLog updated: exp=[] act=[]
+   [MATCH] cl06.LineLog deleted: exp=[] act=[]
+
+== CL07 (CL07-trigger-chain-3.json) db=CascadeLab verdict=MATCH judged=25 match=25 mismatch=0 observed=0
+   stmt 1: UPDATE cl07.A SET v = v + 1 WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl07.A: I0[] U1[{"id":1}(v)] D0[]
+   net cl07.B: I0[] U2[{"id":10}(total) {"id":11}(total)] D0[]
+   net cl07.C: I2[{"b_id":10} {"b_id":11}] U0[] D0[]
+   net cl07.D: I0[] U1[{"id":1}(cnt)] D0[]
+     cl07.A {"id":1}: v 0->1
+     cl07.B {"id":10}: total 0->1
+     cl07.B {"id":11}: total 0->1
+     cl07.D {"id":1}: cnt 0->2
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl07.A keyColumns: exp=id act=id
+   [MATCH] cl07.A inserted: exp=[] act=[]
+   [MATCH] cl07.A updated: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl07.A deleted: exp=[] act=[]
+   [MATCH] cl07.A {"id":1} changedColumns: exp=[v] act=[v]
+   [MATCH] cl07.B keyColumns: exp=id act=id
+   [MATCH] cl07.B inserted: exp=[] act=[]
+   [MATCH] cl07.B updated: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] cl07.B deleted: exp=[] act=[]
+   [MATCH] cl07.B {"id":10} changedColumns: exp=[total] act=[total]
+   [MATCH] cl07.B {"id":11} changedColumns: exp=[total] act=[total]
+   [MATCH] cl07.C keyColumns: exp=b_id act=b_id
+   [MATCH] cl07.C inserted: exp=[{"b_id":10}, {"b_id":11}] act=[{"b_id":10}, {"b_id":11}]
+   [MATCH] cl07.C updated: exp=[] act=[]
+   [MATCH] cl07.C deleted: exp=[] act=[]
+   [MATCH] cl07.D keyColumns: exp=id act=id
+   [MATCH] cl07.D inserted: exp=[] act=[]
+   [MATCH] cl07.D updated: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl07.D deleted: exp=[] act=[]
+   [MATCH] cl07.D {"id":1} changedColumns: exp=[cnt] act=[cnt]
+
+== CL08a (CL08a-self-update-rt-off.json) db=CascadeLab verdict=MATCH judged=11 match=11 mismatch=0 observed=0
+   stmt 1: UPDATE cl08.Acct SET bal = bal + 10 WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl08.Acct: I0[] U1[{"id":1}(bal,touched)] D0[]
+     cl08.Acct {"id":1}: bal 100->110, touched 0->1
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl08.Acct keyColumns: exp=id act=id
+   [MATCH] cl08.Acct inserted: exp=[] act=[]
+   [MATCH] cl08.Acct updated: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl08.Acct deleted: exp=[] act=[]
+   [MATCH] cl08.Acct {"id":1} changedColumns: exp=[bal, touched] act=[bal, touched]
+   [MATCH] cl08.Acct {"id":1} after.touched: exp=1 act=1
+
+== CL08b (CL08b-self-update-rt-on.json) db=CascadeLab_RT verdict=MATCH judged=11 match=11 mismatch=0 observed=0
+   stmt 1: UPDATE cl08.Acct SET bal = bal + 10 WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl08.Acct: I0[] U1[{"id":1}(bal,touched)] D0[]
+     cl08.Acct {"id":1}: bal 100->110, touched 0->3
+   [MATCH] env: 시작 상태 = 시드 상태: exp=78EF7DC7082C7A41 act=78EF7DC7082C7A41
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=78EF7DC7082C7A41 act=78EF7DC7082C7A41
+   [MATCH] status: exp=ok act=ok
+   [MATCH] errorNumber: exp=null act=null
+   [MATCH] statement 1 status: exp=ok act=ok
+   [MATCH] cl08.Acct keyColumns: exp=id act=id
+   [MATCH] cl08.Acct inserted: exp=[] act=[]
+   [MATCH] cl08.Acct updated: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] cl08.Acct deleted: exp=[] act=[]
+   [MATCH] cl08.Acct {"id":1} changedColumns: exp=[bal, touched] act=[bal, touched]
+   [MATCH] cl08.Acct {"id":1} after.touched: exp=3 act=3
+
+summary: MATCH 11 (사례 11개)
+결과: cascadelab\verification\logs\oracle-2026-11-10.json, cascadelab\verification\logs\oracle-2026-11-10.txt
+## audit --repeat 5
+# CascadeLab.Verify audit 2026-11-10T10:18:46.6792110+09:00
+env: productVersion="17.0.5035.5"; productUpdateLevel="CU10"; edition="Enterprise Developer Edition (64-bit)"; nestedTriggers=1; disallowResultsFromTriggers=0; sessionOptions=5432; xactAbort=0; db:CascadeLab={is_recursive_triggers_on=false, compatibility_level=170, is_read_committed_snapshot_on=false, snapshot_isolation_state_desc="OFF", collation_name="SQL_Latin1_General_CP1_CI_AS"}; db:CascadeLab_RT={is_recursive_triggers_on=true, compatibility_level=170, is_read_committed_snapshot_on=false, snapshot_isolation_state_desc="OFF", collation_name="SQL_Latin1_General_CP1_CI_AS"}; db:CascadeLab_Sandbox={is_recursive_triggers_on=false, compatibility_level=170, is_read_committed_snapshot_on=false, snapshot_isolation_state_desc="OFF", collation_name="SQL_Latin1_General_CP1_CI_AS"}; db:CascadeLab_RT_Sandbox={is_recursive_triggers_on=true, compatibility_level=170, is_read_committed_snapshot_on=false, snapshot_isolation_state_desc="OFF", collation_name="SQL_Latin1_General_CP1_CI_AS"}
+seed digest: CascadeLab_Sandbox=6E605145E7235F14, CascadeLab=6E605145E7235F14, CascadeLab_RT_Sandbox=78EF7DC7082C7A41, CascadeLab_RT=78EF7DC7082C7A41
+[MATCH] env: CascadeLab_Sandbox 데이터 = CascadeLab 데이터(감사 스키마 제외 디지스트): exp=6E605145E7235F14 act=6E605145E7235F14
+[MATCH] env: RECURSIVE_TRIGGERS CascadeLab = CascadeLab_Sandbox: exp=false act=false
+[MATCH] env: CascadeLab_RT_Sandbox 데이터 = CascadeLab_RT 데이터(감사 스키마 제외 디지스트): exp=78EF7DC7082C7A41 act=78EF7DC7082C7A41
+[MATCH] env: RECURSIVE_TRIGGERS CascadeLab_RT = CascadeLab_RT_Sandbox: exp=true act=true
+
+== CL01 (CL01-cascade-4.json) db=CascadeLab_Sandbox verdict=MATCH judged=27 match=27 mismatch=0 observed=4
+   stmt 1: DELETE FROM cl01.A WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl01.A: I0[] U0[] D1[{"id":1}]
+   net cl01.B: I0[] U0[] D2[{"id":10} {"id":11}]
+   net cl01.C: I0[] U0[] D3[{"id":100} {"id":101} {"id":110}]
+   net cl01.D: I0[] U0[] D3[{"id":1000} {"id":1001} {"id":1100}]
+   audit order (captureSeq:table:op:depth:rows): 261:cl01.D:D:d1:r3 < 262:cl01.C:D:d1:r3 < 263:cl01.B:D:d1:r2 < 264:cl01.A:D:d1:r1
+     261 DELETED key={"id":1100} row={"id":1100,"c_id":110}
+     261 DELETED key={"id":1001} row={"id":1001,"c_id":101}
+     261 DELETED key={"id":1000} row={"id":1000,"c_id":100}
+     262 DELETED key={"id":110} row={"id":110,"b_id":11}
+     262 DELETED key={"id":101} row={"id":101,"b_id":10}
+     262 DELETED key={"id":100} row={"id":100,"b_id":10}
+     263 DELETED key={"id":11} row={"id":11,"a_id":1}
+     263 DELETED key={"id":10} row={"id":10,"a_id":1}
+     264 DELETED key={"id":1} row={"id":1,"name":"a1"}
+   audit triggers: A DELETE dbr_audit_A_D LAST | A INSERT dbr_audit_A_I LAST | A UPDATE dbr_audit_A_U LAST | B DELETE dbr_audit_B_D LAST | B INSERT dbr_audit_B_I LAST | B UPDATE dbr_audit_B_U LAST | C DELETE dbr_audit_C_D LAST | C INSERT dbr_audit_C_I LAST | C UPDATE dbr_audit_C_U LAST | D DELETE dbr_audit_D_D LAST | D INSERT dbr_audit_D_I LAST | D UPDATE dbr_audit_D_U LAST
+   run1: status=ok err=null order=cl01.D:D:d1:r3 < cl01.C:D:d1:r3 < cl01.B:D:d1:r2 < cl01.A:D:d1:r1 net=cl01.A I0[] U0[] D1[{"id":1}]; cl01.B I0[] U0[] D2[{"id":10} {"id":11}]; cl01.C I0[] U0[] D3[{"id":100} {"id":101} {"id":110}]; cl01.D I0[] U0[] D3[{"id":1000} {"id":1001} {"id":1100}]
+   run2: status=ok err=null order=cl01.D:D:d1:r3 < cl01.C:D:d1:r3 < cl01.B:D:d1:r2 < cl01.A:D:d1:r1 net=cl01.A I0[] U0[] D1[{"id":1}]; cl01.B I0[] U0[] D2[{"id":10} {"id":11}]; cl01.C I0[] U0[] D3[{"id":100} {"id":101} {"id":110}]; cl01.D I0[] U0[] D3[{"id":1000} {"id":1001} {"id":1100}]
+   run3: status=ok err=null order=cl01.D:D:d1:r3 < cl01.C:D:d1:r3 < cl01.B:D:d1:r2 < cl01.A:D:d1:r1 net=cl01.A I0[] U0[] D1[{"id":1}]; cl01.B I0[] U0[] D2[{"id":10} {"id":11}]; cl01.C I0[] U0[] D3[{"id":100} {"id":101} {"id":110}]; cl01.D I0[] U0[] D3[{"id":1000} {"id":1001} {"id":1100}]
+   run4: status=ok err=null order=cl01.D:D:d1:r3 < cl01.C:D:d1:r3 < cl01.B:D:d1:r2 < cl01.A:D:d1:r1 net=cl01.A I0[] U0[] D1[{"id":1}]; cl01.B I0[] U0[] D2[{"id":10} {"id":11}]; cl01.C I0[] U0[] D3[{"id":100} {"id":101} {"id":110}]; cl01.D I0[] U0[] D3[{"id":1000} {"id":1001} {"id":1100}]
+   run5: status=ok err=null order=cl01.D:D:d1:r3 < cl01.C:D:d1:r3 < cl01.B:D:d1:r2 < cl01.A:D:d1:r1 net=cl01.A I0[] U0[] D1[{"id":1}]; cl01.B I0[] U0[] D2[{"id":10} {"id":11}]; cl01.C I0[] U0[] D3[{"id":100} {"id":101} {"id":110}]; cl01.D I0[] U0[] D3[{"id":1000} {"id":1001} {"id":1100}]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] sandbox status: exp=ok act=ok
+   [MATCH] sandbox errorNumber: exp=null act=null
+   [MATCH] sandbox statement 1 status: exp=ok act=ok
+   [MATCH] sandbox cl01.A keyColumns: exp=id act=id
+   [MATCH] sandbox cl01.A inserted: exp=[] act=[]
+   [MATCH] sandbox cl01.A updated: exp=[] act=[]
+   [MATCH] sandbox cl01.A deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] sandbox cl01.B keyColumns: exp=id act=id
+   [MATCH] sandbox cl01.B inserted: exp=[] act=[]
+   [MATCH] sandbox cl01.B updated: exp=[] act=[]
+   [MATCH] sandbox cl01.B deleted: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] sandbox cl01.C keyColumns: exp=id act=id
+   [MATCH] sandbox cl01.C inserted: exp=[] act=[]
+   [MATCH] sandbox cl01.C updated: exp=[] act=[]
+   [MATCH] sandbox cl01.C deleted: exp=[{"id":100}, {"id":101}, {"id":110}] act=[{"id":100}, {"id":101}, {"id":110}]
+   [MATCH] sandbox cl01.D keyColumns: exp=id act=id
+   [MATCH] sandbox cl01.D inserted: exp=[] act=[]
+   [MATCH] sandbox cl01.D updated: exp=[] act=[]
+   [MATCH] sandbox cl01.D deleted: exp=[{"id":1000}, {"id":1001}, {"id":1100}] act=[{"id":1000}, {"id":1001}, {"id":1100}]
+   [MATCH] env: 롤백 뒤 감사 헤더가 경계로 돌아감: exp=0 act=0
+   [MATCH] firing F:cl01.D:DELETE (table, op, rowCount): exp=cl01.D DELETE 3 act=cl01.D DELETE 3  (captureSeq 261, inserted 0, deleted 3)
+   [OBSERVED] firing F:cl01.D:DELETE depth (FK 연쇄 경로, H2 전제값): exp=1 act=1
+   [MATCH] firing F:cl01.C:DELETE (table, op, rowCount): exp=cl01.C DELETE 3 act=cl01.C DELETE 3  (captureSeq 262, inserted 0, deleted 3)
+   [OBSERVED] firing F:cl01.C:DELETE depth (FK 연쇄 경로, H2 전제값): exp=1 act=1
+   [MATCH] firing F:cl01.B:DELETE (table, op, rowCount): exp=cl01.B DELETE 2 act=cl01.B DELETE 2  (captureSeq 263, inserted 0, deleted 2)
+   [OBSERVED] firing F:cl01.B:DELETE depth (FK 연쇄 경로, H2 전제값): exp=1 act=1
+   [MATCH] firing F:cl01.A:DELETE (table, op, rowCount): exp=cl01.A DELETE 1 act=cl01.A DELETE 1  (captureSeq 264, inserted 0, deleted 1)
+   [MATCH] firing F:cl01.A:DELETE depth: exp=1 act=1
+   [OBSERVED] 반복 5회: 순서·순 변경 문자열 종류 수: exp=1 act=1  (M4 맛보기. captureSeq 값 자체는 빼고 비교)
+
+== CL02 (CL02-set-null.json) db=CascadeLab_Sandbox verdict=MATCH judged=21 match=21 mismatch=0 observed=2
+   stmt 1: DELETE FROM cl02.Dept WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl02.Dept: I0[] U0[] D1[{"id":1}]
+   net cl02.Emp: I0[] U2[{"id":10}(dept_id) {"id":11}(dept_id)] D0[]
+     cl02.Emp {"id":10}: dept_id 1->null
+     cl02.Emp {"id":11}: dept_id 1->null
+   audit order (captureSeq:table:op:depth:rows): 281:cl02.Emp:U:d1:r2 < 282:cl02.Dept:D:d1:r1
+     281 DELETED key={"id":11} row={"id":11,"dept_id":1,"name":"e11"}
+     281 DELETED key={"id":10} row={"id":10,"dept_id":1,"name":"e10"}
+     281 INSERTED key={"id":11} row={"id":11,"dept_id":null,"name":"e11"}
+     281 INSERTED key={"id":10} row={"id":10,"dept_id":null,"name":"e10"}
+     282 DELETED key={"id":1} row={"id":1,"name":"d1"}
+   audit triggers: Dept DELETE dbr_audit_Dept_D LAST | Dept INSERT dbr_audit_Dept_I LAST | Dept UPDATE dbr_audit_Dept_U LAST | Emp DELETE dbr_audit_Emp_D LAST | Emp INSERT dbr_audit_Emp_I LAST | Emp UPDATE dbr_audit_Emp_U LAST
+   run1: status=ok err=null order=cl02.Emp:U:d1:r2 < cl02.Dept:D:d1:r1 net=cl02.Dept I0[] U0[] D1[{"id":1}]; cl02.Emp I0[] U2[{"id":10}(dept_id) {"id":11}(dept_id)] D0[]
+   run2: status=ok err=null order=cl02.Emp:U:d1:r2 < cl02.Dept:D:d1:r1 net=cl02.Dept I0[] U0[] D1[{"id":1}]; cl02.Emp I0[] U2[{"id":10}(dept_id) {"id":11}(dept_id)] D0[]
+   run3: status=ok err=null order=cl02.Emp:U:d1:r2 < cl02.Dept:D:d1:r1 net=cl02.Dept I0[] U0[] D1[{"id":1}]; cl02.Emp I0[] U2[{"id":10}(dept_id) {"id":11}(dept_id)] D0[]
+   run4: status=ok err=null order=cl02.Emp:U:d1:r2 < cl02.Dept:D:d1:r1 net=cl02.Dept I0[] U0[] D1[{"id":1}]; cl02.Emp I0[] U2[{"id":10}(dept_id) {"id":11}(dept_id)] D0[]
+   run5: status=ok err=null order=cl02.Emp:U:d1:r2 < cl02.Dept:D:d1:r1 net=cl02.Dept I0[] U0[] D1[{"id":1}]; cl02.Emp I0[] U2[{"id":10}(dept_id) {"id":11}(dept_id)] D0[]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] sandbox status: exp=ok act=ok
+   [MATCH] sandbox errorNumber: exp=null act=null
+   [MATCH] sandbox statement 1 status: exp=ok act=ok
+   [MATCH] sandbox cl02.Dept keyColumns: exp=id act=id
+   [MATCH] sandbox cl02.Dept inserted: exp=[] act=[]
+   [MATCH] sandbox cl02.Dept updated: exp=[] act=[]
+   [MATCH] sandbox cl02.Dept deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] sandbox cl02.Emp keyColumns: exp=id act=id
+   [MATCH] sandbox cl02.Emp inserted: exp=[] act=[]
+   [MATCH] sandbox cl02.Emp updated: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] sandbox cl02.Emp deleted: exp=[] act=[]
+   [MATCH] sandbox cl02.Emp {"id":10} changedColumns: exp=[dept_id] act=[dept_id]
+   [MATCH] sandbox cl02.Emp {"id":10} after.dept_id: exp=null act=null
+   [MATCH] sandbox cl02.Emp {"id":11} changedColumns: exp=[dept_id] act=[dept_id]
+   [MATCH] sandbox cl02.Emp {"id":11} after.dept_id: exp=null act=null
+   [MATCH] env: 롤백 뒤 감사 헤더가 경계로 돌아감: exp=0 act=0
+   [MATCH] firing F:cl02.Emp:UPDATE (table, op, rowCount): exp=cl02.Emp UPDATE 2 act=cl02.Emp UPDATE 2  (captureSeq 281, inserted 2, deleted 2)
+   [OBSERVED] firing F:cl02.Emp:UPDATE depth (FK 연쇄 경로, H2 전제값): exp=1 act=1
+   [MATCH] firing F:cl02.Dept:DELETE (table, op, rowCount): exp=cl02.Dept DELETE 1 act=cl02.Dept DELETE 1  (captureSeq 282, inserted 0, deleted 1)
+   [MATCH] firing F:cl02.Dept:DELETE depth: exp=1 act=1
+   [OBSERVED] 반복 5회: 순서·순 변경 문자열 종류 수: exp=1 act=1  (M4 맛보기. captureSeq 값 자체는 빼고 비교)
+
+== CL03 (CL03-set-default.json) db=CascadeLab_Sandbox verdict=MATCH judged=23 match=23 mismatch=0 observed=2
+   stmt 1: DELETE FROM cl03.Category WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl03.Category: I0[] U0[] D1[{"id":1}]
+   net cl03.Product: I0[] U2[{"id":10}(category_id) {"id":11}(category_id)] D0[]
+     cl03.Product {"id":10}: category_id 1->0
+     cl03.Product {"id":11}: category_id 1->0
+   audit order (captureSeq:table:op:depth:rows): 291:cl03.Product:U:d1:r2 < 292:cl03.Category:D:d1:r1
+     291 DELETED key={"id":11} row={"id":11,"category_id":1}
+     291 DELETED key={"id":10} row={"id":10,"category_id":1}
+     291 INSERTED key={"id":11} row={"id":11,"category_id":0}
+     291 INSERTED key={"id":10} row={"id":10,"category_id":0}
+     292 DELETED key={"id":1} row={"id":1,"name":"c1"}
+   audit triggers: Category DELETE dbr_audit_Category_D LAST | Category INSERT dbr_audit_Category_I LAST | Category UPDATE dbr_audit_Category_U LAST | Grp DELETE dbr_audit_Grp_D LAST | Grp INSERT dbr_audit_Grp_I LAST | Grp UPDATE dbr_audit_Grp_U LAST | Item DELETE dbr_audit_Item_D LAST | Item INSERT dbr_audit_Item_I LAST | Item UPDATE dbr_audit_Item_U LAST | Product DELETE dbr_audit_Product_D LAST | Product INSERT dbr_audit_Product_I LAST | Product UPDATE dbr_audit_Product_U LAST
+   run1: status=ok err=null order=cl03.Product:U:d1:r2 < cl03.Category:D:d1:r1 net=cl03.Category I0[] U0[] D1[{"id":1}]; cl03.Product I0[] U2[{"id":10}(category_id) {"id":11}(category_id)] D0[]
+   run2: status=ok err=null order=cl03.Product:U:d1:r2 < cl03.Category:D:d1:r1 net=cl03.Category I0[] U0[] D1[{"id":1}]; cl03.Product I0[] U2[{"id":10}(category_id) {"id":11}(category_id)] D0[]
+   run3: status=ok err=null order=cl03.Product:U:d1:r2 < cl03.Category:D:d1:r1 net=cl03.Category I0[] U0[] D1[{"id":1}]; cl03.Product I0[] U2[{"id":10}(category_id) {"id":11}(category_id)] D0[]
+   run4: status=ok err=null order=cl03.Product:U:d1:r2 < cl03.Category:D:d1:r1 net=cl03.Category I0[] U0[] D1[{"id":1}]; cl03.Product I0[] U2[{"id":10}(category_id) {"id":11}(category_id)] D0[]
+   run5: status=ok err=null order=cl03.Product:U:d1:r2 < cl03.Category:D:d1:r1 net=cl03.Category I0[] U0[] D1[{"id":1}]; cl03.Product I0[] U2[{"id":10}(category_id) {"id":11}(category_id)] D0[]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] sandbox status: exp=ok act=ok
+   [MATCH] sandbox errorNumber: exp=null act=null
+   [MATCH] sandbox statement 1 status: exp=ok act=ok
+   [MATCH] sandbox cl03.Category keyColumns: exp=id act=id
+   [MATCH] sandbox cl03.Category inserted: exp=[] act=[]
+   [MATCH] sandbox cl03.Category updated: exp=[] act=[]
+   [MATCH] sandbox cl03.Category deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] sandbox cl03.Product keyColumns: exp=id act=id
+   [MATCH] sandbox cl03.Product inserted: exp=[] act=[]
+   [MATCH] sandbox cl03.Product updated: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] sandbox cl03.Product deleted: exp=[] act=[]
+   [MATCH] sandbox cl03.Product {"id":10} changedColumns: exp=[category_id] act=[category_id]
+   [MATCH] sandbox cl03.Product {"id":10} after.category_id: exp=0 act=0
+   [MATCH] sandbox cl03.Product {"id":11} changedColumns: exp=[category_id] act=[category_id]
+   [MATCH] sandbox cl03.Product {"id":11} after.category_id: exp=0 act=0
+   [MATCH] sandbox cl03.Grp 변경 0(정답에 없는 같은 패턴 스키마 테이블): exp=I0 U0 D0 act=I0 U0 D0
+   [MATCH] sandbox cl03.Item 변경 0(정답에 없는 같은 패턴 스키마 테이블): exp=I0 U0 D0 act=I0 U0 D0
+   [MATCH] env: 롤백 뒤 감사 헤더가 경계로 돌아감: exp=0 act=0
+   [MATCH] firing F:cl03.Product:UPDATE (table, op, rowCount): exp=cl03.Product UPDATE 2 act=cl03.Product UPDATE 2  (captureSeq 291, inserted 2, deleted 2)
+   [OBSERVED] firing F:cl03.Product:UPDATE depth (FK 연쇄 경로, H2 전제값): exp=1 act=1
+   [MATCH] firing F:cl03.Category:DELETE (table, op, rowCount): exp=cl03.Category DELETE 1 act=cl03.Category DELETE 1  (captureSeq 292, inserted 0, deleted 1)
+   [MATCH] firing F:cl03.Category:DELETE depth: exp=1 act=1
+   [OBSERVED] 반복 5회: 순서·순 변경 문자열 종류 수: exp=1 act=1  (M4 맛보기. captureSeq 값 자체는 빼고 비교)
+
+== CL03b (CL03b-set-default-missing.json) db=CascadeLab_Sandbox verdict=MATCH judged=16 match=16 mismatch=0 observed=1
+   stmt 1: DELETE FROM cl03.Grp WHERE id = 1;
+     status=failed rowsAffected=- tranCountAfter=1 xactStateAfter=1
+     error 547 class=16 state=0 line=1: The DELETE statement conflicted with the FOREIGN KEY constraint "FK_cl03_Item_Grp". The conflict occurred in database "CascadeLab_Sandbox", table "cl03.Grp", column 'id'.
+     error 3621 class=0 state=0 line=1: The statement has been terminated.
+   audit order (captureSeq:table:op:depth:rows): 
+   audit triggers: Category DELETE dbr_audit_Category_D LAST | Category INSERT dbr_audit_Category_I LAST | Category UPDATE dbr_audit_Category_U LAST | Grp DELETE dbr_audit_Grp_D LAST | Grp INSERT dbr_audit_Grp_I LAST | Grp UPDATE dbr_audit_Grp_U LAST | Item DELETE dbr_audit_Item_D LAST | Item INSERT dbr_audit_Item_I LAST | Item UPDATE dbr_audit_Item_U LAST | Product DELETE dbr_audit_Product_D LAST | Product INSERT dbr_audit_Product_I LAST | Product UPDATE dbr_audit_Product_U LAST
+   run1: status=failed err=547 order= net=
+   run2: status=failed err=547 order= net=
+   run3: status=failed err=547 order= net=
+   run4: status=failed err=547 order= net=
+   run5: status=failed err=547 order= net=
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] sandbox status: exp=failed act=failed
+   [MATCH] sandbox errorNumber: exp=547 act=547  (수집한 오류: 547(class 16), 3621(class 0))
+   [MATCH] sandbox statement 1 status: exp=failed act=failed
+   [MATCH] sandbox cl03.Grp keyColumns: exp=id act=id
+   [MATCH] sandbox cl03.Grp inserted: exp=[] act=[]
+   [MATCH] sandbox cl03.Grp updated: exp=[] act=[]
+   [MATCH] sandbox cl03.Grp deleted: exp=[] act=[]
+   [MATCH] sandbox cl03.Item keyColumns: exp=id act=id
+   [MATCH] sandbox cl03.Item inserted: exp=[] act=[]
+   [MATCH] sandbox cl03.Item updated: exp=[] act=[]
+   [MATCH] sandbox cl03.Item deleted: exp=[] act=[]
+   [MATCH] sandbox cl03.Category 변경 0(정답에 없는 같은 패턴 스키마 테이블): exp=I0 U0 D0 act=I0 U0 D0
+   [MATCH] sandbox cl03.Product 변경 0(정답에 없는 같은 패턴 스키마 테이블): exp=I0 U0 D0 act=I0 U0 D0
+   [MATCH] env: 롤백 뒤 감사 헤더가 경계로 돌아감: exp=0 act=0
+   [OBSERVED] 반복 5회: 순서·순 변경 문자열 종류 수: exp=1 act=1  (M4 맛보기. captureSeq 값 자체는 빼고 비교)
+
+== CL04 (CL04-update-cascade-pk.json) db=CascadeLab_Sandbox verdict=MATCH judged=23 match=23 mismatch=0 observed=2
+   stmt 1: UPDATE cl04.P SET id = id + 100 WHERE id IN (1, 2);
+     status=ok rowsAffected=2 tranCountAfter=1 xactStateAfter=1
+   net cl04.Ch: I0[] U3[{"id":10}(p_id) {"id":11}(p_id) {"id":20}(p_id)] D0[]
+   net cl04.P: I2[{"id":101} {"id":102}] U0[] D2[{"id":1} {"id":2}]
+     cl04.Ch {"id":10}: p_id 1->101
+     cl04.Ch {"id":11}: p_id 1->101
+     cl04.Ch {"id":20}: p_id 2->102
+   audit order (captureSeq:table:op:depth:rows): 301:cl04.Ch:U:d1:r3 < 302:cl04.P:U:d1:r2
+     301 DELETED key={"id":20} row={"id":20,"p_id":2}
+     301 DELETED key={"id":11} row={"id":11,"p_id":1}
+     301 DELETED key={"id":10} row={"id":10,"p_id":1}
+     301 INSERTED key={"id":20} row={"id":20,"p_id":102}
+     301 INSERTED key={"id":11} row={"id":11,"p_id":101}
+     301 INSERTED key={"id":10} row={"id":10,"p_id":101}
+     302 DELETED key={"id":2} row={"id":2,"name":"p2"}
+     302 DELETED key={"id":1} row={"id":1,"name":"p1"}
+     302 INSERTED key={"id":102} row={"id":102,"name":"p2"}
+     302 INSERTED key={"id":101} row={"id":101,"name":"p1"}
+   audit triggers: Ch DELETE dbr_audit_Ch_D LAST | Ch INSERT dbr_audit_Ch_I LAST | Ch UPDATE dbr_audit_Ch_U LAST | P DELETE dbr_audit_P_D LAST | P INSERT dbr_audit_P_I LAST | P UPDATE dbr_audit_P_U LAST
+   run1: status=ok err=null order=cl04.Ch:U:d1:r3 < cl04.P:U:d1:r2 net=cl04.Ch I0[] U3[{"id":10}(p_id) {"id":11}(p_id) {"id":20}(p_id)] D0[]; cl04.P I2[{"id":101} {"id":102}] U0[] D2[{"id":1} {"id":2}]
+   run2: status=ok err=null order=cl04.Ch:U:d1:r3 < cl04.P:U:d1:r2 net=cl04.Ch I0[] U3[{"id":10}(p_id) {"id":11}(p_id) {"id":20}(p_id)] D0[]; cl04.P I2[{"id":101} {"id":102}] U0[] D2[{"id":1} {"id":2}]
+   run3: status=ok err=null order=cl04.Ch:U:d1:r3 < cl04.P:U:d1:r2 net=cl04.Ch I0[] U3[{"id":10}(p_id) {"id":11}(p_id) {"id":20}(p_id)] D0[]; cl04.P I2[{"id":101} {"id":102}] U0[] D2[{"id":1} {"id":2}]
+   run4: status=ok err=null order=cl04.Ch:U:d1:r3 < cl04.P:U:d1:r2 net=cl04.Ch I0[] U3[{"id":10}(p_id) {"id":11}(p_id) {"id":20}(p_id)] D0[]; cl04.P I2[{"id":101} {"id":102}] U0[] D2[{"id":1} {"id":2}]
+   run5: status=ok err=null order=cl04.Ch:U:d1:r3 < cl04.P:U:d1:r2 net=cl04.Ch I0[] U3[{"id":10}(p_id) {"id":11}(p_id) {"id":20}(p_id)] D0[]; cl04.P I2[{"id":101} {"id":102}] U0[] D2[{"id":1} {"id":2}]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] sandbox status: exp=ok act=ok
+   [MATCH] sandbox errorNumber: exp=null act=null
+   [MATCH] sandbox statement 1 status: exp=ok act=ok
+   [MATCH] sandbox cl04.P keyColumns: exp=id act=id
+   [MATCH] sandbox cl04.P inserted: exp=[{"id":101}, {"id":102}] act=[{"id":101}, {"id":102}]
+   [MATCH] sandbox cl04.P updated: exp=[] act=[]
+   [MATCH] sandbox cl04.P deleted: exp=[{"id":1}, {"id":2}] act=[{"id":1}, {"id":2}]
+   [MATCH] sandbox cl04.Ch keyColumns: exp=id act=id
+   [MATCH] sandbox cl04.Ch inserted: exp=[] act=[]
+   [MATCH] sandbox cl04.Ch updated: exp=[{"id":10}, {"id":11}, {"id":20}] act=[{"id":10}, {"id":11}, {"id":20}]
+   [MATCH] sandbox cl04.Ch deleted: exp=[] act=[]
+   [MATCH] sandbox cl04.Ch {"id":10} changedColumns: exp=[p_id] act=[p_id]
+   [MATCH] sandbox cl04.Ch {"id":10} after.p_id: exp=101 act=101
+   [MATCH] sandbox cl04.Ch {"id":11} changedColumns: exp=[p_id] act=[p_id]
+   [MATCH] sandbox cl04.Ch {"id":11} after.p_id: exp=101 act=101
+   [MATCH] sandbox cl04.Ch {"id":20} changedColumns: exp=[p_id] act=[p_id]
+   [MATCH] sandbox cl04.Ch {"id":20} after.p_id: exp=102 act=102
+   [MATCH] env: 롤백 뒤 감사 헤더가 경계로 돌아감: exp=0 act=0
+   [MATCH] firing F:cl04.Ch:UPDATE (table, op, rowCount): exp=cl04.Ch UPDATE 3 act=cl04.Ch UPDATE 3  (captureSeq 301, inserted 3, deleted 3)
+   [OBSERVED] firing F:cl04.Ch:UPDATE depth (FK 연쇄 경로, H2 전제값): exp=1 act=1
+   [MATCH] firing F:cl04.P:UPDATE (table, op, rowCount): exp=cl04.P UPDATE 2 act=cl04.P UPDATE 2  (captureSeq 302, inserted 2, deleted 2)
+   [MATCH] firing F:cl04.P:UPDATE depth: exp=1 act=1
+   [OBSERVED] 반복 5회: 순서·순 변경 문자열 종류 수: exp=1 act=1  (M4 맛보기. captureSeq 값 자체는 빼고 비교)
+
+== CL04b (CL04b-update-cascade-single.json) db=CascadeLab_Sandbox verdict=MATCH judged=19 match=19 mismatch=0 observed=2
+   stmt 1: UPDATE cl04.P SET id = 300 WHERE id = 3;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl04.Ch: I0[] U1[{"id":30}(p_id)] D0[]
+   net cl04.P: I1[{"id":300}] U0[] D1[{"id":3}]
+     cl04.Ch {"id":30}: p_id 3->300
+   audit order (captureSeq:table:op:depth:rows): 311:cl04.Ch:U:d1:r1 < 312:cl04.P:U:d1:r1
+     311 DELETED key={"id":30} row={"id":30,"p_id":3}
+     311 INSERTED key={"id":30} row={"id":30,"p_id":300}
+     312 DELETED key={"id":3} row={"id":3,"name":"p3"}
+     312 INSERTED key={"id":300} row={"id":300,"name":"p3"}
+   audit triggers: Ch DELETE dbr_audit_Ch_D LAST | Ch INSERT dbr_audit_Ch_I LAST | Ch UPDATE dbr_audit_Ch_U LAST | P DELETE dbr_audit_P_D LAST | P INSERT dbr_audit_P_I LAST | P UPDATE dbr_audit_P_U LAST
+   run1: status=ok err=null order=cl04.Ch:U:d1:r1 < cl04.P:U:d1:r1 net=cl04.Ch I0[] U1[{"id":30}(p_id)] D0[]; cl04.P I1[{"id":300}] U0[] D1[{"id":3}]
+   run2: status=ok err=null order=cl04.Ch:U:d1:r1 < cl04.P:U:d1:r1 net=cl04.Ch I0[] U1[{"id":30}(p_id)] D0[]; cl04.P I1[{"id":300}] U0[] D1[{"id":3}]
+   run3: status=ok err=null order=cl04.Ch:U:d1:r1 < cl04.P:U:d1:r1 net=cl04.Ch I0[] U1[{"id":30}(p_id)] D0[]; cl04.P I1[{"id":300}] U0[] D1[{"id":3}]
+   run4: status=ok err=null order=cl04.Ch:U:d1:r1 < cl04.P:U:d1:r1 net=cl04.Ch I0[] U1[{"id":30}(p_id)] D0[]; cl04.P I1[{"id":300}] U0[] D1[{"id":3}]
+   run5: status=ok err=null order=cl04.Ch:U:d1:r1 < cl04.P:U:d1:r1 net=cl04.Ch I0[] U1[{"id":30}(p_id)] D0[]; cl04.P I1[{"id":300}] U0[] D1[{"id":3}]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] sandbox status: exp=ok act=ok
+   [MATCH] sandbox errorNumber: exp=null act=null
+   [MATCH] sandbox statement 1 status: exp=ok act=ok
+   [MATCH] sandbox cl04.P keyColumns: exp=id act=id
+   [MATCH] sandbox cl04.P inserted: exp=[{"id":300}] act=[{"id":300}]
+   [MATCH] sandbox cl04.P updated: exp=[] act=[]
+   [MATCH] sandbox cl04.P deleted: exp=[{"id":3}] act=[{"id":3}]
+   [MATCH] sandbox cl04.Ch keyColumns: exp=id act=id
+   [MATCH] sandbox cl04.Ch inserted: exp=[] act=[]
+   [MATCH] sandbox cl04.Ch updated: exp=[{"id":30}] act=[{"id":30}]
+   [MATCH] sandbox cl04.Ch deleted: exp=[] act=[]
+   [MATCH] sandbox cl04.Ch {"id":30} changedColumns: exp=[p_id] act=[p_id]
+   [MATCH] sandbox cl04.Ch {"id":30} after.p_id: exp=300 act=300
+   [MATCH] env: 롤백 뒤 감사 헤더가 경계로 돌아감: exp=0 act=0
+   [MATCH] firing F:cl04.Ch:UPDATE (table, op, rowCount): exp=cl04.Ch UPDATE 1 act=cl04.Ch UPDATE 1  (captureSeq 311, inserted 1, deleted 1)
+   [OBSERVED] firing F:cl04.Ch:UPDATE depth (FK 연쇄 경로, H2 전제값): exp=1 act=1
+   [MATCH] firing F:cl04.P:UPDATE (table, op, rowCount): exp=cl04.P UPDATE 1 act=cl04.P UPDATE 1  (captureSeq 312, inserted 1, deleted 1)
+   [MATCH] firing F:cl04.P:UPDATE depth: exp=1 act=1
+   [OBSERVED] 반복 5회: 순서·순 변경 문자열 종류 수: exp=1 act=1  (M4 맛보기. captureSeq 값 자체는 빼고 비교)
+
+== CL05 (CL05-two-chains.json) db=CascadeLab_Sandbox verdict=MATCH judged=32 match=32 mismatch=0 observed=5
+   stmt 1: DELETE FROM cl05.P WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl05.P: I0[] U0[] D1[{"id":1}]
+   net cl05.X: I0[] U0[] D2[{"id":10} {"id":11}]
+   net cl05.X2: I0[] U0[] D2[{"id":100} {"id":110}]
+   net cl05.Y: I0[] U0[] D1[{"id":30}]
+   net cl05.Y2: I0[] U0[] D1[{"id":300}]
+   audit order (captureSeq:table:op:depth:rows): 321:cl05.Y2:D:d1:r1 < 322:cl05.Y:D:d1:r1 < 323:cl05.X2:D:d1:r2 < 324:cl05.X:D:d1:r2 < 325:cl05.P:D:d1:r1
+     321 DELETED key={"id":300} row={"id":300,"y_id":30}
+     322 DELETED key={"id":30} row={"id":30,"p_id":1}
+     323 DELETED key={"id":110} row={"id":110,"x_id":11}
+     323 DELETED key={"id":100} row={"id":100,"x_id":10}
+     324 DELETED key={"id":11} row={"id":11,"p_id":1}
+     324 DELETED key={"id":10} row={"id":10,"p_id":1}
+     325 DELETED key={"id":1} row={"id":1}
+   audit triggers: P DELETE dbr_audit_P_D LAST | P INSERT dbr_audit_P_I LAST | P UPDATE dbr_audit_P_U LAST | X DELETE dbr_audit_X_D LAST | X INSERT dbr_audit_X_I LAST | X UPDATE dbr_audit_X_U LAST | X2 DELETE dbr_audit_X2_D LAST | X2 INSERT dbr_audit_X2_I LAST | X2 UPDATE dbr_audit_X2_U LAST | Y DELETE dbr_audit_Y_D LAST | Y INSERT dbr_audit_Y_I LAST | Y UPDATE dbr_audit_Y_U LAST | Y2 DELETE dbr_audit_Y2_D LAST | Y2 INSERT dbr_audit_Y2_I LAST | Y2 UPDATE dbr_audit_Y2_U LAST
+   run1: status=ok err=null order=cl05.Y2:D:d1:r1 < cl05.Y:D:d1:r1 < cl05.X2:D:d1:r2 < cl05.X:D:d1:r2 < cl05.P:D:d1:r1 net=cl05.P I0[] U0[] D1[{"id":1}]; cl05.X I0[] U0[] D2[{"id":10} {"id":11}]; cl05.X2 I0[] U0[] D2[{"id":100} {"id":110}]; cl05.Y I0[] U0[] D1[{"id":30}]; cl05.Y2 I0[] U0[] D1[{"id":300}]
+   run2: status=ok err=null order=cl05.Y2:D:d1:r1 < cl05.Y:D:d1:r1 < cl05.X2:D:d1:r2 < cl05.X:D:d1:r2 < cl05.P:D:d1:r1 net=cl05.P I0[] U0[] D1[{"id":1}]; cl05.X I0[] U0[] D2[{"id":10} {"id":11}]; cl05.X2 I0[] U0[] D2[{"id":100} {"id":110}]; cl05.Y I0[] U0[] D1[{"id":30}]; cl05.Y2 I0[] U0[] D1[{"id":300}]
+   run3: status=ok err=null order=cl05.Y2:D:d1:r1 < cl05.Y:D:d1:r1 < cl05.X2:D:d1:r2 < cl05.X:D:d1:r2 < cl05.P:D:d1:r1 net=cl05.P I0[] U0[] D1[{"id":1}]; cl05.X I0[] U0[] D2[{"id":10} {"id":11}]; cl05.X2 I0[] U0[] D2[{"id":100} {"id":110}]; cl05.Y I0[] U0[] D1[{"id":30}]; cl05.Y2 I0[] U0[] D1[{"id":300}]
+   run4: status=ok err=null order=cl05.Y2:D:d1:r1 < cl05.Y:D:d1:r1 < cl05.X2:D:d1:r2 < cl05.X:D:d1:r2 < cl05.P:D:d1:r1 net=cl05.P I0[] U0[] D1[{"id":1}]; cl05.X I0[] U0[] D2[{"id":10} {"id":11}]; cl05.X2 I0[] U0[] D2[{"id":100} {"id":110}]; cl05.Y I0[] U0[] D1[{"id":30}]; cl05.Y2 I0[] U0[] D1[{"id":300}]
+   run5: status=ok err=null order=cl05.Y2:D:d1:r1 < cl05.Y:D:d1:r1 < cl05.X2:D:d1:r2 < cl05.X:D:d1:r2 < cl05.P:D:d1:r1 net=cl05.P I0[] U0[] D1[{"id":1}]; cl05.X I0[] U0[] D2[{"id":10} {"id":11}]; cl05.X2 I0[] U0[] D2[{"id":100} {"id":110}]; cl05.Y I0[] U0[] D1[{"id":30}]; cl05.Y2 I0[] U0[] D1[{"id":300}]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] sandbox status: exp=ok act=ok
+   [MATCH] sandbox errorNumber: exp=null act=null
+   [MATCH] sandbox statement 1 status: exp=ok act=ok
+   [MATCH] sandbox cl05.P keyColumns: exp=id act=id
+   [MATCH] sandbox cl05.P inserted: exp=[] act=[]
+   [MATCH] sandbox cl05.P updated: exp=[] act=[]
+   [MATCH] sandbox cl05.P deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] sandbox cl05.X keyColumns: exp=id act=id
+   [MATCH] sandbox cl05.X inserted: exp=[] act=[]
+   [MATCH] sandbox cl05.X updated: exp=[] act=[]
+   [MATCH] sandbox cl05.X deleted: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] sandbox cl05.X2 keyColumns: exp=id act=id
+   [MATCH] sandbox cl05.X2 inserted: exp=[] act=[]
+   [MATCH] sandbox cl05.X2 updated: exp=[] act=[]
+   [MATCH] sandbox cl05.X2 deleted: exp=[{"id":100}, {"id":110}] act=[{"id":100}, {"id":110}]
+   [MATCH] sandbox cl05.Y keyColumns: exp=id act=id
+   [MATCH] sandbox cl05.Y inserted: exp=[] act=[]
+   [MATCH] sandbox cl05.Y updated: exp=[] act=[]
+   [MATCH] sandbox cl05.Y deleted: exp=[{"id":30}] act=[{"id":30}]
+   [MATCH] sandbox cl05.Y2 keyColumns: exp=id act=id
+   [MATCH] sandbox cl05.Y2 inserted: exp=[] act=[]
+   [MATCH] sandbox cl05.Y2 updated: exp=[] act=[]
+   [MATCH] sandbox cl05.Y2 deleted: exp=[{"id":300}] act=[{"id":300}]
+   [MATCH] env: 롤백 뒤 감사 헤더가 경계로 돌아감: exp=0 act=0
+   [MATCH] firing F:cl05.Y2:DELETE (table, op, rowCount): exp=cl05.Y2 DELETE 1 act=cl05.Y2 DELETE 1  (captureSeq 321, inserted 0, deleted 1)
+   [OBSERVED] firing F:cl05.Y2:DELETE depth (FK 연쇄 경로, H2 전제값): exp=1 act=1
+   [MATCH] firing F:cl05.Y:DELETE (table, op, rowCount): exp=cl05.Y DELETE 1 act=cl05.Y DELETE 1  (captureSeq 322, inserted 0, deleted 1)
+   [OBSERVED] firing F:cl05.Y:DELETE depth (FK 연쇄 경로, H2 전제값): exp=1 act=1
+   [MATCH] firing F:cl05.X2:DELETE (table, op, rowCount): exp=cl05.X2 DELETE 2 act=cl05.X2 DELETE 2  (captureSeq 323, inserted 0, deleted 2)
+   [OBSERVED] firing F:cl05.X2:DELETE depth (FK 연쇄 경로, H2 전제값): exp=1 act=1
+   [MATCH] firing F:cl05.X:DELETE (table, op, rowCount): exp=cl05.X DELETE 2 act=cl05.X DELETE 2  (captureSeq 324, inserted 0, deleted 2)
+   [OBSERVED] firing F:cl05.X:DELETE depth (FK 연쇄 경로, H2 전제값): exp=1 act=1
+   [MATCH] firing F:cl05.P:DELETE (table, op, rowCount): exp=cl05.P DELETE 1 act=cl05.P DELETE 1  (captureSeq 325, inserted 0, deleted 1)
+   [MATCH] firing F:cl05.P:DELETE depth: exp=1 act=1
+   [OBSERVED] 반복 5회: 순서·순 변경 문자열 종류 수: exp=1 act=1  (M4 맛보기. captureSeq 값 자체는 빼고 비교)
+
+== CL06 (CL06-cascade-target-trigger.json) db=CascadeLab_Sandbox verdict=MATCH judged=22 match=22 mismatch=0 observed=3
+   stmt 1: DELETE FROM cl06.Ord WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl06.Line: I0[] U0[] D2[{"id":10} {"id":11}]
+   net cl06.LineLog: I2[{"line_id":10} {"line_id":11}] U0[] D0[]
+   net cl06.Ord: I0[] U0[] D1[{"id":1}]
+   audit order (captureSeq:table:op:depth:rows): 346:cl06.LineLog:I:d2:r2 < 347:cl06.Line:D:d1:r2 < 348:cl06.Ord:D:d1:r1
+     346 INSERTED key={"line_id":10} row={"line_id":10,"action":"D"}
+     346 INSERTED key={"line_id":11} row={"line_id":11,"action":"D"}
+     347 DELETED key={"id":11} row={"id":11,"ord_id":1,"qty":3}
+     347 DELETED key={"id":10} row={"id":10,"ord_id":1,"qty":5}
+     348 DELETED key={"id":1} row={"id":1}
+   audit triggers: Line DELETE dbr_audit_Line_D LAST | Line DELETE trg_Line_del NONE | Line INSERT dbr_audit_Line_I LAST | Line UPDATE dbr_audit_Line_U LAST | LineLog DELETE dbr_audit_LineLog_D LAST | LineLog INSERT dbr_audit_LineLog_I LAST | LineLog UPDATE dbr_audit_LineLog_U LAST | Ord DELETE dbr_audit_Ord_D LAST | Ord INSERT dbr_audit_Ord_I LAST | Ord UPDATE dbr_audit_Ord_U LAST
+   run1: status=ok err=null order=cl06.LineLog:I:d2:r2 < cl06.Line:D:d1:r2 < cl06.Ord:D:d1:r1 net=cl06.Line I0[] U0[] D2[{"id":10} {"id":11}]; cl06.LineLog I2[{"line_id":10} {"line_id":11}] U0[] D0[]; cl06.Ord I0[] U0[] D1[{"id":1}]
+   run2: status=ok err=null order=cl06.LineLog:I:d2:r2 < cl06.Line:D:d1:r2 < cl06.Ord:D:d1:r1 net=cl06.Line I0[] U0[] D2[{"id":10} {"id":11}]; cl06.LineLog I2[{"line_id":10} {"line_id":11}] U0[] D0[]; cl06.Ord I0[] U0[] D1[{"id":1}]
+   run3: status=ok err=null order=cl06.LineLog:I:d2:r2 < cl06.Line:D:d1:r2 < cl06.Ord:D:d1:r1 net=cl06.Line I0[] U0[] D2[{"id":10} {"id":11}]; cl06.LineLog I2[{"line_id":10} {"line_id":11}] U0[] D0[]; cl06.Ord I0[] U0[] D1[{"id":1}]
+   run4: status=ok err=null order=cl06.LineLog:I:d2:r2 < cl06.Line:D:d1:r2 < cl06.Ord:D:d1:r1 net=cl06.Line I0[] U0[] D2[{"id":10} {"id":11}]; cl06.LineLog I2[{"line_id":10} {"line_id":11}] U0[] D0[]; cl06.Ord I0[] U0[] D1[{"id":1}]
+   run5: status=ok err=null order=cl06.LineLog:I:d2:r2 < cl06.Line:D:d1:r2 < cl06.Ord:D:d1:r1 net=cl06.Line I0[] U0[] D2[{"id":10} {"id":11}]; cl06.LineLog I2[{"line_id":10} {"line_id":11}] U0[] D0[]; cl06.Ord I0[] U0[] D1[{"id":1}]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] sandbox status: exp=ok act=ok
+   [MATCH] sandbox errorNumber: exp=null act=null
+   [MATCH] sandbox statement 1 status: exp=ok act=ok
+   [MATCH] sandbox cl06.Ord keyColumns: exp=id act=id
+   [MATCH] sandbox cl06.Ord inserted: exp=[] act=[]
+   [MATCH] sandbox cl06.Ord updated: exp=[] act=[]
+   [MATCH] sandbox cl06.Ord deleted: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] sandbox cl06.Line keyColumns: exp=id act=id
+   [MATCH] sandbox cl06.Line inserted: exp=[] act=[]
+   [MATCH] sandbox cl06.Line updated: exp=[] act=[]
+   [MATCH] sandbox cl06.Line deleted: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] sandbox cl06.LineLog keyColumns: exp=line_id act=line_id
+   [MATCH] sandbox cl06.LineLog inserted: exp=[{"line_id":10}, {"line_id":11}] act=[{"line_id":10}, {"line_id":11}]
+   [MATCH] sandbox cl06.LineLog updated: exp=[] act=[]
+   [MATCH] sandbox cl06.LineLog deleted: exp=[] act=[]
+   [MATCH] env: 롤백 뒤 감사 헤더가 경계로 돌아감: exp=0 act=0
+   [MATCH] firing F:cl06.LineLog:INSERT (table, op, rowCount): exp=cl06.LineLog INSERT 2 act=cl06.LineLog INSERT 2  (captureSeq 346, inserted 2, deleted 0)
+   [OBSERVED] firing F:cl06.LineLog:INSERT depth (FK 연쇄 경로, H2 전제값): exp=2 act=2
+   [MATCH] firing F:cl06.Line:DELETE (table, op, rowCount): exp=cl06.Line DELETE 2 act=cl06.Line DELETE 2  (captureSeq 347, inserted 0, deleted 2)
+   [OBSERVED] firing F:cl06.Line:DELETE depth (FK 연쇄 경로, H2 전제값): exp=1 act=1
+   [MATCH] firing F:cl06.Ord:DELETE (table, op, rowCount): exp=cl06.Ord DELETE 1 act=cl06.Ord DELETE 1  (captureSeq 348, inserted 0, deleted 1)
+   [MATCH] firing F:cl06.Ord:DELETE depth: exp=1 act=1
+   [OBSERVED] 반복 5회: 순서·순 변경 문자열 종류 수: exp=1 act=1  (M4 맛보기. captureSeq 값 자체는 빼고 비교)
+
+== CL07 (CL07-trigger-chain-3.json) db=CascadeLab_Sandbox verdict=MATCH judged=34 match=34 mismatch=0 observed=1
+   stmt 1: UPDATE cl07.A SET v = v + 1 WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl07.A: I0[] U1[{"id":1}(v)] D0[]
+   net cl07.B: I0[] U2[{"id":10}(total) {"id":11}(total)] D0[]
+   net cl07.C: I2[{"b_id":10} {"b_id":11}] U0[] D0[]
+   net cl07.D: I0[] U1[{"id":1}(cnt)] D0[]
+     cl07.A {"id":1}: v 0->1
+     cl07.B {"id":10}: total 0->1
+     cl07.B {"id":11}: total 0->1
+     cl07.D {"id":1}: cnt 0->2
+   audit order (captureSeq:table:op:depth:rows): 361:cl07.D:U:d4:r1 < 362:cl07.C:I:d3:r2 < 363:cl07.B:U:d2:r2 < 364:cl07.A:U:d1:r1
+     361 DELETED key={"id":1} row={"id":1,"cnt":0}
+     361 INSERTED key={"id":1} row={"id":1,"cnt":2}
+     362 INSERTED key={"b_id":10} row={"b_id":10,"note":"from B"}
+     362 INSERTED key={"b_id":11} row={"b_id":11,"note":"from B"}
+     363 DELETED key={"id":11} row={"id":11,"a_id":1,"total":0}
+     363 DELETED key={"id":10} row={"id":10,"a_id":1,"total":0}
+     363 INSERTED key={"id":11} row={"id":11,"a_id":1,"total":1}
+     363 INSERTED key={"id":10} row={"id":10,"a_id":1,"total":1}
+     364 DELETED key={"id":1} row={"id":1,"v":0}
+     364 INSERTED key={"id":1} row={"id":1,"v":1}
+   audit triggers: A DELETE dbr_audit_A_D LAST | A INSERT dbr_audit_A_I LAST | A UPDATE dbr_audit_A_U LAST | A UPDATE trg_A_upd NONE | B DELETE dbr_audit_B_D LAST | B INSERT dbr_audit_B_I LAST | B UPDATE dbr_audit_B_U LAST | B UPDATE trg_B_upd NONE | C DELETE dbr_audit_C_D LAST | C INSERT dbr_audit_C_I LAST | C INSERT trg_C_ins NONE | C UPDATE dbr_audit_C_U LAST | D DELETE dbr_audit_D_D LAST | D INSERT dbr_audit_D_I LAST | D UPDATE dbr_audit_D_U LAST
+   run1: status=ok err=null order=cl07.D:U:d4:r1 < cl07.C:I:d3:r2 < cl07.B:U:d2:r2 < cl07.A:U:d1:r1 net=cl07.A I0[] U1[{"id":1}(v)] D0[]; cl07.B I0[] U2[{"id":10}(total) {"id":11}(total)] D0[]; cl07.C I2[{"b_id":10} {"b_id":11}] U0[] D0[]; cl07.D I0[] U1[{"id":1}(cnt)] D0[]
+   run2: status=ok err=null order=cl07.D:U:d4:r1 < cl07.C:I:d3:r2 < cl07.B:U:d2:r2 < cl07.A:U:d1:r1 net=cl07.A I0[] U1[{"id":1}(v)] D0[]; cl07.B I0[] U2[{"id":10}(total) {"id":11}(total)] D0[]; cl07.C I2[{"b_id":10} {"b_id":11}] U0[] D0[]; cl07.D I0[] U1[{"id":1}(cnt)] D0[]
+   run3: status=ok err=null order=cl07.D:U:d4:r1 < cl07.C:I:d3:r2 < cl07.B:U:d2:r2 < cl07.A:U:d1:r1 net=cl07.A I0[] U1[{"id":1}(v)] D0[]; cl07.B I0[] U2[{"id":10}(total) {"id":11}(total)] D0[]; cl07.C I2[{"b_id":10} {"b_id":11}] U0[] D0[]; cl07.D I0[] U1[{"id":1}(cnt)] D0[]
+   run4: status=ok err=null order=cl07.D:U:d4:r1 < cl07.C:I:d3:r2 < cl07.B:U:d2:r2 < cl07.A:U:d1:r1 net=cl07.A I0[] U1[{"id":1}(v)] D0[]; cl07.B I0[] U2[{"id":10}(total) {"id":11}(total)] D0[]; cl07.C I2[{"b_id":10} {"b_id":11}] U0[] D0[]; cl07.D I0[] U1[{"id":1}(cnt)] D0[]
+   run5: status=ok err=null order=cl07.D:U:d4:r1 < cl07.C:I:d3:r2 < cl07.B:U:d2:r2 < cl07.A:U:d1:r1 net=cl07.A I0[] U1[{"id":1}(v)] D0[]; cl07.B I0[] U2[{"id":10}(total) {"id":11}(total)] D0[]; cl07.C I2[{"b_id":10} {"b_id":11}] U0[] D0[]; cl07.D I0[] U1[{"id":1}(cnt)] D0[]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] sandbox status: exp=ok act=ok
+   [MATCH] sandbox errorNumber: exp=null act=null
+   [MATCH] sandbox statement 1 status: exp=ok act=ok
+   [MATCH] sandbox cl07.A keyColumns: exp=id act=id
+   [MATCH] sandbox cl07.A inserted: exp=[] act=[]
+   [MATCH] sandbox cl07.A updated: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] sandbox cl07.A deleted: exp=[] act=[]
+   [MATCH] sandbox cl07.A {"id":1} changedColumns: exp=[v] act=[v]
+   [MATCH] sandbox cl07.B keyColumns: exp=id act=id
+   [MATCH] sandbox cl07.B inserted: exp=[] act=[]
+   [MATCH] sandbox cl07.B updated: exp=[{"id":10}, {"id":11}] act=[{"id":10}, {"id":11}]
+   [MATCH] sandbox cl07.B deleted: exp=[] act=[]
+   [MATCH] sandbox cl07.B {"id":10} changedColumns: exp=[total] act=[total]
+   [MATCH] sandbox cl07.B {"id":11} changedColumns: exp=[total] act=[total]
+   [MATCH] sandbox cl07.C keyColumns: exp=b_id act=b_id
+   [MATCH] sandbox cl07.C inserted: exp=[{"b_id":10}, {"b_id":11}] act=[{"b_id":10}, {"b_id":11}]
+   [MATCH] sandbox cl07.C updated: exp=[] act=[]
+   [MATCH] sandbox cl07.C deleted: exp=[] act=[]
+   [MATCH] sandbox cl07.D keyColumns: exp=id act=id
+   [MATCH] sandbox cl07.D inserted: exp=[] act=[]
+   [MATCH] sandbox cl07.D updated: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] sandbox cl07.D deleted: exp=[] act=[]
+   [MATCH] sandbox cl07.D {"id":1} changedColumns: exp=[cnt] act=[cnt]
+   [MATCH] env: 롤백 뒤 감사 헤더가 경계로 돌아감: exp=0 act=0
+   [MATCH] firing F:cl07.D:UPDATE (table, op, rowCount): exp=cl07.D UPDATE 1 act=cl07.D UPDATE 1  (captureSeq 361, inserted 1, deleted 1)
+   [MATCH] firing F:cl07.D:UPDATE depth: exp=4 act=4
+   [MATCH] firing F:cl07.C:INSERT (table, op, rowCount): exp=cl07.C INSERT 2 act=cl07.C INSERT 2  (captureSeq 362, inserted 2, deleted 0)
+   [MATCH] firing F:cl07.C:INSERT depth: exp=3 act=3
+   [MATCH] firing F:cl07.B:UPDATE (table, op, rowCount): exp=cl07.B UPDATE 2 act=cl07.B UPDATE 2  (captureSeq 363, inserted 2, deleted 2)
+   [MATCH] firing F:cl07.B:UPDATE depth: exp=2 act=2
+   [MATCH] firing F:cl07.A:UPDATE (table, op, rowCount): exp=cl07.A UPDATE 1 act=cl07.A UPDATE 1  (captureSeq 364, inserted 1, deleted 1)
+   [MATCH] firing F:cl07.A:UPDATE depth: exp=1 act=1
+   [OBSERVED] 반복 5회: 순서·순 변경 문자열 종류 수: exp=1 act=1  (M4 맛보기. captureSeq 값 자체는 빼고 비교)
+
+== CL08a (CL08a-self-update-rt-off.json) db=CascadeLab_Sandbox verdict=MATCH judged=16 match=16 mismatch=0 observed=1
+   stmt 1: UPDATE cl08.Acct SET bal = bal + 10 WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl08.Acct: I0[] U1[{"id":1}(bal,touched)] D0[]
+     cl08.Acct {"id":1}: bal 100->110, touched 0->1
+   audit order (captureSeq:table:op:depth:rows): 381:cl08.Acct:U:d2:r1 < 382:cl08.Acct:U:d1:r1
+     381 DELETED key={"id":1} row={"id":1,"bal":110,"touched":0}
+     381 INSERTED key={"id":1} row={"id":1,"bal":110,"touched":1}
+     382 DELETED key={"id":1} row={"id":1,"bal":100,"touched":0}
+     382 INSERTED key={"id":1} row={"id":1,"bal":110,"touched":0}
+   audit triggers: Acct DELETE dbr_audit_Acct_D LAST | Acct INSERT dbr_audit_Acct_I LAST | Acct UPDATE dbr_audit_Acct_U LAST | Acct UPDATE trg_Acct_upd NONE
+   run1: status=ok err=null order=cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{"id":1}(bal,touched)] D0[]
+   run2: status=ok err=null order=cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{"id":1}(bal,touched)] D0[]
+   run3: status=ok err=null order=cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{"id":1}(bal,touched)] D0[]
+   run4: status=ok err=null order=cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{"id":1}(bal,touched)] D0[]
+   run5: status=ok err=null order=cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{"id":1}(bal,touched)] D0[]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=6E605145E7235F14 act=6E605145E7235F14
+   [MATCH] sandbox status: exp=ok act=ok
+   [MATCH] sandbox errorNumber: exp=null act=null
+   [MATCH] sandbox statement 1 status: exp=ok act=ok
+   [MATCH] sandbox cl08.Acct keyColumns: exp=id act=id
+   [MATCH] sandbox cl08.Acct inserted: exp=[] act=[]
+   [MATCH] sandbox cl08.Acct updated: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] sandbox cl08.Acct deleted: exp=[] act=[]
+   [MATCH] sandbox cl08.Acct {"id":1} changedColumns: exp=[bal, touched] act=[bal, touched]
+   [MATCH] sandbox cl08.Acct {"id":1} after.touched: exp=1 act=1
+   [MATCH] env: 롤백 뒤 감사 헤더가 경계로 돌아감: exp=0 act=0
+   [MATCH] firing F:cl08.Acct:UPDATE#2 (table, op, rowCount): exp=cl08.Acct UPDATE 1 act=cl08.Acct UPDATE 1  (captureSeq 381, inserted 1, deleted 1)
+   [MATCH] firing F:cl08.Acct:UPDATE#2 depth: exp=2 act=2
+   [MATCH] firing F:cl08.Acct:UPDATE#1 (table, op, rowCount): exp=cl08.Acct UPDATE 1 act=cl08.Acct UPDATE 1  (captureSeq 382, inserted 1, deleted 1)
+   [MATCH] firing F:cl08.Acct:UPDATE#1 depth: exp=1 act=1
+   [OBSERVED] 반복 5회: 순서·순 변경 문자열 종류 수: exp=1 act=1  (M4 맛보기. captureSeq 값 자체는 빼고 비교)
+
+== CL08b (CL08b-self-update-rt-on.json) db=CascadeLab_RT_Sandbox verdict=MATCH judged=20 match=20 mismatch=0 observed=1
+   stmt 1: UPDATE cl08.Acct SET bal = bal + 10 WHERE id = 1;
+     status=ok rowsAffected=1 tranCountAfter=1 xactStateAfter=1
+   net cl08.Acct: I0[] U1[{"id":1}(bal,touched)] D0[]
+     cl08.Acct {"id":1}: bal 100->110, touched 0->3
+   audit order (captureSeq:table:op:depth:rows): 41:cl08.Acct:U:d4:r1 < 42:cl08.Acct:U:d3:r1 < 43:cl08.Acct:U:d2:r1 < 44:cl08.Acct:U:d1:r1
+     41 DELETED key={"id":1} row={"id":1,"bal":110,"touched":2}
+     41 INSERTED key={"id":1} row={"id":1,"bal":110,"touched":3}
+     42 DELETED key={"id":1} row={"id":1,"bal":110,"touched":1}
+     42 INSERTED key={"id":1} row={"id":1,"bal":110,"touched":2}
+     43 DELETED key={"id":1} row={"id":1,"bal":110,"touched":0}
+     43 INSERTED key={"id":1} row={"id":1,"bal":110,"touched":1}
+     44 DELETED key={"id":1} row={"id":1,"bal":100,"touched":0}
+     44 INSERTED key={"id":1} row={"id":1,"bal":110,"touched":0}
+   audit triggers: Acct DELETE dbr_audit_Acct_D LAST | Acct INSERT dbr_audit_Acct_I LAST | Acct UPDATE dbr_audit_Acct_U LAST | Acct UPDATE trg_Acct_upd NONE
+   run1: status=ok err=null order=cl08.Acct:U:d4:r1 < cl08.Acct:U:d3:r1 < cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{"id":1}(bal,touched)] D0[]
+   run2: status=ok err=null order=cl08.Acct:U:d4:r1 < cl08.Acct:U:d3:r1 < cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{"id":1}(bal,touched)] D0[]
+   run3: status=ok err=null order=cl08.Acct:U:d4:r1 < cl08.Acct:U:d3:r1 < cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{"id":1}(bal,touched)] D0[]
+   run4: status=ok err=null order=cl08.Acct:U:d4:r1 < cl08.Acct:U:d3:r1 < cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{"id":1}(bal,touched)] D0[]
+   run5: status=ok err=null order=cl08.Acct:U:d4:r1 < cl08.Acct:U:d3:r1 < cl08.Acct:U:d2:r1 < cl08.Acct:U:d1:r1 net=cl08.Acct I0[] U1[{"id":1}(bal,touched)] D0[]
+   [MATCH] env: 시작 상태 = 시드 상태: exp=78EF7DC7082C7A41 act=78EF7DC7082C7A41
+   [MATCH] env: ROLLBACK 뒤 시드 상태로 복귀: exp=78EF7DC7082C7A41 act=78EF7DC7082C7A41
+   [MATCH] sandbox status: exp=ok act=ok
+   [MATCH] sandbox errorNumber: exp=null act=null
+   [MATCH] sandbox statement 1 status: exp=ok act=ok
+   [MATCH] sandbox cl08.Acct keyColumns: exp=id act=id
+   [MATCH] sandbox cl08.Acct inserted: exp=[] act=[]
+   [MATCH] sandbox cl08.Acct updated: exp=[{"id":1}] act=[{"id":1}]
+   [MATCH] sandbox cl08.Acct deleted: exp=[] act=[]
+   [MATCH] sandbox cl08.Acct {"id":1} changedColumns: exp=[bal, touched] act=[bal, touched]
+   [MATCH] sandbox cl08.Acct {"id":1} after.touched: exp=3 act=3
+   [MATCH] env: 롤백 뒤 감사 헤더가 경계로 돌아감: exp=0 act=0
+   [MATCH] firing F:cl08.Acct:UPDATE#4 (table, op, rowCount): exp=cl08.Acct UPDATE 1 act=cl08.Acct UPDATE 1  (captureSeq 41, inserted 1, deleted 1)
+   [MATCH] firing F:cl08.Acct:UPDATE#4 depth: exp=4 act=4
+   [MATCH] firing F:cl08.Acct:UPDATE#3 (table, op, rowCount): exp=cl08.Acct UPDATE 1 act=cl08.Acct UPDATE 1  (captureSeq 42, inserted 1, deleted 1)
+   [MATCH] firing F:cl08.Acct:UPDATE#3 depth: exp=3 act=3
+   [MATCH] firing F:cl08.Acct:UPDATE#2 (table, op, rowCount): exp=cl08.Acct UPDATE 1 act=cl08.Acct UPDATE 1  (captureSeq 43, inserted 1, deleted 1)
+   [MATCH] firing F:cl08.Acct:UPDATE#2 depth: exp=2 act=2
+   [MATCH] firing F:cl08.Acct:UPDATE#1 (table, op, rowCount): exp=cl08.Acct UPDATE 1 act=cl08.Acct UPDATE 1  (captureSeq 44, inserted 1, deleted 1)
+   [MATCH] firing F:cl08.Acct:UPDATE#1 depth: exp=1 act=1
+   [OBSERVED] 반복 5회: 순서·순 변경 문자열 종류 수: exp=1 act=1  (M4 맛보기. captureSeq 값 자체는 빼고 비교)
+
+summary: MATCH 11 (사례 11개)
+결과: cascadelab\verification\logs\audit-2026-11-10.json, cascadelab\verification\logs\audit-2026-11-10.txt

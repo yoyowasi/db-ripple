@@ -1,0 +1,27 @@
+# spikes\sql\sp2_05_trigger_order.sql db=AW_SpikeB part=0 at=2026-11-10T09:28:09.6151764+09:00 elapsedSec=0.73 exit=0
+db tableName evt firstTrigger lastTrigger afterTriggers auditOrder
+-- --------- --- ------------ ----------- ------------- ----------
+AW_SpikeB Person.Person INSERT NULL NULL 1 LAST 가능
+AW_SpikeB Person.Person UPDATE NULL NULL 1 LAST 가능
+AW_SpikeB Production.WorkOrder INSERT NULL NULL 1 LAST 가능
+AW_SpikeB Production.WorkOrder UPDATE NULL NULL 1 LAST 가능
+AW_SpikeB Purchasing.PurchaseOrderDetail INSERT NULL NULL 1 LAST 가능
+AW_SpikeB Purchasing.PurchaseOrderDetail UPDATE NULL NULL 1 LAST 가능
+AW_SpikeB Purchasing.PurchaseOrderHeader UPDATE NULL NULL 1 LAST 가능
+AW_SpikeB Sales.SalesOrderDetail DELETE NULL NULL 1 LAST 가능
+AW_SpikeB Sales.SalesOrderDetail INSERT NULL NULL 1 LAST 가능
+AW_SpikeB Sales.SalesOrderDetail UPDATE NULL NULL 1 LAST 가능
+AW_SpikeB Sales.SalesOrderHeader UPDATE NULL NULL 1 LAST 가능
+
+(11 rows affected)
+db tableName insteadOfTrigger evt
+-- --------- ---------------- ---
+AW_SpikeB HumanResources.Employee dEmployee DELETE
+AW_SpikeB Purchasing.Vendor dVendor DELETE
+
+(2 rows affected)
+db is_recursive_triggers_on
+-- ------------------------
+AW_SpikeB 0
+
+(1 rows affected)

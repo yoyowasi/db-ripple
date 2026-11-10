@@ -1,0 +1,27 @@
+# cascadelab\verification\sql\sandbox-check.sql db=CascadeLab_RT_Sandbox part=0 at=2026-11-10T09:11:19.1644266+09:00 elapsedSec=0.81 exit=0
+db audit_header_id audit_image_id audit_control_id capture_seq_id
+-- --------------- -------------- ---------------- --------------
+CascadeLab_RT_Sandbox 1541580530 1605580758 1637580872 1525580473
+name is_recursive_triggers_on compatibility_level is_read_committed_snapshot_on
+---- ------------------------ ------------------- -----------------------------
+CascadeLab 0 170 0
+CascadeLab_Sandbox 0 170 0
+CascadeLab_Sandbox_base 0 170 0
+id mode cap
+-- ---- ---
+1 FULL 100000
+header_rows max_seq
+----------- -------
+0 NULL
+== ??? ?? SET ??(???/??? ??) ==
+kind uses_quoted_identifier uses_ansi_nulls modules
+---- ---------------------- --------------- -------
+audit 1 1 3
+user 1 1 1
+== triggers (??? + ??) ==
+on_table event trg ord is_disabled
+-------- ----- --- --- -----------
+cl08.Acct DELETE cl08.dbr_audit_Acct_D LAST 0
+cl08.Acct INSERT cl08.dbr_audit_Acct_I LAST 0
+cl08.Acct UPDATE cl08.dbr_audit_Acct_U LAST 0
+cl08.Acct UPDATE cl08.trg_Acct_upd NONE 0

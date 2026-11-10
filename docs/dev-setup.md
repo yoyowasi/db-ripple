@@ -11,7 +11,7 @@
 | 메모리 | 컨테이너 한도 6g, `MSSQL_MEMORY_LIMIT_MB=4096` | 4GB 이상 요구 충족 |
 | 포트 | `127.0.0.1:14333 -> 1433` | 호스트 포트는 `.env`의 `MSSQL_HOST_PORT` |
 | 저장소 | named volume `mssql-data` -> `/var/opt/mssql` | 데이터 `/var/opt/mssql/data`, 백업 `/var/opt/mssql/backup`. Windows 바인드 마운트는 스파스 파일(스냅샷)·O_DIRECT 문제 가능(추정, 미확인)이라 피함 |
-| AdventureWorks | `AdventureWorks2025.bak`, 50,229,248 bytes (약 47.9 MiB) | GitHub releases URL에 HEAD 요청, 200 확인 (2026-11-06). 다운로드는 안 함 |
+| AdventureWorks | `AdventureWorks2025.bak`, 50,229,248 bytes (약 47.9 MiB), SHA256 `FA6A2A5D431AD88123F89B36B1F2C7E42CA4BDF6B293269A44DF80F6DE3738A5` | 2026-11-09 `scripts/fetch-adventureworks.ps1`로 받음. 해시가 GitHub release 자산의 `digest`(sha256, 자산 갱신 2025-11-18)와 일치 |
 
 AW .bak URL: `https://github.com/Microsoft/sql-server-samples/releases/download/adventureworks/AdventureWorks2025.bak`
 
@@ -20,6 +20,8 @@ AW .bak URL: `https://github.com/Microsoft/sql-server-samples/releases/download/
 1. 관리자 PowerShell: `wsl --install --no-distribution` 후 재부팅.
 2. Docker Desktop 설치: `winget install -e --id Docker.DockerDesktop` 또는 공식 설치 파일. Settings에서 WSL2 백엔드 사용 확인 (`docker info`에 `OSType: linux`, `wsl -l -v`에 `docker-desktop` VERSION 2).
    - 라이선스: 직원 250명 이상 또는 매출 1천만 달러 이상 기업은 Docker Desktop이 유료 구독 대상. 대안은 WSL2 배포판 안에 Docker Engine 설치.
+   - 실제 설치 기록(2026-11-09~10): 사용자별 설치(per-user)는 관리자 권한이 없어 "Virtual Machine Platform" 기능을 켜지 못하고 실패했다. WSL·가상 머신 플랫폼을 켠 뒤(관리자 승인) 사용자별 설치가 됐고, 재부팅 뒤 엔진이 떴다(Docker Desktop 29.9.2, 설치 경로 `%LOCALAPPDATA%\Programs\DockerDesktop`). 설치 직후 이미 열려 있던 셸에는 `docker`가 PATH에 없을 수 있다.
+   - 확인한 이미지: `mcr.microsoft.com/mssql/server:2025-CU10-ubuntu-24.04`, 다이제스트 `sha256:245f6b1c8903edae52cb20fa31419cefcde1a49938bb8c3447099011fc871ca3`(2026-11-10 pull).
 3. `.env` 작성: `Copy-Item .env.example .env` 후 `MSSQL_SA_PASSWORD`를 강한 값으로 교체. (파일을 열어 직접 편집, 값을 화면에 출력하지 않음)
 4. `.\scripts\db-up.ps1` — compose up, healthy까지 대기.
 5. `.\scripts\fetch-adventureworks.ps1` — `.data\backup\`에 .bak 다운로드, 크기·SHA256 출력. 크기가 위 값과 같은지 확인.

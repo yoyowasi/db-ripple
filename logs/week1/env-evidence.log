@@ -1,0 +1,11 @@
+# env evidence at=2026-11-10T10:09:42.5548298+09:00 (MSSQL_SA_PASSWORD는 기록하지 않음)
+docker: client 29.9.2 / server 29.9.2 linux/amd64
+image: mcr.microsoft.com/mssql/server@sha256:245f6b1c8903edae52cb20fa31419cefcde1a49938bb8c3447099011fc871ca3
+container dbripple-sql image: mcr.microsoft.com/mssql/server:2025-CU10-ubuntu-24.04 sha256:245f6b1c8903edae52cb20fa31419cefcde1a49938bb8c3447099011fc871ca3
+container dbripple-sql env: MSSQL_MEMORY_LIMIT_MB=4096
+container dbripple-sql env: ACCEPT_EULA=Y
+container dbripple-sql env: MSSQL_PID=EnterpriseDeveloper
+container dbripple-sql env: MSSQL_AGENT_ENABLED=false
+sqlcmd default (no -I) @@OPTIONS: 5688 qi=0
+sqlcmd -I @@OPTIONS: 5944 qi=1
+SqlClient(System.Data) session @@OPTIONS / DatabaseLog rows: 5432 qi=1 | DatabaseLog AW_Origin=927, AW_SpikeA=953, AW_SpikeB=1001

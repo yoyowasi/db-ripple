@@ -1,0 +1,35 @@
+# logs\week1\baseline-state-check.sql db=master part=0 at=2026-11-10T09:35:14.2485014+09:00 elapsedSec=0.8 exit=0
+name state_desc snapshot_of create_date
+---- ---------- ----------- -----------
+AW_Origin ONLINE NULL 2026-11-09 23:44:53.017
+AW_Sandbox ONLINE NULL 2026-11-09 23:56:35.290
+AW_Sandbox_base ONLINE AW_Sandbox 2026-11-10 00:29:18.647
+CascadeLab ONLINE NULL 2026-11-10 00:09:39.330
+CascadeLab_RT ONLINE NULL 2026-11-10 00:09:39.687
+CascadeLab_RT_Sandbox ONLINE NULL 2026-11-10 00:10:55.620
+CascadeLab_RT_Sandbox_base ONLINE CascadeLab_RT_Sandbox 2026-11-10 00:10:57.230
+CascadeLab_Sandbox ONLINE NULL 2026-11-10 00:10:33.750
+CascadeLab_Sandbox_base ONLINE CascadeLab_Sandbox 2026-11-10 00:10:45.550
+
+(9 rows affected)
+Changed database context to 'AW_Sandbox'.
+auditTriggers auditLastSlots auditFirstSlots
+------------- -------------- ---------------
+213 213 0
+
+(1 rows affected)
+userDmlTriggers
+---------------
+10
+
+(1 rows affected)
+headerRows imageRows mode cap
+---------- --------- ---- ---
+0 0 FULL 100000
+
+(1 rows affected)
+modulesWithQuotedIdentifierOff
+------------------------------
+0
+
+(1 rows affected)

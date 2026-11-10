@@ -30,7 +30,8 @@ public sealed record CatalogTriggerEvent(
     public bool IsEncrypted => Definition is null;
 }
 
-public sealed record CatalogTable(int ObjectId, string Schema, string Name, TemporalType Temporal, bool IsMemoryOptimized);
+/// <summary>Owner는 테이블의 실효 소유자(개체 소유자 없으면 스키마 소유자) DB 사용자 이름.</summary>
+public sealed record CatalogTable(int ObjectId, string Schema, string Name, TemporalType Temporal, bool IsMemoryOptimized, string Owner = "dbo");
 
 public sealed record CatalogFile(int FileId, string LogicalName, string TypeDesc, string PhysicalName);
 
@@ -56,7 +57,8 @@ public sealed record DbCatalog(
         var after = Triggers.Where(tr => tr.ParentId == t.ObjectId && !tr.IsInsteadOf).ToList();
         return new TableInfo(t.Schema, t.Name, t.ObjectId, cols, pk, uq, t.Temporal, t.IsMemoryOptimized,
             after.Where(x => x.IsFirst).Select(x => ToOp(x.Event)).OfType<DmlOperation>().Distinct().ToList(),
-            after.Where(x => x.IsLast).Select(x => ToOp(x.Event)).OfType<DmlOperation>().Distinct().ToList());
+            after.Where(x => x.IsLast).Select(x => ToOp(x.Event)).OfType<DmlOperation>().Distinct().ToList(),
+            t.Owner);
     }).ToList();
 
     static DmlOperation? ToOp(string ev) => ev.ToUpperInvariant() switch

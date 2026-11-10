@@ -1,6 +1,6 @@
 # SQL 실행 전 변경 미리보기 도구 — 아키텍처 설계
 
-> 상태: 설계 v1.3 초안 (1주차 1일, 2026-11-06: 정적 검토 반영분만 들어 있고 스파이크 실측 전이다. D1·D3·D4와 H1~H5는 아직 v1.2 상태) · v1.2 작성 2026-11-06(독립 검토 2회 반영) · 조사 기준일 2026-11-06
+> 상태: 설계 v1.3 (1주차 실측 반영, 2026-11-10: SP0~SP6·SP10 결과로 D1·D3·D4 확정, H1~H5 성립. 바꾼 곳마다 "v1.3"과 근거 스파이크를 적었다) · v1.2 작성 2026-11-06(독립 검토 2회 반영) · 조사 기준일 2026-11-06
 > 범위: 졸업작품, 1인, 약 1달(AI 보조), MVP를 먼저 만들고 계속 개선 · 공개 샘플 DB만 사용
 
 **ID 규칙**
@@ -35,10 +35,10 @@
 
 | # | 결정 | 추천 | 확신도 |
 |---|---|---|---|
-| D1 | 대상 DBMS | SQL Server 2025 EnterpriseDeveloper(CU 태그 고정), SP0 실패 시 2022 Developer | 중 |
+| D1 | 대상 DBMS | SQL Server 2025 EnterpriseDeveloper(2025-CU10 태그 고정). **확정(2026-11-10, SP0)** | 높음 |
 | D2 | 샌드박스 | 같은 인스턴스의 COPY_ONLY 복제 DB + 읽기 전용 기준 스냅샷 1개. 미리보기는 트랜잭션 실행 후 ROLLBACK | 중 |
-| D3 | 변경 수집 | 감사 AFTER 트리거(Last, First 금지) + 롤백 전 재조회와 최종 차이 대조 | 중 |
-| D4 | 원인·순서 | FK는 확정, 트리거는 추론, 모호하면 후보. 순서는 "인과 단계"가 주, "수집 발동 순번"은 보조 | 중 |
+| D3 | 변경 수집 | 감사 AFTER 트리거(테이블·연산마다 1개, Last, First 금지) + 롤백 전 재조회와 최종 차이 대조. **확정(2026-11-10, SP2·SP3·SP6·SP10, C9 실DB 검증)** | 높음 |
+| D4 | 원인·순서 | FK는 확정, 트리거는 추론, 모호하면 후보. 순서는 "인과 단계"가 주, "수집 발동 순번"은 보조. **확정(2026-11-10, SP1·SP3)**: H1~H5 성립, §7.2 2·6단계 보완 | 높음 |
 | D5 | 배치 분석 | ScriptDom 허용 목록(INSERT/UPDATE/DELETE), 파싱 실패나 규칙 위반이면 실행 거부, 문장별 실행 | 높음 |
 | D6 | 기술 스택 | .NET 10 + ASP.NET Core + ScriptDom + Microsoft.Data.SqlClient / Vue 3 + CodeMirror 6 + Vue Flow + dagre + AG Grid Community | 높음 |
 | D7 | [적용] | 같은 실행 봉투로 원본 재실행 → 드리프트 검사 → 커밋 전 최종 차이 대조 → COMMIT 또는 ROLLBACK | 중 |
@@ -51,7 +51,7 @@
 - 트리거 원인 귀속 규칙의 전제(H1~H5)가 실제와 다를 가능성
 - 1인·1달 일정
 
-그래서 1주차 처음 이틀은 문서로 확정하지 못한 가정을 실험으로 확인한다(§13 SP0~SP6, SP10). 그 결과로 1주차 끝에 D1, D3, D4를 확정한다.
+그래서 1주차 처음 이틀은 문서로 확정하지 못한 가정을 실험으로 확인한다(§13 SP0~SP6, SP10). 그 결과로 1주차 끝에 D1, D3, D4를 확정한다. **v1.3(2026-11-10):** 실측으로 셋 모두 확정했다. 전제 H1~H5는 깨지지 않았고, 바뀐 규칙은 감사 트리거 연산별 분리, §6.1 형식 변환, §7.2 2·6단계 보완이다(각 결정 기록과 docs/spikes/).
 
 **차별점.** 실제 실행 자체는 신규성이 아니다(§1.5). 신규성은 "기존 SQL Server DB에서 실행 전에, 모든 테이블의 행 단위 diff와 그 변경을 일으킨 FK·트리거·전파 단계를 함께 보여 주는 것"에 둔다.
 
@@ -120,28 +120,28 @@ INSERT/UPDATE/DELETE 한 문장이 FK 연쇄(CASCADE, SET NULL, SET DEFAULT)와 
 |---|---|---|---|---|
 | A1 | FK 연쇄 동작이 연쇄 대상 테이블의 AFTER 트리거를 발동하는가? (사용자 지정 핵심 가정) | **발동한다.** 원래 DELETE/UPDATE가 직접 일으킨 연쇄를 먼저 모두 수행한다. 영향받은 테이블의 AFTER 트리거는 그 뒤 "연쇄의 반대 순서"로 발동한다(반대 순서의 정확한 정의는 문서에 없다). AFTER 트리거는 모든 연쇄 동작과 제약 검사가 성공해야 발동한다. | [PK/FK constraints](https://learn.microsoft.com/en-us/sql/relational-databases/tables/primary-and-foreign-key-constraints) "Triggers and cascading referential actions", [CREATE TRIGGER](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-trigger-transact-sql) "FOR \| AFTER" | 샌드박스 테이블마다 감사용 AFTER 트리거만 깔아도 연쇄로 바뀐 행이 수집된다. |
 | A2 | 트리거와 연쇄 체인 사이의 실행 순서가 정해져 있는가? | **일부만 정해져 있다.** 한 테이블의 트리거는 First/Last로 지정한 것 외에는 무작위다. 직접 대상에서 갈라진 체인 사이 순서는 미정이다(한 체인이 트리거를 모두 발동한 뒤 다음 체인이 시작). 문서는 트리거가 일으킨 2차 체인을 "모든 1차 체인의 트리거가 발동한 뒤" 처리한다고 쓰지만 그 의미는 분명하지 않다. 체인 안에서 오류가 나면 그 체인의 AFTER 트리거는 발동하지 않고, 그 체인을 만든 DELETE/UPDATE 작업이 롤백된다. CASCADE·SET NULL·SET DEFAULT를 먼저 적용하고 NO ACTION을 나중에 검사한다는 규칙은 DELETE에만 명시돼 있다. | PK/FK constraints, [sp_settriggerorder](https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-settriggerorder-transact-sql) | 그래프는 "인과 단계" 기준으로 그리고, 관측 순번은 "보장되지 않는 순서"로 표시한다. 2차 체인 처리 시점은 전제 H5로 두고 SP1로 확인한다(§7). |
-| A3 | 행 단위 트리거가 있는가? 0행이어도 발동하는가? | 행 단위 트리거는 **없다.** DML 트리거는 이벤트마다 발동하고, 여러 행이 inserted/deleted에 함께 담긴다(문서 표현은 "may cause a single trigger invocation"). 직접 대상 테이블의 AFTER 트리거는 영향 행이 0이어도 발동한다. FK 연쇄 대상에서 연쇄 행이 0개일 때와 MERGE의 0행 액션에서 발동하는지는 문서에 없다. MERGE는 액션별로, BULK INSERT(FIRE_TRIGGERS)는 완료된 배치별로 발동한다. | CREATE TRIGGER, [Create DML triggers to handle multiple rows](https://learn.microsoft.com/en-us/sql/relational-databases/triggers/create-dml-triggers-to-handle-multiple-rows-of-data), [MERGE](https://learn.microsoft.com/en-us/sql/t-sql/statements/merge-transact-sql) "Trigger implementation" | 수집 단위는 "변경 묶음"(감사 트리거 발동 1회)이다. 묶음 안 행 순서에는 의미를 두지 않는다. 0행 발동은 헤더만 기록하고, 연쇄 0행 경우는 SP2(d)로 실측한다. |
+| A3 | 행 단위 트리거가 있는가? 0행이어도 발동하는가? | 행 단위 트리거는 **없다.** DML 트리거는 이벤트마다 발동하고, 여러 행이 inserted/deleted에 함께 담긴다(문서 표현은 "may cause a single trigger invocation"). 직접 대상 테이블의 AFTER 트리거는 영향 행이 0이어도 발동한다. FK 연쇄 대상에서 연쇄 행이 0개일 때와 MERGE의 0행 액션에서 발동하는지는 문서에 없다. MERGE는 액션별로, BULK INSERT(FIRE_TRIGGERS)는 완료된 배치별로 발동한다. | CREATE TRIGGER, [Create DML triggers to handle multiple rows](https://learn.microsoft.com/en-us/sql/relational-databases/triggers/create-dml-triggers-to-handle-multiple-rows-of-data), [MERGE](https://learn.microsoft.com/en-us/sql/t-sql/statements/merge-transact-sql) "Trigger implementation" | 수집 단위는 "변경 묶음"(감사 트리거 발동 1회)이다. 묶음 안 행 순서에는 의미를 두지 않는다. 0행 발동은 헤더만 기록하고, 연쇄 0행 경우는 SP2(d)로 실측한다. **SP2(d) 실측(2026-11-10):** 직접 대상의 0행 발동은 기록된다. FK 연쇄로 바뀐 자식 행이 0개이면 자식 테이블의 트리거는 발동하지 않았다(감사 헤더 없음). 관측은 ON DELETE CASCADE 1단계 하나이고, SET NULL·SET DEFAULT·ON UPDATE CASCADE·다단 연쇄의 0행은 재지 않았다. |
 | A4 | 한 테이블로 가는 연쇄 경로가 둘 이상이거나 순환할 수 있는가? | **불가.** 한 DELETE/UPDATE가 시작하는 연쇄 목록에 같은 테이블이 두 번 나올 수 없다. 이를 어기는 FK는 만들 때 오류 1785로 거부된다. 갈라지는 것(트리)은 허용된다. | [MSSQLSERVER_1785](https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/mssqlserver-1785-database-engine-error) | 한 문장이 시작한 FK 연쇄는 트리다. 순환과 같은 테이블 재도달은 트리거 간선과 2차 체인에서만 생긴다. |
 | A5 | INSTEAD OF와 뷰의 제약 | 연쇄 FK를 가진 테이블에는 해당 이벤트의 INSTEAD OF 트리거를 둘 수 없다. 뷰에는 AFTER 트리거를 둘 수 없다. 임시 테이블에는 DML 트리거를 둘 수 없다. | CREATE TRIGGER "Trigger limitations", [DML triggers](https://learn.microsoft.com/en-us/sql/relational-databases/triggers/dml-triggers) | 감사 트리거는 기반 테이블의 AFTER 트리거로만 만든다. 사용자 INSTEAD OF 트리거는 "원래 동작을 대체한 노드"로 표시한다(§6.3 REPLACES). |
 | A6 | 감사 트리거의 순서를 고정할 수 있는가? | 문장 종류별로 First 1개, Last 1개만 지정할 수 있다. INSTEAD OF는 지정할 수 없다. ALTER TRIGGER를 하면 None으로 초기화된다. 어느 트리거든 ROLLBACK하면 그 뒤 트리거는 실행되지 않는다. | sp_settriggerorder, [Specify first and last triggers](https://learn.microsoft.com/en-us/sql/relational-databases/triggers/specify-first-and-last-triggers), CREATE TRIGGER | 감사 트리거는 연산별 Last로만 지정한다. First에는 두지 않는다(D3). 그 연산에 사용자 Last가 이미 있으면 지정하지 않고(`NONE`) 매니페스트에 표시한다. Last 지정 가능 여부와 기존 점유는 SP2(a)로 확인한다. |
 | A7 | 트리거 중첩 깊이를 알 수 있는가? | 인자 없는 `TRIGGER_NESTLEVEL()`은 자기 자신을 포함한 호출 스택의 트리거 수다. object_id 인자는 "그 문장에서 그 트리거가 실행된 횟수"이지 스택 위치가 아니다. FK 연쇄로 발동된 트리거의 값은 문서에 없다. | [TRIGGER_NESTLEVEL](https://learn.microsoft.com/en-us/sql/t-sql/functions/trigger-nestlevel-transact-sql) | 깊이만 기록하고, 부모 트리거는 §7 규칙으로 귀속한다. 연쇄 시 값은 SP1로 실측한다(H2). |
 | A8 | 중첩·재귀 설정 | 중첩은 최대 32단계다. 서버 옵션 nested triggers의 기본값은 1이다. DB 옵션 RECURSIVE_TRIGGERS는 model 기본값이 OFF이고, 실제 값은 원본 DB를 따른다. | CREATE TRIGGER "Nested triggers", [nested triggers option](https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/configure-the-nested-triggers-server-configuration-option), [Create nested triggers](https://learn.microsoft.com/en-us/sql/relational-databases/triggers/create-nested-triggers) | 기준선을 만들 때 원본과 샌드박스의 서버·DB 설정을 비교한다(환경 지문). 다르면 미리보기와 [적용]을 막는다. |
-| A9 | 실행 사이에 끼운 호출이 @@ROWCOUNT를 바꾸는가? | 공식 문구는 "EXECUTE statements preserve the previous @@ROWCOUNT"다. SET <option>, PRINT, BEGIN/COMMIT TRAN은 0으로, `SET @v`는 1로 만든다. 호출된 프로시저 내부 문장의 영향은 문서에 없다. | [@@ROWCOUNT](https://learn.microsoft.com/en-us/sql/t-sql/functions/rowcount-transact-sql) | 사용자 문장 사이에 계측 호출을 끼우지 않는다. 문장은 별도 명령으로 하나씩 실행하고, 경계는 수집 순번 최댓값으로 잡는다(D3). DML 직후 행 수가 계측 전과 같은지는 SP2(c)로 실측한다. |
+| A9 | 실행 사이에 끼운 호출이 @@ROWCOUNT를 바꾸는가? | 공식 문구는 "EXECUTE statements preserve the previous @@ROWCOUNT"다. SET <option>, PRINT, BEGIN/COMMIT TRAN은 0으로, `SET @v`는 1로 만든다. 호출된 프로시저 내부 문장의 영향은 문서에 없다. | [@@ROWCOUNT](https://learn.microsoft.com/en-us/sql/t-sql/functions/rowcount-transact-sql) | 사용자 문장 사이에 계측 호출을 끼우지 않는다. 문장은 별도 명령으로 하나씩 실행하고, 경계는 수집 순번 최댓값으로 잡는다(D3). DML 직후 행 수가 계측 전과 같은지는 SP2(c)로 실측한다. **SP2(c) 실측(2026-11-10):** 감사 유무에 따라 DML 직후 @@ROWCOUNT·ROWCOUNT_BIG()과 드라이버(System.Data.SqlClient) 영향 행 수가 같았다. 트리거 안 행 수는 호출자에게도, 다음 트리거 시작 시점에도 새지 않았다. NOCOUNT 없는 트리거의 DML 행 수는 드라이버 영향 행 수에 더해진다(감사와 무관한 대조 트리거로 3→5). 감사 트리거 자체를 NOCOUNT 없이 잰 것은 아니다. |
 | A10 | SESSION_CONTEXT로 문장 번호를 넘길 수 있는가? | 키 128바이트, 값 8,000바이트, 전체 1MB 제한이 있다. read_only 키는 다시 바꿀 수 없다. 롤백 시 값이 되돌아가는지는 문서에 없다. 병렬 계획과 세션 재설정(연결 풀링)이 겹치면 생기는 알려진 문제가 있다(2019 CU14 이후, TF 11042로 우회). | [sp_set_session_context](https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-set-session-context-transact-sql), [SESSION_CONTEXT](https://learn.microsoft.com/en-us/sql/t-sql/functions/session-context-transact-sql) | **쓰지 않는다**(D3). 롤백 시 동작이 문서에 없고 알려진 문제가 있기 때문이다. 감사 트리거에 전달할 값(수집 모드, 상한)은 감사 스키마의 제어 테이블로 넘긴다(§6.2). 실행용 연결은 풀링을 끈 전용 연결로 둔다. |
 | A11 | OUTPUT 절로 연쇄·트리거 변경을 받을 수 있는가? | **받을 수 없다.** OUTPUT 값은 트리거 실행 전 값이다. 대상 테이블에 활성 트리거가 있으면 INTO 없는 OUTPUT은 오류다. OUTPUT INTO 대상은 활성 트리거, FK, CHECK를 가질 수 없다. 연쇄 행이 빠진다는 점은 문서 구조에서 나온 추론이다. | [OUTPUT clause](https://learn.microsoft.com/en-us/sql/t-sql/queries/output-clause-transact-sql) | OUTPUT은 수집 수단에서 뺀다. 감사 트리거 때문에 사용자의 OUTPUT 문장이 실패할 수 있으므로 배치 분석에서 거부한다(E11). |
 | A12 | UPDATE 전후 행을 짝지을 수 있는가? | UPDATE는 삭제 후 삽입과 비슷하게 inserted/deleted에 담긴다. `UPDATE()`와 `COLUMNS_UPDATED()`는 값이 같아도 true다(SET 목록 기준). AFTER 트리거는 text/ntext/image 열을 참조할 수 없다. PK가 바뀔 때 짝짓는 방법은 문서에 없다. | [Use the inserted and deleted tables](https://learn.microsoft.com/en-us/sql/relational-databases/triggers/use-the-inserted-and-deleted-tables), [UPDATE()](https://learn.microsoft.com/en-us/sql/t-sql/functions/update-trigger-functions-transact-sql) | 바뀐 열은 값 비교로 계산한다. PK가 바뀐 다중 행 UPDATE는 "짝 미확정"으로 표시한다. text/ntext/image는 수집 불가 열로 둔다. |
 | A13 | 트랜잭션 + 롤백은 흔적 없이 되돌리는가? | **아니다.** 데이터를 수정하는 트랜잭션은 끝날 때까지 배타 잠금을 유지한다. IDENTITY 값은 롤백돼도 회수되지 않는다. SEQUENCE는 트랜잭션과 무관하게 소비된다. | [Locking guide](https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide), [IDENTITY](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-table-transact-sql-identity-property), [CREATE SEQUENCE](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-sequence-transact-sql) | 원본 DB에서는 미리보기를 하지 않는다. 샌드박스에서는 트랜잭션 실행 후 ROLLBACK한다(D2). 소비된 IDENTITY·SEQUENCE 값은 "예상값"으로 표시하고 기준선 새로 고침으로 맞춘다. 스냅샷 되돌리기는 평가 회차 초기화에만 쓴다. |
-| A14 | 데이터베이스 스냅샷을 쓸 수 있는가? | 에디션 표: 2022 Windows는 모든 에디션, 2025 Windows는 모든 에디션, 2025 Linux는 Express만 지원하지 않는다. 2022 Linux 표는 확인하지 않았다. 스냅샷을 만들 때는 원본의 데이터 파일마다 논리 이름과 스파스 파일 경로를 지정해야 한다. 스냅샷이 있는 동안 원본 DB는 RESTORE·DROP·DETACH할 수 없다. 되돌리기 조건은 다음과 같다: 스냅샷이 1개뿐이어야 하고, 읽기 전용·압축 파일 그룹과 새로 오프라인된 파일이 없어야 한다. 되돌리면 로그를 다시 만들고(백업 체인 끊김), 전체 텍스트 카탈로그를 지우며, 진행 중에는 DB를 쓸 수 없다. FILESTREAM이 있으면 되돌릴 수 없다. 메모리 최적화 파일 그룹은 2019부터 지원한다. | [Database snapshots](https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-snapshots-sql-server), [Create a database snapshot](https://learn.microsoft.com/en-us/sql/relational-databases/databases/create-a-database-snapshot-transact-sql), [Revert to a snapshot](https://learn.microsoft.com/en-us/sql/relational-databases/databases/revert-a-database-to-a-database-snapshot), [Linux 2025 editions](https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-editions-and-components-2025) | 컨테이너는 Developer 계열로 띄운다. 기준 스냅샷은 1개만 두고 읽기 전용 비교 기준으로만 쓴다. RESTORE 전에는 반드시 스냅샷을 먼저 지운다(§5.1). 2022로 폴백하면 SP0에서 스냅샷 생성을 다시 확인한다. |
+| A14 | 데이터베이스 스냅샷을 쓸 수 있는가? | 에디션 표: 2022 Windows는 모든 에디션, 2025 Windows는 모든 에디션, 2025 Linux는 Express만 지원하지 않는다. 2022 Linux 표는 확인하지 않았다. 스냅샷을 만들 때는 원본의 데이터 파일마다 논리 이름과 스파스 파일 경로를 지정해야 한다. 스냅샷이 있는 동안 원본 DB는 RESTORE·DROP·DETACH할 수 없다. 되돌리기 조건은 다음과 같다: 스냅샷이 1개뿐이어야 하고, 읽기 전용·압축 파일 그룹과 새로 오프라인된 파일이 없어야 한다. 되돌리면 로그를 다시 만들고(백업 체인 끊김), 전체 텍스트 카탈로그를 지우며, 진행 중에는 DB를 쓸 수 없다. FILESTREAM이 있으면 되돌릴 수 없다. 메모리 최적화 파일 그룹은 2019부터 지원한다. | [Database snapshots](https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-snapshots-sql-server), [Create a database snapshot](https://learn.microsoft.com/en-us/sql/relational-databases/databases/create-a-database-snapshot-transact-sql), [Revert to a snapshot](https://learn.microsoft.com/en-us/sql/relational-databases/databases/revert-a-database-to-a-database-snapshot), [Linux 2025 editions](https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-editions-and-components-2025) | 컨테이너는 Developer 계열로 띄운다. 기준 스냅샷은 1개만 두고 읽기 전용 비교 기준으로만 쓴다. RESTORE 전에는 반드시 스냅샷을 먼저 지운다(§5.1). 2022로 폴백하면 SP0에서 스냅샷 생성을 다시 확인한다. **SP0·SP5 실측(2026-11-10):** 2025 Linux 컨테이너에서 스냅샷 생성 362ms, 되돌리기 411ms. 스냅샷이 있으면 RESTORE는 오류 5094로 거부된다. AW2025에는 FILESTREAM·메모리 최적화가 없고 전체 텍스트 카탈로그 1개(인덱스 3개)가 있다. 컨테이너에는 전체 텍스트 검색이 설치돼 있지 않아(`IsFullTextInstalled = 0`) `CONTAINS`는 오류 7609다. 전체 텍스트 인덱스가 걸린 Production.ProductReview의 UPDATE(값 동일)·DELETE 각 1행은 정상이었다(다른 두 테이블과 값이 바뀌는 UPDATE는 미측정). |
 | A15 | 원본 스키마·데이터를 어떻게 복제하는가? | `BACKUP ... WITH COPY_ONLY`는 기존 백업 체인에 영향이 없다. 백업은 같은 버전 이상에만 복원된다. 복원한 DB는 허용 범위 안이면 호환성 수준을 유지한다. Linux 컨테이너에 복원할 때는 `WITH MOVE`가 필요하다. bacpac은 PreserveIdentityLastValues 기본값이 False이고 Azure SQL DB 표면적으로 제한된다. DBCC CLONEDATABASE는 스키마 전용이며 다른 용도는 지원하지 않는다. | [Copy-only backups](https://learn.microsoft.com/en-us/sql/relational-databases/backup-restore/copy-only-backups-sql-server), [BACKUP](https://learn.microsoft.com/en-us/sql/t-sql/statements/backup-transact-sql), [RESTORE](https://learn.microsoft.com/en-us/sql/t-sql/statements/restore-statements-transact-sql), [Compatibility level](https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-transact-sql-compatibility-level), [SqlPackage Import](https://learn.microsoft.com/en-us/sql/tools/sqlpackage/sqlpackage-import), [DBCC CLONEDATABASE](https://learn.microsoft.com/en-us/sql/t-sql/database-console-commands/dbcc-clonedatabase-transact-sql) | COPY_ONLY 백업 → 샌드박스 복원을 채택한다. bacpac과 CLONEDATABASE는 쓰지 않는다. |
-| A16 | 트랜잭션 안에서 할 수 없는 것 | CREATE/ALTER DATABASE, BACKUP, RESTORE는 트랜잭션 안에서 실행할 수 없다. CREATE TRIGGER는 배치의 첫 문장이어야 한다. CREATE TRIGGER가 롤백되는지 밝힌 현행 문서는 찾지 못했다. | [CREATE DATABASE](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-database-transact-sql), BACKUP, RESTORE, CREATE TRIGGER | 기준선 구축과 스냅샷 생성은 자동 커밋 모드에서 배치를 나눠 실행한다. |
-| A17 | 컨테이너 조건 | 이미지 `mcr.microsoft.com/mssql/server`는 Linux x86-64 전용이고, 최소 2GB RAM과 ACCEPT_EULA가 필요하며, Agent는 기본으로 꺼져 있다. 2025의 MSSQL_PID 표에는 EnterpriseDeveloper/StandardDeveloper가 있으나 예시는 'Developer'를 쓴다(불일치). SQL Server 2025는 2025-11-18 GA, 최신 CU10(2026-10-22), 호환성 수준 170이다. | [Container deployment](https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-docker-container-deployment), [Environment variables](https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-configure-environment-variables), [What's new 2025](https://learn.microsoft.com/en-us/sql/sql-server/what-s-new-in-sql-server-2025), [GA 발표](https://techcommunity.microsoft.com/blog/SQLServer/sql-server-2025-is-now-generally-available/4470570) | `MSSQL_PID=EnterpriseDeveloper`를 명시하고 SP0로 확인한다. |
-| A18 | 권한과 실행 주체가 결과를 바꾸는가? | 트리거의 기본 실행 컨텍스트는 CALLER다. 소유권 체인은 소유자가 같고 정적 DML일 때만 권한 검사를 건너뛴다. 동적 SQL과 DB 간 호출은 권한을 다시 검사한다. `EXECUTE AS USER`의 가장 범위는 현재 DB로 제한되어, 3·4부분 이름으로 다른 DB를 참조하면 문장이 실패한다. | [EXECUTE AS clause](https://learn.microsoft.com/en-us/sql/t-sql/statements/execute-as-clause-transact-sql), [EXECUTE AS](https://learn.microsoft.com/en-us/sql/t-sql/statements/execute-as-transact-sql), [GRANT schema permissions](https://learn.microsoft.com/en-us/sql/t-sql/statements/grant-schema-permissions-transact-sql) | 사용자 문장 구간에만 `EXECUTE AS USER`(원본과 같은 DB 사용자)를 쓰고, 문장마다 REVERT한 뒤 도구 계정으로 수집 기록을 읽고 다른 DB(스냅샷)와 비교한다(§5.2). 감사 테이블과 SEQUENCE는 사용자 테이블과 같은 소유자(dbo)로 둔다. 트랜잭션 안 EXECUTE AS/REVERT, 감사 쓰기의 소유권 체인은 SP10으로 확인한다. |
-| A19 | 행 이미지를 JSON으로 직렬화할 때의 제약 | FOR JSON은 INCLUDE_NULL_VALUES가 없으면 NULL 속성을 뺀다. binary는 base64, money와 uniqueidentifier는 문자열이 된다. int, bigint, float, decimal, numeric은 JSON 숫자다. CLR 형식(hierarchyid, geography 등)은 오류라 문자열 변환이 필요하다. EXCEPT는 NULL끼리 같다고 보며 xml/text/ntext/image/비이진 CLR UDT 열을 쓸 수 없다. | [FOR JSON](https://learn.microsoft.com/en-us/sql/relational-databases/json/format-query-results-as-json-with-for-json-sql-server), [FOR JSON 형식 변환](https://learn.microsoft.com/en-us/sql/relational-databases/json/how-for-json-converts-sql-server-data-types-to-json-data-types-sql-server), [EXCEPT and INTERSECT](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/set-operators-except-and-intersect-transact-sql) | 감사 트리거 생성기와 최종 차이 계산기에 형식별 변환 규칙을 둔다(§6.1). SP6로 실측한다. |
+| A16 | 트랜잭션 안에서 할 수 없는 것 | CREATE/ALTER DATABASE, BACKUP, RESTORE는 트랜잭션 안에서 실행할 수 없다. CREATE TRIGGER는 배치의 첫 문장이어야 한다. CREATE TRIGGER가 롤백되는지 밝힌 현행 문서는 찾지 못했다. **SP1 실측(2026-11-10):** 트랜잭션 안에서 만든 트리거는 ROLLBACK으로 되돌려졌다. | [CREATE DATABASE](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-database-transact-sql), BACKUP, RESTORE, CREATE TRIGGER | 기준선 구축과 스냅샷 생성은 자동 커밋 모드에서 배치를 나눠 실행한다. |
+| A17 | 컨테이너 조건 | 이미지 `mcr.microsoft.com/mssql/server`는 Linux x86-64 전용이고, 최소 2GB RAM과 ACCEPT_EULA가 필요하며, Agent는 기본으로 꺼져 있다. 2025의 MSSQL_PID 표에는 EnterpriseDeveloper/StandardDeveloper가 있으나 예시는 'Developer'를 쓴다(불일치). SQL Server 2025는 2025-11-18 GA, 최신 CU10(2026-10-22), 호환성 수준 170이다. | [Container deployment](https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-docker-container-deployment), [Environment variables](https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-configure-environment-variables), [What's new 2025](https://learn.microsoft.com/en-us/sql/sql-server/what-s-new-in-sql-server-2025), [GA 발표](https://techcommunity.microsoft.com/blog/SQLServer/sql-server-2025-is-now-generally-available/4470570) | `MSSQL_PID=EnterpriseDeveloper`를 명시하고 SP0로 확인한다. **SP0 실측(2026-11-10):** 2025-CU10 이미지에서 `EnterpriseDeveloper`와 `Developer` 모두 "Enterprise Developer Edition (64-bit)"이 된다. 표와 예시의 불일치는 결과에 영향이 없다. |
+| A18 | 권한과 실행 주체가 결과를 바꾸는가? | 트리거의 기본 실행 컨텍스트는 CALLER다. 소유권 체인은 소유자가 같고 정적 DML일 때만 권한 검사를 건너뛴다. 동적 SQL과 DB 간 호출은 권한을 다시 검사한다. `EXECUTE AS USER`의 가장 범위는 현재 DB로 제한되어, 3·4부분 이름으로 다른 DB를 참조하면 문장이 실패한다. | [EXECUTE AS clause](https://learn.microsoft.com/en-us/sql/t-sql/statements/execute-as-clause-transact-sql), [EXECUTE AS](https://learn.microsoft.com/en-us/sql/t-sql/statements/execute-as-transact-sql), [GRANT schema permissions](https://learn.microsoft.com/en-us/sql/t-sql/statements/grant-schema-permissions-transact-sql) | 사용자 문장 구간에만 `EXECUTE AS USER`(원본과 같은 DB 사용자)를 쓰고, 문장마다 REVERT한 뒤 도구 계정으로 수집 기록을 읽고 다른 DB(스냅샷)와 비교한다(§5.2). 감사 테이블과 SEQUENCE는 사용자 테이블과 같은 소유자(dbo)로 둔다. 트랜잭션 안 EXECUTE AS/REVERT, 감사 쓰기의 소유권 체인은 SP10으로 확인한다. **SP10 실측(2026-11-10):** 열린 트랜잭션 안에서 EXECUTE AS USER/REVERT를 반복할 수 있고, DML 권한만 가진 사용자 문맥에서도 감사 헤더 INSERT와 NEXT VALUE FOR가 소유권 체인으로 성공했다. AW에서 그 사용자와 dbo의 결과가 같았다(감사 유무 모두). 소유자가 다르면 체인이 끊겨 229가 난다. 가장 중 다른 DB를 참조하면 916과 함께 트랜잭션이 doomed(XACT_STATE −1)가 되고, 그 상태에서는 REVERT가 3930으로 실패해 가장이 남는다. ROLLBACK한 뒤에는 REVERT가 된다. 이 관측은 T-SQL TRY/CATCH 안, XACT_ABORT를 지정하지 않은 상태의 값이다. 제품 실행기(SqlClient, XACT_ABORT ON)에서는 상태가 다를 수 있다. |
+| A19 | 행 이미지를 JSON으로 직렬화할 때의 제약 | FOR JSON은 INCLUDE_NULL_VALUES가 없으면 NULL 속성을 뺀다. binary는 base64, money와 uniqueidentifier는 문자열이 된다. int, bigint, float, decimal, numeric은 JSON 숫자다. CLR 형식(hierarchyid, geography 등)은 오류라 문자열 변환이 필요하다. EXCEPT는 NULL끼리 같다고 보며 xml/text/ntext/image/비이진 CLR UDT 열을 쓸 수 없다. | [FOR JSON](https://learn.microsoft.com/en-us/sql/relational-databases/json/format-query-results-as-json-with-for-json-sql-server), [FOR JSON 형식 변환](https://learn.microsoft.com/en-us/sql/relational-databases/json/how-for-json-converts-sql-server-data-types-to-json-data-types-sql-server), [EXCEPT and INTERSECT](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/set-operators-except-and-intersect-transact-sql) | 감사 트리거 생성기와 최종 차이 계산기에 형식별 변환 규칙을 둔다(§6.1). SP6로 실측한다. **SP6 실측(2026-11-10)으로 정정:** FOR JSON 오류(13604)는 geography·geometry뿐이고 hierarchyid는 문자열로 나온다. money는 문자열이 아니라 JSON 숫자다. float는 16자리로 나와 정밀도가 줄고(최댓값을 되읽으면 overflow), 공간 형식의 `STAsText()`는 Z/M 값을 버린다. text/ntext/image를 inserted/deleted에서 참조하면(`SELECT *` 포함) 트리거 생성 시점에 311이 난다. 바꾼 규칙은 §6.1에 있다. |
 | A20 | 다른 수집 기능(CDC, Change Tracking, temporal)을 쓸 수 있는가? | CDC는 Agent가 필요하고(Express 불가), 커밋 기준 비동기이며, 원인 정보가 없다. 트랜잭션 안 순서는 _CT 문서 기준 `__$command_id`로 본다(개요 문서는 `__$seqval`이라고 써서 두 문서가 충돌한다). Change Tracking은 PK 값, 작업 종류, 바뀐 열 정보만 남기고 값과 중간 상태는 남기지 않는다. temporal 기간 값은 트랜잭션 시작 시각이라 트랜잭션 안 순서를 가리지 못한다. | [About CDC](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/about-change-data-capture-sql-server), [cdc _CT 테이블](https://learn.microsoft.com/en-us/sql/relational-databases/system-tables/cdc-capture-instance-ct-transact-sql), [About Change Tracking](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/about-change-tracking-sql-server), [Temporal tables](https://learn.microsoft.com/en-us/sql/relational-databases/tables/temporal-tables) | 주 수집 방식에서 뺀다. |
 | A21 | TRUNCATE와 BULK INSERT도 수집되는가? | TRUNCATE는 DELETE 트리거를 발동하지 않고, FK로 참조되는 테이블에는 쓸 수 없다. BULK INSERT는 FIRE_TRIGGERS가 없으면 트리거가 발동하지 않고, CHECK_CONSTRAINTS가 없으면 CHECK·FK를 검사하지 않는다(그 제약은 not-trusted로 표시된다). | [TRUNCATE TABLE](https://learn.microsoft.com/en-us/sql/t-sql/statements/truncate-table-transact-sql), [BULK INSERT](https://learn.microsoft.com/en-us/sql/t-sql/statements/bulk-insert-transact-sql) | MVP에서는 거부한다. |
 | A22 | 트리거 안에서 ROLLBACK하면? | 그때까지의 변경이 모두 롤백되고 배치가 끝난다. 다만 ROLLBACK 뒤 트리거의 나머지 문장은 계속 실행되고, 그 변경은 롤백되지 않는다(트랜잭션 밖에서 확정). 트리거 안에서는 XACT_ABORT 기본값이 ON이다. 오류 3609는 이 상황에서 흔히 보고되는 번호이고, 발생 조건은 2차 출처 기준이다. | [ROLLBACK TRANSACTION](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/rollback-transaction-transact-sql) "Interoperability", [SET XACT_ABORT](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-xact-abort-transact-sql) | "트리거가 거부함"은 오류 번호와 트랜잭션 상태로 판정한다. 그 뒤에는 기준 스냅샷과 비교해 롤백 뒤 남은 변경(예: 오류 로그 행)을 찾는다. 찾으면 결과에 보이고, 샌드박스를 "오염"으로 표시해 다음 미리보기 전에 다시 만든다(§5.2). |
 | A23 | 실행 계획으로 연쇄·트리거를 미리 알 수 있는가? | 예상 계획은 실행하지 않으므로 예상 행 수만 담는다. 트리거는 호출 배치와 별도 계획으로 실행된다. 연쇄가 계획에 어떻게 나타나는지 설명한 공식 문서는 없다(2차 출처만 있음). | [Display the estimated execution plan](https://learn.microsoft.com/en-us/sql/relational-databases/performance/display-the-estimated-execution-plan), [Query processing architecture guide](https://learn.microsoft.com/en-us/sql/relational-databases/query-processing-architecture-guide) "Stored procedure and trigger execution" | 평가의 정적 예측 대조군으로만 쓴다(이후 범위 B3). |
-| A24 | 공개 샘플 DB에 연쇄·트리거가 있는가? | **AdventureWorks**(sql-server-samples 저장소 루트의 MIT 라이선스)는 FK 90개 가운데 참조 동작이 ON DELETE CASCADE 2개뿐이다(SalesOrderHeader→SalesOrderDetail, SalesOrderHeader→SalesOrderHeaderSalesReason). DML 트리거는 10개(AFTER 8, INSTEAD OF DELETE 2)이고 DDL 트리거가 1개 있다. dbo.DatabaseLog는 PK 없는 힙이다. **pubs**에는 PK 없는 테이블 2개(roysched, discounts)와 ROLLBACK하는 트리거 employee_insupd가 있다. **Northwind**는 확인한 구간에서 FK 13개가 모두 NO ACTION이었고 트리거가 없었다(스크립트 일부만 확인). | [instawdb.sql](https://raw.githubusercontent.com/microsoft/sql-server-samples/master/samples/databases/adventure-works/oltp-install-script/instawdb.sql), [instpubs.sql](https://raw.githubusercontent.com/microsoft/sql-server-samples/master/samples/databases/northwind-pubs/instpubs.sql), [instnwnd.sql](https://raw.githubusercontent.com/microsoft/sql-server-samples/master/samples/databases/northwind-pubs/instnwnd.sql), [AdventureWorks 설치](https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure) — 스크립트를 WebFetch 요약으로 읽었으므로 설치 후 `sys.foreign_keys`, `sys.triggers`로 다시 확인한다 | 시연은 AdventureWorks로, 정확도 평가는 정답을 아는 합성 DB로 한다(§10). |
+| A24 | 공개 샘플 DB에 연쇄·트리거가 있는가? | **AdventureWorks**(sql-server-samples 저장소 루트의 MIT 라이선스)는 FK 90개 가운데 참조 동작이 ON DELETE CASCADE 2개뿐이다(SalesOrderHeader→SalesOrderDetail, SalesOrderHeader→SalesOrderHeaderSalesReason). DML 트리거는 10개(AFTER 8, INSTEAD OF DELETE 2)이고 DDL 트리거가 1개 있다. dbo.DatabaseLog는 PK 없는 힙이다(**v1.3 정정, C7 실측 2026-11-10:** 힙은 맞지만 비클러스터형 PK가 있다. AW에 PK 없는 테이블은 0개이고, FK 90·CASCADE 2·DML 트리거 10(AFTER 8, INSTEAD OF DELETE 2)·DDL 트리거 1은 설계 값과 같다). **pubs**에는 PK 없는 테이블 2개(roysched, discounts)와 ROLLBACK하는 트리거 employee_insupd가 있다. **Northwind**는 확인한 구간에서 FK 13개가 모두 NO ACTION이었고 트리거가 없었다(스크립트 일부만 확인). | [instawdb.sql](https://raw.githubusercontent.com/microsoft/sql-server-samples/master/samples/databases/adventure-works/oltp-install-script/instawdb.sql), [instpubs.sql](https://raw.githubusercontent.com/microsoft/sql-server-samples/master/samples/databases/northwind-pubs/instpubs.sql), [instnwnd.sql](https://raw.githubusercontent.com/microsoft/sql-server-samples/master/samples/databases/northwind-pubs/instnwnd.sql), [AdventureWorks 설치](https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure) — 스크립트를 WebFetch 요약으로 읽었으므로 설치 후 `sys.foreign_keys`, `sys.triggers`로 다시 확인한다 | 시연은 AdventureWorks로, 정확도 평가는 정답을 아는 합성 DB로 한다(§10). |
 
 PostgreSQL 비교에 쓴 사실(내부 RI 트리거, 행 단위 트리거, 이름순 발동, `pg_trigger_depth`, TEMPLATE 복제, RETURNING old/new)은 D1 결정 기록(§8)에 출처와 함께 적는다.
 
@@ -255,11 +255,12 @@ flowchart LR
 
 ### 5.1 기준선 구축 (처음, 새로 고침, [적용] 직후, 오염 뒤)
 
-1. `AW_Sandbox_base` 스냅샷이 있으면 먼저 지운다. 스냅샷이 있는 동안에는 `AW_Sandbox`를 RESTORE할 수 없다(A14).
+1. `AW_Sandbox_base` 스냅샷이 있으면 먼저 지운다. 스냅샷이 있는 동안에는 `AW_Sandbox`를 RESTORE할 수 없다(A14, SP5 실측: 오류 5094). 이어서 `AW_Sandbox`에 남은 연결을 끊는다(`SET SINGLE_USER WITH ROLLBACK IMMEDIATE`). 연결이 남아 있으면 RESTORE … REPLACE가 실패한다.
 2. C8이 `AW_Origin`을 `BACKUP ... WITH COPY_ONLY`로 백업한다. 자동 커밋 모드에서 실행한다(A15, A16).
 3. 백업 파일의 논리 파일 목록을 읽고, 그 백업을 `AW_Sandbox`로 `RESTORE ... WITH MOVE, REPLACE`한다.
 4. C7이 `AW_Sandbox`의 카탈로그를 읽는다.
 5. C9가 수집 장치를 설치하고 매니페스트를 쓴다. AdventureWorks에는 DDL 트리거(`ddlDatabaseTriggerLog`)가 있어 설치 과정의 DDL이 `dbo.DatabaseLog`에 기록된다. 이 행은 기준선에 포함되고 원본과 다르다는 점을 매니페스트에 적는다.
+   - **v1.3(2026-11-10, C8·C9 실DB 실행):** 설치 전후 사용자 테이블 행 수를 재서 바뀐 테이블을 매니페스트 notes에 적는다(AW: `dbo.DatabaseLog +431행`). 설치 DDL에 발동하는 DDL 트리거와 그 이벤트도 적는다(`sp_settriggerorder`는 ALTER_TRIGGER로 잡힌다). 설치 중 DDL 트리거가 쓴 행을 이미 깔린 감사 트리거가 기록하므로, 설치 마지막 배치에서 AuditHeader·AuditRowImage를 비운다(SEQUENCE는 재설정하지 않음). 기준 스냅샷은 설치가 끝난 뒤 만든다(7단계).
 6. 원본과 샌드박스의 환경 지문(§6.2)을 비교해 기록한다. 다르면 `fingerprintMatch=false`로 기록한다. 상태(`state`)는 `ready`를 유지하되 미리보기와 [적용]은 막는다.
 7. `AW_Sandbox`의 데이터 파일마다 논리 이름과 스파스 파일 경로를 지정해 `AW_Sandbox_base`를 `CREATE DATABASE ... AS SNAPSHOT OF`로 만든다.
 8. 상태(기준 시각 = 백업 완료 시각, 지문, 매니페스트 요약)를 화면에 보인다.
@@ -298,7 +299,7 @@ sequenceDiagram
 
 1. 분석에서 거부되면 실행하지 않는다. 결과를 저장하지 않고 422 ProblemDetails와 거부 목록(문장 번호, 위치, 규칙 ID, 근거)을 돌려준다.
 2. 샌드박스가 "오염" 상태이면 먼저 §5.1로 다시 만든다.
-3. 실행 주체 전환은 사용자 문장 구간에만 둔다. 수집 기록·재조회·최종 차이는 REVERT 뒤 도구 계정으로 같은 연결·같은 트랜잭션에서 한다(A18). 트랜잭션 안에서 EXECUTE AS/REVERT가 되는지는 SP10으로 확인한다.
+3. 실행 주체 전환은 사용자 문장 구간에만 둔다. 수집 기록·재조회·최종 차이는 REVERT 뒤 도구 계정으로 같은 연결·같은 트랜잭션에서 한다(A18). 트랜잭션 안에서 EXECUTE AS/REVERT가 되는지는 SP10으로 확인한다. **v1.3(SP10):** 반복 전환이 된다. 문장이 실패해 XACT_STATE가 −1(doomed)이면 REVERT가 3930으로 실패한다(T-SQL TRY/CATCH, XACT_ABORT 미지정에서 관측). 그래서 C10 규칙은 "문장 뒤 XACT_STATE·@@TRANCOUNT 확인 → 트랜잭션이 남아 있으면 ROLLBACK → REVERT"로 한다. 사용자 문장의 3·4부분 이름은 D5에서 거부하지만, 트리거 본문의 3부분 이름은 거부 목록에 없다(4부분 이름만 외부 부작용으로 거부). 트리거는 CALLER 문맥이라 같은 916·doomed 경로가 생길 수 있다(추론).
 4. 문장 실행 중 오류가 나면 거기서 멈추고, 트랜잭션이 남아 있으면 ROLLBACK한다. 결과 상태는 `failed`다. 트리거가 거부한 경우(A22)는 `trigger_blocked`다. 두 경우 모두 롤백 뒤 같은 연결에서 전체 사용자 테이블(감사 스키마 제외)을 기준 스냅샷과 비교한다. 범위는 §5.3 `SNAPSHOT_NETDIFF`와 같다. 감사 기록이 함께 롤백되어 범위를 좁히는 데 쓸 수 없기 때문이다. 트랜잭션 밖에서 확정된 변경(예: 트리거 CATCH 블록이 쓴 오류 로그 행)이 나오면 "롤백 뒤 남은 변경"으로 결과에 보인다. 그 테이블의 감사 트리거도 자동 커밋으로 감사 행을 남기므로 샌드박스를 "오염"으로 표시한다. 이 변경은 [적용] 때 원본에도 똑같이 생길 수 있다.
 5. 수집 이미지 수가 상한을 넘으면 제어 테이블을 `KEYS`로 바꾼다. 그 뒤 묶음은 헤더와 키만 남긴다. 결과 상태는 `truncated`이고, 테이블별 정확한 건수는 최종 차이로 계산한다(D8).
 6. 롤백 전에 읽은 원자료만으로 결과를 만든다. 롤백한 뒤에는 샌드박스 상태를 다시 보지 않는다(4의 실패 검사는 예외).
@@ -367,13 +368,18 @@ sequenceDiagram
 | SQL 형식 | 표현 |
 |---|---|
 | 모든 값 | API에서는 문자열로 내보낸다. 열 메타데이터에 `sqlType`을 함께 둔다. NULL은 JSON `null`이다. 백엔드는 감사 JSON의 숫자를 원문 그대로 읽어 문자열로 바꾼다. |
-| datetime, datetime2, datetimeoffset, time | ISO 8601. 원래 정밀도를 유지한다. |
+| datetime, datetime2, datetimeoffset, time | ISO 8601. FOR JSON은 소수 끝자리 0을 생략하므로(SP6), 표시 자릿수는 `sqlType`의 정밀도로 맞춘다. |
 | binary, varbinary, rowversion | base64(FOR JSON 기본 변환) |
-| money, uniqueidentifier | FOR JSON에서 이미 문자열이다(A19). |
-| xml | 문자열 |
+| int, bigint, decimal, numeric, money, smallmoney | FOR JSON의 JSON 숫자 원문을 그대로 문자열로 바꾼다. **v1.3(SP6):** money는 v1.2의 "문자열"이 아니라 JSON 숫자다. |
+| uniqueidentifier | FOR JSON에서 이미 문자열이다. |
+| float, real | **v1.3(SP6):** `CONVERT(varchar(30), 열, 3)`(real은 float로 바꾼 뒤 스타일 3)으로 17자리 문자열. FOR JSON 기본은 16자리라 값이 바뀐다. |
+| xml | `CONVERT(nvarchar(max), 열)` 문자열 |
 | hierarchyid | `ToString()` 결과 |
-| geography, geometry | `STAsText()`와 SRID |
-| text, ntext, image | AFTER 트리거에서 참조할 수 없으므로(A12) `unobservable`로 표시하고 최종 차이에서만 비교한다. |
+| geography, geometry | **v1.3(SP6):** `ToString()`(Z/M 값 유지)과 별도 속성 `열@srid`(`STSrid`). v1.2의 `STAsText()`는 Z/M을 버린다. |
+| sql_variant | **v1.3(SP6):** 기저 값(float·real이면 스타일 3 문자열)과 별도 속성 `열@type`(`SQL_VARIANT_PROPERTY(…, 'BaseType')`) |
+| 사용자 CLR UDT | `CONVERT(nvarchar(max), 열)`. 실측하지 않았다(서버 CLR 설정 변경이 필요해 범위 밖). |
+| text, ntext, image | AFTER 트리거에서 참조할 수 없으므로(A12, SP6: 생성 시점 오류 311) `unobservable`로 표시하고 최종 차이에서만 비교한다. |
+| JSON 키 충돌 열 | **v1.3(SP6):** 이름에 `.`이 있는 열은 FOR JSON PATH가 중첩 객체로 만들어 키와 열의 대응이 깨진다(`{"a":{"b":20}}`, `JSON_KEY_DOT`). 앞부분이 같은 열(`[a]`와 `[a.b]`)이 함께 있으면 13601로 실패한다. 다른 열의 생성 속성(`@srid`·`@type`)과 이름이 같은 열도 충돌한다(`JSON_KEY_CONFLICT`). 이런 열은 행 이미지에서 빼고 `unobservable`로 둔다. 키 열이 충돌하면 그 테이블을 제외한다. |
 
 ### 6.2 변경 이벤트 스키마
 
@@ -572,7 +578,8 @@ INSERT 예시(비결정 열):
 
 - `category`는 `EXCLUDED_TABLE`, `UNOBSERVABLE_COLUMN`, `SAME_TABLE_TRIGGER`, `UNKNOWN` 중 하나다. 원인 후보는 이 순서로 따진다.
 - **행 변경과 잔차의 관계:** 재조회 값이 감사 after와 다른 열은 RowChange.after를 재조회 값으로 고치고(`finalAfterSource=REREAD`), 그 열의 원인은 Residual로 따로 귀속한다(`rowChangeId`로 연결). 감사 기록에 그 행이 아예 없으면 Residual만 만든다. M2는 (테이블, 키)당, M1은 (테이블, 키, 열)당 한 번만 센다.
-- 이 예에서 감사 트리거(Last)의 inserted에는 SalesOrderHeader를 바꾼 문장의 결과만 담긴다. 같은 테이블 트리거 uSalesOrderHeader가 RevisionNumber를 다시 바꾼 결과는 담기지 않는다(그 중첩 갱신에 감사 트리거가 발동하는지는 SP3로 확인).
+- 이 예에서 감사 트리거(Last)의 inserted에는 SalesOrderHeader를 바꾼 문장의 결과만 담긴다. 같은 테이블 트리거 uSalesOrderHeader가 RevisionNumber를 다시 바꾼 결과는 담기지 않는다.
+- **v1.3(2026-11-10, 근거: SP3):** 그 중첩 갱신에도 감사 트리거가 발동한다(RECURSIVE_TRIGGERS OFF에서도). 중첩 갱신은 한 단계 깊은 SalesOrderHeader 묶음으로 바깥 묶음보다 먼저 기록된다. 4단계 트리거 판정으로 uSalesOrderHeader에 `inferred`로 귀속될 예정이다(분석기는 2주차, AW 실제 트리거의 쓰기 대상 추출은 아직 확인 전). 그래서 위 Residual 예시의 RevisionNumber는 실제로는 잔차가 아니라 묶음이다. 예시는 형식 설명용으로 남기고, `SAME_TABLE_TRIGGER` 잔차는 이 경로가 실패할 때의 안전망으로 둔다.
 
 **NetChange (최종 차이 한 건)**
 
@@ -611,6 +618,10 @@ INSERT 예시(비결정 열):
 
 **환경 지문:** 위 `fingerprint` 필드들이다. 원본과 샌드박스에서 모두 같아야 한다.
 
+**v1.3 보충(2026-11-10):**
+- `sessionOptions`(@@OPTIONS)는 지문을 읽는 연결의 값이라 원본과 샌드박스 비교에서는 늘 같다. 실행 봉투의 세션 옵션은 실행기(C10)가 따로 고정하고 점검한다. SqlClient 기본값은 QUOTED_IDENTIFIER ON(@@OPTIONS 5432)이고, sqlcmd는 `-I`가 없으면 OFF다.
+- 헤더 `tranCount`는 BEGIN TRAN 안의 문장에서 2가 정상값이다(트리거 안 @@TRANCOUNT, SP10).
+
 ### 6.3 그래프 형식
 
 노드는 행이 아니라 **발동 단위**로 만든다. 그래서 그래프 크기는 변경 행 수가 아니라 트리거 발동 수에 비례한다.
@@ -624,7 +635,7 @@ INSERT 예시(비결정 열):
 | `error` | 실패·거부 | `errorNumber`, `message`, `isToolFault` |
 | `group` | 접힌 묶음(노드 200개 초과 시 같은 테이블·연산·깊이) | `members`, `rowCount` |
 
-노드 표시 플래그는 DTO 필드에서 계산한다: `zeroRows = rowCount == 0`, `partial = imageMode != FULL`, `auditNotLast = auditOrder == NONE`.
+노드 표시 플래그는 DTO 필드에서 계산한다: `zeroRows = rowCount == 0`, `partial = imageMode != FULL`, `auditNotLast = auditOrder == NONE`. **v1.3(SP2(d)):** FK 연쇄 대상은 바뀐 행이 0개이면 트리거가 발동하지 않아 묶음이 생기지 않았다(ON DELETE CASCADE 1단계에서 관측, 다른 참조 동작은 미측정). 그래서 `zeroRows` 묶음은 직접 대상과 트리거 본문 안 문장에서 나온다고 본다.
 
 | 간선 `kind` | 방향 | 의미 |
 |---|---|---|
@@ -669,6 +680,8 @@ INSERT 예시(비결정 열):
 ```
 
 같은 부모 아래 형제 묶음(`f-1001`, `f-1005`) 사이의 순서는 `observed_only`이며, 화면에서는 "관측 순서, 보장 안 됨"으로 표시한다.
+
+**v1.3 주석:** 위 예시와 §6.2 NetChange 예시의 `r-1`(RevisionNumber 잔차)과 `e7` RESIDUAL 간선은 v1.2 형식 설명용이다. 실측(SP3, SP10 AW 판)에서는 RevisionNumber 재갱신이 깊이 3 SalesOrderHeader 묶음으로 잡히므로, 실제 결과에서는 `t-2 → (깊이 3 SOH 묶음)` WRITES 간선이 생기고 그 행의 `residualId`는 null이다.
 
 ### 6.4 API
 
@@ -739,11 +752,13 @@ MVP의 미리보기 요청은 끝날 때까지 기다리는 동기 방식이다.
 
 | ID | 전제 | 근거 | 깨지면 |
 |---|---|---|---|
-| H1 | 감사 트리거를 테이블·연산별 Last로 두면, 같은 테이블의 사용자 트리거와 그 중첩 변경은 모두 감사 기록보다 먼저 끝난다(후위 순서). | A6, 추론 | 그 테이블의 트리거 문맥 자식은 `ambiguous` 이하로 둔다. |
-| H2 | 사용자 문장과 그 문장의 FK 연쇄로 발동한 감사 트리거의 `TRIGGER_NESTLEVEL()`은 같다. 트리거 안 DML로 발동한 것은 1 크다. | A7(연쇄 시 값은 문서에 없음) | FK 판정은 깊이와 상관없이 키 일치로 한다. 같은 문맥에 그 테이블을 쓰는 트리거가 있으면 `inferred`로 낮춘다. |
-| H3 | 한 문장 안에서 AFTER 트리거는 테이블별로 묶여 실행된다. | A1·A2("연쇄의 반대 순서", 테이블별 First/Last), 추론 | 괄호 추론을 쓰지 않고 정적 쓰기 대상으로만 후보를 정한다(최대 `ambiguous`). |
-| H4 | 한 문장이 시작한 FK 연쇄는 트리다. | A4(오류 1785) | — (문서 규칙). 단 트리거가 만든 2차 체인은 다른 루트로 같은 테이블에 닿을 수 있다. |
-| H5 | 트리거 안 DML이 일으킨 FK 연쇄와 그 연쇄 대상의 트리거는 그 트리거가 끝나기 전에 실행된다. | 추론. 문서의 "2차 체인은 모든 1차 체인의 트리거가 발동한 뒤 처리" 문구와 충돌할 수 있다(A2). | 2차 연쇄 묶음은 괄호 대신 FK 키 일치로만 부모를 찾고(3단계 FK 판정은 이미 순서와 무관), 확신도를 `inferred` 이하로, 순서를 `observed_only`로 둔다. |
+| H1 | 감사 트리거를 테이블·연산별 Last로 두면, 같은 테이블의 사용자 트리거와 그 중첩 변경은 모두 감사 기록보다 먼저 끝난다(후위 순서). | A6, 추론. **v1.3: 성립**(SP1 CL06·CL07·CL13과 AW SalesOrderHeader DELETE). CascadeLab에서도 사용자 트리거가 있는 4사례(CL06·CL07·CL08a·CL08b)에서 같은 세션 5회 반복 관측했다(순서는 대조의 판정 항목이 아니었다) | 그 테이블의 트리거 문맥 자식은 `ambiguous` 이하로 둔다. |
+| H2 | 사용자 문장과 그 문장의 FK 연쇄로 발동한 감사 트리거의 `TRIGGER_NESTLEVEL()`은 같다. 트리거 안 DML로 발동한 것은 1 크다. | A7(연쇄 시 값은 문서에 없음). **v1.3: 성립**(SP1 CL06·CL07·CL09·AW). 트리거 안 DML이 일으킨 FK 연쇄는 그 트리거 깊이+1이다 | FK 판정은 깊이와 상관없이 키 일치로 한다. 같은 문맥에 그 테이블을 쓰는 트리거가 있으면 `inferred`로 낮춘다. |
+| H3 | 한 문장 안에서 AFTER 트리거는 테이블별로 묶여 실행된다. | A1·A2("연쇄의 반대 순서", 테이블별 First/Last), 추론. **v1.3: 관측한 3회 모두 성립**(SP1 CL13). 문서 보장은 아니다. 관측 구성은 부모·자식(CL13)과 형제 1개(CL09, 한쪽만 사용자 트리거)뿐이고 3회는 한 배치 안 반복이다. 같은 깊이의 두 테이블이 각각 사용자 트리거를 가진 형제 구성은 2주차에 CascadeLab 사례로 더한다 | 괄호 추론을 쓰지 않고 정적 쓰기 대상으로만 후보를 정한다(최대 `ambiguous`). |
+| H4 | 한 문장이 시작한 FK 연쇄는 트리다. | A4(오류 1785). **v1.3: 반례 없음**(SP1 CL09). 실험의 키 중복 검사는 DELETE 특성상 늘 참이라, H4는 사실상 문서 규칙(1785)에 기댄다. 트리거가 만든 2차 체인이 다른 루트로 같은 테이블에 다시 닿는 것은 관측했다 | — (문서 규칙). 단 트리거가 만든 2차 체인은 다른 루트로 같은 테이블에 닿을 수 있다. |
+| H5 | 트리거 안 DML이 일으킨 FK 연쇄와 그 연쇄 대상의 트리거는 그 트리거가 끝나기 전에 실행된다. | 추론. 문서의 "2차 체인은 모든 1차 체인의 트리거가 발동한 뒤 처리" 문구와 충돌할 수 있다(A2). **v1.3: 관측한 1구성에서 성립**(SP1 CL09: 2차 체인이 nestLevel 2이고 그 트리거 묶음보다 먼저 기록됨). 1차 체인 순서를 바꾼 구성은 보지 않았다 | 2차 연쇄 묶음은 괄호 대신 FK 키 일치로만 부모를 찾고(3단계 FK 판정은 이미 순서와 무관), 확신도를 `inferred` 이하로, 순서를 `observed_only`로 둔다. |
+
+**v1.3 상태(2026-11-10, DB 실측):** H1~H5 가운데 깨진 전제가 없어 "깨지면" 규칙은 적용하지 않는다. 다만 H2·H3·H5는 관측일 뿐 문서 보장이 아니므로, 트리거 귀속 상한 `inferred`와 형제·2차 체인 순서의 `observed_only`는 그대로 둔다. 근거: [SP1](spikes/SP1.md), [SP3](spikes/SP3.md), [CascadeLab 대조](../cascadelab/verification/report-2026-11-10.md).
 
 ### 7.2 단계
 
@@ -751,6 +766,7 @@ MVP의 미리보기 요청은 끝날 때까지 기다리는 동기 방식이다.
 2. **트리거 문맥(괄호, 잠정):** `captureSeq` 순서로 훑는다. 깊이 d인 묶음 F가 나오면, 직전의 깊이 d 이하 묶음 이후에 기록된 깊이 d+1 미배정 묶음을 모두 F의 "트리거 문맥 자식"으로 정한다(H1). 확신도 상한은 두 가지다.
    - F의 테이블·연산에서 감사 트리거가 Last가 아니면(`NONE`), F의 자식은 `ambiguous` 이하다.
    - 같은 문맥(같은 부모, 같은 깊이)에서 그 F 뒤에 오는 모든 형제의 자식도 `ambiguous` 이하다. F 뒤에 기록된 F의 자식이 다음 형제에게 잘못 붙을 수 있기 때문이다.
+   - **v1.3 보완(2026-11-10, 근거: SP1 CL13):** F의 감사 순서가 `NONE`이면 같은 테이블의 순서 미지정 사용자 트리거와 사용자 Last 트리거가 감사 트리거보다 늦게 실행될 수 있어, 그 중첩 묶음이 F 뒤에 기록된다(CL13에서 trg_T_2·trg_T_3의 묶음이 T 감사 뒤에 기록됨). 그래서 F 뒤에 기록된 깊이 d+1 미배정 묶음도 F를 부모 후보로 둔다. 같은 문맥에 뒤 형제 G가 있으면 후보는 {F, G}이고 `ambiguous`다. 뒤 형제가 없으면 후보는 F 하나지만 순서 근거가 약하므로 역시 `ambiguous`로 둔다(이 규칙이 없으면 미배정으로 남아 `unexplained`가 된다). CL13 증거는 뒤 형제가 없는 경우뿐이다.
 3. **FK 판정(문장 안 전체, 순서와 무관):** 각 묶음에 대해 FK 메타데이터로 부모 후보 묶음을 찾는다. 판정이 나면 그 결과가 2단계의 잠정 부모보다 우선한다.
    - **대상 FK:** 자식 테이블이 이 묶음의 테이블이고, 부모 연산에 맞는 참조 동작이 있고(`DELETE` → ON DELETE CASCADE·SET NULL·SET DEFAULT, 키를 바꾸는 `UPDATE` → ON UPDATE 동작), `is_disabled = 0`인 FK다.
    - **행 일치(짝 없이 집합으로 판정)**
@@ -768,12 +784,13 @@ MVP의 미리보기 요청은 끝날 때까지 기다리는 동기 방식이다.
    - 깊이 1 묶음 가운데 테이블과 연산이 문장의 대상과 같으면 `DIRECT`(`certain`)다.
    - 대상에 그 연산의 INSTEAD OF 트리거가 있으면 직접 묶음이 생기지 않는다. 그 문장 안에서 깊이 1 부모가 없는 깊이 2 묶음은 모두 가상 INSTEAD OF 실행 노드(`REPLACES` 간선, `parentFiringId = null`)의 자식으로 두고 `inferred`로 귀속한다. 그 아래 깊이 3 이상은 2~4단계를 그대로 쓴다.
 6. **재조회와 잔차:** 롤백 전 재조회에서 감사 after와 다른 열은 RowChange.after를 고치고(`REREAD`), 원인은 Residual로 귀속한다. 최종 차이에만 있는 변경은 Residual만 만든다. 후보는 `EXCLUDED_TABLE` → `UNOBSERVABLE_COLUMN` → `SAME_TABLE_TRIGGER`(그 테이블에 쓰는 트리거가 실행된 경우) → `UNKNOWN` 순서로 따진다.
+   - **v1.3 보완(2026-11-10, 근거: SP3, CascadeLab CL08a·CL08b):** 같은 행을 여러 묶음이 바꾸면 수집 순번은 실제 변경 순서와 반대일 수 있다(후위 기록). 재조회와 비교할 "감사 after"는 captureSeq가 가장 큰 묶음이 아니라, 트리거 문맥 트리를 전위 순서로 훑었을 때 그 행을 마지막으로 바꾼 묶음의 after다. captureSeq 최댓값을 쓰면 이미 묶음으로 설명된 변경이 잔차로 한 번 더 생긴다(CL08에서 바깥 문장 묶음의 after는 중첩 갱신 전 값이었다). 형제 순서가 `observed_only`라 마지막 묶음을 정할 수 없으면 재조회 값을 최종으로 쓴다(`REREAD`).
 7. **순서 표시:** 아래 세 층으로 나눠 표시한다.
 
 | 층 | 무엇 | 보장 여부 |
 |---|---|---|
 | 문장 순서 | 사용자가 쓴 순서 | 보장(도구가 하나씩 실행) |
-| 인과 단계 | 문장 → 직접 → FK 연쇄 → 트리거 1차 → … | 보장되는 것: 연쇄 동작이 그 문장의 AFTER 트리거보다 먼저 일어나고(A1), 트리거가 쓴 변경은 그 트리거를 발동시킨 문장 뒤에 일어난다. 2차 체인의 처리 시점은 문서 문구의 의미가 불명확하므로 H5가 확인되기 전에는 `observed_only`로 둔다. |
+| 인과 단계 | 문장 → 직접 → FK 연쇄 → 트리거 1차 → … | 보장되는 것: 연쇄 동작이 그 문장의 AFTER 트리거보다 먼저 일어나고(A1), 트리거가 쓴 변경은 그 트리거를 발동시킨 문장 뒤에 일어난다. 2차 체인의 처리 시점은 문서 문구의 의미가 불명확하므로 H5가 확인되기 전에는 `observed_only`로 둔다. **v1.3:** H5는 1구성에서 관측됐지만 문서 보장이 아니므로 `observed_only`를 유지한다. |
 | 수집 발동 순번 | `captureSeq` | 관측값일 뿐이다. 형제 묶음 사이, 체인 사이, First와 Last 사이 트리거, MERGE 액션 사이의 순서는 보장되지 않는다(A2, A3). |
 
 ### 7.3 확신도 등급
@@ -822,6 +839,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 - **결정:** A로 한다. 이미지 태그를 CU로 고정하고 `MSSQL_PID=EnterpriseDeveloper`로 띄운다. SP0에서 에디션이나 스냅샷 확인이 실패하면 B로 바꾸고, 같은 SP0을 2022에서 다시 한다. 파서는 문서로 확인된 TSql160Parser를 기본으로 하고, SP4에서 확인되면 더 높은 버전 클래스를 쓴다. 허용 목록이 DML 세 종류뿐이라 파서 버전 차이의 영향은 작다. 모르는 구문은 파싱 실패로 거부한다.
 - **v1.3 반영(2026-11-06, 근거: SP4, 라이브러리 실행):** ScriptDom 180.140.0에는 TSql170Parser와 TSql180Parser가 있다. 대상 엔진의 호환성 수준(2025는 170)에 맞춰 TSql170Parser를 쓰고, 2022로 바꾸면 TSql160Parser를 쓴다. DML·CREATE TRIGGER 표본은 160과 180의 파싱 결과가 같았다. 170과 180의 차이는 확인하지 않았다. 에디션·스냅샷(SP0)이 확인되기 전이므로 D1 자체는 아직 확정하지 않는다.
 - **반대 의견(패널, 충실도 관점):** B가 문서로 더 확실하다. → SP0을 첫날 끝내고, 실패하면 B로 바꾸는 분기를 미리 정했다.
+- **v1.3 확정(2026-11-10, 근거: SP0, DB 실측, `spikes/logs/sp0-*.log`·`logs/week1/env-evidence.log`):** `2025-CU10-ubuntu-24.04` 이미지(다이제스트 `sha256:245f6b1c…`)는 `MSSQL_PID=EnterpriseDeveloper`와 `Developer` 모두 Enterprise Developer Edition(17.0.5035.5, RTM-CU10)으로 떴고, 파일별 경로를 지정한 스냅샷이 만들어졌다. A로 확정하고 B(2022) 분기는 닫는다. 파서는 TSql170Parser를 쓴다(SP4).
 - **이후 범위:** PostgreSQL 어댑터. 카탈로그, 수집 장치 설치기, 최종 차이 계산기만 DB별로 바꾸면 되도록 경계를 둔다.
 
 ### D2. 샌드박스 — 같은 인스턴스의 복제 DB, 트랜잭션 실행 후 ROLLBACK
@@ -834,25 +852,25 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 
 - **복제 방법:** `BACKUP ... WITH COPY_ONLY` → `RESTORE ... WITH MOVE`로 한다(A15). bacpac(IDENTITY 마지막 값 기본 미보존)과 DBCC CLONEDATABASE(스키마 전용)는 쓰지 않는다.
 - **최신성:** 기준 시각(백업 완료 시각)을 화면에 보인다. [기준선 새로 고침] 버튼을 두고, [적용] 직후와 오염 뒤에 자동으로 새로 고친다. 원본이 바뀌었는지는 LSN으로 판정하지 않는다(형식 차이, 백업 자체의 로그 기록, 공식 가이드 없음). 대신 [적용] 때 행 값으로 검사한다(D7).
-- **복구:** 실행 중 연결이 끊기거나 이상 상태가 되면 §5.1로 기준선을 다시 만든다. RESTORE 전에는 기준 스냅샷부터 지운다. 스냅샷 되돌리기는 평가 회차 초기화에만 쓴다(SP5로 시간을 잰 뒤 결정).
+- **복구:** 실행 중 연결이 끊기거나 이상 상태가 되면 §5.1로 기준선을 다시 만든다. RESTORE 전에는 기준 스냅샷부터 지운다. 스냅샷 되돌리기는 평가 회차 초기화에만 쓴다(SP5로 시간을 잰 뒤 결정). **v1.3(SP5):** 되돌리기 411ms, RESTORE 611ms(AW, 1회 측정, 되돌리기 전 변경은 1,000행 하나). 평가 회차 초기화는 스냅샷 되돌리기로 하고, 실패하면 RESTORE로 대신한다.
 - **반대 의견(패널, 충실도 관점):** B가 IDENTITY·SEQUENCE를 원본과 같게 유지해 충실도가 높다. → 새 키는 어느 방식이든 [적용] 때 달라질 수 있어 "예상값"으로 표시해야 한다(A13). 그래서 C를 기본으로 두고, 비교에는 IDENTITY 짝 매핑(§10.4)을 쓴다. 평가는 제품과 같은 정책(C)으로 재고, 사례 사이에만 초기화한다.
 
 ### D3. 변경 수집 — 감사 트리거(Last) + 최종 차이 대조
 
 | 대안 | 장점 | 단점 |
 |---|---|---|
-| **A. 샌드박스 전용 감사 AFTER 트리거 (채택, 주 경로)** | 연쇄로 발동한 트리거까지 잡는다(A1). 직접 대상의 0행 발동도 남는다(A3). 발동 순번과 깊이가 있다. | 관찰자 효과(A6, A9, A11). RECURSIVE_TRIGGERS OFF에서 자기 테이블 재갱신을 놓칠 수 있다(SP3). |
+| **A. 샌드박스 전용 감사 AFTER 트리거 (채택, 주 경로)** | 연쇄로 발동한 트리거까지 잡는다(A1). 직접 대상의 0행 발동도 남는다(A3). 발동 순번과 깊이가 있다. | 관찰자 효과(A6, A9, A11). v1.2에서 걱정한 "RECURSIVE_TRIGGERS OFF에서 자기 테이블 재갱신 누락"은 SP3에서 일어나지 않았다(감사가 깊이+1 묶음으로 잡음). |
 | **B. 기준 스냅샷과의 최종 차이 (채택, 대조 경로)** | 엔진 동작에 끼어들지 않는다. 최종 상태의 정답이다. | 순서·원인·중간값이 없다. 형식 변환이 필요하다(A19). |
 | C. CDC, OUTPUT, Change Tracking, temporal, Extended Events | — | CDC는 Agent가 필요하고 비동기이며 원인이 없다. OUTPUT은 트리거 전 값만 준다. Change Tracking은 PK·작업 종류·바뀐 열 정보만 남기고 값이 없다. temporal은 트랜잭션 안 순서를 가리지 못한다(A11, A20). XE는 필드명과 트리거·동적 SQL 안 문장 포착이 확인되지 않았다. 이후 범위 |
 
 **감사 트리거 규칙**
 
-1. 테이블·연산마다 1개를 둔다(INSERT, UPDATE, DELETE 각각). 이름은 `[테이블 스키마].[dbr_audit_<테이블>_<I|U|D>]`다(DML 트리거는 테이블과 같은 스키마에 속한다). **v1.3 변경(2026-11-06, 근거: 정적 검토, SP2(d)로 실측 확인 예정):** v1.2는 "테이블마다 1개(INSERT·UPDATE·DELETE)"였다. 0행 발동이면 inserted·deleted가 모두 비어 한 트리거로는 연산을 구분할 수 없고, 헤더 `operation`(§6.2)과 0행 발동 기록(E23)을 채울 수 없어 바꿨다. 각 트리거에 그 연산의 Last를 지정한다. 그 연산에 이미 사용자 Last가 있으면 지정하지 않고(`NONE`) 매니페스트에 표시한다. **First에는 두지 않는다.** 앞에서 실행된 트리거가 다음 트리거 시작 시점의 @@ROWCOUNT에 영향을 주는지 문서에 없기 때문이다(A9).
+1. 테이블·연산마다 1개를 둔다(INSERT, UPDATE, DELETE 각각). 이름은 `[테이블 스키마].[dbr_audit_<테이블>_<I|U|D>]`다(DML 트리거는 테이블과 같은 스키마에 속한다). **v1.3 변경(2026-11-06, 근거: 정적 검토. SP2(d) 실측 2026-11-10: 직접 대상 0행 발동이 연산과 함께 기록됨):** v1.2는 "테이블마다 1개(INSERT·UPDATE·DELETE)"였다. 0행 발동이면 inserted·deleted가 모두 비어 한 트리거로는 연산을 구분할 수 없고, 헤더 `operation`(§6.2)과 0행 발동 기록(E23)을 채울 수 없어 바꿨다. 각 트리거에 그 연산의 Last를 지정한다. 그 연산에 이미 사용자 Last가 있으면 지정하지 않고(`NONE`) 매니페스트에 표시한다. **First에는 두지 않는다.** 앞에서 실행된 트리거가 다음 트리거 시작 시점의 @@ROWCOUNT에 영향을 주는지 문서에 없기 때문이다(A9). **v1.3:** 행 수 누출은 SP2(c)에서 관측되지 않았다. First 금지의 남은 근거는 H1이다(감사가 마지막이어야 같은 테이블 사용자 트리거의 중첩 변경이 감사보다 먼저 기록된다).
 2. 본문은 `SET NOCOUNT ON` → 헤더 1행 INSERT → 행 이미지 INSERT(deleted, inserted) 순서다(§6.2 감사 저장소).
    - 행 수는 @@ROWCOUNT가 아니라 inserted/deleted의 `COUNT_BIG(*)`로 구한다.
    - 수집 모드(FULL/KEYS)는 제어 테이블에서 읽는다.
    - 마지막 문장은 발동 문장과 같은 행 수를 남기는 이미지 INSERT로 둔다. 그러면 트리거 활동이 호출자의 @@ROWCOUNT에 새는지와 상관없이 값이 같다. 0행 발동이면 헤더만 남고 마지막 INSERT는 0행이다.
-3. 감사 저장소에는 IDENTITY 열을 두지 않고 순번은 SEQUENCE만 쓴다. 사용자 트리거가 @@IDENTITY를 읽을 때 값이 바뀌는 관찰자 효과를 막기 위해서다. 결과 집합을 돌려주지 않고, 조인이나 짝짓기 같은 복잡한 처리를 하지 않는다. 트리거 안에서는 XACT_ABORT가 ON이라 수집 오류가 전체를 중단시킬 수 있다(A22). 오류 메시지에 감사 트리거 이름이 있으면 `isToolFault=true`로 따로 분류한다.
+3. 감사 저장소에는 IDENTITY 열을 두지 않고 순번은 SEQUENCE만 쓴다. 사용자 트리거가 @@IDENTITY를 읽을 때 값이 바뀌는 관찰자 효과를 막기 위해서다. 결과 집합을 돌려주지 않고, 조인이나 짝짓기 같은 복잡한 처리를 하지 않는다. 트리거 안에서는 XACT_ABORT가 ON이라 수집 오류가 전체를 중단시킬 수 있다(A22). 오류 메시지에 감사 트리거 이름이 있으면 `isToolFault=true`로 따로 분류한다. **v1.3 정정(2026-11-10, `logs/week1/r18-computed-overflow-repro.log`):** 트리거 이름은 메시지 본문이 아니라 오류의 프로시저 필드(`ERROR_PROCEDURE()`, SqlClient `SqlError.Procedure`)에 나온다. 그래서 판정은 "오류 프로시저가 `dbr_audit_`로 시작하는 감사 트리거"로 한다.
 4. CLR·xml은 문자열로 바꾼다. text/ntext/image는 수집 불가 열로 뺀다(§6.1).
 5. temporal 히스토리, 메모리 최적화 테이블, 뷰에는 설치하지 않고 제외 테이블로 기록한다.
 6. 사용자 트리거 본문과 순서는 바꾸지 않는다.
@@ -866,7 +884,17 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 
 감사로 설명되지 않는 변경은 잔차(§6.2)가 된다. 평가 모드에서는 모든 테이블을 비교한다.
 
-- **반대 의견(패널, 1달 MVP 관점):** 최종 차이는 제품이 아니라 평가에서만 쓰자. → 최종 차이가 없으면 자기 테이블 재갱신 누락을 제품이 알아챌 수 없다(AdventureWorks `uSalesOrderHeader`의 RevisionNumber가 그 예). 그래서 범위를 줄인 형태로 필수에 넣었다.
+- **반대 의견(패널, 1달 MVP 관점):** 최종 차이는 제품이 아니라 평가에서만 쓰자. → 최종 차이가 없으면 자기 테이블 재갱신 누락을 제품이 알아챌 수 없다(AdventureWorks `uSalesOrderHeader`의 RevisionNumber가 그 예). 그래서 범위를 줄인 형태로 필수에 넣었다. **v1.3 주석:** SP3에서 이 RevisionNumber 재갱신은 감사 묶음으로 잡혀 "누락"이 일어나지 않았다. 최종 차이 대조는 수집 범위 밖 변경(제외 테이블, 수집 불가 열, 예상 못 한 경로)을 찾는 안전망으로 계속 필수로 둔다.
+
+**v1.3 확정(2026-11-10, 근거: SP2·SP3·SP6·SP10과 C9의 AW·CascadeLab 실DB 설치):** A안(감사 트리거 + 최종 차이 대조)을 확정한다. 실측으로 바뀌거나 더해진 규칙은 다음과 같다.
+
+- 감사 트리거는 테이블·연산마다 1개다(규칙 1, 0행 발동 연산 기록). AW에서는 71개 테이블에 213개를 깔았고 모두 Last로 지정됐다(기존 First/Last 점유 0, SP2(a)).
+- 값을 바꾸는 관찰자 효과는 측정한 범위에서 0이다: DML 직후 행 수(SQL·드라이버), 호출자의 @@IDENTITY, DML 전용 사용자 문맥의 결과가 감사 유무에 따라 같았다(SP2(c)(e), SP10). 트리거 안 SCOPE_IDENTITY()는 감사 유무와 무관하게 NULL이었다. 트리거 안 행 수는 새지 않았으므로 "마지막 문장 행 수" 규칙은 방어용으로 남긴다. `SET NOCOUNT ON`은 필수다(NOCOUNT 없는 대조 트리거는 드라이버 행 수를 3에서 5로 바꿨다). 실패형 관찰자 효과는 아래 OWNER_NOT_DBO·설치 세션 옵션·R18 항목에 있다.
+- RECURSIVE_TRIGGERS OFF에서도 같은 테이블 트리거의 중첩 자기 갱신이 감사된다(SP3). 최종 after는 §7.2 6단계 규칙으로 정한다.
+- 소유권 체인을 위해 테이블의 실효 소유자가 dbo가 아니면 설치하지 않고 제외한다(`OWNER_NOT_DBO`, SP10).
+- 형식 변환은 §6.1 v1.3 규칙을 쓴다(SP6). 열 이름 충돌은 `unobservable` 또는 테이블 제외로 처리한다.
+- 설치 세션은 ANSI_NULLS·QUOTED_IDENTIFIER를 ON으로 둔다. 두 값은 트리거 정의에 저장되므로 SqlClient·SSMS로 만든 것과 같은 설정을 남기기 위한 규칙이다. 관측한 1934는 세션 수준이다(sqlcmd 기본 OFF 세션에서 계산 열 인덱스가 있는 AW 테이블에 사용자 DML, `spikes/logs/sp1-30-aw-try1.log`). 감사 트리거의 DML 대상은 audit.*뿐이라 트리거 안 1934는 해당하지 않으며 측정하지 않았다.
+- 새로 확인한 관찰자 효과 위험(실패형): 비지속 계산 열의 식이 오류를 내는 행(예: 오버플로)은 감사가 없으면 DML이 성공하지만, 감사 트리거가 그 열을 읽으면 트리거 안에서 8115가 나서 DML이 실패하고 트랜잭션이 doomed(XACT_STATE −1)가 된다(재현: `logs/week1/r18-computed-overflow-repro.log`, 감사 모양 트리거). 오류 프로시저가 감사 트리거이므로 `isToolFault=true`로 분류해 보이고, 처리 방식(그 열을 이미지에서 빼는 안 등)은 이후 범위로 둔다(R18).
 
 ### D4. 원인 귀속과 순서 — 관측값 + 메타데이터 + 정적 쓰기 대상
 
@@ -877,6 +905,8 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 | C. Extended Events 문장 추적 | 트리거 안 어느 문장인지까지 알 수 있다. | 필드명과 트리거·동적 SQL 안 문장 포착이 확인되지 않았다. 평가 모드 교차 검증으로 이후 범위 |
 
 **결정:** §7 규칙을 따른다. FK는 `certain`까지, 트리거는 `inferred`까지 준다. 모호하면 후보를 모두 보여 준다. 순서는 "인과 단계"를 주로 표시하고 "수집 발동 순번"은 보조로 둔다. 확인한 사실(키 일치)과 추정(괄호 추론)을 등급으로 나눠 화면에 그대로 드러낸다.
+
+**v1.3 확정(2026-11-10, 근거: SP1·SP3, CascadeLab 감사 대조 11사례 일치(묶음의 테이블·연산·행 수)):** H1~H5가 모두 실측에서 깨지지 않아 §7 규칙을 유지한다. 바꾼 점은 §7.2 2단계(감사 순서 `NONE` 뒤에 기록된 중첩 묶음)와 6단계(전위 순서로 마지막 묶음의 after를 최종 after로 씀) 두 가지다. H2·H3·H5는 관측일 뿐 문서 보장이 아니어서 트리거 귀속 상한 `inferred`와 형제·2차 체인 순서의 `observed_only`는 유지한다.
 
 ### D5. 배치 분석 — ScriptDom 허용 목록, 실패 시 거부
 
@@ -1004,7 +1034,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 | E3 | SEQUENCE(NEXT VALUE FOR) | 트랜잭션과 무관하게 소비된다. "예상값"으로 표시한다. | — | A13 |
 | E4 | rowversion, 계산 열 | rowversion은 비결정 열이다. 계산 열은 "파생"으로 표시하고, 식이 결정적이면 비교에 넣는다. | — | §6.1 |
 | E5 | 수만 행 변경 | D8 규칙(상한, KEYS 모드, 정확한 건수, [적용] 차단) | 키만 수집 + 샌드박스 상태 유지 | D8 |
-| E6 | PK 없는 테이블(pubs roysched·discounts, AW dbo.DatabaseLog) | NOT NULL 유일 인덱스가 있으면 그것을 키로 쓴다. 없으면 다중집합으로 다룬다. 최종 차이는 모든 열 묶음의 개수로 비교하고(`MULTISET_*`), 그리드에는 "제거된 행 n개, 추가된 행 m개"로 보인다. UPDATE 전후 짝은 확정하지 않는다. `%%physloc%%` 같은 문서화되지 않은 기능은 쓰지 않는다. | 열 차이가 가장 작은 짝을 "추정"으로 표시 | A12, A24 |
+| E6 | PK 없는 테이블(pubs roysched·discounts, CascadeLab CL14). v1.3: AW에는 없다(dbo.DatabaseLog·Production.ProductProductPhoto는 힙이지만 비클러스터형 PK가 있다, C7 실측) | NOT NULL 유일 인덱스가 있으면 그것을 키로 쓴다. 없으면 다중집합으로 다룬다. 최종 차이는 모든 열 묶음의 개수로 비교하고(`MULTISET_*`), 그리드에는 "제거된 행 n개, 추가된 행 m개"로 보인다. UPDATE 전후 짝은 확정하지 않는다. `%%physloc%%` 같은 문서화되지 않은 기능은 쓰지 않는다. | 열 차이가 가장 작은 짝을 "추정"으로 표시 | A12, A24 |
 | E7 | PK가 바뀌는 다중 행 UPDATE | 바뀌지 않는 다른 유일 키가 있으면 그것으로 짝을 짓는다. 없으면 `UNPAIRED`(삭제와 삽입의 쌍)로 둔다. 단일 행이면 짝을 확정한다. 이 경우의 UPDATE CASCADE는 집합으로 판정한다(§7.2 3단계). | — | A12 |
 | E8 | 트리거 안 동적 SQL(EXEC, sp_executesql) | 수집은 그대로 된다(감사 트리거가 잡는다). 동적 SQL을 쓰는 트리거는 모든 테이블에 쓸 수 있는 후보로 보고 확신도를 낮춘다. 다른 DB에 쓰는 동적 SQL은 감지하지 못하므로 경고한다. | XE로 동적 SQL 문장 추적 | A18, §7.2 |
 | E9 | 여러 문장 배치, GO | 문장마다 별도 명령으로 같은 트랜잭션 안에서 실행한다. 앞 문장 결과에 의존하는 문장도 그대로 반영된다. 변수·제어 흐름은 거부한다. | 계측 호출을 주입해 변수·제어 흐름 지원(EXEC 뒤 @@ROWCOUNT 실측 뒤) | D5 |
@@ -1012,7 +1042,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 | E11 | OUTPUT 절 | 거부한다(관찰자 효과). "OUTPUT 없이 미리보기한 뒤 원래 문장은 직접 실행"하라고 안내한다. | 그 테이블에서 감사 트리거를 빼고 최종 차이로만 수집 | A11 |
 | E12 | MERGE, TRUNCATE, BULK INSERT | 거부한다. | MERGE: 액션별 발동 처리와 `mergeAction` 필드 | A3, A21 |
 | E13 | 트리거의 ROLLBACK, INSTEAD OF 거부(AW dEmployee·dVendor, pubs employee_insupd) | 오류 번호와 트랜잭션 상태로 `trigger_blocked`를 판정한다. 트랜잭션 안의 변경과 감사 기록은 함께 롤백되므로 결과는 "트랜잭션 안 변경 0건 + error 노드"다. 거부한 트리거는 정적 분석(ROLLBACK 포함 여부, INSTEAD OF) 후보로 표시하고 [적용]을 막는다. ROLLBACK 뒤 트리거가 남긴 변경(예: CATCH 블록의 오류 로그 INSERT)은 기준 스냅샷과 비교해 "롤백 뒤 남은 변경"으로 보이고, 샌드박스를 오염으로 표시해 다시 만든다. | — | A6, A22 |
-| E14 | 트리거가 자기 테이블을 다시 갱신(RECURSIVE_TRIGGERS OFF, AW uSalesOrderHeader) | 롤백 전 재조회와 최종 차이로 잔차를 찾아 `SAME_TABLE_TRIGGER`로 귀속한다. | — | A8, SP3 |
+| E14 | 트리거가 자기 테이블을 다시 갱신(RECURSIVE_TRIGGERS OFF, AW uSalesOrderHeader) | **v1.3(SP3):** 감사 트리거가 중첩 자기 갱신을 깊이+1 묶음으로 잡으므로 4단계 트리거 판정으로 귀속한다. 최종 after는 §7.2 6단계(전위 순서 마지막 묶음)로 정한다. 롤백 전 재조회와 최종 차이의 `SAME_TABLE_TRIGGER` 잔차는 안전망으로 남긴다(v1.2는 잔차로 찾는 것이 주 경로였다). | — | A8, SP3 |
 | E15 | 사용자 Last 트리거가 이미 있는 테이블 | 감사 트리거 순서를 `NONE`으로 두고, 그 문맥의 자식 귀속은 `ambiguous` 이하로 한다(§7.2 2단계). 매니페스트에 표시한다. | — | A6 |
 | E16 | CLR(hierarchyid, geography), xml, text/ntext/image 열 | §6.1 규칙을 따른다. text/ntext/image는 최종 차이에서만 비교한다. | — | A12, A19 |
 | E17 | temporal 히스토리, 메모리 최적화 테이블 | 감사 트리거를 설치하지 않는다. 최종 차이로만 수집하고 원인은 `EXCLUDED_TABLE`로 둔다(temporal은 시스템 버전 관리로 표시). | WWI 지원 | A20, A14 |
@@ -1021,7 +1051,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 | E20 | 타임아웃, 연결 끊김 | CommandTimeout, XACT_ABORT ON, finally에서 ROLLBACK한다. 상태가 이상하면 세션을 정리하고, 기준 스냅샷을 지운 뒤 RESTORE로 기준선을 다시 만든다(§5.1). | — | §5 |
 | E21 | 중첩 32단계 초과 | 엔진 오류를 그대로 `failed`로 보인다. | — | A8 |
 | E22 | 비활성(NOCHECK) FK, 비활성 트리거 | 카탈로그에 표시한다. 비활성 FK는 FK 판정에서, 비활성 트리거는 발동 후보에서 뺀다. | — | §7.2 |
-| E23 | 영향 0행 문장, 연쇄 행 0개 | 문장 노드에 `rowsAffected=0`을 표시한다. 직접 대상의 0행 발동은 헤더만 남기고, 화면에서는 기본으로 숨긴다. 연쇄 행 0개일 때 발동하는지는 문서에 없으므로 SP2(d)로 실측한다. | — | A3 |
+| E23 | 영향 0행 문장, 연쇄 행 0개 | 문장 노드에 `rowsAffected=0`을 표시한다. 직접 대상의 0행 발동은 헤더만 남기고, 화면에서는 기본으로 숨긴다. 연쇄 행 0개일 때 발동하는지는 문서에 없으므로 SP2(d)로 실측한다. **v1.3(SP2(d)):** 연쇄 행이 0개이면 자식 테이블 트리거는 발동하지 않아 묶음이 없었다(ON DELETE CASCADE 1단계에서 관측). 그래프에는 그 FK 간선을 그리지 않는다. 다른 참조 동작의 0행은 2주차 CascadeLab 사례로 확인한다. | — | A3 |
 | E24 | 같은 행을 여러 문장이 바꿈 | "발동 보기"에서는 문장별 중간 값을, "최종 차이 보기"에서는 순 변경을 보인다. | — | §6.2 |
 | E25 | 사용자 트리거가 @@IDENTITY를 읽음 | 감사 저장소에 IDENTITY 열을 두지 않아 값이 바뀌지 않게 한다(D3 규칙 3). CL12로 확인한다. | — | D3 |
 
@@ -1115,10 +1145,12 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 
 실제 전파는 SP8에서 실행으로 확정한다. 아래는 트리거 정의를 읽어 세운 예상이다.
 
+**v1.3 주의(2026-11-10, 재현 `logs/week1/aw-uworkorder-repro.log`):** AW 샘플의 `uWorkOrder`는 ProductID·OrderQty를 UPDATE하면 TransactionHistory에 ActualCost(NOT NULL, 기본값 없음)를 넣지 않아 515로 실패한다. CATCH에서 ROLLBACK한 뒤 `uspLogError`가 ErrorLog에 트랜잭션 밖 행 1개를 남기고, 호출 쪽은 3609("The transaction ended in the trigger")를 받는다. 샌드박스를 오염시키므로 일반 데모·평가 사례에서는 이 경로를 쓰지 않는다. 대신 E13·A22의 "롤백 뒤 남은 변경" 시연 후보로 쓸 수 있다(DM3 보조).
+
 | ID | 시나리오 | 보여 줄 것 |
 |---|---|---|
-| DM1 | SalesOrderHeader 1건 DELETE | FK 연쇄로 SalesOrderDetail과 SalesOrderHeaderSalesReason이 삭제된다(FK 이름 표시). 연쇄 대상에서 iduSalesOrderDetail이 발동한다. 트리거 본문 분기에 따라 추가 변경이 없을 수도 있다. "발동했지만 변경 없음"을 보여 준다(0행 발동 기록 여부는 SP2(d)). |
-| DM2 | SalesOrderDetail.OrderQty UPDATE | iduSalesOrderDetail이 TransactionHistory INSERT, Person.Person(Demographics xml) UPDATE, SalesOrderHeader.SubTotal UPDATE를 일으킨다. 이어서 uSalesOrderHeader가 SalesPerson·SalesTerritory의 SalesYTD를 갱신한다(3단 사슬). RevisionNumber 잔차와 비결정 열 "예상값"을 함께 보여 준다. |
+| DM1 | SalesOrderHeader 1건 DELETE | FK 연쇄로 SalesOrderDetail과 SalesOrderHeaderSalesReason이 삭제된다(FK 이름 표시). 연쇄 대상에서 iduSalesOrderDetail이 발동한다. 트리거 본문 분기에 따라 추가 변경이 없을 수도 있다. "발동했지만 변경 없음"을 보여 준다. **v1.3:** 0행 발동이 감사에 기록되는 것은 SP1(`spikes/logs/sp1-30-aw.log`)과 감사 스모크(`logs/week1/aw-audit-smoke.log`)에서 확인했다. |
+| DM2 | SalesOrderDetail.OrderQty UPDATE | iduSalesOrderDetail이 TransactionHistory INSERT, Person.Person(Demographics xml) UPDATE, SalesOrderHeader.SubTotal UPDATE를 일으킨다. 이어서 uSalesOrderHeader가 SalesPerson·SalesTerritory의 SalesYTD를 갱신한다(3단 사슬). RevisionNumber 잔차와 비결정 열 "예상값"을 함께 보여 준다. **v1.3 관측(SP10 AW 판 `sp10-20-aw-part2.log` 70·74·86행, 감사 스모크 14~16행):** RevisionNumber 재갱신은 잔차가 아니라 깊이 3 SalesOrderHeader UPDATE 묶음으로 잡힌다(uSalesOrderHeader 귀속은 분석기 구현 뒤 `inferred` 예정). 관측한 주문에서는 SalesPerson·SalesTerritory UPDATE가 0행 발동이었다(SalesYTD 변화 없음). 3단 사슬을 보이려면 SP8에서 SalesYTD가 실제로 바뀌는 주문을 골라 대본을 확정한다. |
 | DM3 | HumanResources.Employee DELETE | INSTEAD OF 트리거 dEmployee가 거부한다. 변경 0건, error 노드, [적용] 비활성을 보여 준다. |
 | DM4 | CascadeLab: SET NULL + 3단 CASCADE + 동적 SQL 트리거 | 모호한 귀속을 그대로 표시한다. |
 | DM5 | pubs: discounts(PK 없음) UPDATE와 employee_insupd ROLLBACK | 다중집합 diff와 거부 |
@@ -1182,10 +1214,11 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 
 | # | 위험 | 영향 | 가능성 | 대응 | 확인 |
 |---|---|---|---|---|---|
-| R1 | 관찰자 효과: 감사 트리거가 원래 동작(OUTPUT, @@ROWCOUNT, @@IDENTITY, 트리거 순서)을 바꾼다. | 높음 | 중간 | Last 고정, First 금지, 마지막 문장 행 수 맞추기, IDENTITY 열 금지, OUTPUT 거부, E_obs 측정 | SP2, CL12 |
+| R1 | 관찰자 효과: 감사 트리거가 원래 동작(OUTPUT, @@ROWCOUNT, @@IDENTITY, 트리거 순서)을 바꾼다. | 높음 | 중간(v1.3: 값을 바꾸는 효과는 SP2·SP10 측정 범위에서 0, CascadeLab 감사 대조의 샌드박스 순 변경 11/11 일치. 실패형 효과는 확인됨: 소유자 불일치 229 → 제외 규칙, 설치 세션 QUOTED_IDENTIFIER OFF → 설치 세션 ON 고정, 계산 열 식 오류 8115 → R18) | Last 고정, First 금지, 마지막 문장 행 수 맞추기, IDENTITY 열 금지, OUTPUT 거부, E_obs 측정, `OWNER_NOT_DBO` 제외 | SP2, SP10, CL12, R18 재현 |
+| R18 | 비지속 계산 열의 식 오류: 감사 트리거가 그 열을 읽으면 원래는 성공할 DML이 트리거 안 오류(예: 8115)로 실패한다. | 중간 | 낮음 | 오류 프로시저가 감사 트리거면 `isToolFault=true`로 분류해 보이고, 그 열을 이미지에서 빼는 안은 이후 범위로 둔다 | 재현 `logs/week1/r18-computed-overflow-repro.log`(감사 없음 OK, 감사 모양 트리거 8115·`ERROR_PROCEDURE`=트리거 이름·XACT_STATE −1) |
 | R2 | 원인 귀속 오류: 전제 H1~H5가 실제와 다르다. | 높음 | 중간 | 등급 상한, 모호하면 후보 표시, FK는 순서와 무관한 키 일치로 판정 | SP1, CL06·CL07·CL09·CL13 |
-| R3 | 자기 테이블 재갱신을 놓친다(RECURSIVE_TRIGGERS OFF). | 중간 | 높음 | 롤백 전 재조회 + 최종 차이 잔차 | SP3 |
-| R4 | 스냅샷·FILESTREAM·전체 텍스트 제약(Linux는 FILESTREAM 미지원) | 중간 | 중간 | SP5 첫 단계에서 `RESTORE FILELISTONLY`, RESTORE로 대체, 다른 .bak 사용 | SP5 |
+| R3 | 자기 테이블 재갱신을 놓친다(RECURSIVE_TRIGGERS OFF). | 중간 | 낮음(v1.3: SP3에서 감사가 깊이+1 묶음으로 잡음) | 롤백 전 재조회 + 최종 차이 잔차(안전망) | SP3 통과 |
+| R4 | 스냅샷·FILESTREAM·전체 텍스트 제약(Linux는 FILESTREAM 미지원) | 중간 | 낮음(v1.3: AW2025에 FILESTREAM·메모리 최적화 없음, 전체 텍스트는 미설치지만 DML 영향 없음) | SP5 첫 단계에서 `RESTORE FILELISTONLY`, RESTORE로 대체, 다른 .bak 사용 | SP5 통과 |
 | R5 | 열린 트랜잭션 안에서 스냅샷과 비교할 수 없다. | 중간 | 낮음(추정) | 안 되면 재조회와 KEYSET 비교로 낮추고 표시 | SP7 |
 | R6 | 비결정 값 때문에 거짓 불일치가 난다. | 중간 | 높음 | 비결정 열 판정, IDENTITY 짝 매핑, 존재·형식 비교 | CL16 |
 | R7 | 1인·1달 일정 초과 | 높음 | 높음 | 스파이크를 선행 조건 순서로 배치, 하네스를 2주차에 시작, 자를 목록을 미리 정함 | 주간 점검 |
@@ -1208,15 +1241,15 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 |---|---|---|---|---|---|
 | SP0 | 1주차 1일 | 컨테이너 에디션과 스냅샷 | 2025 CU 이미지를 `MSSQL_PID=EnterpriseDeveloper`로 띄우고 `SERVERPROPERTY('Edition')`를 확인한 뒤 파일별 경로를 지정해 스냅샷을 만든다. `Developer` 값도 함께 시험한다. | Developer 계열 에디션이고 스냅샷이 만들어진다. | 2022-latest Developer로 바꾸고 같은 확인을 다시 한다(D1). |
 | SP1 | 1주차 1~2일 | 전제 H1~H5 | 손으로 쓴 감사 트리거와 미니 스키마(CL06·CL07·CL09·CL13), AW SalesOrderHeader DELETE에서 헤더의 `nestLevel`과 `captureSeq` 순서를 본다. | 연쇄 대상의 깊이가 문장과 같고(H2), Last일 때 후위 순서가 성립하며(H1, H3), 2차 연쇄가 트리거 안에서 끝난다(H5). | 깨진 전제마다 §7.1의 "깨지면" 규칙을 적용한다. |
-| SP2 | 1주차 1~2일, (b)는 2주차에 자동화 | 관찰자 효과 | (a) AW·pubs·CascadeLab에서 Last 지정 가능 여부와 기존 First/Last 점유를 본다. (b) 감사 장치를 깐 사본과 깔지 않은 사본에서 같은 문장 결과를 비교한다(1주차는 수동 쿼리, 2주차는 하네스). (c) DML 직후 @@ROWCOUNT와 드라이버의 영향 행 수가 같은지 본다. (d) 0행 발동과 연쇄 0행 발동 기록을 본다. (e) @@IDENTITY가 바뀌지 않는지 본다. | 결과 동일(E_obs = 0), 행 수 동일 | 해당 테이블을 매니페스트에 "관찰자 효과 가능"으로 표시하고 필요하면 제외한다. |
-| SP3 | 1주차 1~2일 | 자기 테이블 재갱신 | RECURSIVE_TRIGGERS OFF에서 uSalesOrderHeader의 RevisionNumber 갱신이 감사에 잡히는지, 재조회와 최종 차이가 잔차를 찾는지 본다. | 잔차로 검출된다. | 재조회 범위를 테이블 전체로 넓힌다. |
+| SP2 | 1주차 1~2일, (b)는 2주차에 자동화 | 관찰자 효과 | (a) AW·pubs·CascadeLab에서 Last 지정 가능 여부와 기존 First/Last 점유를 본다. (b) 감사 장치를 깐 사본과 깔지 않은 사본에서 같은 문장 결과를 비교한다(1주차는 수동 쿼리, 2주차는 하네스). (c) DML 직후 @@ROWCOUNT와 드라이버의 영향 행 수가 같은지 본다. (d) 0행 발동과 연쇄 0행 발동 기록을 본다. (e) @@IDENTITY가 바뀌지 않는지 본다. | 결과 동일(E_obs = 0), 행 수 동일 | 해당 테이블을 매니페스트에 "관찰자 효과 가능"으로 표시하고 필요하면 제외한다. **결과(2026-11-10): 통과.** (a) AW·CascadeLab 기존 First/Last 점유 0, Last 지정 모두 가능(pubs는 미설치로 미확인). (c)(e) 감사 유무에 따라 같음. (d) 직접 대상 0행은 기록, 연쇄 0행은 미발동. (b)는 2주차 하네스. |
+| SP3 | 1주차 1~2일 | 자기 테이블 재갱신 | RECURSIVE_TRIGGERS OFF에서 uSalesOrderHeader의 RevisionNumber 갱신이 감사에 잡히는지, 재조회와 최종 차이가 잔차를 찾는지 본다. | 잔차로 검출된다. **결과(2026-11-10): 통과.** 잔차가 아니라 감사 묶음으로 잡혔다(CAPTURED: 미니 OFF·ON, AW OFF). 통과 기준("잔차로 검출")보다 앞선 단계에서 잡힌 것이라 기준을 넓혀 판정했다. 잔차(안전망) 경로 자체는 이번 실측에서 실행되지 않았다. | 재조회 범위를 테이블 전체로 넓힌다. |
 | SP4 | 1주차 1~2일 | ScriptDom | 180.140.0에서 쓸 수 있는 최고 파서 클래스, GO·주석·문자열 처리, 오류 위치, AW 트리거 10개의 쓰기 대상 추출을 확인한다. | 배치가 나뉘고, 쓰기 대상이 샘플 DB 조사(부록 C)의 AW 트리거 목록과 맞는다. | sqlcmd 규칙으로 GO를 분리하고 쓰기 대상은 수동으로 보정한다. |
 | SP5 | 1주차 1~2일 | 기준선 | `RESTORE FILELISTONLY`(FILESTREAM·메모리 최적화 파일 그룹), 전체 텍스트 카탈로그 유무, BACKUP/RESTORE 시간, 스냅샷 생성·되돌리기 시간, 스냅샷이 있을 때 RESTORE가 거부되는지 본다. | FILESTREAM이 없다. 시간을 기록한다. | 다른 .bak이나 Windows 설치로 바꾼다. 평가 초기화는 RESTORE로 한다. |
-| SP6 | 1주차 1~2일 | 형식 변환 | xml, hierarchyid, geography, money, varbinary, datetimeoffset을 FOR JSON으로 직렬화하고 text/ntext/image 처리를 확인한다. | 오류가 없고 값이 보존된다. | 형식별 변환 규칙을 고친다. |
+| SP6 | 1주차 1~2일 | 형식 변환 | xml, hierarchyid, geography, money, varbinary, datetimeoffset을 FOR JSON으로 직렬화하고 text/ntext/image 처리를 확인한다. | 오류가 없고 값이 보존된다. | 형식별 변환 규칙을 고친다. **결과(2026-11-10): 일부 깨짐 → 규칙을 고쳤다.** float 정밀도, 공간 형식 Z/M, money가 숫자인 점, 열 이름 충돌을 §6.1에 반영했다. |
 | SP7 | 2주차(C12 첫판 직후) | 열린 트랜잭션 안 최종 차이 | REVERT 뒤 같은 연결·트랜잭션에서 미커밋 변경을 스냅샷과 비교해 정확성과 시간을 잰다(AW 전 테이블). | 정확하고, AW 전 테이블 기준 수 초 안에 끝난다(추정 목표). | 재조회와 KEYSET 비교로 낮춘다. |
 | SP8 | 3주차 1일 | 데모 사슬 실측 | AW DM1·DM2·DM3의 실제 전파와 0행 발동 기록을 본다. | 데모 대본을 확정한다. | 시나리오를 바꾼다. |
 | SP9 | 3주차 1일 | 프런트 성능 | Vue Flow + dagre로 노드 50·200·500개, AG Grid로 1만·5만 행을 렌더링한다. | 노드 200개, 페이지 1개 기준으로 체감 지연이 없다(추정 목표). | 노드 묶기 기준을 낮추고 페이지 크기를 줄인다. |
-| SP10 | 1주차 1~2일 | 실행 주체 | 열린 트랜잭션 안에서 EXECUTE AS USER/REVERT를 반복할 수 있는지 본다. 사용자 문맥에서 감사 트리거의 헤더 INSERT와 NEXT VALUE FOR가 소유권 체인으로 성공하는지, AW 트리거가 권한 오류 없이 동작하는지 본다. | 원본에서와 같은 결과가 나오고, 감사 기록이 남는다. | 감사 SEQUENCE·테이블에 필요한 최소 권한을 샌드박스에서만 실행 사용자에게 준다(사용자 DML 의미는 바뀌지 않음). |
+| SP10 | 1주차 1~2일 | 실행 주체 | 열린 트랜잭션 안에서 EXECUTE AS USER/REVERT를 반복할 수 있는지 본다. 사용자 문맥에서 감사 트리거의 헤더 INSERT와 NEXT VALUE FOR가 소유권 체인으로 성공하는지, AW 트리거가 권한 오류 없이 동작하는지 본다. | 원본에서와 같은 결과가 나오고, 감사 기록이 남는다. | 감사 SEQUENCE·테이블에 필요한 최소 권한을 샌드박스에서만 실행 사용자에게 준다(사용자 DML 의미는 바뀌지 않음). **결과(2026-11-10): 통과.** 권한 부여 없이 소유권 체인으로 감사가 기록됐다. doomed 상태에서는 ROLLBACK 뒤 REVERT해야 한다(§5.2). |
 
 ## 부록 A. 출처
 
@@ -1301,4 +1334,5 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
   - 스파이크·일정 선후 조정
 - **2차 검토:** architect 1명이 1차 major 28건이 모두 해소됐음을 확인했다. 수정 중 새로 생긴 major 2건(KEYS 모드의 키 없는 테이블 처리, 실패 뒤 검사 범위)과 minor 5건은 v1.2에 반영했다.
 - **남은 이견:** D1(2022 대 2025)과 D2(매번 되돌리기 대 롤백)는 각 결정 기록의 "반대 의견"에 적었다.
-- **증거 범위:** 모든 근거는 웹 문서와 공식 저장소를 정적으로 조사한 것이다(2026-11-06). DB 실측은 하지 않았다. 회사 업무 DB와 mssql MCP 도구는 쓰지 않았다. 실측이 필요한 항목은 §13에 모았다.
+- **1주차 실측(v1.3, 2026-11-10):** 로컬 컨테이너(SQL Server 2025 RTM-CU10 Linux, Enterprise Developer)에서 SP0~SP6·SP10을 실행했다. database-engineer 2명이 SP1·SP3과 SP6·SP10·SP2를, qa-engineer가 CascadeLab 정답 대조를, backend-developer가 C7·C8·C9 실DB 검증을 맡았다. 결과와 로그는 `docs/spikes/`, `spikes/logs/`, `cascadelab/verification/`, `logs/week1/`에 있다.
+- **증거 범위(v1.2까지):** 모든 근거는 웹 문서와 공식 저장소를 정적으로 조사한 것이다(2026-11-06). DB 실측은 하지 않았다. 회사 업무 DB와 mssql MCP 도구는 쓰지 않았다. 실측이 필요한 항목은 §13에 모았다.

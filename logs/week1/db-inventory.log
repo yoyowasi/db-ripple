@@ -1,0 +1,16 @@
+# logs\week1\db-inventory.sql db=master part=0 at=2026-11-10T10:27:16.3124625+09:00 elapsedSec=1.12 exit=0
+name state_desc user_access_desc snapshot_of is_recursive_triggers_on
+---- ---------- ---------------- ----------- ------------------------
+AW_Origin ONLINE MULTI_USER NULL 0
+AW_Sandbox ONLINE MULTI_USER NULL 0
+AW_Sandbox_base ONLINE MULTI_USER AW_Sandbox 0
+AW_SpikeA ONLINE MULTI_USER NULL 0
+AW_SpikeB ONLINE MULTI_USER NULL 0
+CascadeLab ONLINE MULTI_USER NULL 0
+CascadeLab_RT ONLINE MULTI_USER NULL 1
+CascadeLab_RT_Sandbox ONLINE MULTI_USER NULL 1
+CascadeLab_RT_Sandbox_base ONLINE MULTI_USER CascadeLab_RT_Sandbox 0
+CascadeLab_Sandbox ONLINE MULTI_USER NULL 0
+CascadeLab_Sandbox_base ONLINE MULTI_USER CascadeLab_Sandbox 0
+
+(11 rows affected)

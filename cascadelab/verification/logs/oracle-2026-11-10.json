@@ -1,0 +1,1967 @@
+{
+  "Mode": "oracle",
+  "StartedAt": "2026-11-10T10:18:41.4109420+09:00",
+  "Tool": "cascadelab/verification/CascadeLab.Verify",
+  "Env": {
+    "productVersion": "17.0.5035.5",
+    "productUpdateLevel": "CU10",
+    "edition": "Enterprise Developer Edition (64-bit)",
+    "nestedTriggers": 1,
+    "disallowResultsFromTriggers": 0,
+    "sessionOptions": 5432,
+    "xactAbort": 0,
+    "db:CascadeLab": {
+      "is_recursive_triggers_on": false,
+      "compatibility_level": 170,
+      "is_read_committed_snapshot_on": false,
+      "snapshot_isolation_state_desc": "OFF",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS"
+    },
+    "db:CascadeLab_RT": {
+      "is_recursive_triggers_on": true,
+      "compatibility_level": 170,
+      "is_read_committed_snapshot_on": false,
+      "snapshot_isolation_state_desc": "OFF",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS"
+    }
+  },
+  "SeedDigest": {
+    "CascadeLab": "6E605145E7235F14",
+    "CascadeLab_RT": "78EF7DC7082C7A41"
+  },
+  "EnvChecks": [],
+  "Cases": [
+    {
+      "Id": "CL01",
+      "CaseFile": "CL01-cascade-4.json",
+      "Database": "CascadeLab",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "DELETE FROM cl01.A WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl01.A",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":1}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl01.B",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":10}",
+            "{\"id\":11}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl01.C",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":100}",
+            "{\"id\":101}",
+            "{\"id\":110}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl01.D",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":1000}",
+            "{\"id\":1001}",
+            "{\"id\":1100}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.A keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.A inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.A updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.A deleted",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.B keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.B inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.B updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.B deleted",
+          "Expected": "[{\"id\":10}, {\"id\":11}]",
+          "Actual": "[{\"id\":10}, {\"id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.C keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.C inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.C updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.C deleted",
+          "Expected": "[{\"id\":100}, {\"id\":101}, {\"id\":110}]",
+          "Actual": "[{\"id\":100}, {\"id\":101}, {\"id\":110}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.D keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.D inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.D updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl01.D deleted",
+          "Expected": "[{\"id\":1000}, {\"id\":1001}, {\"id\":1100}]",
+          "Actual": "[{\"id\":1000}, {\"id\":1001}, {\"id\":1100}]",
+          "Verdict": "MATCH"
+        }
+      ]
+    },
+    {
+      "Id": "CL02",
+      "CaseFile": "CL02-set-null.json",
+      "Database": "CascadeLab",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "DELETE FROM cl02.Dept WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl02.Dept",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":1}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl02.Emp",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":10}",
+              "ChangedColumns": [
+                "dept_id"
+              ],
+              "Before": {
+                "dept_id": 1
+              },
+              "After": {
+                "dept_id": null
+              }
+            },
+            {
+              "Key": "{\"id\":11}",
+              "ChangedColumns": [
+                "dept_id"
+              ],
+              "Before": {
+                "dept_id": 1
+              },
+              "After": {
+                "dept_id": null
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl02.Dept keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl02.Dept inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl02.Dept updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl02.Dept deleted",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl02.Emp keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl02.Emp inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl02.Emp updated",
+          "Expected": "[{\"id\":10}, {\"id\":11}]",
+          "Actual": "[{\"id\":10}, {\"id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl02.Emp deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl02.Emp {\"id\":10} changedColumns",
+          "Expected": "[dept_id]",
+          "Actual": "[dept_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl02.Emp {\"id\":10} after.dept_id",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl02.Emp {\"id\":11} changedColumns",
+          "Expected": "[dept_id]",
+          "Actual": "[dept_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl02.Emp {\"id\":11} after.dept_id",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        }
+      ]
+    },
+    {
+      "Id": "CL03",
+      "CaseFile": "CL03-set-default.json",
+      "Database": "CascadeLab",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "DELETE FROM cl03.Category WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl03.Category",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":1}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl03.Product",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":10}",
+              "ChangedColumns": [
+                "category_id"
+              ],
+              "Before": {
+                "category_id": 1
+              },
+              "After": {
+                "category_id": 0
+              }
+            },
+            {
+              "Key": "{\"id\":11}",
+              "ChangedColumns": [
+                "category_id"
+              ],
+              "Before": {
+                "category_id": 1
+              },
+              "After": {
+                "category_id": 0
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Category keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Category inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Category updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Category deleted",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Product keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Product inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Product updated",
+          "Expected": "[{\"id\":10}, {\"id\":11}]",
+          "Actual": "[{\"id\":10}, {\"id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Product deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Product {\"id\":10} changedColumns",
+          "Expected": "[category_id]",
+          "Actual": "[category_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Product {\"id\":10} after.category_id",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Product {\"id\":11} changedColumns",
+          "Expected": "[category_id]",
+          "Actual": "[category_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Product {\"id\":11} after.category_id",
+          "Expected": "0",
+          "Actual": "0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Grp 변경 0(정답에 없는 같은 패턴 스키마 테이블)",
+          "Expected": "I0 U0 D0",
+          "Actual": "I0 U0 D0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Item 변경 0(정답에 없는 같은 패턴 스키마 테이블)",
+          "Expected": "I0 U0 D0",
+          "Actual": "I0 U0 D0",
+          "Verdict": "MATCH"
+        }
+      ]
+    },
+    {
+      "Id": "CL03b",
+      "CaseFile": "CL03b-set-default-missing.json",
+      "Database": "CascadeLab",
+      "Verdict": "MATCH",
+      "Status": "failed",
+      "ErrorNumber": 547,
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "DELETE FROM cl03.Grp WHERE id = 1;",
+          "Status": "failed",
+          "ErrorNumber": 547,
+          "Errors": [
+            {
+              "Number": 547,
+              "Class": 16,
+              "State": 0,
+              "Line": 1,
+              "Message": "The DELETE statement conflicted with the FOREIGN KEY constraint \"FK_cl03_Item_Grp\". The conflict occurred in database \"CascadeLab\", table \"cl03.Grp\", column 'id'."
+            },
+            {
+              "Number": 3621,
+              "Class": 0,
+              "State": 0,
+              "Line": 1,
+              "Message": "The statement has been terminated."
+            }
+          ],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "status",
+          "Expected": "failed",
+          "Actual": "failed",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "errorNumber",
+          "Expected": "547",
+          "Actual": "547",
+          "Verdict": "MATCH",
+          "Note": "수집한 오류: 547(class 16), 3621(class 0)"
+        },
+        {
+          "Item": "statement 1 status",
+          "Expected": "failed",
+          "Actual": "failed",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Grp keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Grp inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Grp updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Grp deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Item keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Item inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Item updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Item deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Category 변경 0(정답에 없는 같은 패턴 스키마 테이블)",
+          "Expected": "I0 U0 D0",
+          "Actual": "I0 U0 D0",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl03.Product 변경 0(정답에 없는 같은 패턴 스키마 테이블)",
+          "Expected": "I0 U0 D0",
+          "Actual": "I0 U0 D0",
+          "Verdict": "MATCH"
+        }
+      ]
+    },
+    {
+      "Id": "CL04",
+      "CaseFile": "CL04-update-cascade-pk.json",
+      "Database": "CascadeLab",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "UPDATE cl04.P SET id = id + 100 WHERE id IN (1, 2);",
+          "Status": "ok",
+          "RowsAffected": 2,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl04.Ch",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":10}",
+              "ChangedColumns": [
+                "p_id"
+              ],
+              "Before": {
+                "p_id": 1
+              },
+              "After": {
+                "p_id": 101
+              }
+            },
+            {
+              "Key": "{\"id\":11}",
+              "ChangedColumns": [
+                "p_id"
+              ],
+              "Before": {
+                "p_id": 1
+              },
+              "After": {
+                "p_id": 101
+              }
+            },
+            {
+              "Key": "{\"id\":20}",
+              "ChangedColumns": [
+                "p_id"
+              ],
+              "Before": {
+                "p_id": 2
+              },
+              "After": {
+                "p_id": 102
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl04.P",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [
+            "{\"id\":101}",
+            "{\"id\":102}"
+          ],
+          "Deleted": [
+            "{\"id\":1}",
+            "{\"id\":2}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.P keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.P inserted",
+          "Expected": "[{\"id\":101}, {\"id\":102}]",
+          "Actual": "[{\"id\":101}, {\"id\":102}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.P updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.P deleted",
+          "Expected": "[{\"id\":1}, {\"id\":2}]",
+          "Actual": "[{\"id\":1}, {\"id\":2}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch updated",
+          "Expected": "[{\"id\":10}, {\"id\":11}, {\"id\":20}]",
+          "Actual": "[{\"id\":10}, {\"id\":11}, {\"id\":20}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch {\"id\":10} changedColumns",
+          "Expected": "[p_id]",
+          "Actual": "[p_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch {\"id\":10} after.p_id",
+          "Expected": "101",
+          "Actual": "101",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch {\"id\":11} changedColumns",
+          "Expected": "[p_id]",
+          "Actual": "[p_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch {\"id\":11} after.p_id",
+          "Expected": "101",
+          "Actual": "101",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch {\"id\":20} changedColumns",
+          "Expected": "[p_id]",
+          "Actual": "[p_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch {\"id\":20} after.p_id",
+          "Expected": "102",
+          "Actual": "102",
+          "Verdict": "MATCH"
+        }
+      ]
+    },
+    {
+      "Id": "CL04b",
+      "CaseFile": "CL04b-update-cascade-single.json",
+      "Database": "CascadeLab",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "UPDATE cl04.P SET id = 300 WHERE id = 3;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl04.Ch",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":30}",
+              "ChangedColumns": [
+                "p_id"
+              ],
+              "Before": {
+                "p_id": 3
+              },
+              "After": {
+                "p_id": 300
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl04.P",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [
+            "{\"id\":300}"
+          ],
+          "Deleted": [
+            "{\"id\":3}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.P keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.P inserted",
+          "Expected": "[{\"id\":300}]",
+          "Actual": "[{\"id\":300}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.P updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.P deleted",
+          "Expected": "[{\"id\":3}]",
+          "Actual": "[{\"id\":3}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch updated",
+          "Expected": "[{\"id\":30}]",
+          "Actual": "[{\"id\":30}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch {\"id\":30} changedColumns",
+          "Expected": "[p_id]",
+          "Actual": "[p_id]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl04.Ch {\"id\":30} after.p_id",
+          "Expected": "300",
+          "Actual": "300",
+          "Verdict": "MATCH"
+        }
+      ]
+    },
+    {
+      "Id": "CL05",
+      "CaseFile": "CL05-two-chains.json",
+      "Database": "CascadeLab",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "DELETE FROM cl05.P WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl05.P",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":1}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl05.X",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":10}",
+            "{\"id\":11}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl05.X2",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":100}",
+            "{\"id\":110}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl05.Y",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":30}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl05.Y2",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":300}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.P keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.P inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.P updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.P deleted",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.X keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.X inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.X updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.X deleted",
+          "Expected": "[{\"id\":10}, {\"id\":11}]",
+          "Actual": "[{\"id\":10}, {\"id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.X2 keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.X2 inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.X2 updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.X2 deleted",
+          "Expected": "[{\"id\":100}, {\"id\":110}]",
+          "Actual": "[{\"id\":100}, {\"id\":110}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.Y keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.Y inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.Y updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.Y deleted",
+          "Expected": "[{\"id\":30}]",
+          "Actual": "[{\"id\":30}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.Y2 keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.Y2 inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.Y2 updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl05.Y2 deleted",
+          "Expected": "[{\"id\":300}]",
+          "Actual": "[{\"id\":300}]",
+          "Verdict": "MATCH"
+        }
+      ]
+    },
+    {
+      "Id": "CL06",
+      "CaseFile": "CL06-cascade-target-trigger.json",
+      "Database": "CascadeLab",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "DELETE FROM cl06.Ord WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl06.Line",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":10}",
+            "{\"id\":11}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl06.LineLog",
+          "KeyColumns": [
+            "line_id"
+          ],
+          "Inserted": [
+            "{\"line_id\":10}",
+            "{\"line_id\":11}"
+          ],
+          "Deleted": [],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl06.Ord",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [
+            "{\"id\":1}"
+          ],
+          "Updated": [],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl06.Ord keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl06.Ord inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl06.Ord updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl06.Ord deleted",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl06.Line keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl06.Line inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl06.Line updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl06.Line deleted",
+          "Expected": "[{\"id\":10}, {\"id\":11}]",
+          "Actual": "[{\"id\":10}, {\"id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl06.LineLog keyColumns",
+          "Expected": "line_id",
+          "Actual": "line_id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl06.LineLog inserted",
+          "Expected": "[{\"line_id\":10}, {\"line_id\":11}]",
+          "Actual": "[{\"line_id\":10}, {\"line_id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl06.LineLog updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl06.LineLog deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        }
+      ]
+    },
+    {
+      "Id": "CL07",
+      "CaseFile": "CL07-trigger-chain-3.json",
+      "Database": "CascadeLab",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "UPDATE cl07.A SET v = v + 1 WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl07.A",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":1}",
+              "ChangedColumns": [
+                "v"
+              ],
+              "Before": {
+                "v": 0
+              },
+              "After": {
+                "v": 1
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl07.B",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":10}",
+              "ChangedColumns": [
+                "total"
+              ],
+              "Before": {
+                "total": 0
+              },
+              "After": {
+                "total": 1
+              }
+            },
+            {
+              "Key": "{\"id\":11}",
+              "ChangedColumns": [
+                "total"
+              ],
+              "Before": {
+                "total": 0
+              },
+              "After": {
+                "total": 1
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl07.C",
+          "KeyColumns": [
+            "b_id"
+          ],
+          "Inserted": [
+            "{\"b_id\":10}",
+            "{\"b_id\":11}"
+          ],
+          "Deleted": [],
+          "Updated": [],
+          "ComparatorIssues": []
+        },
+        {
+          "Table": "cl07.D",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":1}",
+              "ChangedColumns": [
+                "cnt"
+              ],
+              "Before": {
+                "cnt": 0
+              },
+              "After": {
+                "cnt": 2
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.A keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.A inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.A updated",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.A deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.A {\"id\":1} changedColumns",
+          "Expected": "[v]",
+          "Actual": "[v]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.B keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.B inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.B updated",
+          "Expected": "[{\"id\":10}, {\"id\":11}]",
+          "Actual": "[{\"id\":10}, {\"id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.B deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.B {\"id\":10} changedColumns",
+          "Expected": "[total]",
+          "Actual": "[total]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.B {\"id\":11} changedColumns",
+          "Expected": "[total]",
+          "Actual": "[total]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.C keyColumns",
+          "Expected": "b_id",
+          "Actual": "b_id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.C inserted",
+          "Expected": "[{\"b_id\":10}, {\"b_id\":11}]",
+          "Actual": "[{\"b_id\":10}, {\"b_id\":11}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.C updated",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.C deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.D keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.D inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.D updated",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.D deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl07.D {\"id\":1} changedColumns",
+          "Expected": "[cnt]",
+          "Actual": "[cnt]",
+          "Verdict": "MATCH"
+        }
+      ]
+    },
+    {
+      "Id": "CL08a",
+      "CaseFile": "CL08a-self-update-rt-off.json",
+      "Database": "CascadeLab",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "UPDATE cl08.Acct SET bal = bal + 10 WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl08.Acct",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":1}",
+              "ChangedColumns": [
+                "bal",
+                "touched"
+              ],
+              "Before": {
+                "bal": 100,
+                "touched": 0
+              },
+              "After": {
+                "bal": 110,
+                "touched": 1
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "6E605145E7235F14",
+          "Actual": "6E605145E7235F14",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl08.Acct keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl08.Acct inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl08.Acct updated",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl08.Acct deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl08.Acct {\"id\":1} changedColumns",
+          "Expected": "[bal, touched]",
+          "Actual": "[bal, touched]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl08.Acct {\"id\":1} after.touched",
+          "Expected": "1",
+          "Actual": "1",
+          "Verdict": "MATCH"
+        }
+      ]
+    },
+    {
+      "Id": "CL08b",
+      "CaseFile": "CL08b-self-update-rt-on.json",
+      "Database": "CascadeLab_RT",
+      "Verdict": "MATCH",
+      "Status": "ok",
+      "Statements": [
+        {
+          "Index": 1,
+          "Sql": "UPDATE cl08.Acct SET bal = bal + 10 WHERE id = 1;",
+          "Status": "ok",
+          "RowsAffected": 1,
+          "Errors": [],
+          "InfoMessages": [],
+          "TranCountAfter": 1,
+          "XactStateAfter": 1
+        }
+      ],
+      "NetChanges": [
+        {
+          "Table": "cl08.Acct",
+          "KeyColumns": [
+            "id"
+          ],
+          "Inserted": [],
+          "Deleted": [],
+          "Updated": [
+            {
+              "Key": "{\"id\":1}",
+              "ChangedColumns": [
+                "bal",
+                "touched"
+              ],
+              "Before": {
+                "bal": 100,
+                "touched": 0
+              },
+              "After": {
+                "bal": 110,
+                "touched": 3
+              }
+            }
+          ],
+          "ComparatorIssues": []
+        }
+      ],
+      "Checks": [
+        {
+          "Item": "env: 시작 상태 = 시드 상태",
+          "Expected": "78EF7DC7082C7A41",
+          "Actual": "78EF7DC7082C7A41",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "env: ROLLBACK 뒤 시드 상태로 복귀",
+          "Expected": "78EF7DC7082C7A41",
+          "Actual": "78EF7DC7082C7A41",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "errorNumber",
+          "Expected": "null",
+          "Actual": "null",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "statement 1 status",
+          "Expected": "ok",
+          "Actual": "ok",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl08.Acct keyColumns",
+          "Expected": "id",
+          "Actual": "id",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl08.Acct inserted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl08.Acct updated",
+          "Expected": "[{\"id\":1}]",
+          "Actual": "[{\"id\":1}]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl08.Acct deleted",
+          "Expected": "[]",
+          "Actual": "[]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl08.Acct {\"id\":1} changedColumns",
+          "Expected": "[bal, touched]",
+          "Actual": "[bal, touched]",
+          "Verdict": "MATCH"
+        },
+        {
+          "Item": "cl08.Acct {\"id\":1} after.touched",
+          "Expected": "3",
+          "Actual": "3",
+          "Verdict": "MATCH"
+        }
+      ]
+    }
+  ]
+}

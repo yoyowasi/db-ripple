@@ -1,0 +1,103 @@
+# cascadelab\verification\sql\sandbox-check.sql db=CascadeLab_Sandbox part=0 at=2026-11-10T09:11:18.3341670+09:00 elapsedSec=0.79 exit=0
+db audit_header_id audit_image_id audit_control_id capture_seq_id
+-- --------------- -------------- ---------------- --------------
+CascadeLab_Sandbox 354100302 418100530 450100644 338100245
+name is_recursive_triggers_on compatibility_level is_read_committed_snapshot_on
+---- ------------------------ ------------------- -----------------------------
+CascadeLab 0 170 0
+CascadeLab_Sandbox 0 170 0
+CascadeLab_Sandbox_base 0 170 0
+id mode cap
+-- ---- ---
+1 FULL 100000
+header_rows max_seq
+----------- -------
+0 NULL
+== ??? ?? SET ??(???/??? ??) ==
+kind uses_quoted_identifier uses_ansi_nulls modules
+---- ---------------------- --------------- -------
+audit 1 1 75
+user 1 1 5
+== triggers (??? + ??) ==
+on_table event trg ord is_disabled
+-------- ----- --- --- -----------
+cl01.A DELETE cl01.dbr_audit_A_D LAST 0
+cl01.A INSERT cl01.dbr_audit_A_I LAST 0
+cl01.A UPDATE cl01.dbr_audit_A_U LAST 0
+cl01.B DELETE cl01.dbr_audit_B_D LAST 0
+cl01.B INSERT cl01.dbr_audit_B_I LAST 0
+cl01.B UPDATE cl01.dbr_audit_B_U LAST 0
+cl01.C DELETE cl01.dbr_audit_C_D LAST 0
+cl01.C INSERT cl01.dbr_audit_C_I LAST 0
+cl01.C UPDATE cl01.dbr_audit_C_U LAST 0
+cl01.D DELETE cl01.dbr_audit_D_D LAST 0
+cl01.D INSERT cl01.dbr_audit_D_I LAST 0
+cl01.D UPDATE cl01.dbr_audit_D_U LAST 0
+cl02.Dept DELETE cl02.dbr_audit_Dept_D LAST 0
+cl02.Dept INSERT cl02.dbr_audit_Dept_I LAST 0
+cl02.Dept UPDATE cl02.dbr_audit_Dept_U LAST 0
+cl02.Emp DELETE cl02.dbr_audit_Emp_D LAST 0
+cl02.Emp INSERT cl02.dbr_audit_Emp_I LAST 0
+cl02.Emp UPDATE cl02.dbr_audit_Emp_U LAST 0
+cl03.Category DELETE cl03.dbr_audit_Category_D LAST 0
+cl03.Category INSERT cl03.dbr_audit_Category_I LAST 0
+cl03.Category UPDATE cl03.dbr_audit_Category_U LAST 0
+cl03.Grp DELETE cl03.dbr_audit_Grp_D LAST 0
+cl03.Grp INSERT cl03.dbr_audit_Grp_I LAST 0
+cl03.Grp UPDATE cl03.dbr_audit_Grp_U LAST 0
+cl03.Item DELETE cl03.dbr_audit_Item_D LAST 0
+cl03.Item INSERT cl03.dbr_audit_Item_I LAST 0
+cl03.Item UPDATE cl03.dbr_audit_Item_U LAST 0
+cl03.Product DELETE cl03.dbr_audit_Product_D LAST 0
+cl03.Product INSERT cl03.dbr_audit_Product_I LAST 0
+cl03.Product UPDATE cl03.dbr_audit_Product_U LAST 0
+cl04.Ch DELETE cl04.dbr_audit_Ch_D LAST 0
+cl04.Ch INSERT cl04.dbr_audit_Ch_I LAST 0
+cl04.Ch UPDATE cl04.dbr_audit_Ch_U LAST 0
+cl04.P DELETE cl04.dbr_audit_P_D LAST 0
+cl04.P INSERT cl04.dbr_audit_P_I LAST 0
+cl04.P UPDATE cl04.dbr_audit_P_U LAST 0
+cl05.P DELETE cl05.dbr_audit_P_D LAST 0
+cl05.P INSERT cl05.dbr_audit_P_I LAST 0
+cl05.P UPDATE cl05.dbr_audit_P_U LAST 0
+cl05.X DELETE cl05.dbr_audit_X_D LAST 0
+cl05.X INSERT cl05.dbr_audit_X_I LAST 0
+cl05.X UPDATE cl05.dbr_audit_X_U LAST 0
+cl05.X2 DELETE cl05.dbr_audit_X2_D LAST 0
+cl05.X2 INSERT cl05.dbr_audit_X2_I LAST 0
+cl05.X2 UPDATE cl05.dbr_audit_X2_U LAST 0
+cl05.Y DELETE cl05.dbr_audit_Y_D LAST 0
+cl05.Y INSERT cl05.dbr_audit_Y_I LAST 0
+cl05.Y UPDATE cl05.dbr_audit_Y_U LAST 0
+cl05.Y2 DELETE cl05.dbr_audit_Y2_D LAST 0
+cl05.Y2 INSERT cl05.dbr_audit_Y2_I LAST 0
+cl05.Y2 UPDATE cl05.dbr_audit_Y2_U LAST 0
+cl06.Line DELETE cl06.dbr_audit_Line_D LAST 0
+cl06.Line DELETE cl06.trg_Line_del NONE 0
+cl06.Line INSERT cl06.dbr_audit_Line_I LAST 0
+cl06.Line UPDATE cl06.dbr_audit_Line_U LAST 0
+cl06.LineLog DELETE cl06.dbr_audit_LineLog_D LAST 0
+cl06.LineLog INSERT cl06.dbr_audit_LineLog_I LAST 0
+cl06.LineLog UPDATE cl06.dbr_audit_LineLog_U LAST 0
+cl06.Ord DELETE cl06.dbr_audit_Ord_D LAST 0
+cl06.Ord INSERT cl06.dbr_audit_Ord_I LAST 0
+cl06.Ord UPDATE cl06.dbr_audit_Ord_U LAST 0
+cl07.A DELETE cl07.dbr_audit_A_D LAST 0
+cl07.A INSERT cl07.dbr_audit_A_I LAST 0
+cl07.A UPDATE cl07.dbr_audit_A_U LAST 0
+cl07.A UPDATE cl07.trg_A_upd NONE 0
+cl07.B DELETE cl07.dbr_audit_B_D LAST 0
+cl07.B INSERT cl07.dbr_audit_B_I LAST 0
+cl07.B UPDATE cl07.dbr_audit_B_U LAST 0
+cl07.B UPDATE cl07.trg_B_upd NONE 0
+cl07.C DELETE cl07.dbr_audit_C_D LAST 0
+cl07.C INSERT cl07.dbr_audit_C_I LAST 0
+cl07.C INSERT cl07.trg_C_ins NONE 0
+cl07.C UPDATE cl07.dbr_audit_C_U LAST 0
+cl07.D DELETE cl07.dbr_audit_D_D LAST 0
+cl07.D INSERT cl07.dbr_audit_D_I LAST 0
+cl07.D UPDATE cl07.dbr_audit_D_U LAST 0
+cl08.Acct DELETE cl08.dbr_audit_Acct_D LAST 0
+cl08.Acct INSERT cl08.dbr_audit_Acct_I LAST 0
+cl08.Acct UPDATE cl08.dbr_audit_Acct_U LAST 0
+cl08.Acct UPDATE cl08.trg_Acct_upd NONE 0

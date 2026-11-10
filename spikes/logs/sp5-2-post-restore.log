@@ -1,0 +1,30 @@
+# spikes\sql\sp5-2-post-restore.sql db=master part=0 at=2026-11-10T08:45:11.4058844+09:00 elapsedSec=0.8 exit=0
+Changed database context to 'AW_Origin'.
+name type type_desc is_default
+---- ---- --------- ----------
+PRIMARY FG ROWS_FILEGROUP 1
+
+(1 rows affected)
+memory_optimized_or_filestream_groups
+-------------------------------------
+0
+
+(1 rows affected)
+fulltext_catalog_id name is_default
+------------------- ---- ----------
+5 AW2025FullTextCatalog 1
+
+(1 rows affected)
+sch tbl fulltext_catalog_id is_enabled
+--- --- ------------------- ----------
+Production Document 5 1
+HumanResources JobCandidate 5 1
+Production ProductReview 5 1
+
+(3 rows affected)
+name type_desc physical_name size_mb
+---- --------- ------------- -------
+AdventureWorks ROWS /var/opt/mssql/data/AW_Origin_AdventureWorks.mdf 264
+AdventureWorks_log LOG /var/opt/mssql/data/AW_Origin_AdventureWorks_log.ldf 72
+
+(2 rows affected)

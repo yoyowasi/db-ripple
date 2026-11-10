@@ -1,0 +1,187 @@
+# spikes\sql\sp6_20_generator_shape.sql db=SpikeLab_SP6 part=2 at=2026-11-10T09:21:37.1235152+09:00 elapsedSec=1.25 exit=0
+Changed database context to 'SpikeLab_SP6'.
+
+(2 rows affected)
+
+(1 rows affected)
+part objectName uses_quoted_identifier
+---- ---------- ----------------------
+E_module_qi dbr_audit_Types_U 1
+
+(1 rows affected)
+part errNo msg xstate
+---- ----- --- ------
+E_fire NULL NULL 1
+part captureSeq tableName operation insertedCount deletedCount nestLevel tranCount imageMode
+---- ---------- --------- --------- ------------- ------------ --------- --------- ---------
+E_header 1 [dbo].[Types] U 3 3 1 2 FULL
+part imageKind n validRowJson validKeyJson
+---- --------- - ------------ ------------
+E_image_count DELETED 3 3 3
+E_image_count INSERTED 3 3 3
+part keyJson key value type
+---- ------- --- ----- ----
+E_row3_kv {"Id":3} Id 3 2
+E_row3_kv {"Id":3} cXml <r>x&lt;y &amp; "z"</r> 1
+E_row3_kv {"Id":3} cHier / 1
+E_row3_kv {"Id":3} cGeog POINT (126.97801234567891 37.566512345678909) 1
+E_row3_kv {"Id":3} cGeog@srid 4326 2
+E_row3_kv {"Id":3} cGeom POINT (0.30000000000000004 0.1) 1
+E_row3_kv {"Id":3} cGeom@srid 3857 2
+E_row3_kv {"Id":3} cMoney -922337203685477.5808 2
+E_row3_kv {"Id":3} cSmallMoney 214748.3647 2
+E_row3_kv {"Id":3} cVarbin  1
+E_row3_kv {"Id":3} cBin AAAAAA== 1
+E_row3_kv {"Id":3} cRv AAAAAAAAB9k= 1
+E_row3_kv {"Id":3} cDto 0001-01-01T00:00:00-14:00 1
+E_row3_kv {"Id":3} cDt2 0001-01-01T00:00:00 1
+E_row3_kv {"Id":3} cTime 00:00:00.0000001 1
+E_row3_kv {"Id":3} cDec -9999999999999999999999999999.9999999999 2
+E_row3_kv {"Id":3} cBig -9223372036854775808 2
+E_row3_kv {"Id":3} cFloat 3.000000000000000e-001 2
+E_row3_kv {"Id":3} cReal 1.0000000e-001 2
+E_row3_kv {"Id":3} cGuid 00000000-0000-0000-0000-000000000000 1
+E_row3_kv {"Id":3} cVariant 2026-11-06T11:20:00.123 1
+E_row3_kv {"Id":3} cBit false 3
+E_row3_kv {"Id":3} cNvar 	탭
+줄
+ 1
+part Id col same
+---- -- --- ----
+E_roundtrip 1 bigint 원문 1
+E_roundtrip 1 binary 1
+E_roundtrip 1 bit 1
+E_roundtrip 1 datetime2 1
+E_roundtrip 1 datetimeoffset 1
+E_roundtrip 1 decimal(38,10) 원문 1
+E_roundtrip 1 float 0
+E_roundtrip 1 geography STEquals 1
+E_roundtrip 1 geography 이진 동일 1
+E_roundtrip 1 geometry STEquals 1
+E_roundtrip 1 geometry 이진 동일 1
+E_roundtrip 1 hierarchyid 1
+E_roundtrip 1 money 1
+E_roundtrip 1 money 원문 1
+E_roundtrip 1 nvarchar 1
+E_roundtrip 1 real 1
+E_roundtrip 1 rowversion 1
+E_roundtrip 1 smallmoney 1
+E_roundtrip 1 sql_variant(원 형식을 알 때) 1
+E_roundtrip 1 time 1
+E_roundtrip 1 uniqueidentifier 1
+E_roundtrip 1 varbinary 1
+E_roundtrip 1 xml 1
+E_roundtrip 2 bigint 원문 1
+E_roundtrip 2 binary 1
+E_roundtrip 2 bit 1
+E_roundtrip 2 datetime2 1
+E_roundtrip 2 datetimeoffset 1
+E_roundtrip 2 decimal(38,10) 원문 1
+E_roundtrip 2 float 1
+E_roundtrip 2 geography STEquals 1
+E_roundtrip 2 geography 이진 동일 1
+E_roundtrip 2 geometry STEquals 1
+E_roundtrip 2 geometry 이진 동일 1
+E_roundtrip 2 hierarchyid 1
+E_roundtrip 2 money 1
+E_roundtrip 2 money 원문 1
+E_roundtrip 2 nvarchar 1
+E_roundtrip 2 real 1
+E_roundtrip 2 rowversion 1
+E_roundtrip 2 smallmoney 1
+E_roundtrip 2 sql_variant(원 형식을 알 때) 1
+E_roundtrip 2 time 1
+E_roundtrip 2 uniqueidentifier 1
+E_roundtrip 2 varbinary 1
+E_roundtrip 2 xml 1
+E_roundtrip 3 bigint 원문 1
+E_roundtrip 3 binary 1
+E_roundtrip 3 bit 1
+E_roundtrip 3 datetime2 1
+E_roundtrip 3 datetimeoffset 1
+E_roundtrip 3 decimal(38,10) 원문 1
+E_roundtrip 3 float 0
+E_roundtrip 3 geography STEquals 1
+E_roundtrip 3 geography 이진 동일 0
+E_roundtrip 3 geometry STEquals 1
+E_roundtrip 3 geometry 이진 동일 0
+E_roundtrip 3 hierarchyid 1
+E_roundtrip 3 money 1
+E_roundtrip 3 money 원문 1
+E_roundtrip 3 nvarchar 1
+E_roundtrip 3 real 1
+E_roundtrip 3 rowversion 1
+E_roundtrip 3 smallmoney 1
+E_roundtrip 3 sql_variant(원 형식을 알 때) 1
+E_roundtrip 3 time 1
+E_roundtrip 3 uniqueidentifier 1
+E_roundtrip 3 varbinary 1
+E_roundtrip 3 xml 1
+part Id geogSTAsText geogAsTextZM geomSTAsText geomAsTextZM
+---- -- ------------ ------------ ------------ ------------
+E_spatial_text 1 POINT (126.978 37.5665) POINT (126.978 37.5665) LINESTRING (0 0, 1 1) LINESTRING (0 0, 1 1)
+E_spatial_text 3 POINT (126.97801234567891 37.566512345678909) POINT (126.97801234567891 37.566512345678909 10.5 2.25) POINT (0.30000000000000004 0.1) POINT (0.30000000000000004 0.1 7 8)
+part Id geogToStringBinarySame geomToStringBinarySame
+---- -- ---------------------- ----------------------
+E_spatial_alt 1 1 1
+E_spatial_alt 3 1 1
+part label float17 forJson sameForJson sameStyle3
+---- ----- ------- ------- ----------- ----------
+F1_float 0.1+0.2 3.0000000000000004e-001 3.000000000000000e-001 0 1
+F1_float 1/3 3.3333333333333331e-001 3.333333333333333e-001 1 1
+F1_float max 1.7976931348623157e+308 1.797693134862316e+308 0 1
+F1_float -max -1.7976931348623157e+308 -1.797693134862316e+308 0 1
+F1_float min normal 2.2250738585072014e-308 2.225073858507201e-308 0 1
+F1_float 2^53+2 9.0071992547409940e+015 9.007199254740994e+015 1 1
+F1_float 123456789.123456789 1.2345678912345679e+008 1.234567891234568e+008 0 1
+F1_float 0.1 1.0000000000000001e-001 1.000000000000000e-001 1 1
+F1_float 1e23 9.9999999999999992e+022 9.999999999999999e+022 1 1
+F1_float 100 1.0000000000000000e+002 1.000000000000000e+002 1 1
+part label asFloat17 forJson sameForJson sameStyle3
+---- ----- --------- ------- ----------- ----------
+F1_real 0.1 1.0000000149011612e-001 1.0000000e-001 1 1
+F1_real max 3.4028234663852886e+038 3.4028235e+038 1 1
+F1_real 1/3 3.3333334326744080e-001 3.3333334e-001 1 1
+F1_real 16777216 1.6777216000000000e+007 1.6777216e+007 1 1
+F1_real 1.17549435E-38 1.1754943508222875e-038 1.1754944e-038 1 1
+F1_real 1000+2^-14 1.0000000610351562e+003 1.0000001e+003 0 1
+part Id baseType ok errNo json
+---- -- -------- -- ----- ----
+F2_variant 1 int 1 NULL {"v":7}
+F2_variant 2 bigint 1 NULL {"v":9223372036854775807}
+F2_variant 3 decimal 1 NULL {"v":1234567890123456789012345678.0123456789}
+F2_variant 4 float 1 NULL {"v":3.000000000000000e-001}
+F2_variant 5 real 1 NULL {"v":1.0000000e-001}
+F2_variant 6 money 1 NULL {"v":922337203685477.5807}
+F2_variant 7 datetime 1 NULL {"v":"2026-11-06T11:20:00.123"}
+F2_variant 8 datetime2 1 NULL {"v":"2026-11-06T11:20:00.1234567"}
+F2_variant 9 datetimeoffset 1 NULL {"v":"2026-11-06T11:20:00.1234567+09:00"}
+F2_variant 10 date 1 NULL {"v":"2026-11-06"}
+F2_variant 11 time 1 NULL {"v":"23:59:59.9999999"}
+F2_variant 12 varbinary 1 NULL {"v":"AP8Q"}
+F2_variant 13 nvarchar 1 NULL {"v":"한글"}
+F2_variant 14 varchar 1 NULL {"v":"abc"}
+F2_variant 15 uniqueidentifier 1 NULL {"v":"F0E1D2C3-B4A5-4697-8899-AABBCCDDEEFF"}
+F2_variant 16 bit 1 NULL {"v":true}
+F2_variant 17 smalldatetime 1 NULL {"v":"2026-11-06T11:20:00"}
+F2_variant 18 char 1 NULL {"v":"ab "}
+part Id expr ok errNo val
+---- -- ---- -- ----- ---
+F3_clr_convert 1 cGeog.ToString() 1 NULL POINT (126.978 37.5665)
+F3_clr_convert 1 cGeom.ToString() 1 NULL LINESTRING (0 0, 1 1)
+F3_clr_convert 1 CONVERT(nvarchar(max), cGeog) 1 NULL POINT (126.978 37.5665)
+F3_clr_convert 1 CONVERT(nvarchar(max), cGeom) 1 NULL LINESTRING (0 0, 1 1)
+F3_clr_convert 1 CONVERT(nvarchar(max), cHier) 1 NULL /1/2/
+F3_clr_convert 3 cGeog.ToString() 1 NULL POINT (126.97801234567891 37.566512345678909 10.5 2.25)
+F3_clr_convert 3 cGeom.ToString() 1 NULL POINT (0.30000000000000004 0.1 7 8)
+F3_clr_convert 3 CONVERT(nvarchar(max), cGeog) 1 NULL POINT (126.97801234567891 37.566512345678909 10.5 2.25)
+F3_clr_convert 3 CONVERT(nvarchar(max), cGeom) 1 NULL POINT (0.30000000000000004 0.1 7 8)
+F3_clr_convert 3 CONVERT(nvarchar(max), cHier) 1 NULL /
+part case_ ok errNo val
+---- ----- -- ----- ---
+F4_names 점 이름만 [a.b] 1 NULL {"Id":1,"a":{"b":20}}
+F4_names [a]와 [a.b] 함께 0 13601 Property 'a.b' cannot be generated in JSON output due to a conflict with another column name or alias. FOR JSON PATH requires that the column expressions are ordered based on the JSON document paths specified in the column aliases.
+F4_names [g@srid] 생성 키와 같은 이름의 실제 열 0 13601 Property 'g@srid' cannot be generated in JSON output due to a conflict with another column name or alias. FOR JSON PATH requires that the column expressions are ordered based on the JSON document paths specified in the column aliases.
+F4_names 따옴표·역슬래시 이름 1 NULL {"Id":1,"q\"x\\y":5}
+F4_names 트리거 생성(충돌 열 포함) 0 13601 Property 'a.b' cannot be generated in JSON output due to a conflict with another column name or alias. FOR JSON PATH requires that the column expressions are ordered based on the JSON document paths specified in the column aliases.
+Changed database context to 'master'.

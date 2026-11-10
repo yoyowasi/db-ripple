@@ -1,0 +1,66 @@
+# spikes\sql\sp1_10_schema.sql db=SpikeLab_SP1 part=0 at=2026-11-10T09:11:40.9614774+09:00 elapsedSec=1.65 exit=0
+Changed database context to 'SpikeLab_SP1'.
+
+(1 rows affected)
+
+(2 rows affected)
+
+(2 rows affected)
+
+(1 rows affected)
+
+(1 rows affected)
+
+(1 rows affected)
+
+(3 rows affected)
+
+(1 rows affected)
+
+(2 rows affected)
+tableName triggerName evt is_first is_last auditOrder
+--------- ----------- --- -------- ------- ----------
+cl06.C dbr_audit_C_D DELETE 0 1 LAST
+cl06.C trg_C_D DELETE 0 0 NULL
+cl06.G dbr_audit_G_D DELETE 0 1 LAST
+cl06.Log dbr_audit_Log_I INSERT 0 1 LAST
+cl06.P dbr_audit_P_D DELETE 0 1 LAST
+cl07.A dbr_audit_A_I INSERT 0 1 LAST
+cl07.A trg_A_I INSERT 0 0 NULL
+cl07.B dbr_audit_B_I INSERT 0 1 LAST
+cl07.B trg_B_I INSERT 0 0 NULL
+cl07.C dbr_audit_C_I INSERT 0 1 LAST
+cl07.D dbr_audit_D_I INSERT 0 1 LAST
+cl09.K dbr_audit_K_D DELETE 0 1 LAST
+cl09.M dbr_audit_M_D DELETE 0 1 LAST
+cl09.M trg_M_D DELETE 0 0 NULL
+cl09.P dbr_audit_P_D DELETE 0 1 LAST
+cl09.Q dbr_audit_Q_D DELETE 0 1 LAST
+cl13.Log dbr_audit_Log_I INSERT 0 1 LAST
+cl13.T dbr_audit_T_D DELETE 0 0 NONE
+cl13.T trg_T_1 DELETE 1 0 NULL
+cl13.T trg_T_2 DELETE 0 0 NULL
+cl13.T trg_T_3 DELETE 0 1 NULL
+cl13.TC dbr_audit_TC_D DELETE 0 1 LAST
+cl13.TC trg_TC_1 DELETE 0 0 NULL
+
+(23 rows affected)
+sampleAuditTrigger
+------------------
+CREATE TRIGGER [cl06].[dbr_audit_C_D] ON [cl06].[C] AFTER DELETE AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @dbr_seq bigint, @dbr_mode varchar(4);
+    SET @dbr_seq = NEXT VALUE FOR audit.CaptureSeq;
+    SELECT @dbr_mode = mode FROM audit.AuditControl WHERE i
+
+(1 rows affected)
+schemaName objectName uses_quoted_identifier
+---------- ---------- ----------------------
+
+(0 rows affected)
+modules quotedIdentOff sessionQuotedIdentifier
+------- -------------- -----------------------
+25 0 1
+
+(1 rows affected)

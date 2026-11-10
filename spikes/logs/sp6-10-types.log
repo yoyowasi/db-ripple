@@ -1,0 +1,139 @@
+# spikes\sql\sp6_10_types.sql db=master part=0 at=2026-11-10T09:21:33.9284008+09:00 elapsedSec=1.32 exit=0
+Changed database context to 'master'.
+Changed database context to 'SpikeLab_SP6'.
+
+(1 rows affected)
+
+(1 rows affected)
+part col typ ok errNo json
+---- --- --- -- ----- ----
+A_no_conversion cXml xml 1 NULL [{"Id":1,"cXml":"<a x=\"1\">t&amp;<\/a>"},{"Id":2,"cXml":null}]
+A_no_conversion cHier hierarchyid 1 NULL [{"Id":1,"cHier":"\/1\/2\/"},{"Id":2,"cHier":null}]
+A_no_conversion cGeog geography 0 13604 FOR JSON cannot serialize CLR objects. Cast CLR types explicitly into one of the supported types in FOR JSON queries.
+A_no_conversion cGeom geometry 0 13604 FOR JSON cannot serialize CLR objects. Cast CLR types explicitly into one of the supported types in FOR JSON queries.
+A_no_conversion cMoney money 1 NULL [{"Id":1,"cMoney":922337203685477.5807},{"Id":2,"cMoney":null}]
+A_no_conversion cSmallMoney smallmoney 1 NULL [{"Id":1,"cSmallMoney":-214748.3648},{"Id":2,"cSmallMoney":null}]
+A_no_conversion cVarbin varbinary 1 NULL [{"Id":1,"cVarbin":"AP8Q"},{"Id":2,"cVarbin":null}]
+A_no_conversion cBin binary 1 NULL [{"Id":1,"cBin":"3q2+7w=="},{"Id":2,"cBin":null}]
+A_no_conversion cRv timestamp 1 NULL [{"Id":1,"cRv":"AAAAAAAAB9E="},{"Id":2,"cRv":"AAAAAAAAB9U="}]
+A_no_conversion cDto datetimeoffset 1 NULL [{"Id":1,"cDto":"2026-11-06T11:20:00.1234567+09:00"},{"Id":2,"cDto":null}]
+A_no_conversion cDt2 datetime2 1 NULL [{"Id":1,"cDt2":"9999-12-31T23:59:59.9999999"},{"Id":2,"cDt2":null}]
+A_no_conversion cTime time 1 NULL [{"Id":1,"cTime":"23:59:59.9999999"},{"Id":2,"cTime":null}]
+A_no_conversion cDec decimal 1 NULL [{"Id":1,"cDec":1234567890123456789012345678.0123456789},{"Id":2,"cDec":null}]
+A_no_conversion cBig bigint 1 NULL [{"Id":1,"cBig":9223372036854775807},{"Id":2,"cBig":null}]
+A_no_conversion cFloat float 1 NULL [{"Id":1,"cFloat":1.797693134862316e+308},{"Id":2,"cFloat":null}]
+A_no_conversion cReal real 1 NULL [{"Id":1,"cReal":3.4028235e+038},{"Id":2,"cReal":null}]
+A_no_conversion cGuid uniqueidentifier 1 NULL [{"Id":1,"cGuid":"F0E1D2C3-B4A5-4697-8899-AABBCCDDEEFF"},{"Id":2,"cGuid":null}]
+A_no_conversion cVariant sql_variant 1 NULL [{"Id":1,"cVariant":1.25},{"Id":2,"cVariant":null}]
+A_no_conversion cBit bit 1 NULL [{"Id":1,"cBit":true},{"Id":2,"cBit":null}]
+A_no_conversion cNvar nvarchar 1 NULL [{"Id":1,"cNvar":"한글 \"따옴표\" \\역슬래시 '홑😀"},{"Id":2,"cNvar":null}]
+A_no_conversion cText text 1 NULL [{"Id":1,"cText":"text"},{"Id":2,"cText":null}]
+A_no_conversion cNtext ntext 1 NULL [{"Id":1,"cNtext":"ntext 한글"},{"Id":2,"cNtext":null}]
+A_no_conversion cImage image 1 NULL [{"Id":1,"cImage":"AQI="},{"Id":2,"cImage":null}]
+part jsonLen isJson
+---- ------- ------
+B_converted_json 985 1
+part rowIdx key value type
+---- ------ --- ----- ----
+B_converted_kv 0 Id 1 2
+B_converted_kv 0 cXml <a x="1">t&amp;</a> 1
+B_converted_kv 0 cHier /1/2/ 1
+B_converted_kv 0 cGeog POINT (126.978 37.5665) 1
+B_converted_kv 0 cGeog@srid 4326 2
+B_converted_kv 0 cGeom LINESTRING (0 0, 1 1) 1
+B_converted_kv 0 cGeom@srid 0 2
+B_converted_kv 0 cMoney 922337203685477.5807 2
+B_converted_kv 0 cSmallMoney -214748.3648 2
+B_converted_kv 0 cVarbin AP8Q 1
+B_converted_kv 0 cBin 3q2+7w== 1
+B_converted_kv 0 cRv AAAAAAAAB9E= 1
+B_converted_kv 0 cDto 2026-11-06T11:20:00.1234567+09:00 1
+B_converted_kv 0 cDt2 9999-12-31T23:59:59.9999999 1
+B_converted_kv 0 cTime 23:59:59.9999999 1
+B_converted_kv 0 cDec 1234567890123456789012345678.0123456789 2
+B_converted_kv 0 cBig 9223372036854775807 2
+B_converted_kv 0 cFloat 1.797693134862316e+308 2
+B_converted_kv 0 cReal 3.4028235e+038 2
+B_converted_kv 0 cGuid F0E1D2C3-B4A5-4697-8899-AABBCCDDEEFF 1
+B_converted_kv 0 cVariant 1.25 1
+B_converted_kv 0 cVariant@type decimal 1
+B_converted_kv 0 cBit true 3
+B_converted_kv 0 cNvar 한글 "따옴표" \역슬래시 '홑😀 1
+B_converted_kv 1 Id 2 2
+B_converted_kv 1 cXml NULL 0
+B_converted_kv 1 cHier NULL 0
+B_converted_kv 1 cGeog NULL 0
+B_converted_kv 1 cGeog@srid NULL 0
+B_converted_kv 1 cGeom NULL 0
+B_converted_kv 1 cGeom@srid NULL 0
+B_converted_kv 1 cMoney NULL 0
+B_converted_kv 1 cSmallMoney NULL 0
+B_converted_kv 1 cVarbin NULL 0
+B_converted_kv 1 cBin NULL 0
+B_converted_kv 1 cRv AAAAAAAAB9U= 1
+B_converted_kv 1 cDto NULL 0
+B_converted_kv 1 cDt2 NULL 0
+B_converted_kv 1 cTime NULL 0
+B_converted_kv 1 cDec NULL 0
+B_converted_kv 1 cBig NULL 0
+B_converted_kv 1 cFloat NULL 0
+B_converted_kv 1 cReal NULL 0
+B_converted_kv 1 cGuid NULL 0
+B_converted_kv 1 cVariant NULL 0
+B_converted_kv 1 cVariant@type NULL 0
+B_converted_kv 1 cBit NULL 0
+B_converted_kv 1 cNvar NULL 0
+part Id col same
+---- -- --- ----
+C_roundtrip 1 bigint 원문 1
+C_roundtrip 1 binary 1
+C_roundtrip 1 bit 1
+C_roundtrip 1 datetime2 1
+C_roundtrip 1 datetimeoffset 1
+C_roundtrip 1 decimal(38,10) 원문 1
+C_roundtrip 1 float 0
+C_roundtrip 1 geography 1
+C_roundtrip 1 geometry 1
+C_roundtrip 1 hierarchyid 1
+C_roundtrip 1 money 1
+C_roundtrip 1 nvarchar 1
+C_roundtrip 1 real 1
+C_roundtrip 1 rowversion 1
+C_roundtrip 1 smallmoney 1
+C_roundtrip 1 time 1
+C_roundtrip 1 uniqueidentifier 1
+C_roundtrip 1 varbinary 1
+C_roundtrip 1 xml 1
+C_roundtrip 2 bigint 원문 1
+C_roundtrip 2 binary 1
+C_roundtrip 2 bit 1
+C_roundtrip 2 datetime2 1
+C_roundtrip 2 datetimeoffset 1
+C_roundtrip 2 decimal(38,10) 원문 1
+C_roundtrip 2 float 1
+C_roundtrip 2 geography 1
+C_roundtrip 2 geometry 1
+C_roundtrip 2 hierarchyid 1
+C_roundtrip 2 money 1
+C_roundtrip 2 nvarchar 1
+C_roundtrip 2 real 1
+C_roundtrip 2 rowversion 1
+C_roundtrip 2 smallmoney 1
+C_roundtrip 2 time 1
+C_roundtrip 2 uniqueidentifier 1
+C_roundtrip 2 varbinary 1
+C_roundtrip 2 xml 1
+part Id jsonFloat float17 reparsed jsonReal real9
+---- -- --------- ------- -------- -------- -----
+C_float_text 1 1.797693134862316e+308 1.7976931348623157e+308 NULL 3.4028235e+038 3.4028234663852886e+038
+C_float_text 2 NULL NULL NULL NULL NULL
+part key value type
+---- --- ----- ----
+B_srid_attr cGeog@srid 4326 2
+B_srid_attr cGeom@srid 0 2
+B_srid_attr cVariant@type decimal 1
+part case_ ok errNo msg
+---- ----- -- ----- ---
+D_text_in_trigger text 열 참조 트리거 생성 0 311 Cannot use text, ntext, or image columns in the 'inserted' and 'deleted' tables.
+D_text_in_trigger SELECT * FROM inserted 트리거 생성 0 311 Cannot use text, ntext, or image columns in the 'inserted' and 'deleted' tables.
+Changed database context to 'master'.

@@ -25,7 +25,8 @@
 | `changes[]` | 테이블별 **순 변경**(NetChange 기준, PK 조인). `{table, keyColumns, inserted[], updated[], deleted[], basis}` |
 | `firings[]` | 기대 변경 묶음(노드). `{node, table, operation, rowCount, causeKind, depth, pairing?}` |
 | `edges[]` | 기대 간선. M3 간선 키 + 기대 확신도 + 근거 |
-| `observedOnly[]` | 문서 규칙만으로 정할 수 없는 부분. `{id, what, alternatives?, basis}` |
+| `observedOnly[]` | 문서 규칙만으로 정할 수 없는 부분. `{id, what, alternatives?, basis, confirmed?}`. 실측으로 값이 정해지면 `confirmed: {date, value, note, evidence}`를 붙인다(2026-11-10 추가) |
+| `corrections[]` | 정답 정정 기록(설계 §10.3). `{date, item, before, after, evidence, cause}`. 대안을 하나로 확정해 `observedOnly`에서 뺀 경우에도 남긴다(2026-11-10 추가) |
 
 ### changes 행
 

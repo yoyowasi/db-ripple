@@ -1,0 +1,51 @@
+# spikes\sql\sp10_10_run.sql db=SpikeLab_SP10 part=2 at=2026-11-10T09:21:32.5874452+09:00 elapsedSec=4.35 exit=0
+Changed database context to 'SpikeLab_SP10'.
+
+(1 rows affected)
+
+(1 rows affected)
+i step userName tranCount ok errNo xstate detail
+- ---- -------- --------- -- ----- ------ ------
+0 other_db_impersonating spk_user 1 0 916 -1 The server principal "S-1-9-3-1741363477-1222080203-1108439724-998032513" is not able to access the database "SpikeLab_SP10_Other" under the current security context.
+0 revert_after_other_db spk_user 1 0 3930 -1 The current transaction cannot be committed and cannot support operations that write to the log file. Roll back the transaction.
+0 state_after_rollback dbo 0 1 NULL 1 NULL
+1 direct_audit_read spk_user 1 0 229 1 The SELECT permission was denied on the object 'AuditHeader', database 'SpikeLab_SP10', schema 'audit'.
+1 other_db_after_revert dbo 1 1 NULL 1 NULL
+1 update_as_user spk_user 1 1 NULL 1 NULL
+2 direct_audit_read spk_user 1 0 229 1 The SELECT permission was denied on the object 'AuditHeader', database 'SpikeLab_SP10', schema 'audit'.
+2 other_db_after_revert dbo 1 1 NULL 1 NULL
+2 update_as_user spk_user 1 1 NULL 1 NULL
+3 direct_audit_read spk_user 1 0 229 1 The SELECT permission was denied on the object 'AuditHeader', database 'SpikeLab_SP10', schema 'audit'.
+3 other_db_after_revert dbo 1 1 NULL 1 NULL
+3 update_as_user spk_user 1 1 NULL 1 NULL
+4 direct_audit_read spk_user 1 0 229 1 The SELECT permission was denied on the object 'AuditHeader', database 'SpikeLab_SP10', schema 'audit'.
+4 other_db_after_revert dbo 1 1 NULL 1 NULL
+4 update_as_user spk_user 1 1 NULL 1 NULL
+5 direct_audit_read spk_user 1 0 229 1 The SELECT permission was denied on the object 'AuditHeader', database 'SpikeLab_SP10', schema 'audit'.
+5 other_db_after_revert dbo 1 1 NULL 1 NULL
+5 update_as_user spk_user 1 1 NULL 1 NULL
+captureSeq nestLevel tranCount
+---------- --------- ---------
+1 1 2
+2 1 2
+3 1 2
+4 1 2
+5 1 2
+chk verdict
+--- -------
+repeat_impersonation PASS
+ownership_chain_header_and_sequence PASS
+no_direct_audit_permission PASS
+other_db_after_revert_ok PASS
+other_db_impersonating_fails PASS
+chk errNo xstate msg revertErrNo revertXstate userAfter verdict
+--- ----- ------ --- ----------- ------------ --------- -------
+negative_control 229 -1 The UPDATE permission was denied on the object 'Seq', database 'SpikeLab_SP10', schema 'auditx'. 3930 -1 dbo PASS
+chk schemaName objectName
+--- ---------- ----------
+chk modules quotedIdentOff
+--- ------- --------------
+modules 4 0
+Changed database context to 'master'.
+Nonqualified transactions are being rolled back. Estimated rollback completion: 0%.
+Nonqualified transactions are being rolled back. Estimated rollback completion: 100%.

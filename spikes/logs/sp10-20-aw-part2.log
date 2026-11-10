@@ -1,0 +1,129 @@
+# spikes\sql\sp10_20_aw.sql db=AW_SpikeB part=2 at=2026-11-10T09:20:02.6793644+09:00 elapsedSec=3.01 exit=0
+Changed database context to 'AW_SpikeB'.
+  CREATE_TRIGGER - Sales.dbr_audit_SalesOrderDetail_I
+  ALTER_TRIGGER - Sales.dbr_audit_SalesOrderDetail_I
+  CREATE_TRIGGER - Production.dbr_audit_TransactionHistory_I
+  ALTER_TRIGGER - Production.dbr_audit_TransactionHistory_I
+  CREATE_TRIGGER - Person.dbr_audit_Person_I
+  ALTER_TRIGGER - Person.dbr_audit_Person_I
+  CREATE_TRIGGER - Sales.dbr_audit_SalesOrderHeader_I
+  ALTER_TRIGGER - Sales.dbr_audit_SalesOrderHeader_I
+  CREATE_TRIGGER - Sales.dbr_audit_SalesPerson_I
+  ALTER_TRIGGER - Sales.dbr_audit_SalesPerson_I
+  CREATE_TRIGGER - Sales.dbr_audit_SalesTerritory_I
+  ALTER_TRIGGER - Sales.dbr_audit_SalesTerritory_I
+  CREATE_TRIGGER - Sales.dbr_audit_SalesOrderDetail_U
+  ALTER_TRIGGER - Sales.dbr_audit_SalesOrderDetail_U
+  CREATE_TRIGGER - Production.dbr_audit_TransactionHistory_U
+  ALTER_TRIGGER - Production.dbr_audit_TransactionHistory_U
+  CREATE_TRIGGER - Person.dbr_audit_Person_U
+  ALTER_TRIGGER - Person.dbr_audit_Person_U
+  CREATE_TRIGGER - Sales.dbr_audit_SalesOrderHeader_U
+  ALTER_TRIGGER - Sales.dbr_audit_SalesOrderHeader_U
+  CREATE_TRIGGER - Sales.dbr_audit_SalesPerson_U
+  ALTER_TRIGGER - Sales.dbr_audit_SalesPerson_U
+  CREATE_TRIGGER - Sales.dbr_audit_SalesTerritory_U
+  ALTER_TRIGGER - Sales.dbr_audit_SalesTerritory_U
+  CREATE_TRIGGER - Sales.dbr_audit_SalesOrderDetail_D
+  ALTER_TRIGGER - Sales.dbr_audit_SalesOrderDetail_D
+  CREATE_TRIGGER - Production.dbr_audit_TransactionHistory_D
+  ALTER_TRIGGER - Production.dbr_audit_TransactionHistory_D
+  CREATE_TRIGGER - Person.dbr_audit_Person_D
+  ALTER_TRIGGER - Person.dbr_audit_Person_D
+  CREATE_TRIGGER - Sales.dbr_audit_SalesOrderHeader_D
+  ALTER_TRIGGER - Sales.dbr_audit_SalesOrderHeader_D
+  CREATE_TRIGGER - Sales.dbr_audit_SalesPerson_D
+  ALTER_TRIGGER - Sales.dbr_audit_SalesPerson_D
+  CREATE_TRIGGER - Sales.dbr_audit_SalesTerritory_D
+  ALTER_TRIGGER - Sales.dbr_audit_SalesTerritory_D
+part tbl name type_desc is_first is_last uses_quoted_identifier
+---- --- ---- --------- -------- ------- ----------------------
+audit_installed Person.Person dbr_audit_Person_D DELETE 0 1 1
+audit_installed Person.Person dbr_audit_Person_I INSERT 0 1 1
+audit_installed Person.Person dbr_audit_Person_U UPDATE 0 1 1
+audit_installed Production.TransactionHistory dbr_audit_TransactionHistory_D DELETE 0 1 1
+audit_installed Production.TransactionHistory dbr_audit_TransactionHistory_I INSERT 0 1 1
+audit_installed Production.TransactionHistory dbr_audit_TransactionHistory_U UPDATE 0 1 1
+audit_installed Sales.SalesOrderDetail dbr_audit_SalesOrderDetail_D DELETE 0 1 1
+audit_installed Sales.SalesOrderDetail dbr_audit_SalesOrderDetail_I INSERT 0 1 1
+audit_installed Sales.SalesOrderDetail dbr_audit_SalesOrderDetail_U UPDATE 0 1 1
+audit_installed Sales.SalesOrderHeader dbr_audit_SalesOrderHeader_D DELETE 0 1 1
+audit_installed Sales.SalesOrderHeader dbr_audit_SalesOrderHeader_I INSERT 0 1 1
+audit_installed Sales.SalesOrderHeader dbr_audit_SalesOrderHeader_U UPDATE 0 1 1
+audit_installed Sales.SalesPerson dbr_audit_SalesPerson_D DELETE 0 1 1
+audit_installed Sales.SalesPerson dbr_audit_SalesPerson_I INSERT 0 1 1
+audit_installed Sales.SalesPerson dbr_audit_SalesPerson_U UPDATE 0 1 1
+audit_installed Sales.SalesTerritory dbr_audit_SalesTerritory_D DELETE 0 1 1
+audit_installed Sales.SalesTerritory dbr_audit_SalesTerritory_I INSERT 0 1 1
+audit_installed Sales.SalesTerritory dbr_audit_SalesTerritory_U UPDATE 0 1 1
+part userName seq_update header_insert control_select
+---- -------- ---------- ------------- --------------
+perm_spk_dml_audit spk_dml 0 0 0
+part salesOrderId salesOrderDetailId
+---- ------------ ------------------
+target 43659 1
+part metric base R3_dbo R4_spk_dml r3_vs_r4
+---- ------ ---- ------ ---------- --------
+cmp_audit audit:[Person].[Person]:U NULL firings=6 ins=2 del=2 nest=3,3,2,3,3,2 tran=2 firings=6 ins=2 del=2 nest=3,3,2,3,3,2 tran=2 SAME
+cmp_audit audit:[Production].[TransactionHistory]:I NULL firings=1 ins=1 del=0 nest=2 tran=2 firings=1 ins=1 del=0 nest=2 tran=2 SAME
+cmp_audit audit:[Sales].[SalesOrderDetail]:U NULL firings=1 ins=1 del=1 nest=1 tran=2 firings=1 ins=1 del=1 nest=1 tran=2 SAME
+cmp_audit audit:[Sales].[SalesOrderHeader]:U NULL firings=2 ins=2 del=2 nest=3,2 tran=2 firings=2 ins=2 del=2 nest=3,2 tran=2 SAME
+cmp_audit audit:[Sales].[SalesPerson]:U NULL firings=1 ins=0 del=0 nest=3 tran=2 firings=1 ins=0 del=0 nest=3 tran=2 SAME
+cmp_audit audit:[Sales].[SalesTerritory]:U NULL firings=1 ins=0 del=0 nest=3 tran=2 firings=1 ins=0 del=0 nest=3 tran=2 SAME
+cmp_audit audit:images 0 rows, validJson= 11 rows, validJson=11 11 rows, validJson=11 SAME
+cmp_audit audit:order NULL [Production].[TransactionHistory] I(2) > [Person].[Person] U(3) > [Person].[Person] U(3) > [Person].[Person] U(2) > [Sales].[SalesOrderHeader] U(3) > [Sales].[SalesPerson] U(3) > [Sales].[SalesTerritory] U(3) > [Sales].[SalesOrderHeader] U(2) > [Person].[Person] U(3) > [Person].[Person] U(3) > [Person].[Person] U(2) > [Sales].[SalesOrderDetail] U(1) [Production].[TransactionHistory] I(2) > [Person].[Person] U(3) > [Person].[Person] U(3) > [Person].[Person] U(2) > [Sales].[SalesOrderHeader] U(3) > [Sales].[SalesPerson] U(3) > [Sales].[SalesTerritory] U(3) > [Sales].[SalesOrderHeader] U(2) > [Person].[Person] U(3) > [Person].[Person] U(3) > [Person].[Person] U(2) > [Sales].[SalesOrderDetail] U(1) SAME
+cmp_audit ErrorLog.rows 0 0 0 SAME
+cmp_audit fp:[Person].[Person] 19972/868133745/1396611471 19972/868133745/14891679 19972/868133745/14891679 SAME
+cmp_audit fp:[Production].[TransactionHistory] 113443/940934431/- 113444/-349640602/- 113444/350295968/- SAME(변경 여부·행 수)
+cmp_audit fp:[Sales].[SalesOrderDetail] 121317/183248755/- 121317/-1577809197/- 121317/-1577809197/- SAME
+cmp_audit fp:[Sales].[SalesOrderHeader] 31465/-1145688892/- 31465/126638580/- 31465/126638580/- SAME
+cmp_audit Person.TotalPurchaseYTD -8078.66 -6053.67 -6053.67 SAME
+cmp_audit revert.errNo NULL NULL NULL SAME
+cmp_audit SalesPerson.SalesYTD 2315185.61 2315185.61 2315185.61 SAME
+cmp_audit SalesTerritory.SalesYTD 2538667.25 2538667.25 2538667.25 SAME
+cmp_audit SOD.LineTotal 2024.994000 4049.988000 4049.988000 SAME
+cmp_audit SOD.OrderQty 1 2 2 SAME
+cmp_audit SOH.RevisionNumber 10 11 11 SAME
+cmp_audit SOH.SubTotal 20565.62 22590.61 22590.61 SAME
+cmp_audit stmt.@@ROWCOUNT NULL 1 1 SAME
+cmp_audit stmt.errMsg NULL NULL NULL SAME
+cmp_audit stmt.errNo NULL NULL NULL SAME
+cmp_audit stmt.tranCount NULL 1 1 SAME
+cmp_audit stmt.user NULL dbo spk_dml n/a
+cmp_audit stmt.xactState NULL 1 1 SAME
+cmp_audit TH.rows(ref) 0 1 1 SAME
+part chk verdict
+---- --- -------
+verdict aw_dml_user_same_as_dbo_with_audit PASS
+verdict aw_audit_recorded_for_dml_user PASS
+verdict aw_no_error_dml_user PASS
+part ErrorLogID ErrorTime ErrorNumber ErrorProcedure msg
+---- ---------- --------- ----------- -------------- ---
+  DROP_TRIGGER - Person.dbr_audit_Person_D
+  DROP_TRIGGER - Person.dbr_audit_Person_I
+  DROP_TRIGGER - Person.dbr_audit_Person_U
+  DROP_TRIGGER - Sales.dbr_audit_SalesOrderDetail_D
+  DROP_TRIGGER - Sales.dbr_audit_SalesOrderDetail_I
+  DROP_TRIGGER - Sales.dbr_audit_SalesOrderDetail_U
+  DROP_TRIGGER - Sales.dbr_audit_SalesOrderHeader_D
+  DROP_TRIGGER - Sales.dbr_audit_SalesOrderHeader_I
+  DROP_TRIGGER - Sales.dbr_audit_SalesOrderHeader_U
+  DROP_TRIGGER - Sales.dbr_audit_SalesPerson_D
+  DROP_TRIGGER - Sales.dbr_audit_SalesPerson_I
+  DROP_TRIGGER - Sales.dbr_audit_SalesPerson_U
+  DROP_TRIGGER - Sales.dbr_audit_SalesTerritory_D
+  DROP_TRIGGER - Sales.dbr_audit_SalesTerritory_I
+  DROP_TRIGGER - Sales.dbr_audit_SalesTerritory_U
+  DROP_TRIGGER - Production.dbr_audit_TransactionHistory_D
+  DROP_TRIGGER - Production.dbr_audit_TransactionHistory_I
+  DROP_TRIGGER - Production.dbr_audit_TransactionHistory_U
+  DROP_TABLE - audit.AuditRowImage
+  DROP_TABLE - audit.AuditHeader
+  DROP_TABLE - audit.AuditControl
+  DROP_SEQUENCE - audit.CaptureSeq
+  DROP_SCHEMA - audit.audit
+  DROP_PROCEDURE - dbo.spk10_Measure
+ 
+part auditTriggers auditSchema spkUser measureProc modulesQuotedIdentOff
+---- ------------- ----------- ------- ----------- ---------------------
+cleanup_check 0 NULL NULL NULL 0

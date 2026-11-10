@@ -25,9 +25,9 @@ SELECT 'CL06' AS exp, v.hyp, v.rule_, v.verdict FROM (VALUES
          AND (SELECT COUNT(*) FROM @obs WHERE tableName = N'[cl06].[Log]' AND nestLevel = 2) = 1 THEN 'HOLDS' ELSE 'BROKEN' END),
  ('H1', N'seq(Log) < seq(C)  (C의 사용자 트리거 중첩 변경이 C 감사보다 먼저)',
    CASE WHEN @sL < @sC THEN 'HOLDS' ELSE 'BROKEN' END),
- ('A1(참고)', N'연쇄의 반대 순서 관찰: seq(G) < seq(C) < seq(P) ?',
+ (N'A1(참고)', N'연쇄의 반대 순서 관찰: seq(G) < seq(C) < seq(P) ?',
    CASE WHEN @sG < @sC AND @sC < @sP THEN 'OBSERVED' ELSE 'OTHER_ORDER' END),
- ('A3(참고)', N'헤더 4개(P,C,G,Log)',
+ (N'A3(참고)', N'헤더 4개(P,C,G,Log)',
    CASE WHEN (SELECT COUNT(*) FROM @obs) = 4 THEN 'OK' ELSE 'CHECK' END)
 ) AS v (hyp, rule_, verdict);
 GO
@@ -54,9 +54,9 @@ SELECT 'CL07' AS exp, v.hyp, v.rule_, v.verdict FROM (VALUES
               OR (tableName = N'[cl07].[C]' AND nestLevel = 3)) = 4 THEN 'HOLDS' ELSE 'BROKEN' END),
  ('H1', N'후위 순서: seq(C) < seq(B) < seq(A), seq(D) < seq(A)',
    CASE WHEN @sC < @sB AND @sB < @sA AND @sD < @sA THEN 'HOLDS' ELSE 'BROKEN' END),
- ('H1-괄호', N'C가 B와 D 사이에 오지 않음(seq(C) < seq(B) 또는 seq(C) < seq(D)이고 C가 B 묶음 안)',
+ (N'H1-괄호', N'C가 B와 D 사이에 오지 않음(seq(C) < seq(B) 또는 seq(C) < seq(D)이고 C가 B 묶음 안)',
    CASE WHEN @sC < @sB AND NOT (@sD < @sC AND @sC < @sB) THEN 'HOLDS' ELSE 'BROKEN' END),
- ('참고', N'형제 순서 B/D(보장 아님)', CASE WHEN @sB < @sD THEN 'B<D' ELSE 'D<B' END)
+ (N'참고', N'형제 순서 B/D(보장 아님)', CASE WHEN @sB < @sD THEN 'B<D' ELSE 'D<B' END)
 ) AS v (hyp, rule_, verdict);
 GO
 /* ---------- CL09: DELETE cl09.P (Id=1) → 1차 K{40,42}, M{20}; trg_M_D가 Q{30} 삭제 → 2차 K{41} ---------- */
@@ -88,7 +88,7 @@ SELECT 'CL09' AS exp, v.hyp, v.rule_, v.verdict FROM (VALUES
          AND (SELECT COUNT(*) FROM @obs WHERE captureSeq IN (@sQ, @sK2) AND nestLevel = 2) = 2 THEN 'HOLDS' ELSE 'BROKEN' END),
  ('H2', N'1차 체인 K{40,42}, M, P는 nestLevel=1',
    CASE WHEN (SELECT COUNT(*) FROM @obs WHERE nestLevel = 1) = 3 THEN 'HOLDS' ELSE 'BROKEN' END),
- ('참고', N'2차 체인이 1차 트리거 모두 뒤(문서 문구 그대로)?', CASE WHEN @sK2 > @sP AND @sQ > @sP THEN 'AFTER_ALL' ELSE 'INSIDE' END)
+ (N'참고', N'2차 체인이 1차 트리거 모두 뒤(문서 문구 그대로)?', CASE WHEN @sK2 > @sP AND @sQ > @sP THEN 'AFTER_ALL' ELSE 'INSIDE' END)
 ) AS v (hyp, rule_, verdict);
 GO
 /* ---------- CL13: DELETE cl13.T (Id=1) → TC CASCADE. T: trg_T_1 First, trg_T_2, trg_T_3 Last(사용자), 감사 NONE ---------- */
@@ -121,7 +121,7 @@ SELECT 'CL13' AS exp, v.hyp, v.rule_, v.verdict FROM (VALUES
                          WHERE a.tableName = N'[cl13].[TC]' AND a.captureSeq < l.captureSeq) THEN 'HOLDS' ELSE 'BROKEN' END),
  ('NONE', N'T 감사 트리거 auditOrder=NONE',
    CASE WHEN EXISTS (SELECT 1 FROM dbo.spike_AuditOrder WHERE triggerName = N'dbr_audit_T_D' AND auditOrder = 'NONE') THEN 'OK' ELSE 'CHECK' END),
- ('참고', N'T 감사가 trg_T_3(사용자 Last) Log보다 먼저인 회차 수(= NONE이면 자식이 감사 뒤에 올 수 있음)',
+ (N'참고', N'T 감사가 trg_T_3(사용자 Last) Log보다 먼저인 회차 수(= NONE이면 자식이 감사 뒤에 올 수 있음)',
    CONVERT(varchar(10), (SELECT COUNT(*) FROM @obs AS a JOIN @obs AS l ON l.run = a.run AND l.src = 'trg_T_3'
                          WHERE a.tableName = N'[cl13].[T]' AND a.captureSeq < l.captureSeq)))
 ) AS v (hyp, rule_, verdict);

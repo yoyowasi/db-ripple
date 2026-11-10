@@ -4,8 +4,12 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 if (-not (Test-Path '.env')) { throw '.env가 없습니다. .env.example을 복사해 비밀번호를 채우세요.' }
+# PowerShell 5.1은 네이티브 명령의 stderr(진행 메시지)를 오류로 바꿀 수 있어, 이 구간은 종료 코드로만 판정한다
+$ErrorActionPreference = 'Continue'
 docker compose up -d
-if ($LASTEXITCODE -ne 0) { throw 'docker compose up 실패' }
+$code = $LASTEXITCODE
+$ErrorActionPreference = 'Stop'
+if ($code -ne 0) { throw 'docker compose up 실패' }
 $deadline = (Get-Date).AddSeconds($TimeoutSec)
 while ((Get-Date) -lt $deadline) {
     $id = (docker compose ps -q sql)

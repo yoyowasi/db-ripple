@@ -1,0 +1,49 @@
+# spikes\sql\sp10_20_aw.sql db=AW_SpikeB part=1 at=2026-11-10T09:19:58.7658932+09:00 elapsedSec=2.44 exit=0
+Changed database context to 'AW_SpikeB'.
+  DROP_PROCEDURE - dbo.spk10_Measure
+ 
+ 
+  GRANT_DATABASE - .Sales
+  CREATE_PROCEDURE - dbo.spk10_Measure
+part salesOrderId salesOrderDetailId CustomerID PersonID SalesPersonID TerritoryID OrderDate
+---- ------------ ------------------ ---------- -------- ------------- ----------- ---------
+target 43659 1 29825 1045 279 5 2022-05-30 00:00:00.000
+part userName sod_update th_insert person_update xsc_execute ufn_execute usplogerror_execute
+---- -------- ---------- --------- ------------- ----------- ----------- -------------------
+perm_spk_dml spk_dml 1 0 0 0 0 0
+part metric value
+---- ------ -----
+base_values SOD.OrderQty 1
+base_values SOD.LineTotal 2024.994000
+base_values TH.rows(ref) 0
+base_values Person.TotalPurchaseYTD -8078.66
+base_values SOH.SubTotal 20565.62
+base_values SOH.RevisionNumber 10
+base_values SalesPerson.SalesYTD 2315185.61
+base_values SalesTerritory.SalesYTD 2538667.25
+base_values ErrorLog.rows 0
+part metric base R1_dbo R2_spk_dml r1_vs_r2
+---- ------ ---- ------ ---------- --------
+cmp_no_audit ErrorLog.rows 0 0 0 SAME
+cmp_no_audit fp:[Person].[Person] 19972/868133745/1396611471 19972/868133745/14891679 19972/868133745/14891679 SAME
+cmp_no_audit fp:[Production].[TransactionHistory] 113443/940934431/- 113444/-270144343/- 113444/-279057390/- SAME(변경 여부·행 수)
+cmp_no_audit fp:[Sales].[SalesOrderDetail] 121317/183248755/- 121317/-1577809197/- 121317/-1577809197/- SAME
+cmp_no_audit fp:[Sales].[SalesOrderHeader] 31465/-1145688892/- 31465/126638580/- 31465/126638580/- SAME
+cmp_no_audit Person.TotalPurchaseYTD -8078.66 -6053.67 -6053.67 SAME
+cmp_no_audit revert.errNo NULL NULL NULL SAME
+cmp_no_audit SalesPerson.SalesYTD 2315185.61 2315185.61 2315185.61 SAME
+cmp_no_audit SalesTerritory.SalesYTD 2538667.25 2538667.25 2538667.25 SAME
+cmp_no_audit SOD.LineTotal 2024.994000 4049.988000 4049.988000 SAME
+cmp_no_audit SOD.OrderQty 1 2 2 SAME
+cmp_no_audit SOH.RevisionNumber 10 11 11 SAME
+cmp_no_audit SOH.SubTotal 20565.62 22590.61 22590.61 SAME
+cmp_no_audit stmt.@@ROWCOUNT NULL 1 1 SAME
+cmp_no_audit stmt.errMsg NULL NULL NULL SAME
+cmp_no_audit stmt.errNo NULL NULL NULL SAME
+cmp_no_audit stmt.tranCount NULL 1 1 SAME
+cmp_no_audit stmt.user NULL dbo spk_dml n/a
+cmp_no_audit stmt.xactState NULL 1 1 SAME
+cmp_no_audit TH.rows(ref) 0 1 1 SAME
+part chk verdict changedTables_R1 changedTables_R2
+---- --- ------- ---------------- ----------------
+verdict_no_audit aw_dml_user_same_as_dbo PASS 4 4

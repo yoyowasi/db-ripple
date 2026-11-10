@@ -1,0 +1,7 @@
+# cascadelab\sql\cl08.sql db=CascadeLab part=0 at=2026-11-10T09:09:47.7287909+09:00 elapsedSec=1.02 exit=0
+Changed database context to 'CascadeLab'.
+
+(2 rows affected)
+Changed database context to 'CascadeLab_RT'.
+
+(2 rows affected)

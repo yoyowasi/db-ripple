@@ -87,8 +87,18 @@ END TRY
 BEGIN CATCH
     INSERT @log VALUES (0, 'other_db_impersonating', USER_NAME(), @@TRANCOUNT, 0, ERROR_NUMBER(), XACT_STATE(), LEFT(ERROR_MESSAGE(), 200));
 END CATCH
-REVERT;
+/* 1차 실행(2026-11-10): 여기서 트랜잭션이 doomed(-1)이면 REVERT가 3930으로 실패하고 배치가 끝났다
+   → REVERT를 TRY로 감싸 결과를 남기고, ROLLBACK 뒤에 아직 가장 중이면 REVERT */
+BEGIN TRY
+    REVERT;
+    INSERT @log VALUES (0, 'revert_after_other_db', USER_NAME(), @@TRANCOUNT, 1, NULL, XACT_STATE(), NULL);
+END TRY
+BEGIN CATCH
+    INSERT @log VALUES (0, 'revert_after_other_db', USER_NAME(), @@TRANCOUNT, 0, ERROR_NUMBER(), XACT_STATE(), LEFT(ERROR_MESSAGE(), 200));
+END CATCH
 IF @@TRANCOUNT > 0 ROLLBACK;
+IF USER_NAME() <> N'dbo' REVERT;
+INSERT @log VALUES (0, 'state_after_rollback', USER_NAME(), @@TRANCOUNT, 1, NULL, XACT_STATE(), NULL);
 SELECT * FROM @log ORDER BY i, step;
 SELECT * FROM @hdr ORDER BY captureSeq;
 SELECT v.chk, v.verdict FROM (VALUES
@@ -111,9 +121,18 @@ END TRY
 BEGIN CATCH
     INSERT @r VALUES (ERROR_NUMBER(), XACT_STATE(), LEFT(ERROR_MESSAGE(), 300));
 END CATCH
-REVERT;
+/* doomed면 REVERT가 3930일 수 있어(1부 참고) TRY로 감싸 기록하고 ROLLBACK 뒤 REVERT */
+DECLARE @rv int = NULL, @rvx int = NULL;
+BEGIN TRY REVERT; END TRY
+BEGIN CATCH SELECT @rv = ERROR_NUMBER(), @rvx = XACT_STATE(); END CATCH
 IF @@TRANCOUNT > 0 ROLLBACK;
-SELECT 'negative_control' AS chk, errNo, xstate, msg, CASE WHEN errNo = 229 THEN 'PASS' ELSE 'CHECK' END AS verdict FROM @r;
+IF USER_NAME() <> N'dbo' REVERT;
+SELECT 'negative_control' AS chk, errNo, xstate, msg, @rv AS revertErrNo, @rvx AS revertXstate, USER_NAME() AS userAfter,
+       CASE WHEN errNo = 229 THEN 'PASS' ELSE 'CHECK' END AS verdict FROM @r;
+GO
+/* QUOTED_IDENTIFIER OFF로 저장된 모듈(0행이어야 함, 2026-11-10 run-sql -I 이후 재실행) */
+SELECT 'quoted_identifier_off_modules' AS chk, OBJECT_SCHEMA_NAME(object_id) AS schemaName, OBJECT_NAME(object_id) AS objectName FROM sys.sql_modules WHERE uses_quoted_identifier = 0;
+SELECT 'modules' AS chk, COUNT(*) AS modules, SUM(CASE WHEN uses_quoted_identifier = 0 THEN 1 ELSE 0 END) AS quotedIdentOff FROM sys.sql_modules;
 GO
 USE master;
 GO

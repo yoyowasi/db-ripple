@@ -3,8 +3,10 @@ namespace DbRipple.Core.Catalog;
 /// <summary>C7 sys.* 조회 SQL(읽기 전용).</summary>
 public static class CatalogQueries
 {
+    // 소유자 = 개체 소유자가 따로 없으면 스키마 소유자(트리거도 이 소유자 것이 된다)
     public const string Tables = """
-        SELECT t.object_id, s.name AS schema_name, t.name, t.temporal_type, t.is_memory_optimized
+        SELECT t.object_id, s.name AS schema_name, t.name, t.temporal_type, t.is_memory_optimized,
+               USER_NAME(COALESCE(t.principal_id, s.principal_id)) AS owner_name
         FROM sys.tables AS t
         JOIN sys.schemas AS s ON s.schema_id = t.schema_id
         WHERE t.is_ms_shipped = 0

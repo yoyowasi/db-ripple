@@ -18,7 +18,7 @@ public sealed record ColumnInfo(
     bool IsUserClrType = false,
     bool HasNondeterministicDefault = false);
 
-/// <summary>C9 입력 테이블. UserFirst/UserLast는 기존 사용자 AFTER 트리거가 점유한 연산.</summary>
+/// <summary>C9 입력 테이블. UserFirst/UserLast는 기존 사용자 AFTER 트리거가 점유한 연산. Owner는 실효 소유자(감사 트리거도 이 소유자 것).</summary>
 public sealed record TableInfo(
     string Schema,
     string Name,
@@ -29,7 +29,8 @@ public sealed record TableInfo(
     TemporalType Temporal = TemporalType.None,
     bool IsMemoryOptimized = false,
     IReadOnlyCollection<DmlOperation>? UserFirst = null,
-    IReadOnlyCollection<DmlOperation>? UserLast = null)
+    IReadOnlyCollection<DmlOperation>? UserLast = null,
+    string Owner = "dbo")
 {
     public string QuotedName => SqlText.Quote(Schema, Name);
     public string DisplayName => Schema + "." + Name;
