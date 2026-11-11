@@ -68,5 +68,14 @@ public static class CatalogQueries
         ORDER BY file_id;
         """;
 
-    public static IReadOnlyList<string> All => [Tables, Columns, KeyIndexes, ForeignKeys, Triggers, Files];
+    // 2주차 인계 1: 트리거가 부르는 프로시저 본문을 한 단계 펼치려고 읽는다. 암호화·CLR(PC)·확장(X)은 definition NULL. 시스템 제공(is_ms_shipped)은 뺀다.
+    public const string Procedures = """
+        SELECT p.object_id, SCHEMA_NAME(p.schema_id) AS schema_name, p.name, m.definition
+        FROM sys.procedures AS p
+        LEFT JOIN sys.sql_modules AS m ON m.object_id = p.object_id
+        WHERE p.is_ms_shipped = 0
+        ORDER BY schema_name, p.name;
+        """;
+
+    public static IReadOnlyList<string> All => [Tables, Columns, KeyIndexes, ForeignKeys, Triggers, Files, Procedures];
 }

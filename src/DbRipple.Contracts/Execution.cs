@@ -127,6 +127,13 @@ public sealed record RawCapture
     public IReadOnlyList<NetChange> ResidualCommitted { get; init; } = [];
     /// <summary>ResidualCommitted가 있어 샌드박스를 오염으로 표시해야 함(§5.2 4). 표시 자체는 파이프라인이 ISandboxManager.MarkDirty로 한다.</summary>
     public required bool SandboxDirty { get; init; }
+    /// <summary>
+    /// 실패 뒤 "롤백 뒤 남은 변경" 검사(§5.2 4, 전체 사용자 테이블 최종 차이)가 예외로 끝났는지(2주차 인계 7: 예 8115). true면 ResidualCommitted는 빈 배열이고 믿을 수 없으며,
+    /// 실행기는 SandboxDirty = true로 둔다(상태를 알 수 없으므로 재구축). 예외를 밖으로 던지지 않고 결과로 돌려준다. 2026-11-11 추가(비파괴, 기본 false, Q31).
+    /// </summary>
+    public bool ResidualCheckFailed { get; init; }
+    /// <summary>ResidualCheckFailed일 때 원인 요약(SQL 오류 번호와 메시지, 비밀값 금지). 아니면 null. 2026-11-11 추가(Q31).</summary>
+    public string? ResidualCheckMessage { get; init; }
     /// <summary>수집 범위 정보.</summary>
     public required CaptureInfo Capture { get; init; }
     /// <summary>단계 시간(ms): execute, readLog, reread, netDiff(§10.4 M5).</summary>

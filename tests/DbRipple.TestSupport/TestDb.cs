@@ -27,7 +27,7 @@ public static class TestDb
     /// <summary>
     /// 컴포넌트 코드: ana(C6 Analysis), exe(C10·C11 Execution), dif(C12 Diff), att(C13 Attribution), api(C5·C14·Preview), eval(C16 Eval), sup(TestSupport 자체 검사), int(통합: 진짜 구현 파이프라인).
     /// </summary>
-    public static readonly IReadOnlyList<string> Components = ["ana", "exe", "dif", "att", "api", "eval", "sup", "int"];
+    public static readonly IReadOnlyList<string> Components = ["ana", "exe", "dif", "att", "api", "eval", "sup", "int", "apl"];
 
     /// <summary>컨테이너 백업 폴더(docs/dev-setup.md).</summary>
     public const string BackupDir = "/var/opt/mssql/backup/";

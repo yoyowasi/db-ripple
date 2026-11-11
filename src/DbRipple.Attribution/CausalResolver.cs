@@ -89,7 +89,7 @@ public sealed class CausalResolver : ICausalResolver
                     if (!isPartial && f.Depth == 2 && insteadOf is not null && st is not null)
                     {
                         var conf = Conf.Weaker(Confidence.Inferred, cap);
-                        if (insteadOf.Unknown || !insteadOf.CanWrite(f.Table)) conf = Conf.Weaker(conf, Confidence.Ambiguous);
+                        if (insteadOf.IsUnknownFor(f.Table) || !insteadOf.CanWrite(f.Table)) conf = Conf.Weaker(conf, Confidence.Ambiguous);
                         var v = new Verdict { Kind = CauseKind.InsteadOf, Confidence = conf, Order = conf == Confidence.Inferred ? OrderGuarantee.Guaranteed : OrderGuarantee.ObservedOnly };
                         v.Evidence.AddRange([Evidence.Depth, Evidence.CatalogInsteadOf, Evidence.StaticWriteSet]);
                         v.TriggerPairs.Add(new TriggerPair(null, insteadOf.Name, st.Index));
@@ -107,7 +107,7 @@ public sealed class CausalResolver : ICausalResolver
                     foreach (var t in Fired(p).Where(t => t.CanWrite(f.Table)))
                     {
                         pairs.Add(new TriggerPair(p.Id, t.Name, f.StatementIndex));
-                        unknown |= t.Unknown;
+                        unknown |= t.IsUnknownFor(f.Table);
                     }
                 }
                 var tconf = Conf.ByCount(pairs.Count);

@@ -82,7 +82,7 @@ internal sealed class CatalogBuilder
 
     public CatalogBuilder Trigger(string trigger, string table, ChangeOperation[] events, string[] writes,
         bool insteadOf = false, bool dynamicSql = false, bool encrypted = false, bool unparsed = false, bool disabled = false, bool staticInfo = true,
-        string[]? procedureCalls = null)
+        string[]? procedureCalls = null, string[]? expandedCalls = null, string[]? unresolvedCalls = null)
     {
         var tid = _next++;
         var (_, tn) = Split(trigger);
@@ -94,6 +94,7 @@ internal sealed class CatalogBuilder
                 Trigger = trigger, ObjectId = tid, Table = table, Events = events, IsInsteadOf = insteadOf, IsDisabled = disabled,
                 IsEncrypted = encrypted, IsAuditTrigger = false, WriteTargets = writes, WriteTargetsUnknown = encrypted || unparsed, HasDynamicSql = dynamicSql || encrypted || unparsed,
                 HasRollback = false, ExternalSideEffects = unparsed ? ["unparsed"] : [], ProcedureCalls = procedureCalls ?? [],
+                ExpandedProcedureCalls = expandedCalls ?? [], UnresolvedProcedureCalls = unresolvedCalls ?? [],
             });
         return this;
     }

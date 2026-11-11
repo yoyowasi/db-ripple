@@ -13,14 +13,21 @@ internal sealed record FkInfo(
 /// <summary>
 /// 원인 후보로 쓰는 트리거 한 개. Unknown = 쓰기 대상을 알 수 없음(암호화·CLR·파싱 실패·정적 분석 누락, 열린 질문 Q6).
 /// Dynamic = 동적 SQL(모든 테이블에 쓸 수 있다고 본다, §7.2 4단계). C6 규약: 쓰기 대상 미상이면 WriteTargetsUnknown = true이고 HasDynamicSql = true다.
-/// 저장 프로시저를 부르는 트리거(ProcedureCalls)도 Unknown으로 둔다: 프로시저 본문의 쓰기 대상을 펼치지 않으므로(3주차) 어떤 테이블에든 쓸 수 있다고 보고
-/// FK 쓰기 경합으로 치며, 그 트리거의 WRITES 후보는 ambiguous 이하다(2026-11-10 통합 검토).
+/// UnresolvedProcedures = 펼치지 못한 프로시저를 부름(2주차 인계 1, C6 UnresolvedProcedureCalls, 호환 Q38).
+/// <list type="bullet">
+/// <item>FK 쓰기 경합·후보 집합(CanWrite): 미상을 유지한다. 그 프로시저가 어떤 테이블에든 쓸 수 있다고 본다(프로시저가 자식 다음 부모를 지우면 FK 연쇄와 구별할 수 없음).</item>
+/// <item>WRITES 하향(IsUnknownFor): 진짜 미상에만 한다. Unknown이거나, 못 펼친 프로시저가 있고 그 테이블이 정적 쓰기 대상(펼친 프로시저의 쓰기 대상 포함)에 없을 때.
+/// 정적 쓰기 대상에 있으면 그 트리거가 쓴 것이 확실하므로 inferred를 유지한다(2주차 검토 2회차의 AW 정밀도 퇴행 해소).</item>
+/// </list>
 /// </summary>
 internal sealed record TriggerInfo(
     string Name, string Table, IReadOnlySet<ChangeOperation> Events, bool IsInsteadOf,
-    IReadOnlySet<string> WriteTargets, bool Dynamic, bool Unknown)
+    IReadOnlySet<string> WriteTargets, bool Dynamic, bool Unknown, bool UnresolvedProcedures = false)
 {
-    public bool CanWrite(string table) => Dynamic || Unknown || WriteTargets.Contains(table);
+    public bool CanWrite(string table) => Dynamic || Unknown || UnresolvedProcedures || WriteTargets.Contains(table);
+
+    /// <summary>이 트리거가 table에 쓴 후보를 ambiguous 이하로 내려야 하는지(Q6, 인계 1).</summary>
+    public bool IsUnknownFor(string table) => Unknown || (UnresolvedProcedures && !WriteTargets.Contains(table));
 }
 
 /// <summary>카탈로그·트리거 분석·매니페스트·지문을 C13이 쓰는 모양으로 색인한 것. 감사·비활성 트리거와 비활성 FK는 뺀다(E22).</summary>
@@ -68,7 +75,7 @@ internal sealed class CatalogIndex
             seen.Add(t.Trigger);
             if (t.IsAuditTrigger || IsAuditName(t.Trigger) || t.IsDisabled) continue;
             _triggers.Add(new TriggerInfo(t.Trigger, t.Table, t.Events.ToHashSet(), t.IsInsteadOf,
-                new HashSet<string>(t.WriteTargets, Names), t.HasDynamicSql, IsWriteTargetsUnknown(t) || t.ProcedureCalls.Count > 0));
+                new HashSet<string>(t.WriteTargets, Names), t.HasDynamicSql, IsWriteTargetsUnknown(t), UnresolvedProcedureCalls(t).Count > 0));
         }
         foreach (var g in cat.Triggers.GroupBy(t => t.ObjectId))
         {
@@ -121,6 +128,13 @@ internal sealed class CatalogIndex
     /// (암호화·CLR 또는 파싱 실패, 2026-11-10 통합).
     /// </summary>
     public static bool IsWriteTargetsUnknown(TriggerStaticInfo t) => t.WriteTargetsUnknown;
+
+    /// <summary>
+    /// 펼치지 못한 프로시저 호출(인계 1). 호환(Q38): ProcedureCalls가 있는데 ExpandedProcedureCalls·UnresolvedProcedureCalls가 모두 비면(펼치기 전 분석기 결과) 전부 미상으로 본다.
+    /// Execution ErrorRules.UnresolvedProcedureCalls와 같은 식이다(프로젝트 참조가 없어 따로 둔다).
+    /// </summary>
+    public static IReadOnlyList<string> UnresolvedProcedureCalls(TriggerStaticInfo t) =>
+        t.ExpandedProcedureCalls.Count == 0 && t.UnresolvedProcedureCalls.Count == 0 ? t.ProcedureCalls : t.UnresolvedProcedureCalls;
 
     public static bool IsAuditName(string name)
     {

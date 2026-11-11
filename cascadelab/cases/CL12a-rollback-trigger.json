@@ -1,0 +1,42 @@
+{
+  "id": "CL12a",
+  "pattern": "CL12",
+  "title": "ROLLBACK 트리거와 롤백 뒤 남은 변경",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl12.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "leavesResidue": true,
+  "statements": [
+    { "index": 1, "sql": "UPDATE cl12.Ord SET qty = qty - 10 WHERE id = 1;" }
+  ],
+  "expected": {
+    "status": "trigger_blocked",
+    "errorNumber": 3609,
+    "statementStatus": [ { "index": 1, "status": "trigger_blocked" } ],
+    "changes": [
+      { "table": "cl12.Ord", "keyColumns": ["id"], "inserted": [], "updated": [], "deleted": [], "basis": "트리거 ROLLBACK으로 문장 변경이 되돌려진다(A22)" },
+      { "table": "cl12.OrdHist", "keyColumns": ["ord_id"], "inserted": [], "updated": [], "deleted": [], "basis": "거부 분기에서 RETURN하므로 쓰지 않는다" },
+      { "table": "cl12.ErrLog", "keyColumns": ["log_id"], "inserted": [], "updated": [], "deleted": [], "basis": "트랜잭션 안 순 변경은 없다. ROLLBACK 뒤 INSERT는 residualCommitted에 있다" }
+    ],
+    "residualCommitted": [
+      { "table": "cl12.ErrLog", "keyColumns": ["log_id"], "updated": [], "deleted": [],
+        "inserted": [ { "ref": "e1", "match": { "ord_id": 1, "msg": "negative qty" }, "identity": ["log_id"], "causes": ["TRIGGER"] } ],
+        "basis": "trg_Ord_check가 ROLLBACK 뒤 @bad(롤백 영향 없음)의 행마다 ErrLog 1행. 트랜잭션 밖이라 자동 커밋된다(A22). 키는 IDENTITY라 실행마다 값이 다르다" }
+    ],
+    "firings": [],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "E:3609", "kind": "BLOCKED", "name": null, "confidence": "certain", "basis": "§6.3 BLOCKED, E13(오류 번호와 트랜잭션 상태로 trigger_blocked)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "오류 번호 3609", "basis": "A22: 3609는 트리거 안 ROLLBACK에서 흔히 보고되는 번호이고 발생 조건은 2차 출처 기준이다. 이 저장소의 AW uWorkOrder 재현(logs/week1/aw-uworkorder-repro.log, 설계 §10.7 v1.3 주의)에서 같은 경로로 3609를 받았다. 트리거는 RAISERROR를 하지 않으므로 3609가 대표 오류다(ErrorRules)" },
+      { "id": "OO2", "what": "firings가 비어 있는지", "basis": "Ord 감사 묶음은 ROLLBACK으로 사라진다. ROLLBACK 뒤 ErrLog INSERT의 감사 묶음은 샌드박스에서 트랜잭션 밖에 커밋된다. 제품은 이를 기준 스냅샷 비교로 residualCommitted에 두고(E13) 샌드박스를 오염으로 표시할 것으로 본다. 문장 경계 밖 묶음으로 firings에 나오면 정정 기록 대상이다" },
+      { "id": "OO3", "what": "ROLLBACK 뒤 남은 ErrLog 행이 오라클 원본에 쌓인다", "basis": "leavesResidue. 오라클은 트랜잭션 + ROLLBACK이어도 이 행을 되돌리지 못한다. 키가 IDENTITY라 반복 실행이 실패하지 않는다" }
+    ]
+  },
+  "rationale": [
+    { "claim": "트리거 안 ROLLBACK은 그때까지의 변경을 모두 되돌리고 배치를 끝내지만, 트리거의 나머지 문장은 실행되고 그 변경은 롤백되지 않는다", "basis": "A22(ROLLBACK TRANSACTION 'Interoperability')" },
+    { "claim": "테이블 변수의 행은 롤백되지 않아 ROLLBACK 뒤에도 거부 행 키를 쓸 수 있다", "basis": "table 형식 문서(테이블 변수는 트랜잭션 롤백의 영향을 받지 않음)" },
+    { "claim": "[적용]은 막아야 하고 미리보기는 롤백 뒤 남은 변경을 보인다", "basis": "E13, §5.3 선행 조건 PREVIEW_NOT_OK" },
+    { "claim": "가드 IF ROWCOUNT_BIG() = 0 RETURN은 1행 UPDATE라 통과한다", "basis": "CL12b 참고" }
+  ]
+}

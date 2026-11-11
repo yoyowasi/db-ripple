@@ -64,13 +64,15 @@ public sealed record LabCase(string Id, string Database, IReadOnlyList<string> S
                     x.GetProperty("operation").GetString()!,
                     x.GetProperty("rowCount").GetInt64(),
                     x.GetProperty("depth").GetInt32(),
-                    x.TryGetProperty("pairing", out var p) ? p.GetString() : null)).ToList()));
+                    x.TryGetProperty("pairing", out var p) ? p.GetString() : null,
+                    x.TryGetProperty("statementIndex", out var si) ? si.GetInt32() : 1)).ToList()));
         }
         return list;
     }
 }
 
-public sealed record ExpectedFiring(string Node, string Table, string Operation, long RowCount, int Depth, string? Pairing);
+/// <summary>손 정답 묶음. StatementIndex는 answer-format v0.2(없으면 1, CL12b·CL17·CL18처럼 문장이 여럿일 때 씀).</summary>
+public sealed record ExpectedFiring(string Node, string Table, string Operation, long RowCount, int Depth, string? Pairing, int StatementIndex = 1);
 
 /// <summary>cascadelab/verification/logs/audit-2026-11-10.json의 사례별 감사 헤더(1주차 대조 도구 출력).</summary>
 public static class AuditLog

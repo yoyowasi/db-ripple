@@ -117,15 +117,17 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
                 SqlException? error = null;
                 try
                 {
-                    await using var cmd = new SqlCommand(st.Sql, conn) { CommandTimeout = Settings.CommandTimeoutSeconds };
-                    rows = await cmd.ExecuteNonQueryAsync(ct);
+                    // Q33(오케스트레이터 승인 2026-11-11, A안): StatementRunner와 같은 식으로 센다. D7 1(문장별 행 수)은 미리보기 값과 [적용] runner 값을 비교하므로
+                    // 같은 방식이어야 한다(드라이버 영향 행 수는 NOCOUNT OFF 트리거 행까지 합산).
+                    await using var cmd = new SqlCommand(st.Sql + StatementRunner.RowCountSuffix, conn) { CommandTimeout = Settings.CommandTimeoutSeconds };
+                    rows = await StatementRunner.ReadRowCountAsync(cmd, ct);
                 }
                 catch (SqlException ex)
                 {
                     if (ct.IsCancellationRequested) throw new OperationCanceledException("미리보기 취소", ex, ct);
                     error = ex;
                 }
-                if (conn.State != System.Data.ConnectionState.Open) throw new InvalidOperationException("문장 실행 중 연결이 끊김(E20: 기준선 재구축 필요)", error);
+                if (conn.State != System.Data.ConnectionState.Open) throw new SandboxUnavailableException("문장 실행 중 연결이 끊김(E20: 기준선 재구축 필요)", error);
 
                 // 위험 6(ProbeTests·ErrorRuleTests 실측): XACT_ABORT ON에서 오류는 트랜잭션을 이미 롤백해 @@TRANCOUNT = 0으로 남기고, 그때 XACT_STATE()는 1로 읽혔다.
                 // 그래서 @@TRANCOUNT를 먼저 본다. 트랜잭션이 남아 있고 doomed(−1)면 REVERT가 3930으로 실패하므로(SP10) ROLLBACK을 먼저 한다.
@@ -135,12 +137,13 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
                 if (impersonating) { await ExecAsync(conn, "REVERT;", ct); impersonating = false; }
 
                 // 트리거의 "COMMIT TRAN; BEGIN TRAN;"은 @@TRANCOUNT = 1을 남겨 오류 없이 지나간다. 트랜잭션 ID가 바뀌었으면 그 앞 변경은 이미 확정됐다(검토 재현 2026-11-10).
-                var tranReplaced = error is null && tranOpen && tranCount == 1 && currentTranId != tranId;
+                // 인계 5: 트리거가 "COMMIT; BEGIN TRAN;" 뒤 RAISERROR를 내면 오류가 있어도 트랜잭션이 바뀌어 있다 → 오류가 있어도 확정으로 본다(failed).
+                var tranReplaced = tranOpen && tranCount == 1 && currentTranId != tranId;
                 if (tranReplaced) dirty = true;
                 if (error is not null || !tranOpen || tranCount != 1 || tranReplaced)
                 {
                     var (status, err) = error is not null
-                        ? ErrorRules.Classify(error, baseline)
+                        ? Replaced(ErrorRules.Classify(error, baseline), tranReplaced)
                         : (StatementStatus.Failed, new StatementError
                         {
                             ErrorNumber = 0,
@@ -180,13 +183,25 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
                 if (tranOpen) { await ExecAsync(conn, "ROLLBACK;", ct); tranOpen = false; }
                 if (await CommittedAuditAsync(conn, boundary0, ct)) dirty = true;
                 sw.Restart();
-                var residual = await NetDiffer.DiffAsync(session, baseline.SandboxDb, baseline.SnapshotDb, tables, ct);
+                // 인계 7(Q31): 이 비교가 예외(예 8115)로 끝나도 미리보기 실패 결과는 돌려준다. 남은 변경을 알 수 없으므로 샌드박스는 오염으로 둔다.
+                IReadOnlyList<NetChange> residual = [];
+                string? residualError = null;
+                try
+                {
+                    residual = await NetDiffer.DiffAsync(session, baseline.SandboxDb, baseline.SnapshotDb, tables, ct);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException && !ct.IsCancellationRequested)
+                {
+                    if (conn.State != System.Data.ConnectionState.Open) throw new SandboxUnavailableException("롤백 뒤 남은 변경 검사 중 연결이 끊김(E20: 기준선 재구축 필요)", ex);
+                    residualError = ResidualCheckMessage(ex);
+                }
                 timings.NetDiff = sw.ElapsedMilliseconds;
-                // Q27 보완: 3609(트리거 안에서 트랜잭션이 끝남)는 ROLLBACK이면 거부(trigger_blocked)지만, COMMIT이면 문장 변경이 확정된 것이다.
-                // 롤백 뒤 사용자 테이블에 남은 변경이 있고 그 트리거가 ROLLBACK을 하는 트리거로 확인되지 않으면 failed로 바꾼다.
+                // Q27 보완(인계 5): 트리거 거부(trigger_blocked)는 ROLLBACK이면 맞지만, 트리거가 COMMIT했으면 문장 변경이 확정된 것이다.
+                // 롤백 뒤 사용자 테이블에 남은 변경이 있고 그 거부가 ROLLBACK 트리거에서 났다고 확인되지 않으면 failed로 바꾼다.
+                // 대표 오류가 3609가 아니어도(COMMIT 뒤 RAISERROR: 50000 + 3609, 또는 COMMIT; BEGIN TRAN; RAISERROR) 같은 규칙이다. 검사 실패면 남은 변경을 모르므로 그대로 둔다.
                 if (failure == StatementStatus.TriggerBlocked && residual.Count > 0
-                    && executions[^1].Result.Error is { ErrorNumber: ErrorRules.TransactionEndedInTrigger } e3609
-                    && !ErrorRules.EndedByRollback(e3609.Procedure, executions[^1].Result.Target, executions[^1].Result.Kind, baseline))
+                    && executions[^1].Result is { Error: { } eb } last
+                    && !ErrorRules.EndedByRollback(eb.Procedure, last.Target, last.Kind, baseline))
                 {
                     failure = StatementStatus.Failed;
                     executions[^1] = executions[^1] with { Result = executions[^1].Result with { Status = StatementStatus.Failed } };
@@ -197,7 +212,9 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
                     Executions = executions.Select(e => e with { Result = e.Result with { CaptureSeqRange = null } }).ToList(),
                     Boundary0 = boundary0,
                     ResidualCommitted = residual,
-                    SandboxDirty = dirty || residual.Count > 0,
+                    ResidualCheckFailed = residualError is not null,
+                    ResidualCheckMessage = residualError,
+                    SandboxDirty = dirty || residual.Count > 0 || residualError is not null,
                     Capture = new CaptureInfo { ImageCount = 0, Cap = cap, Truncated = false, ManifestVersion = baseline.Manifest.Version },
                     Timings = timings.ToContract(),
                 };
@@ -253,6 +270,17 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
         {
             await CleanupAsync(conn, impersonating, tranOpen);
         }
+    }
+
+    /// <summary>트랜잭션이 바뀌었으면(트리거의 COMMIT 뒤 BEGIN TRAN) 오류 판정과 상관없이 failed(앞 변경이 확정됨, 인계 5). 오류 내용은 그대로 둔다.</summary>
+    public static (StatementStatus Status, StatementError Error) Replaced((StatementStatus Status, StatementError Error) classified, bool tranReplaced) =>
+        tranReplaced ? (StatementStatus.Failed, classified.Error) : classified;
+
+    /// <summary>잔여 확인 실패 요약(Q31): "형식 [오류 번호] 메시지", 500자 이내. SqlException 메시지에는 연결 문자열이 들어가지 않는다.</summary>
+    public static string ResidualCheckMessage(Exception ex)
+    {
+        var text = ex is SqlException sql ? $"{nameof(SqlException)} {sql.Number}: {sql.Message}" : $"{ex.GetType().Name}: {ex.Message}";
+        return text.Length <= 500 ? text : text[..500];
     }
 
     /// <summary>롤백 뒤 경계 0보다 큰 감사 헤더가 남았는지(감사 기록은 미리보기 트랜잭션 안에서만 쓰이므로, 남았다면 확정된 것이다).</summary>

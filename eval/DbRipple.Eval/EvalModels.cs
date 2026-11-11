@@ -25,7 +25,14 @@ public sealed record OracleColumn(
     bool IsRowVersion,
     bool IsComputed,
     bool IsUserClrType,
-    bool HasNondeterministicDefault);
+    bool HasNondeterministicDefault)
+{
+    /// <summary>문자 열의 정렬 규칙(sys.columns.collation_name). 문자 열이 아니면 null. 키 동등 비교(인계 6, KeyFolding)에 쓴다. 2026-11-11 추가.</summary>
+    public string? Collation { get; init; }
+}
+
+/// <summary>하네스가 sys.foreign_keys로 읽은 FK(자식 쪽 테이블에 붙는다). IDENTITY 짝 매핑(M1, E2)에서 자식 FK 값을 치환하는 데 쓴다. 2026-11-11 추가.</summary>
+public sealed record OracleForeignKey(string Name, IReadOnlyList<string> Columns, string ReferencedTable, IReadOnlyList<string> ReferencedColumns);
 
 /// <summary>비교 대상 테이블(하네스가 sys.* 카탈로그를 직접 읽어 만든다. 제품 C7을 쓰지 않는다).</summary>
 public sealed record OracleTable(string Schema, string Name, OracleKeyKind KeyKind, IReadOnlyList<string> KeyColumns, IReadOnlyList<OracleColumn> Columns)
@@ -36,6 +43,13 @@ public sealed record OracleTable(string Schema, string Name, OracleKeyKind KeyKi
     /// <summary>비결정 열(E1·E2·E4: IDENTITY, rowversion, 비결정 기본값). M1에서 존재·형식만 센다.</summary>
     public IEnumerable<string> VolatileColumns =>
         Columns.Where(c => c.IsIdentity || c.IsRowVersion || c.HasNondeterministicDefault).Select(c => c.Name);
+
+    /// <summary>이 테이블(자식)의 FK. 비활성 FK도 담는다(값 치환에는 상관없다). 2026-11-11 추가.</summary>
+    public IReadOnlyList<OracleForeignKey> ForeignKeys { get; init; } = [];
+
+    /// <summary>키 열 가운데 IDENTITY 열(있으면 새 행의 키가 실행마다 달라진다, E2).</summary>
+    public IReadOnlyList<string> IdentityKeyColumns =>
+        KeyColumns.Where(k => Columns.Any(c => c.IsIdentity && string.Equals(c.Name, k, StringComparison.OrdinalIgnoreCase))).ToList();
 }
 
 /// <summary>순 변경 종류(하네스 문자열). 값은 설계 §6.2 NetChange.change와 같은 철자다.</summary>
@@ -85,6 +99,9 @@ public sealed record OracleResult(
     bool RestoredAfterRollback,
     IReadOnlyList<string> ComparatorIssues)
 {
+    /// <summary>정정 기록 후보(비교기 문제는 아님). 예: 정렬 규칙상 같은 키라 UPDATED로 본 대소문자 변경(인계 6, Q35). 2026-11-11 추가.</summary>
+    public IReadOnlyList<string> Notes { get; init; } = [];
+
     /// <summary>ok, 또는 처음 실패한 문장의 상태(failed, trigger_blocked).</summary>
     public string Status => Statements.FirstOrDefault(s => s.Status is not ("ok" or "not_run"))?.Status ?? "ok";
 }

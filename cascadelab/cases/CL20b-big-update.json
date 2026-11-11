@@ -1,0 +1,57 @@
+{
+  "id": "CL20b",
+  "pattern": "CL20",
+  "title": "Big UPDATE: 자식 qty UPDATE + 자식 AFTER UPDATE 트리거가 부모 total 갱신 (시드 @parents = 3, N = 3)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl20.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "scaling": {
+    "generate": "EXEC cl20.usp_Generate @parents = {N};",
+    "statement": "UPDATE cl20.Child SET qty = qty + 1 WHERE id <= {N};",
+    "counts": {
+      "cl20.Child": "updated N (DIRECT), changedColumns qty",
+      "cl20.Parent": "updated ceil(N/2) (TRIGGER), changedColumns total",
+      "rowImages": "2N + 2*ceil(N/2) (UPDATE 한 행 = 2)",
+      "note": "@parents = N이면 자식은 2N개라 id <= N이 늘 채워진다"
+    }
+  },
+  "statements": [
+    { "index": 1, "sql": "UPDATE cl20.Child SET qty = qty + 1 WHERE id <= 3;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl20.Child", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [
+          { "key": { "id": 1 }, "causes": ["DIRECT"], "changedColumns": ["qty"], "after": { "qty": 2 } },
+          { "key": { "id": 2 }, "causes": ["DIRECT"], "changedColumns": ["qty"], "after": { "qty": 2 } },
+          { "key": { "id": 3 }, "causes": ["DIRECT"], "changedColumns": ["qty"], "after": { "qty": 2 } }
+        ],
+        "basis": "시드 qty 1 -> 2. 4~6은 그대로" },
+      { "table": "cl20.Parent", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [
+          { "key": { "id": 1 }, "causes": ["TRIGGER"], "changedColumns": ["total"], "after": { "total": 4 } },
+          { "key": { "id": 2 }, "causes": ["TRIGGER"], "changedColumns": ["total"], "after": { "total": 3 } }
+        ],
+        "basis": "trg_Child_upd: 부모 1은 자식 1·2(+2) -> 4, 부모 2는 자식 3(+1) -> 3. 부모 3은 그대로" }
+    ],
+    "firings": [
+      { "node": "F:cl20.Child:UPDATE", "table": "cl20.Child", "operation": "UPDATE", "rowCount": 3, "causeKind": "DIRECT", "depth": 1, "pairing": "BY_PK" },
+      { "node": "F:cl20.Parent:UPDATE", "table": "cl20.Parent", "operation": "UPDATE", "rowCount": 2, "causeKind": "TRIGGER", "depth": 2, "pairing": "BY_PK" }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl20.Child:UPDATE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl20.Child:UPDATE", "child": "T:cl20.trg_Child_upd", "kind": "FIRES", "name": "cl20.trg_Child_upd", "confidence": "inferred", "basis": "§6.3" },
+      { "statementIndex": 1, "parent": "T:cl20.trg_Child_upd", "child": "F:cl20.Parent:UPDATE", "kind": "WRITES", "name": "cl20.trg_Child_upd", "confidence": "inferred", "basis": "§7.2 2·4단계(정적 쓰기 대상 Parent)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "큰 N에서 imageMode KEYS 전환", "basis": "CL20 OO2와 같다(D8)" }
+    ]
+  },
+  "rationale": [
+    { "claim": "Parent는 FK 부모이지 자식이 아니므로 Parent UPDATE 묶음에 FK 후보가 없고 트리거 판정으로 간다", "basis": "§7.2 3·4단계" },
+    { "claim": "trg_Child_del은 DELETE 트리거라 이 문장에서 발동하지 않는다", "basis": "cl20.sql" }
+  ]
+}

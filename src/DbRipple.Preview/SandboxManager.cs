@@ -36,6 +36,7 @@ public sealed record SandboxManagerOptions
 /// <item>첫 호출 때 한 번 ManifestPath와 샌드박스 DB에서 기존 기준선을 읽는다(DB가 없거나 매니페스트가 없으면 error). 그 뒤에는 Refresh만 상태를 바꾼다.</item>
 /// <item>기준 시각은 재구축이 ManifestPath 옆 "*.baseline.json"에 적은 백업 완료 시각이다. 파일이 없으면 스냅샷 DB 생성 시각으로 대신한다.</item>
 /// <item>재구축은 호출자의 취소와 무관하게 끝까지 한다(중간에 끊으면 샌드박스가 반쯤 복원된 채 남는다). 호출자의 취소는 기다림만 그만둔다.</item>
+/// <item>409 경로(구축 중, 기준선 없음, 잠금 충돌)는 PreviewConflictException(reason BUILDING, NO_BASELINE, LOCKED)이다(AD9).</item>
 /// <item>RefreshAsync는 미리보기 잠금이 풀릴 때까지 기다리므로, 잠금을 쥔 채 부르면 교착한다. 파이프라인은 잠금 전에 부른다.</item>
 /// </list>
 /// </summary>
@@ -89,8 +90,8 @@ public sealed class SandboxManager(SandboxManagerOptions options, ITriggerAnalyz
         await EnsureLoadedAsync(ct);
         lock (gate)
         {
-            if (building) throw new InvalidOperationException("기준선을 구축하는 중입니다.");
-            return context ?? throw new InvalidOperationException("기준선이 없습니다. 새로 고침으로 구축하세요.");
+            if (building) throw new PreviewConflictException(ConflictReason.Building, "기준선을 구축하는 중입니다.");
+            return context ?? throw new PreviewConflictException(ConflictReason.NoBaseline, "기준선이 없습니다. 새로 고침으로 구축하세요.");
         }
     }
 
@@ -114,8 +115,8 @@ public sealed class SandboxManager(SandboxManagerOptions options, ITriggerAnalyz
         ct.ThrowIfCancellationRequested();
         lock (gate)
         {
-            if (building) throw new InvalidOperationException("기준선을 구축하는 중이라 미리보기를 시작할 수 없습니다.");
-            if (!exclusive.Wait(0, ct)) throw new InvalidOperationException("다른 미리보기가 실행 중입니다.");
+            if (building) throw new PreviewConflictException(ConflictReason.Building, "기준선을 구축하는 중이라 미리보기를 시작할 수 없습니다.");
+            if (!exclusive.Wait(0, ct)) throw new PreviewConflictException(ConflictReason.Locked, "다른 미리보기가 실행 중입니다.");
             previewLocked = true;
         }
         return Task.FromResult<IAsyncDisposable>(new Releaser(this));

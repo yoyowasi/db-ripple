@@ -43,7 +43,7 @@ public sealed class PreviewPipelineTests : IDisposable
         public void StartRefresh() { }
         public Task<IAsyncDisposable> AcquirePreviewLockAsync(CancellationToken ct)
         {
-            if (Locked) throw new InvalidOperationException("다른 미리보기가 실행 중입니다.");
+            if (Locked) throw new PreviewConflictException(ConflictReason.Locked, "다른 미리보기가 실행 중입니다.");
             Locked = true;
             Calls.Add("lock");
             AfterAcquire?.Invoke();
@@ -227,23 +227,25 @@ public sealed class PreviewPipelineTests : IDisposable
     }
 
     [Fact]
-    public async Task Persistently_dirty_sandbox_gives_up_with_invalid_operation_and_holds_no_lock()
+    public async Task Persistently_dirty_sandbox_gives_up_with_conflict_dirty_and_holds_no_lock()
     {
         var rig = NewRig();
         rig.Sandbox.State = SandboxState.Dirty;
         rig.Sandbox.OnRefresh = () => SandboxState.Dirty;
-        await Assert.ThrowsAsync<InvalidOperationException>(() => rig.Pipeline.RunAsync("x", new PreviewOptions(), null, default));
+        var ex = await Assert.ThrowsAsync<PreviewConflictException>(() => rig.Pipeline.RunAsync("x", new PreviewOptions(), null, default));
+        Assert.Equal(ConflictReason.Dirty, ex.Reason);
         Assert.Equal(PreviewPipeline.MaxRefreshAttempts, rig.Sandbox.RefreshCount);
         Assert.False(rig.Sandbox.Locked);
         Assert.Equal(0, rig.Executor.Runs);
     }
 
     [Fact]
-    public async Task Lock_conflict_is_invalid_operation()
+    public async Task Lock_conflict_is_conflict_locked()
     {
         var rig = NewRig();
         rig.Sandbox.Locked = true;
-        await Assert.ThrowsAsync<InvalidOperationException>(() => rig.Pipeline.RunAsync("x", new PreviewOptions(), null, default));
+        var ex = await Assert.ThrowsAsync<PreviewConflictException>(() => rig.Pipeline.RunAsync("x", new PreviewOptions(), null, default));
+        Assert.Equal(ConflictReason.Locked, ex.Reason);
         Assert.True(rig.Sandbox.Locked); // 남의 잠금을 풀지 않는다
         Assert.Equal(0, rig.Executor.Runs);
     }
@@ -253,7 +255,8 @@ public sealed class PreviewPipelineTests : IDisposable
     {
         var rig = NewRig();
         rig.Sandbox.FingerprintMatch = false;
-        await Assert.ThrowsAsync<InvalidOperationException>(() => rig.Pipeline.RunAsync("x", new PreviewOptions(), null, default));
+        var ex = await Assert.ThrowsAsync<PreviewConflictException>(() => rig.Pipeline.RunAsync("x", new PreviewOptions(), null, default));
+        Assert.Equal(ConflictReason.FingerprintMismatch, ex.Reason);
         Assert.False(rig.Sandbox.Locked);
         Assert.DoesNotContain("analyze", calls);
     }
@@ -271,6 +274,49 @@ public sealed class PreviewPipelineTests : IDisposable
         Assert.Equal(residual, outcome.Record.Result.ResidualCommitted);
         Assert.Equal(["lock", "context", "analyze", "execute", "markDirty", "collect", "resolve", "unlock"], calls);
         Assert.NotNull(await rig.Store.GetAsync(outcome.Record.Result.PreviewId, default)); // 실패 결과도 저장(거부만 저장 안 함)
+    }
+
+    [Fact]
+    public async Task Residual_check_failure_is_carried_into_the_result_and_marks_dirty_once()
+    {
+        var rig = NewRig(raw: () => TestData.Raw(PreviewStatus.Failed, dirty: true, residualCheckFailed: true, residualCheckMessage: "8115: 산술 오버플로"));
+        var outcome = await rig.Pipeline.RunAsync("x", new PreviewOptions(), null, default);
+
+        var result = outcome.Record!.Result;
+        Assert.True(result.ResidualCheckFailed);
+        Assert.Equal("8115: 산술 오버플로", result.ResidualCheckMessage);
+        Assert.Equal(PreviewStatus.Failed, result.Status);
+        Assert.Equal(1, rig.Sandbox.DirtyMarks); // SandboxDirty와 겹쳐도 한 번만
+        Assert.Contains("8115", rig.Sandbox.DirtyReason);
+        Assert.Equal(["lock", "context", "analyze", "execute", "markDirty", "collect", "resolve", "unlock"], calls);
+        var stored = await rig.Store.GetAsync(result.PreviewId, default);
+        Assert.True(stored!.Result.ResidualCheckFailed);
+    }
+
+    [Fact]
+    public async Task Residual_check_failure_marks_dirty_even_without_the_sandbox_dirty_flag()
+    {
+        var rig = NewRig(raw: () => TestData.Raw(PreviewStatus.Failed, residualCheckFailed: true, residualCheckMessage: "x"));
+        await rig.Pipeline.RunAsync("x", new PreviewOptions(), null, default);
+        Assert.Equal(1, rig.Sandbox.DirtyMarks);
+    }
+
+    [Fact]
+    public async Task Normal_result_has_no_residual_check_failure()
+    {
+        var rig = NewRig();
+        var outcome = await rig.Pipeline.RunAsync("x", new PreviewOptions(), null, default);
+        Assert.False(outcome.Record!.Result.ResidualCheckFailed);
+        Assert.Null(outcome.Record.Result.ResidualCheckMessage);
+        Assert.Equal(0, rig.Sandbox.DirtyMarks);
+    }
+
+    [Fact]
+    public void SqlHash_and_Summarize_delegate_to_the_shared_contract_formulas()
+    {
+        Assert.Equal(ContractFormulas.SqlHash("abc"), PreviewPipeline.SqlHash("abc"));
+        var net = new[] { TestData.Net("sales.B", NetChangeKind.Inserted, "1"), TestData.Net("dbo.H", NetChangeKind.MultisetAdded, "a", multiplicity: 2) };
+        Assert.Equal(ContractFormulas.Summarize(net), PreviewPipeline.Summarize(net));
     }
 
     [Fact]

@@ -10,8 +10,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DbRipple.Api;
 
 /// <summary>
-/// C5 REST API(§6.4). 서비스(ISandboxManager, IBatchAnalyzer, IPreviewPipeline, IPreviewStore)는 호스트가 등록한다.
+/// C5 REST API(§6.4). 서비스(ISandboxManager, IBatchAnalyzer, IPreviewPipeline, IPreviewStore, ICatalogSchemaProvider, IApplyService)는 호스트가 등록한다.
 /// 경로·상태 코드·본문 형식은 §6.4 계약이다. 응답 JSON은 ContractJson 설정(camelCase, 열거형 문자열, null 포함).
+/// 오류 응답은 모두 ProblemDetails다. 예외 → 상태 코드 매핑은 <see cref="ApiExceptionHandler"/>(AD9): 409(확장 <c>reason</c>), 503, 400, 501, 500.
 /// </summary>
 public static class DbRippleApi
 {
@@ -44,11 +45,11 @@ public static class DbRippleApi
             })
             .WithName("RefreshSandbox").WithSummary("기준선 새로 고침 시작(202 후 GET /api/sandbox로 상태 조회)");
 
-        // GET /api/catalog/schema: 응답 형식("자동완성용 테이블·열 목록")이 설계에 정의되지 않아 열린 질문 Q23으로 남기고 501을 돌려준다.
-        api.MapGet("/catalog/schema", ProblemHttpResult () =>
-                TypedResults.Problem(title: "응답 형식 미정(열린 질문 Q23)", statusCode: StatusCodes.Status501NotImplemented))
-            .WithName("GetCatalogSchema").WithSummary("자동완성용 스키마(형식 미정)")
-            .ProducesProblem(StatusCodes.Status501NotImplemented);
+        api.MapGet("/catalog/schema", async Task<Ok<CatalogSchema>> ([FromServices] ICatalogSchemaProvider provider, CancellationToken ct) =>
+                TypedResults.Ok(await provider.GetSchemaAsync(ct)))
+            .WithName("GetCatalogSchema").WithSummary("자동완성용 스키마(Q23): 테이블·열·sqlType·키·수집 범위")
+            .WithDescription("현재 기준선 샌드박스 카탈로그에서 만든다. 기준선이 없거나 구축 중이면 409(reason NO_BASELINE·BUILDING). baselineAt이 캐시 키다.")
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         api.MapPost("/analyze", async Task<Results<Ok<AnalysisResult>, ValidationProblem>> (
                 AnalyzeRequest request, [FromServices] ISandboxManager sandbox, [FromServices] IBatchAnalyzer analyzer, CancellationToken ct) =>
@@ -71,7 +72,9 @@ public static class DbRippleApi
             })
             .WithName("CreatePreview").WithSummary("미리보기 실행(동기). 거부면 422 ProblemDetails + rejects")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
-            .ProducesProblem(StatusCodes.Status409Conflict);
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
+            .ProducesProblem(StatusCodes.Status500InternalServerError);
 
         api.MapGet("/previews/{id}", async Task<Results<Ok<PreviewResult>, NotFound>> (string id, [FromServices] IPreviewStore store, CancellationToken ct) =>
                 await store.GetAsync(id, ct) is { } r ? TypedResults.Ok(r.Result) : TypedResults.NotFound())
@@ -95,11 +98,14 @@ public static class DbRippleApi
             })
             .WithName("GetPreviewRows").WithSummary("행 페이지(view=event: RowChange[], view=net: NetChange[])");
 
-        // [적용](C15)은 3주차 범위다. ApplyResult 계약은 그때 정한다(열린 질문 Q24).
-        api.MapPost("/previews/{id}/apply", ProblemHttpResult (string id) =>
-                TypedResults.Problem(title: "[적용]은 3주차(C15)에 구현합니다", statusCode: StatusCodes.Status501NotImplemented))
-            .WithName("ApplyPreview").WithSummary("[적용](3주차)")
-            .ProducesProblem(StatusCodes.Status501NotImplemented);
+        api.MapPost("/previews/{id}/apply", async Task<Results<Ok<ApplyResult>, NotFound>> (
+                string id, [FromBody] ApplyRequest? request, [FromServices] IApplyService apply, CancellationToken ct) =>
+                await apply.ApplyAsync(id, request ?? new ApplyRequest(), ct) is { } result ? TypedResults.Ok(result) : TypedResults.NotFound())
+            .WithName("ApplyPreview").WithSummary("[적용](§5.3, C15): 미리보기를 원본에 반영. 상태 5종(committed, rolled_back_mismatch, drift_detected, precondition_failed, error) 모두 200")
+            .WithDescription("본문은 선택({ sqlHash }). 미리보기가 없거나 만료면 404, 다른 미리보기·적용이 실행 중이거나 기준선 구축 중이면 409(reason LOCKED·BUILDING), SQL Server 연결 끊김은 503.")
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
+            .ProducesProblem(StatusCodes.Status500InternalServerError);
 
         api.MapPost("/previews/{id}/cancel", async Task<Results<NoContent, NotFound>> (string id, [FromServices] IPreviewStore store, CancellationToken ct) =>
                 await store.RemoveAsync(id, ct) ? TypedResults.NoContent() : TypedResults.NotFound())

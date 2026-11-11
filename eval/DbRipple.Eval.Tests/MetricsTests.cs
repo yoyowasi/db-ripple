@@ -71,7 +71,8 @@ public class MetricsTests
         Assert.Equal(0, c.ResidualFilledCells);
         var cells = c.CsvCells();
         Assert.Equal(["1.0000", "1.0000", "1.0000"], cells.Skip(5).Take(3));
-        Assert.Equal("0.0000", cells[^1]);
+        Assert.Equal("0.0000", cells[MetricsCsv.M1Columns.ToList().IndexOf("residual_fill_rate") - 5]);
+        Assert.Equal(["0", "0"], cells.TakeLast(2)); // identity_rows, identity_paired
     }
 
     [Fact]
@@ -89,7 +90,7 @@ public class MetricsTests
         Assert.Equal(3, c.PredictedCells);
         Assert.Equal((4L, 1L), (c.RowsUnion, c.RowsExact));
         Assert.Null(c.ResidualFilledCells);
-        Assert.Equal("", c.CsvCells()[^1]);
+        Assert.Equal("", c.CsvCells()[MetricsCsv.M1Columns.ToList().IndexOf("residual_fill_rate") - 5]);
     }
 
     [Fact]
@@ -185,7 +186,7 @@ public class MetricsTests
     public void Hand_cases_load_with_causes_and_keys()
     {
         var cases = HandCase.LoadAll(Path.Combine(RepoPaths.CascadeLab, "cases"));
-        Assert.Equal(11, cases.Count);
+        Assert.True(cases.Count >= 11); // CL01~CL08b + 3주차 CL09~CL20(lab-1)
         var cl08a = cases.Single(c => c.Id == "CL08a");
         var row = Assert.Single(cl08a.Rows);
         Assert.Equal(["DIRECT", "TRIGGER"], row.Causes);
@@ -198,7 +199,7 @@ public class MetricsTests
         Assert.All(cases.SelectMany(c => c.Rows).SelectMany(r => r.Causes), c => Assert.Contains(c, HandCase.Causes));
 
         // 노드 참조 #k 정규화(C13과 같은 규칙): 같은 문장에 #2가 없으면 #1을 뗀다. 2026-11-10 기준으로 바뀌는 것은 CL08a의 트리거 실행 하나뿐이다.
-        Assert.Equal(["CL08a: 문장 1: T:cl08.trg_Acct_upd#1 → T:cl08.trg_Acct_upd"],
+        Assert.Contains("CL08a: 문장 1: T:cl08.trg_Acct_upd#1 → T:cl08.trg_Acct_upd",
             cases.SelectMany(c => c.NormalizedRefs.Select(x => c.Id + ": " + x)));
         Assert.Contains(cl08a.Edges, e => e.Kind == "FIRES" && e.Parent == "F:cl08.Acct:UPDATE#1" && e.Child == "T:cl08.trg_Acct_upd");
         Assert.Contains(cl08a.Edges, e => e.Kind == "WRITES" && e.Parent == "T:cl08.trg_Acct_upd" && e.Child == "F:cl08.Acct:UPDATE#2");
@@ -225,7 +226,9 @@ public class MetricsTests
         Assert.Equal(MetricsCsv.CaseColumns.Count, s.CaseRow.Count);
         Assert.All(s.M1Rows, r => Assert.Equal(MetricsCsv.M1Columns.Count, r.Count));
         Assert.All(s.M2Rows, r => Assert.Equal(MetricsCsv.M2Columns.Count, r.Count));
-        Assert.Equal(7, s.M2Rows.Count);
+        Assert.Equal(HandCase.Causes.Count, s.M2Rows.Count); // 8(INSTEAD_OF 포함), ALL은 metrics.csv에만
+        Assert.Equal(AttributionMetrics.Scopes.Count, s.M3Rows.Count);
+        Assert.All(s.M3Rows, r => Assert.Equal(MetricsCsv.M3Columns.Count, r.Count));
         string Col(IReadOnlyList<string?> row, IReadOnlyList<string> cols, string name) => row[cols.ToList().IndexOf(name)]!;
         Assert.Equal("ok", Col(s.CaseRow, MetricsCsv.CaseColumns, "status_actual"));
         Assert.Equal("true", Col(s.CaseRow, MetricsCsv.CaseColumns, "status_match"));

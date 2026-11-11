@@ -1,0 +1,34 @@
+{
+  "id": "CL14",
+  "pattern": "CL14",
+  "title": "힙 테이블(키 없음) 중복 행 UPDATE (ROW 키, 다중집합)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl14.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "UPDATE cl14.Tag SET qty = qty + 10 WHERE name = 'a';" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl14.Tag", "keyKind": "ROW", "keyColumns": [], "inserted": [], "updated": [], "deleted": [],
+        "multisetRemoved": [ { "row": { "name": "a", "qty": 1 }, "multiplicity": 2, "causes": ["DIRECT"] } ],
+        "multisetAdded": [ { "row": { "name": "a", "qty": 11 }, "multiplicity": 2, "causes": ["DIRECT"] } ],
+        "basis": "('a', 1) 두 행이 ('a', 11) 두 행이 된다. ('b', 2), ('c', 3)은 그대로. 키가 없어 행 짝을 확정하지 않는다(E6)" }
+    ],
+    "firings": [
+      { "node": "F:cl14.Tag:UPDATE", "table": "cl14.Tag", "operation": "UPDATE", "rowCount": 2, "causeKind": "DIRECT", "depth": 1, "pairing": "UNPAIRED" }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl14.Tag:UPDATE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" }
+    ],
+    "observedOnly": []
+  },
+  "rationale": [
+    { "claim": "PK·NOT NULL 유일 인덱스가 없으면 ROW 키, 최종 차이는 모든 열 묶음의 개수로 비교한다", "basis": "E6, §6.2 key.kind ROW, NetChange MULTISET_*" },
+    { "claim": "키 없는 테이블의 여러 행 UPDATE 묶음은 짝을 짓지 않는다(UNPAIRED). SINGLE_ROW는 한 행 묶음에만 쓴다", "basis": "E6, README 정정 2026-11-10(수집기 규칙 C11, Q11)" },
+    { "claim": "%%physloc%% 같은 문서화되지 않은 기능으로 행을 구별하지 않는다", "basis": "E6" }
+  ]
+}

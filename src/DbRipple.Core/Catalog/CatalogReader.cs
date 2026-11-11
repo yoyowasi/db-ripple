@@ -27,7 +27,9 @@ public static class CatalogReader
             r.GetString(6), r.GetBoolean(7), r.GetBoolean(8), r.IsDBNull(9) ? null : r.GetString(9)), ct);
         var files = await Read(conn, CatalogQueries.Files, r => new CatalogFile(
             r.GetInt32(0), r.GetString(1), r.GetString(2), r.GetString(3)), ct);
-        return new DbCatalog(tables, columns, keys, fks, triggers, files);
+        var procedures = await Read(conn, CatalogQueries.Procedures, r => new CatalogModule(
+            r.GetInt32(0), r.GetString(1), r.GetString(2), r.IsDBNull(3) ? null : r.GetString(3)), ct);
+        return new DbCatalog(tables, columns, keys, fks, triggers, files, procedures);
     }
 
     static async Task<List<T>> Read<T>(SqlConnection conn, string sql, Func<DbDataReader, T> map, CancellationToken ct)

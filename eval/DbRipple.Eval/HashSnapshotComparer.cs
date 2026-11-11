@@ -17,7 +17,11 @@ public sealed record RowHashSnapshot(
 public sealed record RowHash(string Sha256, IReadOnlyDictionary<string, string?> Values, long Multiplicity);
 
 /// <summary>비교 결과: 순 변경과 비교기 자체 점검 문제(해시 판정과 셀 판정이 어긋남 등).</summary>
-public sealed record HashComparison(IReadOnlyList<OracleRowChange> Changes, IReadOnlyList<string> Issues);
+public sealed record HashComparison(IReadOnlyList<OracleRowChange> Changes, IReadOnlyList<string> Issues)
+{
+    /// <summary>정정 기록 후보(인계 6: 정렬 규칙상 같은 키에서 키 열 값만 바뀐 UPDATED). 2026-11-11 추가.</summary>
+    public IReadOnlyList<string> Notes { get; init; } = [];
+}
 
 /// <summary>
 /// 독립 해시 비교기(§10.3): 행별 SHA2_256(FOR JSON PATH, INCLUDE_NULL_VALUES)을 떠서 바뀐 행을 찾고, 그 행을 셀 단위로 비교한다.
@@ -49,7 +53,7 @@ public sealed class HashSnapshotComparer
                    c.is_identity, c.is_computed,
                    CAST(CASE WHEN ty.name = N'timestamp' OR bt.name = N'timestamp' THEN 1 ELSE 0 END AS bit) AS is_rowversion,
                    CAST(CASE WHEN ty.is_assembly_type = 1 AND ty.is_user_defined = 1 THEN 1 ELSE 0 END AS bit) AS is_user_clr,
-                   dc.definition
+                   dc.definition, c.collation_name
             FROM {db}.sys.tables AS t
             JOIN {db}.sys.schemas AS s ON s.schema_id = t.schema_id
             JOIN {db}.sys.columns AS c ON c.object_id = t.object_id
@@ -70,6 +74,21 @@ public sealed class HashSnapshotComparer
               AND i.has_filter = 0 AND i.is_disabled = 0 AND ic.is_included_column = 0 AND ic.key_ordinal > 0
             ORDER BY i.object_id, i.index_id, ic.key_ordinal;
             """, ct);
+        var fks = await RowsAsync(session, $"""
+            SELECT fk.parent_object_id, fk.name, fkc.constraint_column_id, pc.name, rs.name, rt.name, rc.name
+            FROM {db}.sys.foreign_keys AS fk
+            JOIN {db}.sys.foreign_key_columns AS fkc ON fkc.constraint_object_id = fk.object_id
+            JOIN {db}.sys.columns AS pc ON pc.object_id = fkc.parent_object_id AND pc.column_id = fkc.parent_column_id
+            JOIN {db}.sys.tables AS rt ON rt.object_id = fkc.referenced_object_id
+            JOIN {db}.sys.schemas AS rs ON rs.schema_id = rt.schema_id
+            JOIN {db}.sys.columns AS rc ON rc.object_id = fkc.referenced_object_id AND rc.column_id = fkc.referenced_column_id
+            ORDER BY fk.parent_object_id, fk.name, fkc.constraint_column_id;
+            """, ct);
+        var fkByTable = fks.GroupBy(r => Convert.ToInt32(r[0], CultureInfo.InvariantCulture))
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<OracleForeignKey>)g.GroupBy(r => (string)r[1]!, StringComparer.Ordinal)
+                .Select(f => new OracleForeignKey(f.Key, f.Select(r => (string)r[3]!).ToList(), (string)f.First()[4]! + "." + (string)f.First()[5]!,
+                    f.Select(r => (string)r[6]!).ToList()))
+                .ToList());
         var keyByTable = keys.GroupBy(r => Convert.ToInt32(r[0], CultureInfo.InvariantCulture))
             .ToDictionary(g => g.Key, g => g.GroupBy(r => Convert.ToInt32(r[1], CultureInfo.InvariantCulture)).OrderBy(x => x.Key).ToList());
 
@@ -90,7 +109,7 @@ public sealed class HashSnapshotComparer
                 IsComputed: (bool)r[8]!,
                 IsRowVersion: (bool)r[9]!,
                 IsUserClrType: (bool)r[10]!,
-                HasNondeterministicDefault: IsNondeterministicDefault(r[11] as string))).ToList();
+                HasNondeterministicDefault: IsNondeterministicDefault(r[11] as string)) { Collation = r[12] as string }).ToList();
 
             var kind = OracleKeyKind.ROW;
             IReadOnlyList<string> keyCols = [];
@@ -101,7 +120,7 @@ public sealed class HashSnapshotComparer
                 if (pk is not null) { kind = OracleKeyKind.PK; keyCols = pk.Select(r => (string)r[4]!).ToList(); }
                 else if (uq is not null) { kind = OracleKeyKind.UNIQUE; keyCols = uq.Select(r => (string)r[4]!).ToList(); }
             }
-            tables.Add(new OracleTable(schema, name, kind, keyCols, cols));
+            tables.Add(new OracleTable(schema, name, kind, keyCols, cols) { ForeignKeys = fkByTable.GetValueOrDefault(g.Key) ?? [] });
         }
         return (tables.OrderBy(t => t.Display, StringComparer.Ordinal).ToList(), excluded);
     }
@@ -150,6 +169,7 @@ public sealed class HashSnapshotComparer
     {
         var changes = new List<OracleRowChange>();
         var issues = new List<string>();
+        var notes = new List<string>();
         foreach (var t in before.Schema.OrderBy(x => x.Display, StringComparer.Ordinal))
         {
             if (!before.Tables.TryGetValue(t.Display, out var b)) { issues.Add($"{t.Display}: before에 없음"); continue; }
@@ -181,9 +201,13 @@ public sealed class HashSnapshotComparer
                     issues.Add($"{t.Display}{RowKeys.Display(k)}: hashChanged={hashChanged}, cellChanged={changed.Count > 0}");
                 if (changed.Count > 0)
                     changes.Add(new OracleRowChange(t.Display, k, ChangeKinds.Updated, 1, rb.Values, ra.Values, changed));
+                var keyChanged = changed.Where(c => t.KeyColumns.Contains(c, StringComparer.OrdinalIgnoreCase)).ToList();
+                if (keyChanged.Count > 0)
+                    notes.Add($"정렬 규칙상 같은 키라 UPDATED로 봄(인계 6, Q35): {t.Display}{RowKeys.Display(k)} 키 열 " +
+                              string.Join(", ", keyChanged.Select(c => $"{c} {Get(rb.Values, c) ?? "NULL"} → {Get(ra.Values, c) ?? "NULL"}")));
             }
         }
-        return new HashComparison(changes, issues);
+        return new HashComparison(changes, issues) { Notes = notes };
     }
 
     /// <summary>스냅샷 요약(테이블·키·해시·개수의 SHA-256 앞 16자리). 시작 상태 확인·롤백 복원 확인에 쓴다.</summary>
@@ -266,10 +290,12 @@ public sealed class HashSnapshotComparer
         return values;
     }
 
+    // 키 있는 테이블은 정렬 규칙대로 접은 키 값(인계 6, KeyFolding). 키 없는 테이블은 행 전체 값(접지 않음).
     static string KeyOf(OracleTable t, IReadOnlyDictionary<string, string?> values) =>
         t.KeyKind == OracleKeyKind.ROW
             ? RowKeys.Canonical(values)
-            : RowKeys.Canonical(t.KeyColumns.Select(c => new KeyValuePair<string, string?>(c, values[c])));
+            : RowKeys.Canonical(t.KeyColumns.Select(c => new KeyValuePair<string, string?>(c,
+                KeyFolding.Fold(t.Columns.FirstOrDefault(x => string.Equals(x.Name, c, StringComparison.OrdinalIgnoreCase))?.Collation, values[c]))));
 
     static string? Get(IReadOnlyDictionary<string, string?> d, string c) => d.TryGetValue(c, out var v) ? v : null;
 

@@ -1,0 +1,64 @@
+{
+  "id": "CL20",
+  "pattern": "CL20",
+  "title": "Big DELETE: 부모 1 : 자식 2 CASCADE + 자식 AFTER DELETE 트리거 (시드 @parents = 3, N = 2)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl20.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "scaling": {
+    "generate": "EXEC cl20.usp_Generate @parents = {N};",
+    "statement": "DELETE FROM cl20.Parent WHERE id <= {N};",
+    "counts": {
+      "cl20.Parent": "deleted N (DIRECT)",
+      "cl20.Child": "deleted 2N (FK_CASCADE)",
+      "cl20.ChildLog": "inserted 2N (TRIGGER)",
+      "rowImages": "5N (D8 셈법: DELETE·INSERT 행마다 1)",
+      "note": "generate는 원본 역할 DB에서 기준선(백업)을 만들기 전에 실행한다. N은 문장의 직접 대상 행 수다(M5)"
+    }
+  },
+  "statements": [
+    { "index": 1, "sql": "DELETE FROM cl20.Parent WHERE id <= 2;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl20.Parent", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 1 }, "causes": ["DIRECT"] }, { "key": { "id": 2 }, "causes": ["DIRECT"] } ],
+        "basis": "시드 usp_Generate @parents = 3. 3은 그대로" },
+      { "table": "cl20.Child", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [
+          { "key": { "id": 1 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 2 }, "causes": ["FK_CASCADE"] },
+          { "key": { "id": 3 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 4 }, "causes": ["FK_CASCADE"] }
+        ],
+        "basis": "부모 p의 자식은 2p-1, 2p. 5·6은 그대로" },
+      { "table": "cl20.ChildLog", "keyColumns": ["child_id"], "updated": [], "deleted": [],
+        "inserted": [
+          { "key": { "child_id": 1 }, "causes": ["TRIGGER"] }, { "key": { "child_id": 2 }, "causes": ["TRIGGER"] },
+          { "key": { "child_id": 3 }, "causes": ["TRIGGER"] }, { "key": { "child_id": 4 }, "causes": ["TRIGGER"] }
+        ],
+        "basis": "trg_Child_del: FK 연쇄로 지워진 Child마다 1행(A1)" }
+    ],
+    "firings": [
+      { "node": "F:cl20.Parent:DELETE", "table": "cl20.Parent", "operation": "DELETE", "rowCount": 2, "causeKind": "DIRECT", "depth": 1 },
+      { "node": "F:cl20.Child:DELETE", "table": "cl20.Child", "operation": "DELETE", "rowCount": 4, "causeKind": "FK_CASCADE", "depth": 1 },
+      { "node": "F:cl20.ChildLog:INSERT", "table": "cl20.ChildLog", "operation": "INSERT", "rowCount": 4, "causeKind": "TRIGGER", "depth": 2 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl20.Parent:DELETE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl20.Parent:DELETE", "child": "F:cl20.Child:DELETE", "kind": "FK", "name": "FK_cl20_Child_Parent", "action": "CASCADE", "event": "DELETE", "confidence": "certain",
+        "basis": "§7.2 3단계: 부모 후보 하나, 행 일치, 같은 깊이, 이 문장에서 실행되는 트리거(trg_Child_del, 쓰기 대상 ChildLog)가 Child에 쓰지 않음" },
+      { "statementIndex": 1, "parent": "F:cl20.Child:DELETE", "child": "T:cl20.trg_Child_del", "kind": "FIRES", "name": "cl20.trg_Child_del", "confidence": "inferred", "basis": "A1, §6.3" },
+      { "statementIndex": 1, "parent": "T:cl20.trg_Child_del", "child": "F:cl20.ChildLog:INSERT", "kind": "WRITES", "name": "cl20.trg_Child_del", "confidence": "inferred", "basis": "§7.2 2·4단계(정적 쓰기 대상 ChildLog)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "depth(Child 1, ChildLog 2)", "basis": "H2(A7). CL06과 같은 모양이고 CL06은 2026-11-10 실측 일치" },
+      { "id": "OO2", "what": "큰 N에서 imageMode KEYS 전환 시점과 status truncated", "basis": "D8: 상한(기본 10만 이미지)을 넘으면 KEYS. 한 문장이 혼자 넘으면 그 문장 이미지가 모두 수집된 뒤에야 안다. 시드 N = 2에서는 FULL, status ok" }
+    ]
+  },
+  "rationale": [
+    { "claim": "이 사례는 M5·DM6의 모양을 작은 N으로 고정한 정답이다. 큰 N의 정답은 scaling.counts 식으로 센다", "basis": "§10.4 M5, §10.7 DM6, week3-plan Q39·AD11" },
+    { "claim": "usp_Generate는 TRUNCATE를 써서 트리거를 발동하지 않고, 같은 @parents면 같은 상태를 만든다(멱등)", "basis": "A21, cl20.sql" }
+  ]
+}

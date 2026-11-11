@@ -21,7 +21,7 @@ public class SmokeTests
             State = SandboxState.Ready, BaselineAt = DateTimeOffset.Parse("2026-11-06T09:58:02+09:00"), FingerprintMatch = true, Locked = false,
             Manifest = new ManifestSummary { CoveredTables = 71, ExcludedTables = 0, AuditNotLast = 0 },
         });
-        public Task<BaselineContext> GetContextAsync(CancellationToken ct) => throw new InvalidOperationException("기준선 없음");
+        public Task<BaselineContext> GetContextAsync(CancellationToken ct) => throw new PreviewConflictException(ConflictReason.NoBaseline, "기준선 없음");
         public Task RefreshAsync(CancellationToken ct) => Task.CompletedTask;
         public void StartRefresh() { }
         public Task<IAsyncDisposable> AcquirePreviewLockAsync(CancellationToken ct) => throw new NotSupportedException();
@@ -107,7 +107,7 @@ public class SmokeTests
         var badView = await client.GetAsync("/api/previews/x/rows?view=grid");
         Assert.Equal(HttpStatusCode.BadRequest, badView.StatusCode);
 
-        // 준비되지 않은 샌드박스(InvalidOperationException) → 409 ProblemDetails
+        // 준비되지 않은 샌드박스(PreviewConflictException) → 409 ProblemDetails
         var analyze = await client.PostAsync("/api/analyze", new StringContent("""{"sql":"DELETE FROM t;"}""", Encoding.UTF8, "application/json"));
         Assert.Equal(HttpStatusCode.Conflict, analyze.StatusCode);
         Assert.Equal("application/problem+json", analyze.Content.Headers.ContentType?.MediaType);

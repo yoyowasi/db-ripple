@@ -116,7 +116,8 @@ public sealed class SandboxManagerTests : IClassFixture<SandboxManagerTests.Fixt
         Assert.Null(status.BaselineAt);
         Assert.Null(status.Manifest);
         Assert.False(status.FingerprintMatch);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => sbx.GetContextAsync(default));
+        var noBaseline = await Assert.ThrowsAsync<PreviewConflictException>(() => sbx.GetContextAsync(default));
+        Assert.Equal(ConflictReason.NoBaseline, noBaseline.Reason);
         Assert.NotNull(sbx.LastError);
         Assert.DoesNotContain("Password", sbx.LastError, StringComparison.OrdinalIgnoreCase);
     }
@@ -129,14 +130,15 @@ public sealed class SandboxManagerTests : IClassFixture<SandboxManagerTests.Fixt
         await using (await sbx.AcquirePreviewLockAsync(default))
         {
             Assert.True((await sbx.GetStatusAsync(default)).Locked);
-            await Assert.ThrowsAsync<InvalidOperationException>(() => sbx.AcquirePreviewLockAsync(default)); // 기다리지 않고 거부
+            var busy = await Assert.ThrowsAsync<PreviewConflictException>(() => sbx.AcquirePreviewLockAsync(default)); // 기다리지 않고 거부
+            Assert.Equal(ConflictReason.Locked, busy.Reason);
         }
         Assert.False((await sbx.GetStatusAsync(default)).Locked);
         var again = await sbx.AcquirePreviewLockAsync(default);
         await again.DisposeAsync();
         await again.DisposeAsync(); // 두 번 풀어도 다음 잠금을 깨뜨리지 않는다
         await using (await sbx.AcquirePreviewLockAsync(default))
-            await Assert.ThrowsAsync<InvalidOperationException>(() => sbx.AcquirePreviewLockAsync(default));
+            await Assert.ThrowsAsync<PreviewConflictException>(() => sbx.AcquirePreviewLockAsync(default));
     }
 
     [SqlFact]
@@ -190,8 +192,8 @@ public sealed class SandboxManagerTests : IClassFixture<SandboxManagerTests.Fixt
 
         var status = await sbx.GetStatusAsync(default);
         Assert.Equal(SandboxState.Building, status.State);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => sbx.GetContextAsync(default));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => sbx.AcquirePreviewLockAsync(default));
+        Assert.Equal(ConflictReason.Building, (await Assert.ThrowsAsync<PreviewConflictException>(() => sbx.GetContextAsync(default))).Reason);
+        Assert.Equal(ConflictReason.Building, (await Assert.ThrowsAsync<PreviewConflictException>(() => sbx.AcquirePreviewLockAsync(default))).Reason);
 
         await sbx.RefreshAsync(default); // 진행 중인 재구축에 합류해 끝까지 기다린다
         Assert.Equal(SandboxState.Ready, (await sbx.GetStatusAsync(default)).State);
@@ -225,7 +227,7 @@ public sealed class SandboxManagerTests : IClassFixture<SandboxManagerTests.Fixt
         var status = await bad.GetStatusAsync(default);
         Assert.Equal(SandboxState.Error, status.State);
         Assert.NotNull(bad.LastError);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => bad.GetContextAsync(default));
+        await Assert.ThrowsAsync<PreviewConflictException>(() => bad.GetContextAsync(default));
         Assert.False((await bad.GetStatusAsync(default)).Locked);
         await using (await bad.AcquirePreviewLockAsync(default)) { } // 실패한 재구축이 잠금을 쥐고 있지 않다
 

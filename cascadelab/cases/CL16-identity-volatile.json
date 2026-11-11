@@ -1,0 +1,50 @@
+{
+  "id": "CL16",
+  "pattern": "CL16",
+  "title": "IDENTITY·SEQUENCE·SYSDATETIME·NEWID 기본값과 새 IDENTITY를 참조하는 자식",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl16.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "INSERT INTO cl16.Ord (customer) VALUES ('c1'), ('c2');" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl16.Ord", "keyColumns": ["id"], "updated": [], "deleted": [],
+        "inserted": [
+          { "ref": "o1", "match": { "customer": "c1" }, "identity": ["id"], "volatile": ["invoice_no", "created_at", "row_guid"], "causes": ["DIRECT"] },
+          { "ref": "o2", "match": { "customer": "c2" }, "identity": ["id"], "volatile": ["invoice_no", "created_at", "row_guid"], "causes": ["DIRECT"] }
+        ],
+        "basis": "문장 2행. id는 IDENTITY, invoice_no는 SEQUENCE 기본값, created_at은 SYSDATETIME() 기본값, row_guid는 NEWID() 기본값이라 값을 쓰지 않는다. note·touched_at은 NULL" },
+      { "table": "cl16.OrdLine", "keyColumns": ["id"], "updated": [], "deleted": [],
+        "inserted": [
+          { "ref": "l1", "match": { "line_no": 1, "qty": 1, "memo": "c1" }, "identity": ["id"],
+            "identityRefs": { "ord_id": { "table": "cl16.Ord", "ref": "o1" } }, "volatile": ["added_at"], "causes": ["TRIGGER"] },
+          { "ref": "l2", "match": { "line_no": 1, "qty": 1, "memo": "c2" }, "identity": ["id"],
+            "identityRefs": { "ord_id": { "table": "cl16.Ord", "ref": "o2" } }, "volatile": ["added_at"], "causes": ["TRIGGER"] }
+        ],
+        "basis": "trg_Ord_ins: 새 Ord마다 1행. ord_id = 새 Ord.id(짝 매핑으로 비교), memo = customer, added_at = GETDATE()(트리거 안 비결정 값)" }
+    ],
+    "firings": [
+      { "node": "F:cl16.Ord:INSERT", "table": "cl16.Ord", "operation": "INSERT", "rowCount": 2, "causeKind": "DIRECT", "depth": 1 },
+      { "node": "F:cl16.OrdLine:INSERT", "table": "cl16.OrdLine", "operation": "INSERT", "rowCount": 2, "causeKind": "TRIGGER", "depth": 2 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl16.Ord:INSERT", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl16.Ord:INSERT", "child": "T:cl16.trg_Ord_ins", "kind": "FIRES", "name": "cl16.trg_Ord_ins", "confidence": "inferred", "basis": "§6.3, §7.3" },
+      { "statementIndex": 1, "parent": "T:cl16.trg_Ord_ins", "child": "F:cl16.OrdLine:INSERT", "kind": "WRITES", "name": "cl16.trg_Ord_ins", "confidence": "inferred", "basis": "§7.2 2·4단계(정적 쓰기 대상 OrdLine)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "제품의 volatile reason 값(id IDENTITY, invoice_no SEQUENCE_DEFAULT, created_at·row_guid NONDETERMINISTIC_DEFAULT, added_at TRIGGER_GETDATE)", "basis": "§6.2 volatile[].reason. 손 정답 형식은 열 이름만 쓴다(answer-format v0.2). 이유 값은 제품 테스트가 볼 일이다" }
+    ]
+  },
+  "rationale": [
+    { "claim": "IDENTITY 값은 롤백해도 회수되지 않고 SEQUENCE는 트랜잭션과 무관하게 소비되므로 샌드박스·오라클·[적용]마다 값이 다르다", "basis": "A13, E2, E3" },
+    { "claim": "새 IDENTITY 행은 비결정 열을 뺀 값으로 짝짓고, 자식 ord_id는 짝 매핑으로 치환해 비교한다", "basis": "D7 일치 규칙, E2, §10.4 M1" },
+    { "claim": "같은 문장의 자식 두 행을 memo(= customer)로 구별한다. 그래서 IDENTITY 순서에 기대지 않고 짝지을 수 있다", "basis": "cl16.sql 주석, answer-format v0.2 match" },
+    { "claim": "비결정 열은 존재와 형식만 비교한다", "basis": "E1, D7" }
+  ]
+}

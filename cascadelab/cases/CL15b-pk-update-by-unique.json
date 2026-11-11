@@ -1,0 +1,32 @@
+{
+  "id": "CL15b",
+  "pattern": "CL15",
+  "title": "PK를 바꾸는 다중 행 UPDATE, 바뀌지 않는 NOT NULL UNIQUE 키 있음 (BY_UNIQUE)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl15.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "UPDATE cl15.Emp SET id = id + 100 WHERE id IN (1, 2);" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl15.Emp", "keyColumns": ["id"], "updated": [],
+        "deleted": [ { "key": { "id": 1 }, "causes": ["DIRECT"] }, { "key": { "id": 2 }, "causes": ["DIRECT"] } ],
+        "inserted": [ { "key": { "id": 101 }, "causes": ["DIRECT"] }, { "key": { "id": 102 }, "causes": ["DIRECT"] } ],
+        "basis": "순 변경은 PK 조인 기준(NetChange 규칙). 3은 그대로" }
+    ],
+    "firings": [
+      { "node": "F:cl15.Emp:UPDATE", "table": "cl15.Emp", "operation": "UPDATE", "rowCount": 2, "causeKind": "DIRECT", "depth": 1, "pairing": "BY_UNIQUE" }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl15.Emp:UPDATE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" }
+    ],
+    "observedOnly": []
+  },
+  "rationale": [
+    { "claim": "badge(UQ_cl15_Emp_badge, NOT NULL)가 바뀌지 않으므로 그 키로 inserted·deleted 짝을 짓는다", "basis": "E7, §6.2 pairing BY_UNIQUE" }
+  ]
+}

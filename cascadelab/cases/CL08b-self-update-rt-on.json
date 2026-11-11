@@ -20,10 +20,10 @@
         "basis": "ON이면 trg_Acct_upd가 자기 UPDATE로 다시 발동한다. inserted.touched 0,1,2일 때 1씩 올리고 3이면 가드로 끝나므로 touched = 3. id 2는 그대로" }
     ],
     "firings": [
-      { "node": "F:cl08.Acct:UPDATE#1", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "pairing": "SINGLE_ROW" },
-      { "node": "F:cl08.Acct:UPDATE#2", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2, "pairing": "SINGLE_ROW" },
-      { "node": "F:cl08.Acct:UPDATE#3", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 3, "pairing": "SINGLE_ROW" },
-      { "node": "F:cl08.Acct:UPDATE#4", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 4, "pairing": "SINGLE_ROW" }
+      { "node": "F:cl08.Acct:UPDATE#1", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "pairing": "BY_PK" },
+      { "node": "F:cl08.Acct:UPDATE#2", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2, "pairing": "BY_PK" },
+      { "node": "F:cl08.Acct:UPDATE#3", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 3, "pairing": "BY_PK" },
+      { "node": "F:cl08.Acct:UPDATE#4", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 4, "pairing": "BY_PK" }
     ],
     "edges": [
       { "statementIndex": 1, "parent": "S", "child": "F:cl08.Acct:UPDATE#1", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
@@ -35,7 +35,12 @@
       { "statementIndex": 1, "parent": "T:cl08.trg_Acct_upd#3", "child": "F:cl08.Acct:UPDATE#4", "kind": "WRITES", "name": "cl08.trg_Acct_upd", "confidence": "inferred", "basis": "§7.2 2·4단계" },
       { "statementIndex": 1, "parent": "F:cl08.Acct:UPDATE#4", "child": "T:cl08.trg_Acct_upd#4", "kind": "FIRES", "name": "cl08.trg_Acct_upd", "confidence": "inferred", "observed": false, "basis": "가드로 변경 없이 끝남 -> §6.3 observed: false(점선)" }
     ],
-    "observedOnly": []
+    "observedOnly": [],
+    "corrections": [
+      { "date": "2026-11-11", "item": "firings F:cl08.Acct:UPDATE#1~#4 pairing(4건)", "before": "SINGLE_ROW", "after": "BY_PK",
+        "evidence": "실DB 수집기 출력(Execution.Tests CascadeLab 회귀, logs/week2/eval/eval-20261110-132555/records/ rowChanges[].pairing), cascadelab/README.md 정정 2026-11-10",
+        "cause": "정답 오류: 모두 한 행이고 PK가 바뀌지 않은 UPDATE라 BY_PK다(설계 §4 v1.4 C11, Q11). M1·M2·순 변경 영향 없음" }
+    ]
   },
   "rationale": [
     { "claim": "depth 1~4는 트리거 스택 수다", "basis": "A7. FK 연쇄가 없어 H2와 무관" },

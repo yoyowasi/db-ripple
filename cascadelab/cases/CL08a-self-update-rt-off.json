@@ -21,7 +21,7 @@
         "basis": "문장이 bal을, trg_Acct_upd가 touched를 1회 바꾼다. OFF라 trg_Acct_upd는 자기 자신을 다시 발동하지 않으므로 touched = 1(A8, 직접 재귀 금지). id 2는 그대로" }
     ],
     "firings": [
-      { "node": "F:cl08.Acct:UPDATE#1", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "pairing": "SINGLE_ROW" },
+      { "node": "F:cl08.Acct:UPDATE#1", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "pairing": "BY_PK" },
       { "node": "F:cl08.Acct:UPDATE#2", "table": "cl08.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2 }
     ],
     "edges": [
@@ -34,7 +34,10 @@
       { "date": "2026-11-10", "item": "OO1(트리거 안 UPDATE가 감사 트리거를 발동하는지)", "before": "대안 a(감사 발동)·b(감사 미발동 → SAME_TABLE_TRIGGER 잔차) 미정",
         "after": "a로 확정: firings에 F:cl08.Acct:UPDATE#2(깊이 2), edges에 WRITES, causes를 DIRECT·TRIGGER로",
         "evidence": "spikes/logs/sp3-10-mini-part2.log OFF 16~17·20행(CAPTURED), cascadelab/verification/logs/audit-2026-11-10.txt(Acct:U:2:1 < Acct:U:1:1, 5회 같음)",
-        "cause": "문서 해석: A8 문구대로(직접 재귀만 막음) a가 맞다. 설계 E14·DM2의 잔차 가정(b)은 실측과 다름(설계 v1.3에서 고침)" }
+        "cause": "문서 해석: A8 문구대로(직접 재귀만 막음) a가 맞다. 설계 E14·DM2의 잔차 가정(b)은 실측과 다름(설계 v1.3에서 고침)" },
+      { "date": "2026-11-11", "item": "firings F:cl08.Acct:UPDATE#1 pairing", "before": "SINGLE_ROW", "after": "BY_PK",
+        "evidence": "실DB 수집기 출력(Execution.Tests CascadeLab 회귀, logs/week2/eval/eval-20261110-132555/records/ rowChanges[].pairing), cascadelab/README.md 정정 2026-11-10",
+        "cause": "정답 오류: 한 행이고 PK가 바뀌지 않은 UPDATE는 BY_PK다(설계 §4 v1.4 C11, Q11). M1·M2·순 변경 영향 없음" }
     ]
   },
   "rationale": [

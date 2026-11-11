@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    C15 적용 서비스(§4 C15, §5.3, D7). 소유: apply-1(3주차). 참조는 Contracts만(AD1).
+    문장 실행은 IStatementRunner(Execution 구현), 최종 차이는 INetDiffer(Diff 구현)를 생성자로 받는다. 조립은 Host만 한다.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DbRipple.Apply.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DbRipple.Contracts\DbRipple.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

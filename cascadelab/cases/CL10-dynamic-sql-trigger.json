@@ -1,0 +1,77 @@
+{
+  "id": "CL10",
+  "pattern": "CL10",
+  "title": "동적 SQL 트리거 + 3단 CASCADE + SET NULL (DM4)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl10.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "DELETE FROM cl10.Region WHERE id = 1;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "warnings": ["WARN_TRIGGER_DYNAMIC_SQL"],
+    "changes": [
+      { "table": "cl10.Region", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 1 }, "causes": ["DIRECT"] } ],
+        "basis": "문장 WHERE id = 1" },
+      { "table": "cl10.Store", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 10 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 11 }, "causes": ["FK_CASCADE"] } ],
+        "basis": "FK_cl10_Store_Region, region_id = 1(10, 11). 20은 그대로" },
+      { "table": "cl10.Shelf", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 100 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 101 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 110 }, "causes": ["FK_CASCADE"] } ],
+        "basis": "FK_cl10_Shelf_Store, store_id 10·11. 200은 그대로" },
+      { "table": "cl10.Slot", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 1000 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 1001 }, "causes": ["FK_CASCADE"] } ],
+        "basis": "FK_cl10_Slot_Shelf, shelf_id 100·101(110에는 Slot 없음). 2000은 그대로" },
+      { "table": "cl10.Manager", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [
+          { "key": { "id": 500 }, "causes": ["FK_SET_NULL"], "changedColumns": ["region_id"], "after": { "region_id": null } },
+          { "key": { "id": 501 }, "causes": ["FK_SET_NULL"], "changedColumns": ["region_id"], "after": { "region_id": null } }
+        ],
+        "basis": "FK_cl10_Manager_Region ON DELETE SET NULL. 502는 region 2, 503은 이미 NULL이라 그대로" },
+      { "table": "cl10.Counter", "keyColumns": ["name"], "inserted": [], "deleted": [],
+        "updated": [ { "key": { "name": "region_deleted" }, "causes": ["TRIGGER"], "changedColumns": ["n"], "after": { "n": 1 } } ],
+        "basis": "trg_Region_del_dyn: sp_executesql로 n += 삭제 행 수(1)" },
+      { "table": "cl10.RegionLog", "keyColumns": ["region_id"], "updated": [], "deleted": [],
+        "inserted": [ { "key": { "region_id": 1 }, "causes": ["TRIGGER"] } ],
+        "basis": "trg_Region_del_log: 삭제 행마다 1행" }
+    ],
+    "firings": [
+      { "node": "F:cl10.Region:DELETE", "table": "cl10.Region", "operation": "DELETE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1 },
+      { "node": "F:cl10.Store:DELETE", "table": "cl10.Store", "operation": "DELETE", "rowCount": 2, "causeKind": "FK_CASCADE", "depth": 1 },
+      { "node": "F:cl10.Shelf:DELETE", "table": "cl10.Shelf", "operation": "DELETE", "rowCount": 3, "causeKind": "FK_CASCADE", "depth": 1 },
+      { "node": "F:cl10.Slot:DELETE", "table": "cl10.Slot", "operation": "DELETE", "rowCount": 2, "causeKind": "FK_CASCADE", "depth": 1 },
+      { "node": "F:cl10.Manager:UPDATE", "table": "cl10.Manager", "operation": "UPDATE", "rowCount": 2, "causeKind": "FK_SET_NULL", "depth": 1, "pairing": "BY_PK" },
+      { "node": "F:cl10.Counter:UPDATE", "table": "cl10.Counter", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2, "pairing": "BY_PK" },
+      { "node": "F:cl10.RegionLog:INSERT", "table": "cl10.RegionLog", "operation": "INSERT", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl10.Region:DELETE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl10.Region:DELETE", "child": "F:cl10.Store:DELETE", "kind": "FK", "name": "FK_cl10_Store_Region", "action": "CASCADE", "event": "DELETE", "confidence": "inferred",
+        "basis": "§7.2 3단계: 이 문장에서 실행되는 동적 SQL 트리거(trg_Region_del_dyn)는 모든 테이블에 쓸 수 있으므로 쓰기 경합 -> certain 아님(v1.4 넓은 경합)" },
+      { "statementIndex": 1, "parent": "F:cl10.Store:DELETE", "child": "F:cl10.Shelf:DELETE", "kind": "FK", "name": "FK_cl10_Shelf_Store", "action": "CASCADE", "event": "DELETE", "confidence": "inferred", "basis": "같은 이유(동적 SQL 쓰기 경합)" },
+      { "statementIndex": 1, "parent": "F:cl10.Shelf:DELETE", "child": "F:cl10.Slot:DELETE", "kind": "FK", "name": "FK_cl10_Slot_Shelf", "action": "CASCADE", "event": "DELETE", "confidence": "inferred", "basis": "같은 이유(동적 SQL 쓰기 경합)" },
+      { "statementIndex": 1, "parent": "F:cl10.Region:DELETE", "child": "F:cl10.Manager:UPDATE", "kind": "FK", "name": "FK_cl10_Manager_Region", "action": "SET_NULL", "event": "DELETE", "confidence": "inferred", "basis": "같은 이유(동적 SQL 쓰기 경합)" },
+      { "statementIndex": 1, "parent": "F:cl10.Region:DELETE", "child": "T:cl10.trg_Region_del_dyn", "kind": "FIRES", "name": "cl10.trg_Region_del_dyn", "confidence": "inferred", "basis": "§6.3, §7.3" },
+      { "statementIndex": 1, "parent": "F:cl10.Region:DELETE", "child": "T:cl10.trg_Region_del_log", "kind": "FIRES", "name": "cl10.trg_Region_del_log", "confidence": "inferred", "basis": "§6.3, §7.3" },
+      { "statementIndex": 1, "parent": "T:cl10.trg_Region_del_dyn", "child": "F:cl10.Counter:UPDATE", "kind": "WRITES", "name": "cl10.trg_Region_del_dyn", "confidence": "inferred",
+        "basis": "§7.2 4단계: Region 문맥 트리거 가운데 Counter에 쓸 수 있는 것은 동적 SQL 트리거 하나(trg_Region_del_log의 정적 쓰기 대상은 RegionLog뿐) -> 후보 1개. OO1 참고" },
+      { "statementIndex": 1, "parent": "T:cl10.trg_Region_del_log", "child": "F:cl10.RegionLog:INSERT", "kind": "WRITES", "name": "cl10.trg_Region_del_log", "confidence": "ambiguous",
+        "basis": "§7.2 4단계: 정적 쓰기 대상(trg_Region_del_log)과 동적 SQL(trg_Region_del_dyn) 두 후보 -> ambiguous. 정답은 trg_Region_del_log" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "동적 SQL 트리거 하나뿐인 후보(Counter)의 확신도", "alternatives": ["inferred", "ambiguous"],
+        "basis": "§7.2 4단계 문구(동적 SQL 트리거는 모든 테이블에 쓸 수 있다고 보고, 후보 1개 -> inferred)로 inferred를 적었다. E8 '확신도를 낮춘다'를 후보 1개일 때도 낮춘다는 뜻으로 읽으면 ambiguous다" },
+      { "id": "OO2", "what": "두 Region 트리거 사이 순서, 체인(Store→Shelf→Slot, Manager) 사이 순서와 captureSeq", "basis": "A2: First/Last를 지정하지 않은 트리거 순서와 형제 체인 순서는 문서에 없다" },
+      { "id": "OO3", "what": "FK 연쇄 묶음 depth 1, 트리거 쓰기 묶음 depth 2", "basis": "H2(A7)" }
+    ]
+  },
+  "rationale": [
+    { "claim": "동적 SQL 트리거는 수집에는 영향이 없다(감사 트리거가 Counter 갱신을 잡는다)", "basis": "E8, A1" },
+    { "claim": "같은 연쇄라도 동적 SQL 트리거가 있으면 FK 간선이 certain에서 inferred로 내려간다. 데모 DM4가 보여 줄 '모호한 귀속'이다", "basis": "§7.2 3단계 certain 조건, §10.7 DM4" },
+    { "claim": "sp_executesql 안 UPDATE는 소유권 체인이 끊겨 권한을 다시 검사하지만, 실행 사용자(dbr_preview_user)는 cl10 스키마 UPDATE 권한이 있다", "basis": "A18, PreviewUserSql(스키마별 SELECT·INSERT·UPDATE·DELETE)" }
+  ]
+}

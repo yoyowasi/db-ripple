@@ -1,0 +1,33 @@
+{
+  "id": "CL16b",
+  "pattern": "CL16",
+  "title": "문장 안 비결정 함수(SYSDATETIME)로 기존 행 UPDATE",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl16.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "UPDATE cl16.Ord SET note = 'x', touched_at = SYSDATETIME() WHERE id = 1;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "warnings": ["WARN_NONDETERMINISTIC_FUNCTION"],
+    "changes": [
+      { "table": "cl16.Ord", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [ { "key": { "id": 1 }, "causes": ["DIRECT"], "changedColumns": ["note", "touched_at"], "volatile": ["touched_at"], "after": { "note": "x" } } ],
+        "basis": "시드 행 id 1(시드 때 확정된 IDENTITY라 결정적). note NULL -> 'x', touched_at NULL -> 실행 시각" }
+    ],
+    "firings": [
+      { "node": "F:cl16.Ord:UPDATE", "table": "cl16.Ord", "operation": "UPDATE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "pairing": "BY_PK" }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl16.Ord:UPDATE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" }
+    ],
+    "observedOnly": []
+  },
+  "rationale": [
+    { "claim": "문장 안 SYSDATETIME()은 비결정 함수 경고 대상이고 그 열은 '예상값'(STATEMENT_FUNCTION)이다", "basis": "D5 경고, E1, §6.2 volatile reason" },
+    { "claim": "trg_Ord_ins는 INSERT 트리거라 UPDATE에는 발동하지 않는다", "basis": "cl16.sql" }
+  ]
+}

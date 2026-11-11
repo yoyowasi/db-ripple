@@ -56,8 +56,9 @@ public class OracleTests
         await CascadeLabSeed.CreateAsync(def, CascadeLabVariant.Default);
         await CascadeLabSeed.CreateAsync(rt, CascadeLabVariant.RecursiveTriggers);
 
-        var cases = HandCase.LoadAll(Path.Combine(RepoPaths.CascadeLab, "cases"));
         var log = OracleLog.LoadCases(Path.Combine(RepoPaths.CascadeLab, "verification", "logs", "oracle-2026-11-10.json"));
+        // 1주차 기록이 있는 사례(CL01~CL08b)만. 3주차 사례(CL09~CL20)는 CascadeLabWeek3Tests가 본다.
+        var cases = HandCase.LoadAll(Path.Combine(RepoPaths.CascadeLab, "cases")).Where(c => log.ContainsKey(c.Id)).ToList();
         Assert.Equal(11, cases.Count);
         Assert.Equal(cases.Select(c => c.Id).Order(StringComparer.Ordinal), log.Keys.Order(StringComparer.Ordinal));
 

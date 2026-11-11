@@ -35,6 +35,15 @@ public sealed record CatalogTable(int ObjectId, string Schema, string Name, Temp
 
 public sealed record CatalogFile(int FileId, string LogicalName, string TypeDesc, string PhysicalName);
 
+/// <summary>
+/// 저장 프로시저 모듈 1개(sys.procedures + sys.sql_modules, 2주차 인계 1). Definition이 NULL이면 암호화·CLR·확장 프로시저라 본문을 펼칠 수 없다.
+/// 2026-11-11 추가(비파괴). C6 TriggerAnalyzer가 트리거가 부르는 프로시저의 쓰기 대상을 펼칠 때 쓴다.
+/// </summary>
+public sealed record CatalogModule(int ObjectId, string Schema, string Name, string? Definition)
+{
+    public bool IsEncrypted => Definition is null;
+}
+
 /// <summary>C7 카탈로그 스냅샷.</summary>
 public sealed record DbCatalog(
     IReadOnlyList<CatalogTable> Tables,
@@ -42,8 +51,13 @@ public sealed record DbCatalog(
     IReadOnlyList<CatalogIndexColumn> KeyIndexes,
     IReadOnlyList<CatalogForeignKeyColumn> ForeignKeys,
     IReadOnlyList<CatalogTriggerEvent> Triggers,
-    IReadOnlyList<CatalogFile> Files)
+    IReadOnlyList<CatalogFile> Files,
+    IReadOnlyList<CatalogModule>? Procedures = null)
 {
+    /// <summary>프로시저 모듈(인계 1). 생성자에서 생략했으면(3주차 이전 호출자) 빈 목록 = "펼칠 본문 없음"이다.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<CatalogModule> ProcedureModules => Procedures ?? [];
+
     /// <summary>C9 입력으로 바꾼다.</summary>
     public IReadOnlyList<TableInfo> ToCaptureInput() => Tables.Select(t =>
     {

@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using DbRipple.Contracts;
 
@@ -12,9 +11,11 @@ namespace DbRipple.Preview;
 /// → SandboxDirty면 MarkDirty → C11 Collect → C13 Resolve → PreviewResult 조립(netSummary, timingsMs, sqlHash) → C14 Save.
 /// <list type="bullet">
 /// <item>RefreshAsync는 잠금이 풀리길 기다리므로 잠금을 쥔 채 부르면 교착한다. 그래서 "오염 확인 → (재구축) → 잠금 → 다시 오염 확인"을 되풀이한다(최대 <see cref="MaxRefreshAttempts"/>번,
-/// 그래도 오염이면 InvalidOperationException).</item>
-/// <item>잠금 충돌, 구축 중, 기준선 없음, 환경 지문 불일치는 InvalidOperationException(API 409).</item>
+/// 그래도 오염이면 PreviewConflictException(DIRTY)).</item>
+/// <item>잠금 충돌, 구축 중, 기준선 없음, 환경 지문 불일치, 계속 오염은 PreviewConflictException(API 409, reason LOCKED·BUILDING·NO_BASELINE·FINGERPRINT_MISMATCH·DIRTY, AD9). 앞 셋은 SandboxManager가 던진다.</item>
 /// <item>실행기가 예외를 던지면(연결 끊김 등) 샌드박스 상태를 알 수 없으므로 오염으로 표시하고 예외를 그대로 다시 던진다.</item>
+/// <item>실행기가 "롤백 뒤 남은 변경" 검사 실패(RawCapture.ResidualCheckFailed)를 알려 오면 ResidualCheckFailed·ResidualCheckMessage를 결과에 옮기고, SandboxDirty와 같이 한 번 MarkDirty한다(Q31: 샌드박스를 믿을 수 없다).</item>
+/// <item>sqlHash와 netSummary 식은 Contracts <see cref="ContractFormulas"/>가 갖는다(Apply와 공유). <see cref="SqlHash"/>·<see cref="Summarize"/>는 그쪽으로 위임하는 얇은 별칭이다.</item>
 /// <item>sqlHash = "sha256:" + SHA-256(UTF-8 바이트, 정규화 없음) 소문자 16진(Q17).</item>
 /// <item>netSummary는 순 변경(NetChanges)을 테이블별로 센다. 건수는 Multiplicity의 합(Q16).</item>
 /// <item>timingsMs.serialize는 저장할 기록(PreviewRecord)을 ContractJson으로 직렬화하는 시간이다(파일 쓰기 제외: 결과에 담긴 시간이라 저장 시간은 잴 수 없다).</item>
@@ -36,22 +37,10 @@ public sealed class PreviewPipeline(
     public IReadOnlyList<object> Components { get; } = [sandbox, analyzer, executor, collector, resolver, store, clock];
 
     /// <summary>"sha256:" + 소문자 16진(Q17: UTF-8, 정규화 없음).</summary>
-    public static string SqlHash(string sql) => "sha256:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(sql)));
+    public static string SqlHash(string sql) => ContractFormulas.SqlHash(sql);
 
     /// <summary>순 변경을 테이블별 건수로(Q16: Multiplicity 합). 테이블 이름 순.</summary>
-    public static IReadOnlyList<NetSummaryRow> Summarize(IEnumerable<NetChange> net) => net
-        .GroupBy(n => n.Table, StringComparer.Ordinal)
-        .OrderBy(g => g.Key, StringComparer.Ordinal)
-        .Select(g => new NetSummaryRow
-        {
-            Table = g.Key,
-            Inserted = g.Where(n => n.Change == NetChangeKind.Inserted).Sum(n => n.Multiplicity),
-            Updated = g.Where(n => n.Change == NetChangeKind.Updated).Sum(n => n.Multiplicity),
-            Deleted = g.Where(n => n.Change == NetChangeKind.Deleted).Sum(n => n.Multiplicity),
-            MultisetRemoved = g.Where(n => n.Change == NetChangeKind.MultisetRemoved).Sum(n => n.Multiplicity),
-            MultisetAdded = g.Where(n => n.Change == NetChangeKind.MultisetAdded).Sum(n => n.Multiplicity),
-        })
-        .ToList();
+    public static IReadOnlyList<NetSummaryRow> Summarize(IEnumerable<NetChange> net) => ContractFormulas.Summarize(net);
 
     /// <inheritdoc />
     public async Task<PreviewOutcome> RunAsync(string sql, PreviewOptions options, IEvaluationHook? hook, CancellationToken ct)
@@ -62,7 +51,7 @@ public sealed class PreviewPipeline(
         await using var preview = await AcquireReadyAsync(ct);
         var baseline = await sandbox.GetContextAsync(ct);
         if (!baseline.FingerprintMatch)
-            throw new InvalidOperationException("원본과 샌드박스의 환경 지문이 달라 미리보기를 막습니다(§5.1 6).");
+            throw new PreviewConflictException(ConflictReason.FingerprintMismatch, "원본과 샌드박스의 환경 지문이 달라 미리보기를 막습니다(§5.1 6).");
 
         var sw = Stopwatch.StartNew();
         var analysis = analyzer.Analyze(sql, baseline);
@@ -79,7 +68,10 @@ public sealed class PreviewPipeline(
             sandbox.MarkDirty("실행기 예외로 샌드박스 상태를 알 수 없음");
             throw;
         }
-        if (raw.SandboxDirty) sandbox.MarkDirty($"롤백 뒤 남은 변경 {raw.ResidualCommitted.Count}건(감사 트리거가 자동 커밋으로 기록)");
+        if (raw.ResidualCheckFailed)
+            sandbox.MarkDirty($"롤백 뒤 남은 변경 검사 실패로 샌드박스 상태를 알 수 없음: {raw.ResidualCheckMessage}");
+        else if (raw.SandboxDirty)
+            sandbox.MarkDirty($"롤백 뒤 남은 변경 {raw.ResidualCommitted.Count}건(감사 트리거가 자동 커밋으로 기록)");
 
         sw.Restart();
         var collected = collector.Collect(raw, analysis, baseline);
@@ -112,6 +104,8 @@ public sealed class PreviewPipeline(
             Firings = model.Firings,
             Residuals = model.Residuals,
             ResidualCommitted = raw.ResidualCommitted,
+            ResidualCheckFailed = raw.ResidualCheckFailed,
+            ResidualCheckMessage = raw.ResidualCheckMessage,
             NetSummary = Summarize(model.NetChanges),
             Graph = resolution.Graph,
             Warnings = analysis.Warnings,
@@ -153,7 +147,7 @@ public sealed class PreviewPipeline(
             }
             await held.DisposeAsync(); // 그 사이 다른 미리보기가 오염시켰다
         }
-        throw new InvalidOperationException("샌드박스가 계속 오염 상태라 미리보기를 시작할 수 없습니다.");
+        throw new PreviewConflictException(ConflictReason.Dirty, "샌드박스가 계속 오염 상태라 미리보기를 시작할 수 없습니다.");
     }
 
     string NewId() => $"pv_{clock.GetLocalNow():yyyyMMdd}_{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4))}";

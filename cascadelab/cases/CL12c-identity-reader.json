@@ -1,0 +1,47 @@
+{
+  "id": "CL12c",
+  "pattern": "CL12",
+  "title": "@@IDENTITY를 읽는 트리거 (관찰자 효과 E25)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl12.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "INSERT INTO cl12.Doc (title) VALUES ('d1');" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl12.Doc", "keyColumns": ["doc_id"], "updated": [], "deleted": [],
+        "inserted": [ { "ref": "d1", "match": { "title": "d1" }, "identity": ["doc_id"], "causes": ["DIRECT"] } ],
+        "basis": "문장 1행. doc_id는 IDENTITY(샌드박스에서 롤백해도 회수되지 않아 실행마다 다름, A13)" },
+      { "table": "cl12.DocNote", "keyColumns": ["note_id"], "updated": [], "deleted": [],
+        "inserted": [ { "ref": "n1", "match": { "note": "auto" }, "identity": ["note_id"],
+          "identityRefs": { "doc_id": { "table": "cl12.Doc", "ref": "d1" } }, "causes": ["TRIGGER"] } ],
+        "basis": "trg_Doc_ins: 새 Doc마다 DocNote 1행, doc_id = 새 IDENTITY" },
+      { "table": "cl12.IdentSeen", "keyColumns": ["title"], "updated": [], "deleted": [],
+        "inserted": [ { "key": { "title": "d1" }, "identityRefs": { "seen_identity": { "table": "cl12.DocNote", "ref": "n1" } }, "causes": ["TRIGGER"] } ],
+        "basis": "trg_Doc_ins가 DocNote INSERT 직후 @@IDENTITY를 적는다. 정답: 방금 만든 DocNote.note_id. 감사 저장소가 IDENTITY를 쓰면 이 값이 감사 IDENTITY로 바뀐다(관찰자 효과)" }
+    ],
+    "firings": [
+      { "node": "F:cl12.Doc:INSERT", "table": "cl12.Doc", "operation": "INSERT", "rowCount": 1, "causeKind": "DIRECT", "depth": 1 },
+      { "node": "F:cl12.DocNote:INSERT", "table": "cl12.DocNote", "operation": "INSERT", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2 },
+      { "node": "F:cl12.IdentSeen:INSERT", "table": "cl12.IdentSeen", "operation": "INSERT", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl12.Doc:INSERT", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl12.Doc:INSERT", "child": "T:cl12.trg_Doc_ins", "kind": "FIRES", "name": "cl12.trg_Doc_ins", "confidence": "inferred", "basis": "§6.3, §7.3" },
+      { "statementIndex": 1, "parent": "T:cl12.trg_Doc_ins", "child": "F:cl12.DocNote:INSERT", "kind": "WRITES", "name": "cl12.trg_Doc_ins", "confidence": "inferred", "basis": "§7.2 2·4단계(정적 쓰기 대상 DocNote)" },
+      { "statementIndex": 1, "parent": "T:cl12.trg_Doc_ins", "child": "F:cl12.IdentSeen:INSERT", "kind": "WRITES", "name": "cl12.trg_Doc_ins", "confidence": "inferred", "basis": "§7.2 2·4단계(정적 쓰기 대상 IdentSeen)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "DocNote·IdentSeen 묶음 사이 순서", "basis": "§7.4(트리거 본문의 어느 문장이 먼저인지 주장하지 않음)" }
+    ]
+  },
+  "rationale": [
+    { "claim": "@@IDENTITY는 세션의 마지막 IDENTITY 값이고 트리거가 만든 값도 포함한다. DocNote INSERT가 발동한 (샌드박스) 감사 트리거가 IDENTITY 테이블에 쓰면 값이 바뀐다", "basis": "D3 규칙 3, E25" },
+    { "claim": "감사 저장소는 SEQUENCE만 쓰므로 seen_identity = DocNote.note_id가 샌드박스와 오라클에서 모두 성립해야 한다(E_obs 0)", "basis": "§6.2 감사 저장소, SP2(e)" },
+    { "claim": "IdentSeen 키(title)는 결정적이라 key로 쓰고, seen_identity만 짝 매핑으로 비교한다", "basis": "answer-format v0.2 identityRefs" }
+  ]
+}

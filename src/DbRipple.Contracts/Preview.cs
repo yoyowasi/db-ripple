@@ -76,6 +76,10 @@ public sealed record PreviewResult
     public IReadOnlyList<Residual> Residuals { get; init; } = [];
     /// <summary>실패·거부 뒤 트랜잭션 밖에서 확정된 변경(§5.2 4).</summary>
     public IReadOnlyList<NetChange> ResidualCommitted { get; init; } = [];
+    /// <summary>"롤백 뒤 남은 변경" 검사 실패(RawCapture.ResidualCheckFailed 그대로). true면 화면에 "잔여 확인 실패"를 보이고 ResidualCommitted를 믿지 않는다(인계 7). 2026-11-11 추가(비파괴, Q31).</summary>
+    public bool ResidualCheckFailed { get; init; }
+    /// <summary>검사 실패 원인 요약(RawCapture.ResidualCheckMessage 그대로). 아니면 null. 2026-11-11 추가(Q31).</summary>
+    public string? ResidualCheckMessage { get; init; }
     /// <summary>테이블별 순 변경 건수.</summary>
     public IReadOnlyList<NetSummaryRow> NetSummary { get; init; } = [];
     /// <summary>그래프.</summary>

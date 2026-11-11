@@ -1,0 +1,68 @@
+{
+  "id": "CL13",
+  "pattern": "CL13",
+  "title": "같은 테이블 AFTER DELETE 트리거 3개(First, 순서 미지정, 사용자 Last) + CASCADE 자식 트리거, 감사 순서 NONE",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl13.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "DELETE FROM cl13.T WHERE id = 1;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "warnings": ["WARN_AUDIT_NOT_LAST"],
+    "changes": [
+      { "table": "cl13.T", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 1 }, "causes": ["DIRECT"] } ],
+        "basis": "문장 WHERE id = 1" },
+      { "table": "cl13.TC", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 50 }, "causes": ["FK_CASCADE"] }, { "key": { "id": 51 }, "causes": ["FK_CASCADE"] } ],
+        "basis": "FK_cl13_TC_T, t_id = 1(50, 51). 60은 그대로" },
+      { "table": "cl13.Log", "keyColumns": ["id"], "updated": [], "deleted": [],
+        "inserted": [
+          { "key": { "id": 4050 }, "causes": ["TRIGGER"] },
+          { "key": { "id": 4051 }, "causes": ["TRIGGER"] },
+          { "key": { "id": 1001 }, "causes": ["TRIGGER"] },
+          { "key": { "id": 2001 }, "causes": ["TRIGGER"] },
+          { "key": { "id": 3001 }, "causes": ["TRIGGER"] }
+        ],
+        "basis": "trg_TC_1: 4000 + TC id(50, 51). trg_T_1·2·3: 1000·2000·3000 + T id(1)" }
+    ],
+    "firings": [
+      { "node": "F:cl13.T:DELETE", "table": "cl13.T", "operation": "DELETE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "auditOrder": "NONE" },
+      { "node": "F:cl13.TC:DELETE", "table": "cl13.TC", "operation": "DELETE", "rowCount": 2, "causeKind": "FK_CASCADE", "depth": 1 },
+      { "node": "F:cl13.Log:INSERT#1", "table": "cl13.Log", "operation": "INSERT", "rowCount": 2, "causeKind": "TRIGGER", "depth": 2 },
+      { "node": "F:cl13.Log:INSERT#2", "table": "cl13.Log", "operation": "INSERT", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2 },
+      { "node": "F:cl13.Log:INSERT#3", "table": "cl13.Log", "operation": "INSERT", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2 },
+      { "node": "F:cl13.Log:INSERT#4", "table": "cl13.Log", "operation": "INSERT", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl13.T:DELETE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 1, "parent": "F:cl13.T:DELETE", "child": "F:cl13.TC:DELETE", "kind": "FK", "name": "FK_cl13_TC_T", "action": "CASCADE", "event": "DELETE", "confidence": "certain",
+        "basis": "§7.2 3단계: 부모 후보 하나, 행 일치, 같은 깊이, 이 문장의 트리거 4개는 모두 Log에만 쓴다(TC 쓰기 경합 없음). FK 판정은 순서와 무관해 감사 NONE의 영향이 없다" },
+      { "statementIndex": 1, "parent": "F:cl13.TC:DELETE", "child": "T:cl13.trg_TC_1", "kind": "FIRES", "name": "cl13.trg_TC_1", "confidence": "inferred", "basis": "A1, §6.3" },
+      { "statementIndex": 1, "parent": "T:cl13.trg_TC_1", "child": "F:cl13.Log:INSERT#1", "kind": "WRITES", "name": "cl13.trg_TC_1", "confidence": "inferred",
+        "basis": "§7.2 2·4단계: TC 감사는 Last라 괄호가 성립하고 TC 문맥 후보는 trg_TC_1 하나. TC는 NONE 묶음(T)보다 앞 형제라 2단계 상한에 걸리지 않는다" },
+      { "statementIndex": 1, "parent": "F:cl13.T:DELETE", "child": "T:cl13.trg_T_1", "kind": "FIRES", "name": "cl13.trg_T_1", "confidence": "inferred", "basis": "§6.3" },
+      { "statementIndex": 1, "parent": "F:cl13.T:DELETE", "child": "T:cl13.trg_T_2", "kind": "FIRES", "name": "cl13.trg_T_2", "confidence": "inferred", "basis": "§6.3" },
+      { "statementIndex": 1, "parent": "F:cl13.T:DELETE", "child": "T:cl13.trg_T_3", "kind": "FIRES", "name": "cl13.trg_T_3", "confidence": "inferred", "basis": "§6.3" },
+      { "statementIndex": 1, "parent": "T:cl13.trg_T_1", "child": "F:cl13.Log:INSERT#2", "kind": "WRITES", "name": "cl13.trg_T_1", "confidence": "ambiguous",
+        "basis": "§7.2 2단계: T 감사 순서 NONE -> 자식은 ambiguous 이하. 4단계 후보 trg_T_1·2·3(모두 Log에 씀). 정답 trg_T_1(Log 1001)" },
+      { "statementIndex": 1, "parent": "T:cl13.trg_T_2", "child": "F:cl13.Log:INSERT#3", "kind": "WRITES", "name": "cl13.trg_T_2", "confidence": "ambiguous",
+        "basis": "같은 이유. v1.3 보완: T 감사 뒤에 기록된 깊이 2 묶음도 T를 부모 후보로 둔다(SP1 CL13). 정답 trg_T_2(Log 2001)" },
+      { "statementIndex": 1, "parent": "T:cl13.trg_T_3", "child": "F:cl13.Log:INSERT#4", "kind": "WRITES", "name": "cl13.trg_T_3", "confidence": "ambiguous",
+        "basis": "같은 이유. 정답 trg_T_3(Log 3001)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "Log 묶음 번호 #1~#4(인과 순서: trg_TC_1이 먼저(A1 연쇄 대상 트리거가 먼저), 그다음 First·순서 미지정·Last)", "basis": "A1, A6(First·Last 지정). 순서 미지정 트리거가 하나뿐이라 T 트리거 순서는 정해진다. 감사 트리거(NONE)의 위치는 정해지지 않는다" },
+      { "id": "OO2", "what": "T 감사 묶음의 captureSeq 위치", "basis": "SP1 CL13 3회 모두 trg_T_1 바로 뒤, trg_T_2·trg_T_3 앞(docs/spikes/SP1.md 67행). 문서 보장이 아니다(A6)" },
+      { "id": "OO3", "what": "TC 묶음과 T 묶음 그룹이 섞이지 않는지", "basis": "H3(관측 3/3, 문서 보장 아님)" }
+    ]
+  },
+  "rationale": [
+    { "claim": "T DELETE에 사용자 Last(trg_T_3)가 있어 감사 트리거를 Last로 지정하지 못하고 NONE이 된다", "basis": "A6, D3 규칙 1, E15" },
+    { "claim": "Log 키 오프셋으로 정답 트리거가 정해지지만 제품은 그 값을 귀속에 쓰지 않으므로 후보 3개 ambiguous가 맞다", "basis": "§7.3 ambiguous(같은 테이블의 트리거 여러 개, 감사 트리거가 Last가 아님)" }
+  ]
+}

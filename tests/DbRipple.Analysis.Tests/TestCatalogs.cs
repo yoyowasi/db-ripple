@@ -9,6 +9,7 @@ public sealed class CatalogBuilder
     readonly List<CatalogTable> tables = [];
     readonly List<CatalogColumn> columns = [];
     readonly List<CatalogTriggerEvent> triggers = [];
+    readonly List<CatalogModule> procedures = [];
     int nextId = 1000;
 
     public CatalogBuilder Table(string schema, string name, params string[] columnNames)
@@ -38,5 +39,12 @@ public sealed class CatalogBuilder
         return this;
     }
 
-    public DbCatalog Build() => new(tables, columns, [], [], triggers, []);
+    /// <summary>저장 프로시저 모듈(인계 1). definition이 null이면 암호화.</summary>
+    public CatalogBuilder Procedure(string schema, string name, string? definition)
+    {
+        procedures.Add(new CatalogModule(nextId++, schema, name, definition));
+        return this;
+    }
+
+    public DbCatalog Build() => new(tables, columns, [], [], triggers, [], procedures);
 }

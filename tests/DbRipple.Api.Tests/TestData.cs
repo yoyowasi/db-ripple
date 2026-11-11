@@ -84,9 +84,11 @@ public static class TestData
 
     public static CaptureInfo Capture() => new() { ImageCount = 3, Cap = 100_000, Truncated = false, ManifestVersion = "m-test" };
 
-    public static RawCapture Raw(PreviewStatus status = PreviewStatus.Ok, bool dirty = false, IReadOnlyList<NetChange>? net = null, IReadOnlyList<NetChange>? residual = null) => new()
+    public static RawCapture Raw(PreviewStatus status = PreviewStatus.Ok, bool dirty = false, IReadOnlyList<NetChange>? net = null, IReadOnlyList<NetChange>? residual = null,
+        bool residualCheckFailed = false, string? residualCheckMessage = null) => new()
     {
         Status = status,
+        ResidualCheckFailed = residualCheckFailed, ResidualCheckMessage = residualCheckMessage,
         Executions = [new StatementExecution { Result = StatementResult(1, status == PreviewStatus.Failed ? StatementStatus.Failed : StatementStatus.Ok), Boundary = 7 }],
         Boundary0 = 0, SandboxDirty = dirty, Capture = Capture(),
         NetChanges = net ?? [], ResidualCommitted = residual ?? [],
@@ -117,5 +119,33 @@ public static class TestData
         },
     };
 
-    static string PreviewHash(string sql) => DbRipple.Preview.PreviewPipeline.SqlHash(sql);
+    /// <summary>/catalog/schema 응답 샘플.</summary>
+    public static CatalogSchema Schema() => new()
+    {
+        Database = "Origin", BaselineAt = Start.AddMinutes(-5), ManifestVersion = "m-test",
+        Tables =
+        [
+            new SchemaTable
+            {
+                Schema = "dbo", Name = "T", Table = "dbo.T", KeyKind = KeyKind.PK, KeyColumns = ["Id"], Covered = true,
+                Columns =
+                [
+                    new SchemaColumn { Name = "Id", SqlType = "int", IsNullable = false, IsIdentity = true, Volatile = VolatileReason.Identity },
+                    new SchemaColumn { Name = "Amount", SqlType = "decimal(19,4)", IsNullable = true },
+                ],
+            },
+        ],
+    };
+
+    /// <summary>[적용] 결과 샘플. 상태별로 한 건씩.</summary>
+    public static ApplyResult ApplyResult(ApplyStatus status, string previewId = "pv_a") => new()
+    {
+        PreviewId = previewId, Status = status, FinishedAt = Start,
+        PreconditionFailures = status == ApplyStatus.PreconditionFailed ? [ApplyPrecondition.SqlHashMismatch] : [],
+        Verification = new ApplyVerification { Mode = VerificationMode.SnapshotNetdiff, NetSummaryMatch = status == ApplyStatus.Committed ? true : null },
+        TimingsMs = new ApplyTimingsMs { Snapshot = 1, Drift = 2, Execute = 3, NetDiff = 4, Commit = 5 },
+        SandboxRefreshStarted = status == ApplyStatus.Committed,
+    };
+
+    static string PreviewHash(string sql) => ContractFormulas.SqlHash(sql);
 }

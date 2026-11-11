@@ -49,7 +49,7 @@ public class IndependenceTests
     public void Hook_implements_contract_and_csv_columns_are_unique()
     {
         Assert.IsAssignableFrom<IEvaluationHook>(new EvaluationHook(new HashSnapshotComparer()));
-        foreach (var cols in new[] { MetricsCsv.CaseColumns, MetricsCsv.M1Columns, MetricsCsv.M2Columns, MetricsCsv.SuiteColumns })
+        foreach (var cols in new[] { MetricsCsv.CaseColumns, MetricsCsv.M1Columns, MetricsCsv.M2Columns, MetricsCsv.M3Columns, MetricsCsv.M4Columns, MetricsCsv.M5Columns, MetricsCsv.SuiteColumns })
             Assert.Equal(cols.Count, cols.Distinct().Count());
         Assert.Equal("a,\"b,c\",\"d\"\"e\"", MetricsCsv.Line(["a", "b,c", "d\"e"]));
         Assert.Equal("", MetricsCsv.Rate(1, 0));

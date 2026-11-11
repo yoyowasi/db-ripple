@@ -1,0 +1,46 @@
+{
+  "id": "CL12b",
+  "pattern": "CL12",
+  "title": "ROWCOUNT_BIG() 0행 가드 (0행 문장과 1행 문장)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl12.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "UPDATE cl12.Ord SET qty = qty + 1 WHERE id = 99;" },
+    { "index": 2, "sql": "UPDATE cl12.Ord SET qty = qty + 1 WHERE id = 2;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" }, { "index": 2, "status": "ok" } ],
+    "changes": [
+      { "table": "cl12.Ord", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [ { "key": { "id": 2 }, "causes": ["DIRECT"], "changedColumns": ["qty"], "after": { "qty": 8 } } ],
+        "basis": "문장 1은 0행(id 99 없음), 문장 2가 id 2를 7 -> 8" },
+      { "table": "cl12.OrdHist", "keyColumns": ["ord_id"], "updated": [], "deleted": [],
+        "inserted": [ { "key": { "ord_id": 2 }, "causes": ["TRIGGER"] } ],
+        "basis": "문장 2에서만 trg_Ord_check가 가드를 지나 OrdHist에 1행. 문장 1은 가드에서 RETURN" },
+      { "table": "cl12.ErrLog", "keyColumns": ["log_id"], "inserted": [], "updated": [], "deleted": [], "basis": "qty < 0 행 없음" }
+    ],
+    "firings": [
+      { "node": "F:cl12.Ord:UPDATE", "statementIndex": 1, "table": "cl12.Ord", "operation": "UPDATE", "rowCount": 0, "causeKind": "DIRECT", "depth": 1 },
+      { "node": "F:cl12.Ord:UPDATE", "statementIndex": 2, "table": "cl12.Ord", "operation": "UPDATE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "pairing": "BY_PK" },
+      { "node": "F:cl12.OrdHist:INSERT", "statementIndex": 2, "table": "cl12.OrdHist", "operation": "INSERT", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl12.Ord:UPDATE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계. 직접 대상의 0행 발동도 헤더가 남는다(A3, SP2(d), E23)" },
+      { "statementIndex": 1, "parent": "F:cl12.Ord:UPDATE", "child": "T:cl12.trg_Ord_check", "kind": "FIRES", "name": "cl12.trg_Ord_check", "confidence": "inferred", "observed": false, "basis": "0행이어도 직접 대상의 AFTER 트리거는 발동하지만(A3) 가드로 변경 없이 끝남 -> §6.3 observed: false" },
+      { "statementIndex": 2, "parent": "S", "child": "F:cl12.Ord:UPDATE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
+      { "statementIndex": 2, "parent": "F:cl12.Ord:UPDATE", "child": "T:cl12.trg_Ord_check", "kind": "FIRES", "name": "cl12.trg_Ord_check", "confidence": "inferred", "basis": "§6.3, §7.3" },
+      { "statementIndex": 2, "parent": "T:cl12.trg_Ord_check", "child": "F:cl12.OrdHist:INSERT", "kind": "WRITES", "name": "cl12.trg_Ord_check", "confidence": "inferred", "basis": "§7.2 2·4단계(정적 쓰기 대상 OrdHist·ErrLog 가운데 OrdHist)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "트리거 첫 문장의 ROWCOUNT_BIG()이 발동 문장의 행 수(0, 1)인지", "basis": "A9는 트리거 시작 시점 값을 밝히지 않는다. SP2(c)에서 트리거 안 행 수가 호출자·다음 트리거 시작 시점으로 새지 않았다. 감사 트리거는 Last라 사용자 트리거보다 뒤에 돈다(D3 규칙 1)" },
+      { "id": "OO2", "what": "문장 1에서 OrdHist 0행 묶음이 없는지", "basis": "가드가 동작하면 OrdHist INSERT가 실행되지 않는다. 가드가 감사 때문에 틀리면(관찰자 효과) depth 2 OrdHist INSERT 0행 묶음이 생긴다" }
+    ]
+  },
+  "rationale": [
+    { "claim": "가드는 SET NOCOUNT ON보다 앞에 있어야 한다(SET은 @@ROWCOUNT를 0으로 만든다)", "basis": "A9" },
+    { "claim": "문장 1의 Ord 묶음은 0행 헤더만 있고 화면에서 기본으로 숨긴다", "basis": "E23, §6.3 zeroRows" }
+  ]
+}

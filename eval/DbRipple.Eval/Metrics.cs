@@ -21,7 +21,8 @@ public sealed record PredictedChange(OracleRowChange Row, bool ByFiring, string?
     public static PredictedChange Plain(OracleRowChange r) => new(r, false, null, new HashSet<string>());
 
     /// <summary>
-    /// 제품 미리보기 기록의 최종 차이(PreviewRecord.NetChanges, ExplainedBy 채워짐)를 하네스 형식으로 바꾼다.
+    /// 제품 미리보기 기록의 최종 차이(PreviewRecord.NetChanges, ExplainedBy 채워짐)와 롤백 뒤 남은 변경(PreviewResult.ResidualCommitted, 3주차)을 하네스 형식으로 바꾼다.
+    /// 실패 사례에서 사용자가 보는 "실제로 남는 변경"은 ResidualCommitted이고, 오라클 after도 롤백 뒤 상태다(인계 4). 성공 사례에서는 ResidualCommitted가 비어 있다.
     /// 키 없는 테이블(Kind = ROW)의 키는 행 전체 값으로 만든다(하네스 비교기와 같은 규칙, 해시는 쓰지 않음).
     /// </summary>
     public static IReadOnlyList<PredictedChange> FromRecord(PreviewRecord? record)
@@ -29,7 +30,7 @@ public sealed record PredictedChange(OracleRowChange Row, bool ByFiring, string?
         if (record is null) return [];
         var residuals = record.Result.Residuals.ToDictionary(r => r.Id, StringComparer.Ordinal);
         var list = new List<PredictedChange>();
-        foreach (var n in record.NetChanges)
+        foreach (var n in record.NetChanges.Concat(record.Result.ResidualCommitted ?? []))
         {
             var key = n.Key.Kind.ToString() == "ROW"
                 ? RowKeys.Canonical(n.After ?? n.Before ?? new Dictionary<string, string?>())
@@ -52,7 +53,12 @@ public sealed record M1Counts(
     long? ResidualFilledCells,
     long? ResidualBaseCells = null)
 {
-    /// <summary>m1.csv 지표 칸(truth_cells부터 residual_fill_rate까지).</summary>
+    /// <summary>정답 쪽 IDENTITY 키 INSERTED 행 수(IdentityPairing, 3주차).</summary>
+    public long IdentityRows { get; init; }
+    /// <summary>그 가운데 예측 행과 짝지은 수.</summary>
+    public long IdentityPaired { get; init; }
+
+    /// <summary>m1.csv 지표 칸(truth_cells부터 identity_paired까지).</summary>
     public IReadOnlyList<string> CsvCells() =>
     [
         I(TruthCells), I(PredictedCells), I(Tp), I(Fp), I(Fn),
@@ -60,6 +66,7 @@ public sealed record M1Counts(
         I(RowsUnion), I(RowsExact), MetricsCsv.Rate(RowsExact, RowsUnion),
         I(VolatileCells), I(VolatilePresentFormatOk),
         ResidualFilledCells is long r ? I(r) : "", ResidualFilledCells is long r2 ? MetricsCsv.Rate(r2, ResidualBaseCells ?? 0) : "",
+        I(IdentityRows), I(IdentityPaired),
     ];
 
     static string I(long v) => v.ToString(CultureInfo.InvariantCulture);
@@ -248,9 +255,16 @@ public sealed class MetricsCalculator
     }
 }
 
-/// <summary>스위트 마이크로 평균(metrics.csv). (system, comparison)·(system, cause)마다 계수를 더한다.</summary>
+/// <summary>스위트 마이크로 평균(metrics.csv). (system, comparison)·(system, cause)·(system, 확신도)마다 계수를 더한다.</summary>
 public sealed class SuiteAccumulator
 {
+    sealed class M3Sum
+    {
+        public long Predicted, PredictedMatched, Truth, TruthFound, AmbGroups, AmbHit, CertainPredicted, CertainOver, Manual, ManualRuns;
+        public readonly HashSet<string> Cases = [];
+    }
+
+    readonly Dictionary<(string System, string Scope), M3Sum> m3 = [];
     readonly Dictionary<(string System, string Comparison), (M1Counts Sum, HashSet<string> Cases)> m1 = [];
     readonly Dictionary<(string System, string Cause), (long Truth, long Found, HashSet<string> Cases)> m2 = [];
     readonly Dictionary<string, (long Match, long Total, HashSet<string> Cases)> status = [];
@@ -264,7 +278,11 @@ public sealed class SuiteAccumulator
         cur.Sum = new M1Counts(s.TruthCells + c.TruthCells, s.PredictedCells + c.PredictedCells, s.Tp + c.Tp, s.Fp + c.Fp, s.Fn + c.Fn,
             s.RowsUnion + c.RowsUnion, s.RowsExact + c.RowsExact, s.VolatileCells + c.VolatileCells, s.VolatilePresentFormatOk + c.VolatilePresentFormatOk,
             s.ResidualFilledCells is null || c.ResidualFilledCells is null ? null : s.ResidualFilledCells + c.ResidualFilledCells,
-            s.ResidualBaseCells is null || c.ResidualBaseCells is null ? null : s.ResidualBaseCells + c.ResidualBaseCells);
+            s.ResidualBaseCells is null || c.ResidualBaseCells is null ? null : s.ResidualBaseCells + c.ResidualBaseCells)
+        {
+            IdentityRows = s.IdentityRows + c.IdentityRows,
+            IdentityPaired = s.IdentityPaired + c.IdentityPaired,
+        };
         cur.Cases.Add(caseId);
         m1[k] = cur;
     }
@@ -278,6 +296,26 @@ public sealed class SuiteAccumulator
         cur.Found += c.FoundRows;
         if (c.TruthRows > 0) cur.Cases.Add(caseId);
         m2[k] = cur;
+    }
+
+    /// <summary>M3 한 사례·반복(범위별 계수, AttributionMetrics.Compute 결과)을 더한다.</summary>
+    public void AddM3(string system, string caseId, IReadOnlyList<M3Counts> counts)
+    {
+        var certainPredicted = counts.FirstOrDefault(c => c.Confidence == "certain")?.PredictedEdges ?? 0;
+        foreach (var c in counts)
+        {
+            if (!m3.TryGetValue((system, c.Confidence), out var s)) m3[(system, c.Confidence)] = s = new M3Sum();
+            s.Predicted += c.PredictedEdges;
+            s.PredictedMatched += c.PredictedMatched;
+            s.Truth += c.TruthEdges;
+            s.TruthFound += c.TruthFound;
+            s.AmbGroups += c.AmbiguousGroups ?? 0;
+            s.AmbHit += c.AmbiguousGroupsHit ?? 0;
+            s.CertainPredicted += certainPredicted;
+            s.CertainOver += (c.CertainWrong ?? 0) + (c.CertainOverclaim ?? 0);
+            if (c.ManualSelectTables is long m) { s.Manual += m; s.ManualRuns++; }
+            s.Cases.Add(caseId);
+        }
     }
 
     /// <summary>사례 상태 일치 한 건을 더한다.</summary>
@@ -305,10 +343,20 @@ public sealed class SuiteAccumulator
             yield return Row(system, "M1.row_exact_rate", cmp, s.RowsExact, s.RowsUnion, cases.Count);
             yield return Row(system, "M1.volatile_format_ok_rate", cmp, s.VolatilePresentFormatOk, s.VolatileCells, cases.Count);
             if (s.ResidualFilledCells is long r) yield return Row(system, "M1.residual_fill_rate", cmp, r, s.ResidualBaseCells ?? 0, cases.Count);
+            if (s.IdentityRows > 0) yield return Row(system, "M1.identity_pair_rate", cmp, s.IdentityPaired, s.IdentityRows, cases.Count);
         }
         foreach (var ((system, cause), (truth, found, cases)) in m2.OrderBy(x => x.Key.System, StringComparer.Ordinal)
                      .ThenBy(x => x.Key.Cause == "ALL" ? int.MaxValue : HandCase.Causes.ToList().IndexOf(x.Key.Cause)))
             yield return Row(system, "M2.recall", cause, found, truth, cases.Count);
+        foreach (var ((system, scope), s) in m3.OrderBy(x => x.Key.System, StringComparer.Ordinal)
+                     .ThenBy(x => AttributionMetrics.Scopes.ToList().IndexOf(x.Key.Scope)))
+        {
+            yield return Row(system, "M3.precision", scope, s.PredictedMatched, s.Predicted, s.Cases.Count);
+            yield return Row(system, "M3.recall", scope, s.TruthFound, s.Truth, s.Cases.Count);
+            if (scope == "ambiguous") yield return Row(system, "M3.ambiguous_hit_rate", scope, s.AmbHit, s.AmbGroups, s.Cases.Count);
+            if (scope == "certain") yield return Row(system, "M3.certain_overconfident", scope, s.CertainOver, s.CertainPredicted, s.Cases.Count);
+            if (scope == "all" && s.ManualRuns > 0) yield return Row(system, "M3.manual_select_tables", scope, s.Manual, s.ManualRuns, s.Cases.Count);
+        }
         foreach (var (system, (match, total, cases)) in status.OrderBy(x => x.Key, StringComparer.Ordinal))
             yield return Row(system, "status_match_rate", "case", match, total, cases.Count);
     }

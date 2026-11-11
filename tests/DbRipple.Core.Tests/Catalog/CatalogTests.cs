@@ -118,4 +118,35 @@ public class CatalogTests
         Assert.All(cols.Values, t => Assert.Empty(t.UserLast!));
         Assert.Equal("AdventureWorks", Assert.Single(cat.Files, f => f.TypeDesc == "ROWS").LogicalName);
     }
+
+    // 2주차 인계 1(3주차): 프로시저 모듈은 DbCatalog 끝의 기본값 null 매개변수다. 생략한 호출자(3주차 이전)는 빈 목록을 본다.
+    [Fact]
+    public void Procedure_modules_are_optional_and_default_to_empty()
+    {
+        var old = new DbCatalog([], [], [], [], [], []);
+        Assert.Null(old.Procedures);
+        Assert.Empty(old.ProcedureModules);
+        var cat = old with { Procedures = [new(7, "dbo", "uspLogError", "CREATE PROCEDURE dbo.uspLogError AS INSERT dbo.ErrorLog DEFAULT VALUES;"), new(8, "dbo", "uspSecret", null)] };
+        Assert.Equal(2, cat.ProcedureModules.Count);
+        Assert.False(cat.ProcedureModules[0].IsEncrypted);
+        Assert.True(cat.ProcedureModules[1].IsEncrypted);
+        Assert.Contains(CatalogQueries.Procedures, CatalogQueries.All);
+        // ContractJson으로 기준선 픽스처에 실릴 때 계산 속성은 빼고 Procedures만 싣는다(역직렬화 생성자 매개변수와 이름이 같아야 한다)
+        var json = System.Text.Json.JsonSerializer.Serialize(cat);
+        Assert.DoesNotContain("ProcedureModules", json);
+        var back = System.Text.Json.JsonSerializer.Deserialize<DbCatalog>(json)!;
+        Assert.Equal(cat.ProcedureModules, back.ProcedureModules);
+    }
+
+    // AW: 트리거들이 CATCH에서 부르는 dbo.uspLogError와 그것이 부르는 dbo.uspPrintError의 본문을 읽는다(읽기만).
+    [SqlFact]
+    public async Task Reads_adventureworks_procedure_modules()
+    {
+        await using var conn = await TestSql.OpenAsync("AW_Origin");
+        var cat = await CatalogReader.ReadAsync(conn);
+        var log = Assert.Single(cat.ProcedureModules, m => m.Schema == "dbo" && m.Name == "uspLogError");
+        Assert.Contains("ErrorLog", log.Definition!);
+        Assert.Contains("uspPrintError", log.Definition!);
+        Assert.Single(cat.ProcedureModules, m => m.Schema == "dbo" && m.Name == "uspPrintError" && !m.IsEncrypted);
+    }
 }

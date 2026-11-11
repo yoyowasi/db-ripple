@@ -15,6 +15,14 @@ namespace DbRipple.Analysis;
 /// <item>따라서 HasDynamicSql = false이고 WriteTargets가 비었으면 "아무 테이블에도 쓰지 않음"이 확실하다.</item>
 /// <item>스키마를 생략한 쓰기 대상은 트리거 스키마(= 부모 테이블 스키마), dbo 순으로 카탈로그에서 찾고 없으면 dbo로 둔다.</item>
 /// <item>CTE에 대한 쓰기(WITH c AS (SELECT ... FROM t) DELETE FROM c)는 CTE 정의 안의 기반 테이블 전부를 쓰기 대상으로 본다(SP4는 제외했다).</item>
+/// <item>
+/// 프로시저 펼치기(2주차 인계 1): 트리거가 부르는 프로시저를 카탈로그 프로시저 모듈(DbCatalog.ProcedureModules)에서 찾아 본문을 같은 방식으로 분석하고,
+/// 쓰기 대상·비결정 쓰기·외부 부작용·ROLLBACK·트랜잭션 제어를 트리거 결과에 합친다. 펼친 호출은 ExpandedProcedureCalls, 못 펼친 호출은 UnresolvedProcedureCalls(둘이 ProcedureCalls를 이름 그대로 나눈다).
+/// 못 펼치는 경우: 카탈로그에 없음(다른 DB·서버, 시스템 프로시저), 본문 없음(암호화·CLR·확장), 파싱 실패, 동적 SQL, 재귀, 깊이 상한 초과, 안에서 부르는 프로시저를 못 펼침.
+/// 프로시저 안에서 부르는 프로시저도 같은 규칙으로 따라간다(깊이 상한 <see cref="MaxProcedureDepth"/>): AW uspLogError가 uspPrintError(PRINT만)를 부르므로,
+/// 한 단계에서 멈추면 uspLogError가 늘 미상이 되어 인계 1의 목적(dbo.ErrorLog에만 씀)을 이루지 못한다. 못 펼친 프로시저라도 본문을 읽었으면 그 외부 부작용·트랜잭션 제어는 합친다(닫힌 쪽).
+/// 이름 해석: 스키마가 있으면 그대로, 없으면 부르는 모듈의 스키마, dbo 순(TableResolver와 같은 규칙, Q4).
+/// </item>
 /// </list>
 /// </summary>
 public sealed class TriggerAnalyzer : ITriggerAnalyzer
@@ -22,11 +30,15 @@ public sealed class TriggerAnalyzer : ITriggerAnalyzer
     /// <summary>파싱 실패 표시(ExternalSideEffects 항목).</summary>
     public const string UnparsedMarker = "unparsed";
 
+    /// <summary>프로시저 펼치기 깊이 상한(트리거가 직접 부르는 프로시저가 1).</summary>
+    public const int MaxProcedureDepth = 4;
+
     /// <inheritdoc />
     public IReadOnlyList<TriggerStaticInfo> Analyze(DbCatalog catalog)
     {
         var resolver = new TableResolver(catalog);
         var tables = catalog.Tables.ToDictionary(t => t.ObjectId);
+        var expander = new ProcedureExpander(catalog, resolver);
         var result = new List<TriggerStaticInfo>();
 
         foreach (var g in catalog.Triggers
@@ -43,7 +55,7 @@ public sealed class TriggerAnalyzer : ITriggerAnalyzer
             Body body;
             if (isAudit) body = Body.Empty;
             else if (first.Definition is null) body = Body.Opaque;
-            else body = AnalyzeBody(first.Definition, table.Schema, resolver, catalog);
+            else body = AnalyzeBody(first.Definition, table.Schema, resolver, catalog, expander);
 
             result.Add(new TriggerStaticInfo
             {
@@ -62,6 +74,8 @@ public sealed class TriggerAnalyzer : ITriggerAnalyzer
                 HasTransactionControl = body.TransactionControl,
                 ExternalSideEffects = body.External,
                 ProcedureCalls = body.ProcedureCalls,
+                ExpandedProcedureCalls = body.ExpandedCalls,
+                UnresolvedProcedureCalls = body.UnresolvedCalls,
                 NondeterministicWrites = body.NondeterministicWrites,
             });
         }
@@ -80,12 +94,15 @@ public sealed class TriggerAnalyzer : ITriggerAnalyzer
         IReadOnlyList<string> WriteTargets, bool HasDynamicSql, bool HasRollback, IReadOnlyList<string> External,
         IReadOnlyList<string> ProcedureCalls, IReadOnlyList<TableColumn> NondeterministicWrites, bool WriteTargetsUnknown = false, bool TransactionControl = false)
     {
+        public IReadOnlyList<string> ExpandedCalls { get; init; } = [];
+        public IReadOnlyList<string> UnresolvedCalls { get; init; } = [];
+
         public static readonly Body Empty = new([], false, false, [], [], []);
         public static readonly Body Opaque = new([], true, false, [], [], [], WriteTargetsUnknown: true);
         public static Body Unparsed => new([], true, false, [UnparsedMarker], [], [], WriteTargetsUnknown: true);
     }
 
-    static Body AnalyzeBody(string definition, string triggerSchema, TableResolver resolver, DbCatalog catalog)
+    static Body AnalyzeBody(string definition, string triggerSchema, TableResolver resolver, DbCatalog catalog, ProcedureExpander expander)
     {
         TSqlFragment? fragment;
         IList<ParseError> errors;
@@ -103,10 +120,83 @@ public sealed class TriggerAnalyzer : ITriggerAnalyzer
             stmt.StatementList.Accept(new CtePrepass(a.CteDefinitions));
             stmt.StatementList.Accept(new BodyVisitor(a));
         }
+
+        // 인계 1: 직접 부르는 프로시저를 펼쳐 합친다. ProcedureCalls(이름 그대로)를 펼친 것·못 펼친 것으로 나눈다.
+        var expanded = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        var unresolved = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, node) in a.Calls.ToList())
+        {
+            var e = expander.Expand(node, triggerSchema, 1, []);
+            if (e.Parsed is { } p) a.Merge(p);
+            (e.Resolved ? expanded : unresolved).Add(name);
+        }
+        expanded.ExceptWith(unresolved); // 같은 이름은 같은 결과지만, 혹시 갈리면 미상 쪽(닫힌 쪽)
+
         return new Body(
             a.WriteTargets.ToList(), a.DynamicSql, a.Rollback, a.External.ToList(), a.ProcedureCalls.ToList(),
             a.NondeterministicWrites.OrderBy(w => w.Table, StringComparer.OrdinalIgnoreCase).ThenBy(w => w.Column, StringComparer.OrdinalIgnoreCase).ToList(),
-            TransactionControl: a.TransactionControl);
+            TransactionControl: a.TransactionControl)
+        {
+            ExpandedCalls = expanded.ToList(),
+            UnresolvedCalls = unresolved.ToList(),
+        };
+    }
+
+    /// <summary>프로시저 본문 하나를 분석한 결과. Parsed는 본문을 읽은 경우의 누적값(못 펼쳤어도 외부 부작용·트랜잭션 제어는 합친다), Resolved는 쓰기 대상을 다 안다는 뜻.</summary>
+    readonly record struct Expansion(bool Resolved, Accumulator? Parsed);
+
+    /// <summary>프로시저 펼치기(인계 1). 깊이 상한·재귀 판정이 호출 경로마다 달라 캐시하지 않는다(트리거 수 × 호출 수가 작다).</summary>
+    sealed class ProcedureExpander(DbCatalog catalog, TableResolver resolver)
+    {
+        readonly Dictionary<string, CatalogModule> byName = catalog.ProcedureModules
+            .GroupBy(m => m.Schema + "." + m.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        public CatalogModule? Find(SchemaObjectName n, string callerSchema)
+        {
+            if (n.ServerIdentifier != null || n.DatabaseIdentifier != null) return null; // 다른 DB·서버(현재 DB 이름이어도 확인하지 않음, 닫힌 쪽)
+            var name = n.BaseIdentifier.Value;
+            if (n.SchemaIdentifier != null) return byName.GetValueOrDefault(n.SchemaIdentifier.Value + "." + name);
+            return byName.GetValueOrDefault(callerSchema + "." + name) ?? byName.GetValueOrDefault("dbo." + name);
+        }
+
+        public Expansion Expand(SchemaObjectName call, string callerSchema, int depth, HashSet<int> stack)
+        {
+            var module = Find(call, callerSchema);
+            if (module?.Definition is null || depth > MaxProcedureDepth || stack.Contains(module.ObjectId)) return new(false, null);
+
+            TSqlFragment? fragment;
+            IList<ParseError> errors;
+            try { fragment = SqlSyntax.Parse(module.Definition, out errors); }
+            catch (Exception) { return new(false, null); }
+            if (fragment is null || errors.Count > 0) return new(false, null);
+            var finder = new ProcedureFinder();
+            fragment.Accept(finder);
+            if (finder.Statements.Count != 1 || finder.Statements[0].StatementList is not { } body) return new(false, null);
+
+            var a = new Accumulator(module.Schema, resolver, catalog);
+            body.Accept(new CtePrepass(a.CteDefinitions));
+            body.Accept(new BodyVisitor(a));
+
+            var resolved = !a.DynamicSql;
+            stack.Add(module.ObjectId);
+            foreach (var (_, node) in a.Calls.ToList())
+            {
+                var inner = Expand(node, module.Schema, depth + 1, stack);
+                if (inner.Parsed is { } p) a.Merge(p);
+                resolved &= inner.Resolved;
+            }
+            stack.Remove(module.ObjectId);
+            return new(resolved, a);
+        }
+    }
+
+    sealed class ProcedureFinder : TSqlFragmentVisitor
+    {
+        public readonly List<ProcedureStatementBody> Statements = [];
+        public override void Visit(CreateProcedureStatement node) => Statements.Add(node);
+        public override void Visit(AlterProcedureStatement node) => Statements.Add(node);
+        public override void Visit(CreateOrAlterProcedureStatement node) => Statements.Add(node);
     }
 
     sealed class Accumulator(string triggerSchema, TableResolver resolver, DbCatalog catalog)
@@ -122,6 +212,22 @@ public sealed class TriggerAnalyzer : ITriggerAnalyzer
         public bool DynamicSql;
         public bool Rollback;
         public bool TransactionControl;
+        /// <summary>이름 해석 전 프로시저 호출(이름 그대로, 구문 노드). ProcedureCalls와 같은 이름들이다.</summary>
+        public readonly List<(string Name, SchemaObjectName Node)> Calls = [];
+
+        /// <summary>
+        /// 펼친(또는 본문만 읽은) 프로시저 결과를 합친다: 쓰기 대상, 비결정 쓰기, 외부 부작용, ROLLBACK, 트랜잭션 제어.
+        /// 동적 SQL·프로시저 호출 이름은 합치지 않는다(트리거 본문 속성이고, 프로시저 쪽 미상은 UnresolvedProcedureCalls로 나타낸다).
+        /// 못 펼친 프로시저의 쓰기 대상을 합쳐도 해롭지 않다: 그 호출이 UnresolvedProcedureCalls에 있어 C13이 미상으로 본다.
+        /// </summary>
+        public void Merge(Accumulator p)
+        {
+            WriteTargets.UnionWith(p.WriteTargets);
+            NondeterministicWrites.UnionWith(p.NondeterministicWrites);
+            External.UnionWith(p.External);
+            Rollback |= p.Rollback;
+            TransactionControl |= p.TransactionControl;
+        }
     }
 
     sealed class TriggerFinder : TSqlFragmentVisitor
@@ -178,6 +284,7 @@ public sealed class TriggerAnalyzer : ITriggerAnalyzer
                     var last = pn.BaseIdentifier.Value;
                     if (last.Equals("sp_executesql", StringComparison.OrdinalIgnoreCase)) { a.DynamicSql = true; break; }
                     a.ProcedureCalls.Add(SqlSyntax.Name(pn));
+                    a.Calls.Add((SqlSyntax.Name(pn), pn));
                     if (last.StartsWith("xp_", StringComparison.OrdinalIgnoreCase)) a.External.Add("xp_:" + SqlSyntax.Name(pn));
                     if (last.StartsWith("sp_OA", StringComparison.OrdinalIgnoreCase)) a.External.Add("sp_oa:" + SqlSyntax.Name(pn));
                     if (pn.ServerIdentifier != null) a.External.Add("4-part:" + SqlSyntax.Name(pn));

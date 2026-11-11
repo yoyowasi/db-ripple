@@ -100,6 +100,16 @@ public sealed record TriggerStaticInfo
     public IReadOnlyList<string> ExternalSideEffects { get; init; } = [];
     /// <summary>호출하는 저장 프로시저 이름(쓰기 대상 추적 범위 밖, 정보용).</summary>
     public IReadOnlyList<string> ProcedureCalls { get; init; } = [];
+    /// <summary>
+    /// ProcedureCalls 가운데 본문(sys.sql_modules)을 한 단계 펼쳐 쓰기 대상을 WriteTargets에 합친 프로시저 "스키마.이름"(2주차 인계 1, 예 dbo.uspLogError → dbo.ErrorLog).
+    /// 2026-11-11 추가(비파괴, 기본 빈 배열). C6이 채운다.
+    /// </summary>
+    public IReadOnlyList<string> ExpandedProcedureCalls { get; init; } = [];
+    /// <summary>
+    /// ProcedureCalls 가운데 펼치지 못한 프로시저(카탈로그에 없음·다른 DB·본문 없음·암호화·파싱 실패·동적 SQL·재귀·깊이 상한 4 초과·안쪽 호출을 펼치지 못함. 2026-11-11 결정: AW uspLogError → uspPrintError 때문에 한 단계가 아니라 깊이 4까지 따라간다). 이것만 쓰기 대상 미상(Q6)으로 본다(인계 1: WRITES 하향은 진짜 미상에만).
+    /// 호환 규칙: ProcedureCalls가 있는데 ExpandedProcedureCalls와 이 목록이 모두 비어 있으면(펼치기 전 분석기) C13은 ProcedureCalls 전부를 미상으로 본다. 2026-11-11 추가(비파괴).
+    /// </summary>
+    public IReadOnlyList<string> UnresolvedProcedureCalls { get; init; } = [];
     /// <summary>본문의 비결정 함수로 값이 정해지는 (테이블, 열)(E1 → RowChange.volatile TRIGGER_GETDATE).</summary>
     public IReadOnlyList<TableColumn> NondeterministicWrites { get; init; } = [];
 }

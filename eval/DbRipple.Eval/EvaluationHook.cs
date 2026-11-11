@@ -23,6 +23,9 @@ public sealed class EvaluationHook(HashSnapshotComparer comparer) : IEvaluationH
     /// <summary>마지막 호출의 비교기 점검 문제.</summary>
     public IReadOnlyList<string> LastIssues { get; private set; } = [];
 
+    /// <summary>마지막 호출의 정정 기록 후보(인계 6, HashComparison.Notes).</summary>
+    public IReadOnlyList<string> LastNotes { get; private set; } = [];
+
     /// <summary>마지막 호출에서 뺀 테이블과 사유.</summary>
     public IReadOnlyList<string> LastExcluded { get; private set; } = [];
 
@@ -41,6 +44,7 @@ public sealed class EvaluationHook(HashSnapshotComparer comparer) : IEvaluationH
         LastTables = tables;
         LastExcluded = excluded;
         LastIssues = cmp.Issues;
+        LastNotes = cmp.Notes;
         LastSandboxChanges = cmp.Changes;
     }
 }

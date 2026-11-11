@@ -33,7 +33,7 @@
       { "node": "F:cl07.A:UPDATE", "table": "cl07.A", "operation": "UPDATE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "pairing": "BY_PK" },
       { "node": "F:cl07.B:UPDATE", "table": "cl07.B", "operation": "UPDATE", "rowCount": 2, "causeKind": "TRIGGER", "depth": 2, "pairing": "BY_PK" },
       { "node": "F:cl07.C:INSERT", "table": "cl07.C", "operation": "INSERT", "rowCount": 2, "causeKind": "TRIGGER", "depth": 3 },
-      { "node": "F:cl07.D:UPDATE", "table": "cl07.D", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 4, "pairing": "SINGLE_ROW" }
+      { "node": "F:cl07.D:UPDATE", "table": "cl07.D", "operation": "UPDATE", "rowCount": 1, "causeKind": "TRIGGER", "depth": 4, "pairing": "BY_PK" }
     ],
     "edges": [
       { "statementIndex": 1, "parent": "S", "child": "F:cl07.A:UPDATE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" },
@@ -46,6 +46,11 @@
     ],
     "observedOnly": [
       { "id": "OO1", "what": "captureSeq가 D < C < B < A(후위 순서)인지", "basis": "CL07의 확인 대상인 H1(감사 Last면 중첩 변경이 먼저 기록됨)은 A6에서 나온 추론이다. 정답 간선은 이 순서와 무관하다" }
+    ],
+    "corrections": [
+      { "date": "2026-11-11", "item": "firings F:cl07.D:UPDATE pairing", "before": "SINGLE_ROW", "after": "BY_PK",
+        "evidence": "실DB 수집기 출력(Execution.Tests CascadeLab 회귀, logs/week2/eval/eval-20261110-132555/records/ rowChanges[].pairing), cascadelab/README.md 정정 2026-11-10",
+        "cause": "정답 오류: 한 행이고 PK가 바뀌지 않은 UPDATE는 키가 그대로라 BY_PK다(설계 §4 v1.4 C11, Q11). SINGLE_ROW는 키가 바뀌었거나 키 없는 테이블의 한 행 묶음에만 쓴다. 같은 파일의 F:cl07.A:UPDATE(BY_PK)와도 엇갈렸다. M1·M2·순 변경 영향 없음" }
     ]
   },
   "rationale": [

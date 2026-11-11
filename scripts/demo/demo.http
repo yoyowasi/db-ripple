@@ -1,0 +1,140 @@
+# 데모 대본 DM1~DM7 (설계 §10.7). VS Code REST Client 또는 Visual Studio .http 형식.
+# 요청 변수 {{name.response.body.$.previewId}}는 같은 파일에서 "# @name name" 요청을 먼저 보낸 뒤에 쓴다.
+#
+# 준비(테스트 라운드, 이 파일을 만든 라운드에서는 실행하지 않았다)
+#   . .\scripts\env.ps1; dotnet run --project src\DbRipple.Host            # 원본 AW_Origin(appsettings 기본값)
+#   SP8 읽기 전용 조회로 아래 @dm1Order·@dm2Detail·@dm3Employee 값을 고른다:
+#     .\scripts\run-sql.ps1 spikes\sql\sp8-dm1-pick-order.sql -Database AW_Origin -Log spikes\logs\sp8-dm1.log
+#     .\scripts\run-sql.ps1 spikes\sql\sp8-dm2-pick-order.sql -Database AW_Origin -Log spikes\logs\sp8-dm2.log
+#     .\scripts\run-sql.ps1 spikes\sql\sp8-dm3-employee.sql   -Database AW_Origin -Log spikes\logs\sp8-dm3.log
+#   [적용](DM7)에는 원본에 dbr_preview_user가 있어야 한다(scripts\restore-aw-origin.ps1이 복원 뒤 만든다, Q30).
+#
+# 아래 기본값은 형식 예시다. SP8 결과로 바꾼 뒤 대본을 확정한다.
+
+@baseUrl = http://127.0.0.1:5080
+@dm1Order = 43659
+@dm2Detail = 1
+@dm3Employee = 1
+
+### 0. 샌드박스 상태(state ready, fingerprintMatch true를 확인한 뒤 시작)
+GET {{baseUrl}}/api/sandbox
+
+########################################################################
+# DM1: SalesOrderHeader 1건 DELETE
+# 보여 줄 것: FK 연쇄(FK 이름)로 SalesOrderDetail·SalesOrderHeaderSalesReason 삭제, 연쇄 대상에서 iduSalesOrderDetail 발동,
+#            트리거 본문 분기에 따라 변경이 없을 수 있음("발동했지만 변경 없음", 0행 묶음·observed false 점선).
+########################################################################
+
+### DM1 미리보기
+# @name dm1
+POST {{baseUrl}}/api/previews
+Content-Type: application/json
+
+{ "sql": "DELETE FROM Sales.SalesOrderHeader WHERE SalesOrderID = {{dm1Order}};" }
+
+### DM1 최종 차이 보기
+GET {{baseUrl}}/api/previews/{{dm1.response.body.$.previewId}}/rows?view=net&offset=0&limit=100
+
+########################################################################
+# DM2: SalesOrderDetail.OrderQty UPDATE
+# 보여 줄 것: iduSalesOrderDetail → TransactionHistory INSERT(TransactionDate 예상값), Person.Person Demographics UPDATE,
+#            SalesOrderHeader.SubTotal UPDATE → uSalesOrderHeader → RevisionNumber 재갱신(깊이 3 SOH 묶음),
+#            SalesPerson·SalesTerritory SalesYTD UPDATE(3단 사슬). @dm2Detail은 sp8-dm2의 salesperson_ytd_changes = 1인 행.
+#            SP8 1번 결과에서 회계 기간에 든 주문이 0이면 3단 사슬 문구를 빼고 "SalesYTD UPDATE 0행 발동"으로 보인다.
+########################################################################
+
+### DM2 미리보기
+# @name dm2
+POST {{baseUrl}}/api/previews
+Content-Type: application/json
+
+{ "sql": "UPDATE Sales.SalesOrderDetail SET OrderQty = OrderQty + 1 WHERE SalesOrderDetailID = {{dm2Detail}};" }
+
+### DM2 발동 보기(행 변경, 비결정 열 volatile 표시)
+GET {{baseUrl}}/api/previews/{{dm2.response.body.$.previewId}}/rows?view=event&offset=0&limit=100
+
+### DM2 최종 차이 보기
+GET {{baseUrl}}/api/previews/{{dm2.response.body.$.previewId}}/rows?view=net&offset=0&limit=100
+
+########################################################################
+# DM3: HumanResources.Employee DELETE
+# 보여 줄 것: INSTEAD OF DELETE dEmployee가 거부(status trigger_blocked, error 노드), 변경 0건, [적용] 비활성(PREVIEW_NOT_OK).
+# @dm3Employee는 있는 직원이어야 한다(0행이면 dEmployee가 거부 없이 끝난다).
+########################################################################
+
+### DM3 미리보기
+# @name dm3
+POST {{baseUrl}}/api/previews
+Content-Type: application/json
+
+{ "sql": "DELETE FROM HumanResources.Employee WHERE BusinessEntityID = {{dm3Employee}};" }
+
+### DM3 [적용] 시도 → 200 ApplyResult status precondition_failed, preconditionFailures [PREVIEW_NOT_OK]
+POST {{baseUrl}}/api/previews/{{dm3.response.body.$.previewId}}/apply
+
+########################################################################
+# DM4·DM6: CascadeLab(원본을 CascadeLab으로 바꿔 Host를 다시 띄운다)
+#   준비: cascadelab/sql/00-create-databases.sql과 cl01~cl20.sql을 설치한 CascadeLab(README "실행 순서").
+#   Host 재시작(같은 PowerShell 창, 프로세스 환경 변수로 appsettings를 덮어쓴다):
+#     $env:DbRipple__OriginDb = 'CascadeLab'; $env:DbRipple__SandboxDb = 'CascadeLab_Demo_Sandbox'; $env:DbRipple__SnapshotDb = 'CascadeLab_Demo_Sandbox_base'
+#     $env:DbRipple__BackupPath = '/var/opt/mssql/backup/CascadeLab_demo_baseline.bak'; $env:DbRipple__ManifestPath = '.data/cl-demo-baseline/manifest.json'
+#     . .\scripts\env.ps1; dotnet run --project src\DbRipple.Host
+#   샌드박스 이름을 검증 도구(CascadeLab_Sandbox)와 다르게 두어 서로 덮어쓰지 않게 한다.
+########################################################################
+
+### DM4 미리보기: SET NULL + 3단 CASCADE + 동적 SQL 트리거(손 정답 cascadelab/cases/CL10-dynamic-sql-trigger.json)
+# 보여 줄 것: FK 간선이 certain이 아니라 inferred(동적 SQL 쓰기 경합), RegionLog WRITES ambiguous(후보 2), 경고 WARN_TRIGGER_DYNAMIC_SQL.
+# @name dm4
+POST {{baseUrl}}/api/previews
+Content-Type: application/json
+
+{ "sql": "DELETE FROM cl10.Region WHERE id = 1;" }
+
+### DM6 미리보기: CascadeLab Big 5만 행 DELETE
+# 준비: .\scripts\run-sql.ps1 scripts\demo\dm6-generate.sql -Database CascadeLab -Part 1 뒤 아래 refresh, state ready 확인.
+# 보여 줄 것: 행 이미지 25만 > 상한 10만 → KEYS 모드, 정확한 건수(netSummary), status truncated, 단계별 timingsMs, [적용] 차단.
+# 끝나면 dm6-generate.sql -Part 2로 시드 크기로 되돌리고 다시 refresh한다.
+POST {{baseUrl}}/api/sandbox/refresh
+
+###
+# @name dm6
+POST {{baseUrl}}/api/previews
+Content-Type: application/json
+
+{ "sql": "DELETE FROM cl20.Parent WHERE id <= 50000;", "options": { "imageCap": 100000 } }
+
+### DM6 묶음 페이지(KEYS 모드에서는 키와 건수만)
+GET {{baseUrl}}/api/previews/{{dm6.response.body.$.previewId}}/rows?view=event&offset=0&limit=100
+
+########################################################################
+# DM5: pubs (안내문만, 요청 없음)
+#   pubs 스크립트는 저작권 표기와 저장소 라이선스의 관계가 불분명해 저장소에 넣지 않는다(설계 §10.2).
+#   사용자가 microsoft/sql-server-samples의 northwind-pubs/instpubs.sql을 직접 내려받아 로컬 컨테이너에 pubs를 만든 뒤,
+#   위 DM4처럼 OriginDb를 pubs로 바꿔 Host를 띄운다. 보일 것:
+#     - dbo.discounts(PK 없음) UPDATE: 최종 차이 보기에서 "제거된 행 n개, 추가된 행 m개"(ROW 키, 다중집합, E6).
+#       예: UPDATE dbo.discounts SET discount = discount + 1 WHERE stor_id IS NULL;  (값은 설치 뒤 SELECT로 확인)
+#     - dbo.employee의 employee_insupd: job_lvl을 그 job의 min_lvl·max_lvl 밖으로 바꾸면 트리거가 RAISERROR 뒤 ROLLBACK
+#       → trigger_blocked, 변경 0, [적용] 비활성(E13). 예: UPDATE dbo.employee SET job_lvl = 1 WHERE emp_id = '<jobs.min_lvl이 1보다 큰 직원>';
+########################################################################
+
+########################################################################
+# DM7: 미리보기 뒤 원본 행을 바꾸고 [적용] → drift_detected (원본 AW_Origin으로 Host를 띄운 상태)
+########################################################################
+
+### DM7-1 미리보기(Product에는 사용자 트리거가 없다)
+# @name dm7
+POST {{baseUrl}}/api/previews
+Content-Type: application/json
+
+{ "sql": "UPDATE Production.Product SET ListPrice = ListPrice + 1.00 WHERE ProductID = 680;" }
+
+### DM7-2 원본 행 바꾸기(이 파일 밖, PowerShell):
+#   .\scripts\run-sql.ps1 scripts\demo\dm7-drift.sql -Database AW_Origin -Part 1 -Log logs\week3\dm7-drift.log
+### DM7-3 [적용] → status drift_detected, verification.driftRows: Production.Product (680) CHANGED ListPrice
+POST {{baseUrl}}/api/previews/{{dm7.response.body.$.previewId}}/apply
+Content-Type: application/json
+
+{ "sqlHash": "{{dm7.response.body.$.sqlHash}}" }
+
+### DM7-4 되돌리기(PowerShell): .\scripts\run-sql.ps1 scripts\demo\dm7-drift.sql -Database AW_Origin -Part 2 뒤 기준선 새로 고침
+POST {{baseUrl}}/api/sandbox/refresh

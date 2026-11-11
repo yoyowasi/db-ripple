@@ -141,7 +141,7 @@ internal sealed class ResidualBuilder
             foreach (var t in _executed.Where(t => t.CanWrite(table)))
             {
                 candidates.Add(t.Name);
-                unknownTrigger |= t.Unknown;
+                unknownTrigger |= t.IsUnknownFor(table);
                 Sources.Add(new ResidualSource(id, t.Name, null));
             }
         }

@@ -1,0 +1,42 @@
+{
+  "id": "CL11",
+  "pattern": "CL11",
+  "title": "INSTEAD OF INSERT (원래 동작 대체, REPLACES)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl11.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "INSERT INTO cl11.Item (id, name, qty) VALUES (3, 'c', 4);" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl11.Item", "keyColumns": ["id"], "updated": [], "deleted": [],
+        "inserted": [ { "key": { "id": 3 }, "causes": ["INSTEAD_OF"], "after": { "name": "C" } } ],
+        "basis": "trg_Item_ioi가 원래 INSERT를 대신해 UPPER(name)으로 넣는다. after.name 'C'가 대체 동작의 판정 값" },
+      { "table": "cl11.ItemLog", "keyColumns": ["item_id", "action"], "updated": [], "deleted": [],
+        "inserted": [ { "key": { "item_id": 3, "action": "I" }, "causes": ["INSTEAD_OF"] } ],
+        "basis": "trg_Item_ioi: inserted 행마다 (id, 'I'). 시드의 (1,'I'), (2,'I')는 그대로" }
+    ],
+    "firings": [
+      { "node": "F:cl11.Item:INSERT", "table": "cl11.Item", "operation": "INSERT", "rowCount": 1, "causeKind": "INSTEAD_OF", "depth": 2 },
+      { "node": "F:cl11.ItemLog:INSERT", "table": "cl11.ItemLog", "operation": "INSERT", "rowCount": 1, "causeKind": "INSTEAD_OF", "depth": 2 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "T:cl11.trg_Item_ioi", "kind": "REPLACES", "name": "cl11.trg_Item_ioi", "confidence": "inferred", "basis": "§6.3 REPLACES, §7.2 5단계(INSTEAD OF면 직접 묶음 없음, 카탈로그 추론이라 트리거 상한 inferred)" },
+      { "statementIndex": 1, "parent": "T:cl11.trg_Item_ioi", "child": "F:cl11.Item:INSERT", "kind": "WRITES", "name": "cl11.trg_Item_ioi", "confidence": "inferred", "basis": "§7.2 5단계: 깊이 1 부모가 없는 깊이 2 묶음은 가상 INSTEAD OF 실행의 자식, 정적 쓰기 대상(Item)" },
+      { "statementIndex": 1, "parent": "T:cl11.trg_Item_ioi", "child": "F:cl11.ItemLog:INSERT", "kind": "WRITES", "name": "cl11.trg_Item_ioi", "confidence": "inferred", "basis": "§7.2 5단계, 정적 쓰기 대상(ItemLog)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "INSTEAD OF 트리거 안 DML 묶음의 depth = 2", "basis": "A7: 인자 없는 TRIGGER_NESTLEVEL()은 호출 스택의 트리거 수다. INSTEAD OF 트리거도 스택에 든다고 보고 2로 적었다(§7.2 5단계 전제). CascadeLab에서 실측하지 않았다" },
+      { "id": "OO2", "what": "Item 묶음과 ItemLog 묶음 사이 순서", "basis": "트리거 본문 순서와 같을 것으로 보지만 문서 보장이 아니다(§7.4)" }
+    ]
+  },
+  "rationale": [
+    { "claim": "trg_Item_ioi 안의 Item INSERT는 INSTEAD OF를 다시 부르지 않고 제약·AFTER 트리거 처리로 간다", "basis": "CREATE TRIGGER 문서(INSTEAD OF 트리거가 자기 테이블에 같은 문장을 실행하면 재귀 호출하지 않음), A5" },
+    { "claim": "문장 대상에 INSTEAD OF INSERT가 있어 깊이 1 직접 묶음이 생기지 않는다", "basis": "§7.2 5단계" },
+    { "claim": "Item에는 연쇄 FK가 없어 INSTEAD OF를 만들 수 있다", "basis": "A5" }
+  ]
+}

@@ -58,7 +58,8 @@ public class CascadeLabAnalysisTests(CascadeLabFixture fx) : IClassFixture<Casca
     [SqlFact]
     public void Cascadelab_trigger_write_targets_match_the_seed_scripts()
     {
-        var t = fx.Context.Triggers.Where(x => !x.IsAuditTrigger).ToDictionary(x => x.Trigger, StringComparer.OrdinalIgnoreCase);
+        // 3주차: CL09~CL20 시드(cl09.sql~)도 같은 기준선에 실리므로 CL01~CL08 스키마의 트리거만 본다.
+        var t = fx.Context.Triggers.Where(x => !x.IsAuditTrigger && IsWeek1Schema(x.Table)).ToDictionary(x => x.Trigger, StringComparer.OrdinalIgnoreCase);
         Assert.Equal(["cl06.trg_Line_del", "cl07.trg_A_upd", "cl07.trg_B_upd", "cl07.trg_C_ins", "cl08.trg_Acct_upd"], t.Keys.Order());
 
         void Check(string trigger, string table, ChangeOperation op, params string[] targets)
@@ -91,12 +92,80 @@ public class CascadeLabAnalysisTests(CascadeLabFixture fx) : IClassFixture<Casca
         Assert.Equal(0, audit.Count % 3);
     }
 
-    public static TheoryData<string> CaseFiles()
+    static bool IsWeek1Schema(string table) => string.CompareOrdinal(table, "cl09") < 0;
+
+    /// <summary>CL01~CL08(진단 0개 기대). CL09 이후는 기대 경고가 있어 CascadeLabWeek3Tests가 본다.</summary>
+    public static TheoryData<string> CaseFiles() => Files(id => string.CompareOrdinal(id, "CL09") < 0);
+
+    /// <summary>CL09~CL20(lab-1, answer-format v0.2).</summary>
+    public static TheoryData<string> Week3CaseFiles() => Files(id => string.CompareOrdinal(id, "CL09") >= 0);
+
+    static TheoryData<string> Files(Func<string, bool> include)
     {
         var d = new TheoryData<string>();
         if (Directory.Exists(RepoPaths.CascadeLab))
-            foreach (var f in Directory.GetFiles(Path.Combine(RepoPaths.CascadeLab, "cases"), "CL*.json").Order()) d.Add(Path.GetFileName(f));
+            foreach (var f in Directory.GetFiles(Path.Combine(RepoPaths.CascadeLab, "cases"), "CL*.json").Order(StringComparer.Ordinal))
+                if (include(Path.GetFileName(f))) d.Add(Path.GetFileName(f));
         return d;
+    }
+
+    /// <summary>
+    /// 3주차 회귀(CL09~CL20, lab-1 목록 2026-11-11): 거부 사례는 없고, 문장마다 수락되며, 한 스크립트로 이어 붙인 분석의 경고 ruleId 집합이 expected.warnings와 같다
+    /// (CL10 WARN_TRIGGER_DYNAMIC_SQL, CL13 WARN_AUDIT_NOT_LAST, CL14b WARN_TOP_WITHOUT_ORDER, CL16b WARN_NONDETERMINISTIC_FUNCTION, 나머지 없음).
+    /// </summary>
+    [SqlTheory]
+    [MemberData(nameof(Week3CaseFiles))]
+    public void Week3_cascadelab_cases_are_accepted_with_expected_warnings(string file)
+    {
+        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepoPaths.CascadeLab, "cases", file)));
+        var root = doc.RootElement;
+        var id = root.GetProperty("id").GetString()!;
+        var sqls = root.GetProperty("statements").EnumerateArray().Select(s => s.GetProperty("sql").GetString()!).ToList();
+        Assert.NotEmpty(sqls);
+        var expected = root.GetProperty("expected");
+        var warnings = expected.TryGetProperty("warnings", out var w) && w.ValueKind == JsonValueKind.Array
+            ? w.EnumerateArray().Select(x => x.GetString()!).Distinct().Order(StringComparer.Ordinal).ToList()
+            : [];
+
+        foreach (var sql in sqls)
+        {
+            var one = new BatchAnalyzer().Analyze(sql, fx.Context);
+            Assert.True(one.IsAccepted, id + ": " + string.Join("; ", one.Diagnostics.Select(d => d.RuleId + " " + d.Message)));
+            Assert.Empty(one.Rejects);
+            Assert.Equal(sql, Assert.Single(one.Statements).Sql);
+        }
+        var all = new BatchAnalyzer().Analyze(string.Join("\nGO\n", sqls), fx.Context);
+        Assert.True(all.IsAccepted, id);
+        Assert.Equal(sqls.Count, all.Statements.Count);
+        Assert.Equal(warnings, all.Warnings.Select(d => d.RuleId).Distinct().Order(StringComparer.Ordinal).ToList());
+    }
+
+    /// <summary>
+    /// C13 회귀 입력(tests/fixtures/capture/triggers-cascadelab.json): 실제 CascadeLab 카탈로그의 C6 트리거 정적 분석(감사 트리거 제외).
+    /// Execution 픽스처의 기준선은 Triggers가 빈 배열이라(C6 미참조) Attribution.Tests CL09~CL20 회귀가 이 파일로 채운다. DBR_WRITE_FIXTURES=1일 때만 쓴다.
+    /// </summary>
+    [SqlFact]
+    public async Task Write_trigger_static_info_fixture()
+    {
+        var user = fx.Context.Triggers.Where(t => !t.IsAuditTrigger).ToList();
+        Assert.NotEmpty(user);
+        if (Environment.GetEnvironmentVariable("DBR_WRITE_FIXTURES") != "1") return;
+        var path = Path.Combine(RepoPaths.Root, "tests", "fixtures", "capture", "triggers-cascadelab.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var options = new JsonSerializerOptions(ContractJson.Create()) { WriteIndented = true };
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(user, options) + "\n", new System.Text.UTF8Encoding(false));
+    }
+
+    /// <summary>CL10: 동적 SQL 트리거는 HasDynamicSql이고 쓰기 대상 미상은 아니다(Q6 규약). CL12a: ROLLBACK 트리거. 프로시저를 부르는 CascadeLab 트리거가 없으면 두 목록은 빈다.</summary>
+    [SqlFact]
+    public void Week3_cascadelab_trigger_flags()
+    {
+        var user = fx.Context.Triggers.Where(x => !x.IsAuditTrigger).ToList();
+        if (!user.Any(t => t.Table.StartsWith("cl10.", StringComparison.OrdinalIgnoreCase))) return; // 시드 전(lab-1 작성 중)
+        Assert.Contains(user, t => t.Table.StartsWith("cl10.", StringComparison.OrdinalIgnoreCase) && t.HasDynamicSql && !t.WriteTargetsUnknown);
+        Assert.Contains(user, t => t.Table.StartsWith("cl12.", StringComparison.OrdinalIgnoreCase) && t.HasRollback);
+        Assert.All(user, t => Assert.Equal(t.ProcedureCalls.Order(StringComparer.OrdinalIgnoreCase),
+            t.ExpandedProcedureCalls.Concat(t.UnresolvedProcedureCalls).Order(StringComparer.OrdinalIgnoreCase)));
     }
 
     static readonly Dictionary<string, (ChangeOperation Op, string Target)> ExpectedTargets = new()

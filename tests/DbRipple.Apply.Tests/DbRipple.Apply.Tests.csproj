@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- C15 테스트. 소유: apply-1. 통합 테스트 DB 접두 dbrt_apl_(TestSupport TestDb.Components에 "apl" 추가 필요: 오케스트레이터). 단위 테스트는 가짜 IStatementRunner·INetDiffer·IPreviewStore·ISandboxManager를 쓴다. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DbRipple.Apply\DbRipple.Apply.csproj" />
+    <ProjectReference Include="..\DbRipple.TestSupport\DbRipple.TestSupport.csproj" />
+  </ItemGroup>
+
+  <!--
+    DB 테스트(ApplySqlTests.cs)는 실제 구현 프로젝트가 필요하다. 병렬 구현 라운드에서 남의 프로젝트를 컴파일하지 않도록 기본 빌드에서 뺀다.
+    테스트 라운드: dotnet test tests\DbRipple.Apply.Tests -p:ApplyIntegration=true
+  -->
+  <PropertyGroup Condition="'$(ApplyIntegration)' == 'true'">
+    <DefineConstants>$(DefineConstants);APPLY_INTEGRATION</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(ApplyIntegration)' == 'true'">
+    <ProjectReference Include="..\..\src\DbRipple.Analysis\DbRipple.Analysis.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Attribution\DbRipple.Attribution.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Diff\DbRipple.Diff.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Execution\DbRipple.Execution.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Preview\DbRipple.Preview.csproj" />
+  </ItemGroup>
+
+</Project>

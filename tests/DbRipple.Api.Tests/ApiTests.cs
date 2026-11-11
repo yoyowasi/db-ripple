@@ -21,6 +21,8 @@ public sealed class ApiTests : IAsyncLifetime
     PreviewStore store = null!;
     Func<string, PreviewOptions, Task<PreviewOutcome>> pipeline = (_, _) => throw new NotSupportedException();
     Func<Task<BaselineContext>> context = () => Task.FromResult(TestData.Baseline());
+    Func<Task<CatalogSchema>> schema = () => Task.FromResult(TestData.Schema());
+    Func<string, ApplyRequest, Task<ApplyResult?>> apply = (_, _) => Task.FromResult<ApplyResult?>(null);
     int refreshStarts;
 
     sealed class Sandbox(ApiTests t) : ISandboxManager
@@ -42,6 +44,16 @@ public sealed class ApiTests : IAsyncLifetime
         public Task<PreviewOutcome> RunAsync(string sql, PreviewOptions options, IEvaluationHook? hook, CancellationToken ct) => t.pipeline(sql, options);
     }
 
+    sealed class SchemaProvider(ApiTests t) : ICatalogSchemaProvider
+    {
+        public Task<CatalogSchema> GetSchemaAsync(CancellationToken ct) => t.schema();
+    }
+
+    sealed class ApplySvc(ApiTests t) : IApplyService
+    {
+        public Task<ApplyResult?> ApplyAsync(string previewId, ApplyRequest request, CancellationToken ct) => t.apply(previewId, request);
+    }
+
     sealed class Analyzer(Func<string, AnalysisResult> run) : IBatchAnalyzer
     {
         public AnalysisResult Analyze(string sql, BaselineContext baseline) => run(sql);
@@ -58,6 +70,8 @@ public sealed class ApiTests : IAsyncLifetime
         builder.Services.AddSingleton<IPreviewPipeline>(new Pipeline(this));
         builder.Services.AddSingleton<IBatchAnalyzer>(new Analyzer(sql => TestData.Accepted("W_X")));
         builder.Services.AddSingleton<IPreviewStore>(store);
+        builder.Services.AddSingleton<ICatalogSchemaProvider>(new SchemaProvider(this));
+        builder.Services.AddSingleton<IApplyService>(new ApplySvc(this));
         app = builder.Build();
         app.UseExceptionHandler();
         app.MapOpenApi();
@@ -105,13 +119,16 @@ public sealed class ApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Analyze_without_ready_baseline_is_409_problem_json()
+    public async Task Analyze_without_ready_baseline_is_409_problem_json_with_reason()
     {
-        context = () => throw new InvalidOperationException("기준선 없음 connection=Password=SECRET");
+        context = () => throw new PreviewConflictException(ConflictReason.NoBaseline, "기준선 없음 connection=Password=SECRET");
         var res = await client.PostAsync("/api/analyze", Json("""{"sql":"DELETE FROM dbo.T;"}"""));
         Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
         Assert.Equal("application/problem+json", res.Content.Headers.ContentType?.MediaType);
-        Assert.DoesNotContain("SECRET", await res.Content.ReadAsStringAsync()); // 예외 메시지는 응답에 넣지 않는다
+        var text = await res.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("SECRET", text); // 예외 메시지는 응답에 넣지 않는다
+        using var doc = JsonDocument.Parse(text);
+        Assert.Equal("NO_BASELINE", doc.RootElement.GetProperty("reason").GetString());
     }
 
     [Fact]
@@ -160,24 +177,132 @@ public sealed class ApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Preview_lock_conflict_and_fingerprint_mismatch_are_409()
+    public async Task Preview_conflicts_are_409_with_each_reason_code()
     {
-        pipeline = (_, _) => throw new InvalidOperationException("다른 미리보기가 실행 중입니다.");
-        var res = await client.PostAsync("/api/previews", Json("""{"sql":"x"}"""));
-        Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
-        using var doc = await BodyAsync(res);
-        Assert.Equal(409, doc.RootElement.GetProperty("status").GetInt32());
+        foreach (var (reason, wire) in new[]
+        {
+            (ConflictReason.Locked, "LOCKED"), (ConflictReason.Building, "BUILDING"), (ConflictReason.NoBaseline, "NO_BASELINE"),
+            (ConflictReason.FingerprintMismatch, "FINGERPRINT_MISMATCH"), (ConflictReason.Dirty, "DIRTY"),
+        })
+        {
+            pipeline = (_, _) => throw new PreviewConflictException(reason, "내부 메시지 SECRET");
+            var res = await client.PostAsync("/api/previews", Json("""{"sql":"x"}"""));
+            Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
+            Assert.Equal("application/problem+json", res.Content.Headers.ContentType?.MediaType);
+            var text = await res.Content.ReadAsStringAsync();
+            Assert.DoesNotContain("SECRET", text);
+            using var doc = JsonDocument.Parse(text);
+            Assert.Equal(409, doc.RootElement.GetProperty("status").GetInt32());
+            Assert.Equal(wire, doc.RootElement.GetProperty("reason").GetString());
+        }
     }
 
     [Fact]
-    public async Task Not_implemented_endpoints_are_501_problem_json()
+    public async Task Exception_types_map_to_503_400_501_and_500_without_leaking_messages()
     {
-        foreach (var (method, path) in new[] { ("GET", "/api/catalog/schema"), ("POST", "/api/previews/pv_a/apply") })
+        var cases = new (Exception Ex, HttpStatusCode Status)[]
         {
-            var res = await client.SendAsync(new HttpRequestMessage(new HttpMethod(method), path));
-            Assert.Equal(HttpStatusCode.NotImplemented, res.StatusCode);
+            (new SandboxUnavailableException("연결 끊김 Password=SECRET"), HttpStatusCode.ServiceUnavailable),
+            (new ArgumentException("잘못된 인수 SECRET"), HttpStatusCode.BadRequest),
+            (new NotImplementedException("SECRET"), HttpStatusCode.NotImplemented),
+            (new InvalidOperationException("@@OPTIONS 점검 실패 SECRET"), HttpStatusCode.InternalServerError), // 인계 7: 예전 409
+        };
+        foreach (var (ex, status) in cases)
+        {
+            pipeline = (_, _) => throw ex;
+            var res = await client.PostAsync("/api/previews", Json("""{"sql":"x"}"""));
+            Assert.Equal(status, res.StatusCode);
             Assert.Equal("application/problem+json", res.Content.Headers.ContentType?.MediaType);
+            var text = await res.Content.ReadAsStringAsync();
+            Assert.DoesNotContain("SECRET", text);
+            using var doc = JsonDocument.Parse(text);
+            Assert.Equal((int)status, doc.RootElement.GetProperty("status").GetInt32());
+            Assert.False(doc.RootElement.TryGetProperty("reason", out _)); // reason은 409만
         }
+    }
+
+    [Fact]
+    public async Task Sandbox_unavailable_from_apply_is_503_and_conflict_is_409_with_reason()
+    {
+        apply = (_, _) => throw new SandboxUnavailableException("끊김");
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.PostAsync("/api/previews/pv_a/apply", null)).StatusCode);
+        apply = (_, _) => throw new PreviewConflictException(ConflictReason.Locked, "잠금");
+        var res = await client.PostAsync("/api/previews/pv_a/apply", null);
+        Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
+        using var doc = await BodyAsync(res);
+        Assert.Equal("LOCKED", doc.RootElement.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task Catalog_schema_200_returns_tables_columns_and_sql_types()
+    {
+        var res = await client.GetAsync("/api/catalog/schema");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        using var doc = await BodyAsync(res);
+        Assert.Equal("Origin", doc.RootElement.GetProperty("database").GetString());
+        Assert.Equal("m-test", doc.RootElement.GetProperty("manifestVersion").GetString());
+        var table = doc.RootElement.GetProperty("tables")[0];
+        Assert.Equal("dbo.T", table.GetProperty("table").GetString());
+        Assert.Equal("PK", table.GetProperty("keyKind").GetString());
+        Assert.True(table.GetProperty("covered").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, table.GetProperty("excludedReason").ValueKind); // null 속성도 포함
+        var id = table.GetProperty("columns")[0];
+        Assert.Equal("IDENTITY", id.GetProperty("volatile").GetString());
+        Assert.True(id.GetProperty("isIdentity").GetBoolean());
+        Assert.Equal("decimal(19,4)", table.GetProperty("columns")[1].GetProperty("sqlType").GetString());
+    }
+
+    [Fact]
+    public async Task Catalog_schema_without_baseline_is_409_with_reason()
+    {
+        schema = () => throw new PreviewConflictException(ConflictReason.Building, "구축 중");
+        var res = await client.GetAsync("/api/catalog/schema");
+        Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
+        using var doc = await BodyAsync(res);
+        Assert.Equal("BUILDING", doc.RootElement.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task Apply_returns_200_for_every_status_and_passes_the_request_body()
+    {
+        ApplyRequest? seen = null;
+        foreach (var (status, wire) in new[]
+        {
+            (ApplyStatus.Committed, "committed"), (ApplyStatus.RolledBackMismatch, "rolled_back_mismatch"), (ApplyStatus.DriftDetected, "drift_detected"),
+            (ApplyStatus.PreconditionFailed, "precondition_failed"), (ApplyStatus.Error, "error"),
+        })
+        {
+            apply = (id, req) => { seen = req; return Task.FromResult<ApplyResult?>(TestData.ApplyResult(status, id)); };
+            var res = await client.PostAsync("/api/previews/pv_a/apply", Json("""{"sqlHash":"sha256:abc"}"""));
+            Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+            Assert.Equal("sha256:abc", seen!.SqlHash);
+            using var doc = await BodyAsync(res);
+            Assert.Equal("pv_a", doc.RootElement.GetProperty("previewId").GetString());
+            Assert.Equal(wire, doc.RootElement.GetProperty("status").GetString());
+            Assert.Equal("SNAPSHOT_NETDIFF", doc.RootElement.GetProperty("verification").GetProperty("mode").GetString());
+            Assert.Equal(5, doc.RootElement.GetProperty("timingsMs").GetProperty("commit").GetInt32());
+            if (status == ApplyStatus.PreconditionFailed)
+                Assert.Equal("SQL_HASH_MISMATCH", doc.RootElement.GetProperty("preconditionFailures")[0].GetString());
+        }
+    }
+
+    [Fact]
+    public async Task Apply_body_is_optional_empty_body_and_null_hash_are_allowed()
+    {
+        ApplyRequest? seen = null;
+        apply = (id, req) => { seen = req; return Task.FromResult<ApplyResult?>(TestData.ApplyResult(ApplyStatus.Committed, id)); };
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsync("/api/previews/pv_a/apply", null)).StatusCode);
+        Assert.NotNull(seen);
+        Assert.Null(seen!.SqlHash);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsync("/api/previews/pv_a/apply", Json("{}"))).StatusCode);
+        Assert.Null(seen.SqlHash);
+    }
+
+    [Fact]
+    public async Task Apply_404_when_the_preview_is_missing_or_expired()
+    {
+        apply = (_, _) => Task.FromResult<ApplyResult?>(null);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync("/api/previews/none/apply", null)).StatusCode);
     }
 
     [Fact]
@@ -284,7 +409,8 @@ public sealed class ApiTests : IAsyncLifetime
     {
         var res = await client.GetAsync("/openapi/v1.json");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
-        using var doc = await BodyAsync(res);
+        var text = await res.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(text);
         var paths = doc.RootElement.GetProperty("paths");
         foreach (var p in new[]
         {
@@ -295,6 +421,12 @@ public sealed class ApiTests : IAsyncLifetime
         var responses = paths.GetProperty("/api/previews").GetProperty("post").GetProperty("responses");
         foreach (var code in new[] { "200", "422", "409" }) Assert.True(responses.TryGetProperty(code, out _), code);
         Assert.True(paths.GetProperty("/api/sandbox/refresh").GetProperty("post").GetProperty("responses").TryGetProperty("202", out _));
-        Assert.True(paths.GetProperty("/api/catalog/schema").GetProperty("get").GetProperty("responses").TryGetProperty("501", out _));
+        var catalog = paths.GetProperty("/api/catalog/schema").GetProperty("get").GetProperty("responses");
+        foreach (var code in new[] { "200", "409" }) Assert.True(catalog.TryGetProperty(code, out _), "catalog " + code);
+        Assert.False(catalog.TryGetProperty("501", out _));
+        var applyResponses = paths.GetProperty("/api/previews/{id}/apply").GetProperty("post").GetProperty("responses");
+        foreach (var code in new[] { "200", "404", "409", "503", "500" }) Assert.True(applyResponses.TryGetProperty(code, out _), "apply " + code);
+        Assert.True(responses.TryGetProperty("503", out _));
+        Assert.Contains("rolled_back_mismatch", text);
     }
 }

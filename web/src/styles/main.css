@@ -1,0 +1,392 @@
+/* 전역 토큰과 공용 클래스. 색은 모두 변수이고, 어두운 모드는 OS 설정을 따른다. */
+:root {
+  --bg: #f4f6f9;
+  --bg-elev: #ffffff;
+  --bg-sunken: #eef1f5;
+  --fg: #1b1f24;
+  --fg-muted: #4f5b69;
+  --border: #cfd6df;
+  --accent: #1f5fd1;
+  --accent-fg: #ffffff;
+  --accent-soft: #e4edfc;
+  --ok: #17713c;
+  --ok-bg: #e2f4e8;
+  --warn: #7a4e00;
+  --warn-bg: #fff2d1;
+  --err: #a8221b;
+  --err-bg: #fde7e5;
+  --info: #1f4fa8;
+  --info-bg: #e6eefc;
+  --changed-bg: #ffe9a3;
+  --volatile: #6a3fb0;
+  --volatile-bg: #eee6fb;
+  --derived: #0b6a7a;
+  --derived-bg: #dff3f6;
+  --cm-keyword: #1f5fd1;
+  --cm-string: #0b7a4a;
+  --cm-number: #a85500;
+  --cm-type: #7a3fb5;
+  --mono: ui-monospace, 'Cascadia Mono', 'Consolas', 'D2Coding', monospace;
+  --sans: system-ui, -apple-system, 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+  --radius: 6px;
+  --gutter: 16px;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171b;
+    --bg-elev: #1c2025;
+    --bg-sunken: #171a1e;
+    --fg: #e6e9ee;
+    --fg-muted: #a5afbb;
+    --border: #353c46;
+    --accent: #6ea2ff;
+    --accent-fg: #0b1220;
+    --accent-soft: #1b2a45;
+    --ok: #66d490;
+    --ok-bg: #133120;
+    --warn: #f0bd5c;
+    --warn-bg: #3a2d0c;
+    --err: #ff9188;
+    --err-bg: #43191a;
+    --info: #8db4ff;
+    --info-bg: #18273f;
+    --changed-bg: #6b5608;
+    --volatile: #c3a3ff;
+    --volatile-bg: #2d2247;
+    --derived: #6fd3e3;
+    --derived-bg: #123a42;
+    --cm-keyword: #7fb0ff;
+    --cm-string: #7fd8a6;
+    --cm-number: #f0b36a;
+    --cm-type: #c9a8ff;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#app {
+  min-height: 100%;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.3;
+}
+
+h2 {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+h3 {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--fg-muted);
+}
+
+code,
+.mono {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+a {
+  color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -48px;
+  z-index: 100;
+  padding: 8px 12px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-radius: var(--radius);
+}
+.skip-link:focus {
+  top: 8px;
+}
+
+/* 카드 */
+.card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-width: 0;
+}
+.card > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.card > header h2 {
+  margin-right: auto;
+}
+.card-body {
+  padding: 10px 12px;
+}
+
+/* 버튼 */
+.btn {
+  appearance: none;
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 12px;
+  min-height: 30px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--fg);
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+.btn-danger {
+  background: var(--err-bg);
+  border-color: var(--err);
+  color: var(--err);
+  font-weight: 600;
+}
+.btn-sm {
+  padding: 2px 8px;
+  min-height: 24px;
+  font-size: 12px;
+}
+
+input[type='text'],
+input[type='number'],
+select {
+  font: inherit;
+  font-size: 13px;
+  padding: 3px 6px;
+  min-height: 28px;
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* 칩 */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  min-height: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-sunken);
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+.chip-ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+  border-color: transparent;
+}
+.chip-warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-color: transparent;
+}
+.chip-err {
+  background: var(--err-bg);
+  color: var(--err);
+  border-color: transparent;
+}
+.chip-info {
+  background: var(--info-bg);
+  color: var(--info);
+  border-color: transparent;
+}
+
+/* 알림 줄 */
+.banner {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  font-size: 13px;
+}
+.banner > div {
+  min-width: 0;
+}
+.banner strong {
+  display: block;
+}
+.banner-err {
+  background: var(--err-bg);
+  color: var(--err);
+  border-color: var(--err);
+}
+.banner-warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-color: var(--warn);
+}
+.banner-info {
+  background: var(--info-bg);
+  color: var(--info);
+  border-color: var(--info);
+}
+.banner-ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+/* 표 */
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+table.data th,
+table.data td {
+  text-align: left;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+table.data th {
+  color: var(--fg-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+table.data td.num,
+table.data th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+dl.kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  margin: 0;
+  font-size: 12.5px;
+}
+dl.kv dt {
+  color: var(--fg-muted);
+}
+dl.kv dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  color: var(--fg-muted);
+}
+
+/* AG Grid 셀 강조(CSS만으로 "예상값"·"파생" 뱃지를 붙인다) */
+.ag-cell.cell-changed {
+  background: var(--changed-bg);
+  font-weight: 600;
+}
+.ag-cell.cell-null {
+  font-style: italic;
+  color: var(--fg-muted);
+}
+.ag-cell.cell-volatile::after {
+  content: '예상값';
+  margin-left: 6px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  border-radius: 8px;
+  background: var(--volatile-bg);
+  color: var(--volatile);
+}
+.ag-cell.cell-derived::after {
+  content: '파생';
+  margin-left: 6px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  border-radius: 8px;
+  background: var(--derived-bg);
+  color: var(--derived);
+}
+.ag-cell.cell-volatile.cell-derived::after {
+  content: '예상값·파생';
+}
+.ag-cell.cell-op {
+  font-weight: 600;
+}
+.ag-cell.op-insert {
+  color: var(--ok);
+}
+.ag-cell.op-delete,
+.ag-cell.op-multiset_removed {
+  color: var(--err);
+}
+.ag-cell.op-update {
+  color: var(--info);
+}
+.ag-cell.op-multiset_added {
+  color: var(--ok);
+}
+.ag-row.row-linked {
+  box-shadow: inset 3px 0 0 var(--accent);
+}

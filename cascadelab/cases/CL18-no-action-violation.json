@@ -1,0 +1,35 @@
+{
+  "id": "CL18",
+  "pattern": "CL18",
+  "title": "NO ACTION 위반 오류 (failed, 변경 0, 뒤 문장 not_run)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl18.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "UPDATE cl18.Cust SET name = 'x' WHERE id = 2;" },
+    { "index": 2, "sql": "DELETE FROM cl18.Cust WHERE id = 1;" },
+    { "index": 3, "sql": "UPDATE cl18.Cust SET name = 'y' WHERE id = 3;" }
+  ],
+  "expected": {
+    "status": "failed",
+    "errorNumber": 547,
+    "statementStatus": [ { "index": 1, "status": "ok" }, { "index": 2, "status": "failed" }, { "index": 3, "status": "not_run" } ],
+    "changes": [
+      { "table": "cl18.Cust", "keyColumns": ["id"], "inserted": [], "updated": [], "deleted": [], "basis": "문장 2 실패로 트랜잭션 전체 롤백(XACT_ABORT ON 봉투, 첫 오류에서 멈추고 롤백, D5). 문장 1의 변경도 없다" },
+      { "table": "cl18.Inv", "keyColumns": ["id"], "inserted": [], "updated": [], "deleted": [], "basis": "NO ACTION 자식, 변경 없음" },
+      { "table": "cl18.Note", "keyColumns": ["id"], "inserted": [], "updated": [], "deleted": [], "basis": "CASCADE로 먼저 지워졌다가 문장 실패로 되돌려진다" }
+    ],
+    "firings": [],
+    "edges": [
+      { "statementIndex": 2, "parent": "S", "child": "E:547", "kind": "BLOCKED", "name": null, "confidence": "certain", "basis": "§6.3 BLOCKED, §5.2(오류 시 failed)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "오류 번호 547", "basis": "Cust 1을 Inv 10이 NO ACTION으로 참조한다. 같은 FK 충돌 번호를 CL03b에서 실측했다(2026-11-10, SET DEFAULT 경로). NO ACTION 경로는 이 저장소에서 아직 실측하지 않았다" },
+      { "id": "OO2", "what": "firings가 비어 있는지(문장 1의 Cust UPDATE 묶음 포함)", "basis": "XACT_ABORT ON에서 547은 트랜잭션 전체를 롤백해 감사 기록도 사라진다. 제품이 문장 1의 묶음을 롤백 전에 읽어 보인다면 정정 기록 대상이다. 문장 2의 묶음은 A1(AFTER 트리거는 모든 연쇄·제약 검사가 성공해야 발동)로 생기지 않는다" }
+    ]
+  },
+  "rationale": [
+    { "claim": "DELETE에서는 CASCADE(Note)를 먼저 적용하고 NO ACTION(Inv)을 나중에 검사한다", "basis": "A2(DELETE에만 명시)" },
+    { "claim": "첫 오류에서 전체를 멈추고 롤백하므로 문장 3은 not_run이다", "basis": "D5 번호와 실행 의미, §6.2 Statement status" }
+  ]
+}

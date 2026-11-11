@@ -11,6 +11,7 @@
   <Folder Name="/src/">
     <Project Path="src/DbRipple.Analysis/DbRipple.Analysis.csproj" />
     <Project Path="src/DbRipple.Api/DbRipple.Api.csproj" />
+    <Project Path="src/DbRipple.Apply/DbRipple.Apply.csproj" />
     <Project Path="src/DbRipple.Attribution/DbRipple.Attribution.csproj" />
     <Project Path="src/DbRipple.Cli/DbRipple.Cli.csproj" />
     <Project Path="src/DbRipple.Contracts/DbRipple.Contracts.csproj" />
@@ -23,6 +24,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/DbRipple.Analysis.Tests/DbRipple.Analysis.Tests.csproj" />
     <Project Path="tests/DbRipple.Api.Tests/DbRipple.Api.Tests.csproj" />
+    <Project Path="tests/DbRipple.Apply.Tests/DbRipple.Apply.Tests.csproj" />
     <Project Path="tests/DbRipple.Attribution.Tests/DbRipple.Attribution.Tests.csproj" />
     <Project Path="tests/DbRipple.Core.Tests/DbRipple.Core.Tests.csproj" />
     <Project Path="tests/DbRipple.Diff.Tests/DbRipple.Diff.Tests.csproj" />

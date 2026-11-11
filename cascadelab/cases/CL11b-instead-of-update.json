@@ -1,0 +1,44 @@
+{
+  "id": "CL11b",
+  "pattern": "CL11",
+  "title": "INSTEAD OF UPDATE (조건에 맞는 행만 반영하고 모든 시도를 기록)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl11.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "UPDATE cl11.Item SET qty = qty - 3 WHERE id IN (1, 2);" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl11.Item", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [ { "key": { "id": 1 }, "causes": ["INSTEAD_OF"], "changedColumns": ["qty"], "after": { "qty": 2 } } ],
+        "basis": "inserted qty: 1 -> 5-3 = 2(반영), 2 -> 2-3 = -1(qty >= 0 아님, 거름). name은 같은 값으로 다시 써서 바뀐 열이 아니다(A12 값 비교)" },
+      { "table": "cl11.ItemLog", "keyColumns": ["item_id", "action"], "updated": [], "deleted": [],
+        "inserted": [
+          { "key": { "item_id": 1, "action": "U" }, "causes": ["INSTEAD_OF"] },
+          { "key": { "item_id": 2, "action": "R" }, "causes": ["INSTEAD_OF"] }
+        ],
+        "basis": "trg_Item_iou: 반영 행 'U', 거른 행 'R'" }
+    ],
+    "firings": [
+      { "node": "F:cl11.Item:UPDATE", "table": "cl11.Item", "operation": "UPDATE", "rowCount": 1, "causeKind": "INSTEAD_OF", "depth": 2, "pairing": "BY_PK" },
+      { "node": "F:cl11.ItemLog:INSERT", "table": "cl11.ItemLog", "operation": "INSERT", "rowCount": 2, "causeKind": "INSTEAD_OF", "depth": 2 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "T:cl11.trg_Item_iou", "kind": "REPLACES", "name": "cl11.trg_Item_iou", "confidence": "inferred", "basis": "§6.3 REPLACES, §7.2 5단계" },
+      { "statementIndex": 1, "parent": "T:cl11.trg_Item_iou", "child": "F:cl11.Item:UPDATE", "kind": "WRITES", "name": "cl11.trg_Item_iou", "confidence": "inferred", "basis": "§7.2 5단계, 정적 쓰기 대상(Item)" },
+      { "statementIndex": 1, "parent": "T:cl11.trg_Item_iou", "child": "F:cl11.ItemLog:INSERT", "kind": "WRITES", "name": "cl11.trg_Item_iou", "confidence": "inferred", "basis": "§7.2 5단계, 정적 쓰기 대상(ItemLog)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "INSTEAD OF 트리거 안 DML 묶음의 depth = 2", "basis": "CL11 OO1과 같다(A7, 미실측)" },
+      { "id": "OO2", "what": "문장 rowsAffected", "basis": "INSTEAD OF가 원래 동작을 대체할 때 호출자가 받는 행 수는 손 정답 범위 밖이다(판정하지 않음)" }
+    ]
+  },
+  "rationale": [
+    { "claim": "trg_Item_iou 안의 Item UPDATE는 INSTEAD OF UPDATE를 다시 부르지 않는다", "basis": "CREATE TRIGGER 문서(INSTEAD OF 비재귀), A5" },
+    { "claim": "id 2는 바뀌지 않으므로 Item 순 변경은 1행이다", "basis": "트리거 WHERE i.qty >= 0" }
+  ]
+}

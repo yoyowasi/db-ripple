@@ -12,20 +12,6 @@ public class CascadeLabTests(LabFixture lab)
 {
     public static readonly string[] CaseIds = ["CL01", "CL02", "CL03", "CL03b", "CL04", "CL04b", "CL05", "CL06", "CL07", "CL08a", "CL08b"];
 
-    /// <summary>
-    /// 손 정답 pairing과 다르게 내는 묶음(C11 결정: 키가 그대로인 UPDATE는 행 수와 상관없이 BY_PK, SINGLE_ROW는 키가 바뀐 한 행 묶음).
-    /// 손 정답 안에서도 같은 모양(한 행, PK 그대로)이 CL07 A·CL04b Ch는 BY_PK, 아래 묶음은 SINGLE_ROW로 엇갈린다. 정정 기록은 오케스트레이터에 요청했다.
-    /// </summary>
-    static readonly Dictionary<(string Case, string Node), string> PairingOverrides = new()
-    {
-        [("CL07", "F:cl07.D:UPDATE")] = "BY_PK",
-        [("CL08a", "F:cl08.Acct:UPDATE#1")] = "BY_PK",
-        [("CL08b", "F:cl08.Acct:UPDATE#1")] = "BY_PK",
-        [("CL08b", "F:cl08.Acct:UPDATE#2")] = "BY_PK",
-        [("CL08b", "F:cl08.Acct:UPDATE#3")] = "BY_PK",
-        [("CL08b", "F:cl08.Acct:UPDATE#4")] = "BY_PK",
-    };
-
     static ExecutionSettings Settings(bool eval = false) => new() { ExecuteAsUser = PreviewUserSql.UserName, EvaluationMode = eval };
 
     async Task<(RawCapture Raw, CollectResult Collected, AnalysisResult Analysis, BaselineContext Ctx, ExceptNetDiffer Differ)> RunAsync(LabCase c, PreviewOptions? options = null)
@@ -75,7 +61,8 @@ public class CascadeLabTests(LabFixture lab)
             Assert.Equal(expected, actual);
             foreach (var ef in c.Firings.Where(f => f.Pairing is not null))
             {
-                var want = PairingOverrides.GetValueOrDefault((id, ef.Node), ef.Pairing!);
+                // 2주차 인계 8: 손 정답 pairing 6건(CL07 D, CL08a·b Acct)은 lab-1이 BY_PK로 정정했다(cases corrections[] 2026-11-11). 덮어쓰기 표는 지웠다.
+                var want = ef.Pairing!;
                 var firing = collected.Firings.Single(f => f.Table == ef.Table && f.Depth == ef.Depth && f.Operation.ToString().ToUpperInvariant() == ef.Operation);
                 var pairings = collected.RowChanges.Where(r => r.FiringId == firing.Id).Select(r => Pair(r.Pairing)).Distinct().ToList();
                 Assert.True(pairings.SequenceEqual([want]), $"{id} {ef.Node}: 기대 {want}, 실제 {string.Join(",", pairings)}");

@@ -1,0 +1,33 @@
+{
+  "id": "CL15",
+  "pattern": "CL15",
+  "title": "PK를 바꾸는 다중 행 UPDATE, 다른 유일 키 없음 (UNPAIRED)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl15.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "UPDATE cl15.Seat SET id = id + 100 WHERE id IN (1, 2);" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl15.Seat", "keyColumns": ["id"], "updated": [],
+        "deleted": [ { "key": { "id": 1 }, "causes": ["DIRECT"] }, { "key": { "id": 2 }, "causes": ["DIRECT"] } ],
+        "inserted": [ { "key": { "id": 101 }, "causes": ["DIRECT"] }, { "key": { "id": 102 }, "causes": ["DIRECT"] } ],
+        "basis": "PK 조인 기준이라 옛 키는 deleted, 새 키는 inserted(NetChange 규칙). 3은 그대로" }
+    ],
+    "firings": [
+      { "node": "F:cl15.Seat:UPDATE", "table": "cl15.Seat", "operation": "UPDATE", "rowCount": 2, "causeKind": "DIRECT", "depth": 1, "pairing": "UNPAIRED" }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl15.Seat:UPDATE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" }
+    ],
+    "observedOnly": []
+  },
+  "rationale": [
+    { "claim": "PK가 바뀐 다중 행 UPDATE는 inserted·deleted 짝을 정할 문서화된 방법이 없고, 바뀌지 않는 다른 유일 키도 없어 UNPAIRED다", "basis": "A12, E7" },
+    { "claim": "label은 값이 같아도 짝 근거가 아니다(유일 키가 아님)", "basis": "E7" }
+  ]
+}

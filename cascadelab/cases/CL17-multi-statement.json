@@ -1,0 +1,41 @@
+{
+  "id": "CL17",
+  "pattern": "CL17",
+  "title": "다중 문장, 뒤 문장이 앞 문장 결과에 의존 (문장 경계)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl17.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "INSERT INTO cl17.Txn (id, acct_id, amt) VALUES (900, 1, 50);" },
+    { "index": 2, "sql": "UPDATE a SET bal = a.bal + t.amt FROM cl17.Acct AS a INNER JOIN cl17.Txn AS t ON t.acct_id = a.id WHERE t.id = 900;" },
+    { "index": 3, "sql": "DELETE FROM cl17.Txn WHERE id = 900;" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" }, { "index": 2, "status": "ok" }, { "index": 3, "status": "ok" } ],
+    "changes": [
+      { "table": "cl17.Acct", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [ { "key": { "id": 1 }, "causes": ["DIRECT"], "changedColumns": ["bal"], "after": { "bal": 150 } } ],
+        "basis": "문장 2가 문장 1이 넣은 Txn 900(amt 50)을 조인해 Acct 1을 100 -> 150. 문장 1이 없으면 0행이다(의존). Acct 2는 그대로" },
+      { "table": "cl17.Txn", "keyColumns": ["id"], "inserted": [], "updated": [], "deleted": [],
+        "basis": "문장 1에서 넣고 문장 3에서 지워 순 변경이 없다(E24 최종 차이 보기). 시드 Txn 1·2는 그대로" }
+    ],
+    "firings": [
+      { "node": "F:cl17.Txn:INSERT", "statementIndex": 1, "table": "cl17.Txn", "operation": "INSERT", "rowCount": 1, "causeKind": "DIRECT", "depth": 1 },
+      { "node": "F:cl17.Acct:UPDATE", "statementIndex": 2, "table": "cl17.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1, "pairing": "BY_PK" },
+      { "node": "F:cl17.Txn:DELETE", "statementIndex": 3, "table": "cl17.Txn", "operation": "DELETE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl17.Txn:INSERT", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 1·5단계(문장 경계는 captureSeq 범위)" },
+      { "statementIndex": 2, "parent": "S", "child": "F:cl17.Acct:UPDATE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 1·5단계. 조인 UPDATE의 대상은 Acct(별칭 a)" },
+      { "statementIndex": 3, "parent": "S", "child": "F:cl17.Txn:DELETE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 1·5단계" }
+    ],
+    "observedOnly": []
+  },
+  "rationale": [
+    { "claim": "문장은 같은 트랜잭션 안에서 하나씩 실행되므로 앞 문장 결과가 뒤 문장에 보인다", "basis": "E9, D5 번호와 실행 의미" },
+    { "claim": "발동 보기에는 Txn INSERT·DELETE 묶음이 모두 있고 최종 차이 보기에는 Acct 1행만 있다", "basis": "E24, §6.2 NetChange" },
+    { "claim": "FK_cl17_Txn_Acct는 NO ACTION이라 연쇄 묶음이 없다", "basis": "§7.2 3단계 대상 FK(참조 동작이 있는 FK만)" }
+  ]
+}

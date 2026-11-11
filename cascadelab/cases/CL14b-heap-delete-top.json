@@ -1,0 +1,34 @@
+{
+  "id": "CL14b",
+  "pattern": "CL14",
+  "title": "힙 테이블 중복 행 가운데 하나 DELETE TOP (1)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl14.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "DELETE TOP (1) FROM cl14.Tag WHERE name = 'a';" }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "warnings": ["WARN_TOP_WITHOUT_ORDER"],
+    "changes": [
+      { "table": "cl14.Tag", "keyKind": "ROW", "keyColumns": [], "inserted": [], "updated": [], "deleted": [],
+        "multisetRemoved": [ { "row": { "name": "a", "qty": 1 }, "multiplicity": 1, "causes": ["DIRECT"] } ],
+        "multisetAdded": [],
+        "basis": "('a', 1) 두 행 가운데 하나가 지워진다. 두 행이 모든 열에서 같아 어느 행이 골리든 순 변경은 같다" }
+    ],
+    "firings": [
+      { "node": "F:cl14.Tag:DELETE", "table": "cl14.Tag", "operation": "DELETE", "rowCount": 1, "causeKind": "DIRECT", "depth": 1 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "S", "child": "F:cl14.Tag:DELETE", "kind": "DIRECT", "name": null, "confidence": "certain", "basis": "§7.2 5단계" }
+    ],
+    "observedOnly": []
+  },
+  "rationale": [
+    { "claim": "ORDER BY 없는 TOP은 행 선택이 비결정적이라 경고하고 실행한다", "basis": "D5 경고" },
+    { "claim": "다중집합 비교로는 같은 행 두 개 중 어느 것이 지워졌는지 구별할 필요가 없다", "basis": "E6" }
+  ]
+}
