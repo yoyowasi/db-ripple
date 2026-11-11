@@ -18,6 +18,14 @@ import type {
 
 const BASE = '/api'
 
+const UNREACHABLE_TEXT = 'API 서버(127.0.0.1:5080)에 연결할 수 없습니다. Host를 실행했는지 확인하세요.'
+
+/** 서버(platform-2)가 변경 요청의 출처를 확인하는 헤더. 없으면 403. */
+const CSRF_HEADER = 'X-DbRipple-Request'
+
+/** 서버 응답이 아닌 화면 쪽 예외를 ApiError로 감쌀 때 쓰는 상태. 0(네트워크 오류)과 구분해 "서버에 연결할 수 없음"으로 오인하지 않게 한다. */
+export const CLIENT_ERROR_STATUS = -1
+
 export class ApiError extends Error {
   readonly status: number
   readonly problem: ProblemDetails | null
@@ -39,9 +47,9 @@ export class ApiError extends Error {
     return this.problem?.rejects ?? []
   }
 
-  /** 서버에 닿지 못했다(네트워크, 프록시 대상 꺼짐). */
+  /** 서버에 닿지 못했다(네트워크 오류, 또는 Vite 프록시가 대상 꺼짐을 ProblemDetails 없는 500·502·504로 바꾼 경우). */
   get isUnreachable(): boolean {
-    return this.status === 0
+    return this.status === 0 || (this.problem === null && (this.status === 500 || this.status === 502 || this.status === 504))
   }
 }
 
@@ -66,7 +74,10 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
     if (s) url += '?' + s
   }
 
-  const headers: Record<string, string> = { Accept: 'application/json, application/problem+json' }
+  const headers: Record<string, string> = {
+    Accept: 'application/json, application/problem+json',
+    [CSRF_HEADER]: '1',
+  }
   let body: string | undefined
   if (opts.body !== undefined) {
     headers['Content-Type'] = 'application/json'
@@ -78,7 +89,7 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
     res = await fetch(url, { method, headers, body, signal: opts.signal })
   } catch (e) {
     if (isAbortError(e)) throw e
-    throw new ApiError(0, null, '서버에 연결할 수 없습니다. API 서버(127.0.0.1:5080)가 켜져 있는지 확인하세요.')
+    throw new ApiError(0, null, UNREACHABLE_TEXT)
   }
 
   const text = await res.text()
@@ -92,7 +103,9 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
   }
 
   if (!res.ok) {
-    const problem = (json && typeof json === 'object' ? (json as ProblemDetails) : null) ?? null
+    // ProblemDetails는 숫자 status를 가진 JSON 객체다. 프록시 오류(빈 본문·텍스트)는 problem 없음으로 둔다.
+    const problem =
+      json && typeof json === 'object' && typeof (json as ProblemDetails).status === 'number' ? (json as ProblemDetails) : null
     const message = problem?.title ?? problem?.detail ?? `HTTP ${res.status}`
     throw new ApiError(res.status, problem, message)
   }
@@ -174,13 +187,15 @@ export function conflictNeedsRefresh(reason: ConflictReason | undefined): boolea
 
 /** 사용자에게 보일 한 문단. 400이면 필드별 오류, 409면 사유 문장을 붙인다. */
 export function describeApiError(e: ApiError): string {
-  if (e.isUnreachable) return e.message
+  if (e.isUnreachable) return UNREACHABLE_TEXT
   const p = e.problem
   switch (e.status) {
     case 400: {
       const lines = Object.entries(p?.errors ?? {}).flatMap(([field, msgs]) => msgs.map((m) => `${field}: ${m}`))
       return lines.length ? `요청이 올바르지 않습니다. ${lines.join(' / ')}` : `요청이 올바르지 않습니다. ${e.message}`
     }
+    case 403:
+      return `요청이 거부되었습니다(403). ${p?.detail ?? p?.title ?? '요청 출처 확인 헤더가 없거나 허용되지 않은 출처입니다.'} 화면을 새로 고친 뒤 다시 시도하세요.`
     case 404:
       return '미리보기를 찾을 수 없습니다. 만료(30분)됐거나 적용·취소로 지워졌습니다.'
     case 409:
@@ -191,6 +206,8 @@ export function describeApiError(e: ApiError): string {
       return '서버가 아직 지원하지 않는 기능입니다.'
     case 503:
       return '샌드박스 DB에 연결할 수 없습니다(연결 끊김·시간 초과). 잠시 뒤 다시 시도하세요.'
+    case CLIENT_ERROR_STATUS:
+      return `화면 처리 중 오류가 났습니다: ${e.message}`
     default:
       return `서버 오류(${e.status}): ${p?.detail ?? e.message}`
   }

@@ -1,5 +1,6 @@
 using DbRipple.Contracts;
 using DbRipple.Core.Capture;
+using DbRipple.Core.Catalog;
 using static DbRipple.Apply.Tests.TestData;
 
 namespace DbRipple.Apply.Tests;
@@ -69,15 +70,86 @@ public sealed class ApplyMatcherTests
     }
 
     [Fact]
-    public void Ambiguous_identity_candidates_are_unpaired()
+    public void Same_value_identity_rows_pair_in_identity_order_and_children_follow()
     {
-        var preview = Record([Inserted("dbo.P", "100", P("100", "a", "x")), Inserted("dbo.P", "101", P("101", "a", "x"))], [Statement(1, 2, "dbo.P", ChangeOperation.Insert)]);
-        var actual = new List<NetChange> { Inserted("dbo.P", "200", P("200", "a", "y")), Inserted("dbo.P", "201", P("201", "a", "y")) };
+        // INSERT ... SELECT로 IDENTITY만 다른 같은 값 P 3행, 각 P를 가리키는 C 3행. 원본 목록 순서는 섞여 있어도 IDENTITY 오름차순으로 짝짓는다.
+        var preview = Record(
+            [
+                Inserted("dbo.P", "100", P("100", "a", "x1")), Inserted("dbo.P", "101", P("101", "a", "x1")), Inserted("dbo.P", "102", P("102", "a", "x1")),
+                Inserted("dbo.C", "500", C("500", "100", "1")), Inserted("dbo.C", "501", C("501", "101", "2")), Inserted("dbo.C", "502", C("502", "102", "3")),
+            ],
+            [Statement(1, 3, "dbo.P", ChangeOperation.Insert), Statement(2, 3, "dbo.C", ChangeOperation.Insert)]);
+        var actual = new List<NetChange>
+        {
+            Inserted("dbo.P", "202", P("202", "a", "x2")), Inserted("dbo.P", "200", P("200", "a", "x2")), Inserted("dbo.P", "201", P("201", "a", "x2")),
+            Inserted("dbo.C", "902", C("902", "202", "3")), Inserted("dbo.C", "900", C("900", "200", "1")), Inserted("dbo.C", "901", C("901", "201", "2")),
+        };
 
         var outcome = Match(preview, actual);
 
+        Assert.Empty(outcome.Mismatches);
+        var parents = outcome.IdentityPairs.Where(x => x.Table == "dbo.P").Select(x => (x.PreviewKey.Values[0], x.ActualKey.Values[0])).OrderBy(x => x.Item1).ToList();
+        Assert.Equal([("100", "200"), ("101", "201"), ("102", "202")], parents);
+        // 자식은 p_id를 각자 짝 매핑(100→200, 101→201, 102→202)으로 치환한 서명으로 짝지어진다
+        var children = outcome.IdentityPairs.Where(x => x.Table == "dbo.C").Select(x => (x.PreviewKey.Values[0], x.ActualKey.Values[0])).OrderBy(x => x.Item1).ToList();
+        Assert.Equal([("500", "900"), ("501", "901"), ("502", "902")], children);
+        Assert.Contains(ApplyMatcher.IdentityOrderLimitation, outcome.Limitations);
+    }
+
+    [Fact]
+    public void Same_value_identity_rows_with_different_counts_are_unpaired()
+    {
+        var preview = Record([Inserted("dbo.P", "100", P("100", "a", "x")), Inserted("dbo.P", "101", P("101", "a", "x"))], [Statement(1, 2, "dbo.P", ChangeOperation.Insert)]);
+        var actual = new List<NetChange> { Inserted("dbo.P", "200", P("200", "a", "y")), Inserted("dbo.P", "201", P("201", "a", "y")), Inserted("dbo.P", "202", P("202", "a", "y")) };
+
+        var outcome = Match(preview, actual, [Statement(1, 3, "dbo.P", ChangeOperation.Insert)]);
+
         Assert.Equal(2, outcome.Mismatches.Count(m => m.Kind == MismatchKind.IdentityUnpaired));
         Assert.Empty(outcome.IdentityPairs);
+        Assert.Empty(outcome.Limitations);
+    }
+
+    [Fact]
+    public void Same_value_identity_rows_out_of_order_children_are_row_value_mismatch()
+    {
+        // dbo.D(id int PK, p_id int FK → dbo.P.id): 키가 있는 비 IDENTITY 자식. 원본에서는 같은 값 P의 IDENTITY 순서와 자식 연결이 어긋났다.
+        var preview = Record(
+            [
+                Inserted("dbo.P", "100", P("100", "a", "x1")), Inserted("dbo.P", "101", P("101", "a", "x1")),
+                Inserted("dbo.D", "1", Row(("id", "1"), ("p_id", "100"))), Inserted("dbo.D", "2", Row(("id", "2"), ("p_id", "101"))),
+            ],
+            [Statement(1, 2, "dbo.P", ChangeOperation.Insert), Statement(2, 2, "dbo.D", ChangeOperation.Insert)]);
+        var actual = new List<NetChange>
+        {
+            Inserted("dbo.P", "200", P("200", "a", "x2")), Inserted("dbo.P", "201", P("201", "a", "x2")),
+            Inserted("dbo.D", "1", Row(("id", "1"), ("p_id", "201"))), Inserted("dbo.D", "2", Row(("id", "2"), ("p_id", "200"))),
+        };
+
+        var outcome = ApplyMatcher.Match(new MatchInput { Preview = preview, Actual = preview.Result.Statements, ActualNet = actual, Baseline = ContextWithD() });
+
+        Assert.Equal(2, outcome.IdentityPairs.Count(x => x.Table == "dbo.P"));
+        Assert.Contains(outcome.Mismatches, m => m.Kind == MismatchKind.RowValue && m.Table == "dbo.D" && m.Key!.Values[0] == "1" && m.Column == "p_id" && m.Expected == "200" && m.Actual == "201");
+        Assert.Contains(outcome.Mismatches, m => m.Kind == MismatchKind.RowValue && m.Table == "dbo.D" && m.Key!.Values[0] == "2" && m.Column == "p_id" && m.Expected == "201" && m.Actual == "200");
+        Assert.All(outcome.Mismatches, m => Assert.Equal(MismatchKind.RowValue, m.Kind));
+    }
+
+    /// <summary>기본 기준선 + dbo.D(id int PK, p_id int FK → dbo.P.id).</summary>
+    static BaselineContext ContextWithD()
+    {
+        var context = Context();
+        var c = context.Catalog;
+        var catalog = c with
+        {
+            Tables = [.. c.Tables, new CatalogTable(6, "dbo", "D", TemporalType.None, false)],
+            Columns = [.. c.Columns, new CatalogColumn(6, 1, "id", "int", false, false, false, false, false, null), new CatalogColumn(6, 2, "p_id", "int", false, false, false, false, false, null)],
+            KeyIndexes = [.. c.KeyIndexes, new CatalogIndexColumn(6, 1, "PK_D", true, true, 1, "id", false)],
+            ForeignKeys = [.. c.ForeignKeys, new CatalogForeignKeyColumn(101, "FK_D_P", 6, 1, "NO_ACTION", "NO_ACTION", false, false, 1, "p_id", "id")],
+        };
+        var manifest = context.Manifest with
+        {
+            Tables = [.. context.Manifest.Tables, new ManifestTable("dbo.D", true, new AuditOrderInfo("LAST", "LAST", "LAST"), [], [])],
+        };
+        return context with { Catalog = catalog, Manifest = manifest };
     }
 
     [Fact]

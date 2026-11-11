@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using System.Text.RegularExpressions;
 using DbRipple.Contracts;
 using DbRipple.Core.Capture;
@@ -33,6 +34,8 @@ public sealed record MatchOutcome
     public IReadOnlyList<string> VolatileIgnored { get; init; } = [];
     /// <summary>새 IDENTITY 행 짝.</summary>
     public IReadOnlyList<IdentityPair> IdentityPairs { get; init; } = [];
+    /// <summary>판정이 기댄 가정(verification.limitations에 더한다). 예: 같은 값 IDENTITY 행을 IDENTITY 순서로 짝지음.</summary>
+    public IReadOnlyList<string> Limitations { get; init; } = [];
 }
 
 /// <summary>
@@ -42,7 +45,9 @@ public sealed record MatchOutcome
 /// <item>테이블별 netSummary 다섯 건수가 같다(발동 단위가 아니라 최종 차이로 비교, 원본에는 감사 트리거가 없다).</item>
 /// <item>PK·UNIQUE 키 행은 비결정 열(RowChange.volatile + 매니페스트 volatileColumns)을 뺀 값이 모두 같다. 계산 열(derived)은 식이 결정적이므로 비교에 넣는다(E4).
 ///   다만 새 IDENTITY 값이나 그 짝 매핑으로 치환한 FK 값에 기대는 계산 열(예: AW SalesOrderNumber = 'SO' + SalesOrderID)은 그 값만 짝 값으로 바꿔 비교한다.</item>
-/// <item>새 IDENTITY 행은 비결정 열을 뺀 값으로 짝을 짓고, 그 IDENTITY를 참조하는 자식 FK 값은 짝 매핑으로 치환해 비교한다. 짝이 없거나 여럿이면 IDENTITY_UNPAIRED.
+/// <item>새 IDENTITY 행은 비결정 열을 뺀 값으로 짝을 짓고, 그 IDENTITY를 참조하는 자식 FK 값은 짝 매핑으로 치환해 비교한다.
+///   같은 서명 행이 미리보기·원본에 같은 개수로 있으면 각 쪽을 IDENTITY 오름차순으로 정렬해 순서대로 짝짓는다(같은 문장이 같은 순서로 IDENTITY를 매긴다는 가정, Limitations에 남김).
+///   개수가 다르거나 IDENTITY 값으로 순서를 정할 수 없으면 IDENTITY_UNPAIRED. 순서가 어긋나 자식이 다른 부모를 가리키면 자식 쪽 값 비교(ROW_VALUE)나 짝짓기(IDENTITY_UNPAIRED)에서 잡힌다.
 ///   부모 테이블을 먼저 짝짓고(FK 위상 순서), 아직 짝짓지 않은 테이블(자기 참조 포함)을 가리키는 FK 열은 짝짓기 서명에서 빼고 값 비교에서 확인한다.</item>
 /// <item>미리보기에 없는 테이블에 변경이 있으면 UNEXPECTED_TABLE.</item>
 /// <item>비결정 열은 존재(NULL 여부)와 형식만 비교한다(VOLATILE_FORMAT).</item>
@@ -52,6 +57,10 @@ public sealed record MatchOutcome
 /// </summary>
 public static class ApplyMatcher
 {
+    /// <summary>같은 값 IDENTITY 행을 순서로 짝지었을 때 verification.limitations에 남기는 가정.</summary>
+    public const string IdentityOrderLimitation =
+        "비결정 열을 뺀 값이 같은 새 IDENTITY 행은 IDENTITY 순서로 짝지음(같은 문장이 같은 순서로 IDENTITY를 매긴다는 가정)";
+
     /// <summary>D7 판정.</summary>
     public static MatchOutcome Match(MatchInput input)
     {
@@ -100,6 +109,7 @@ public static class ApplyMatcher
             Mismatches = list,
             VolatileIgnored = rows.VolatileIgnored,
             IdentityPairs = rows.IdentityPairs,
+            Limitations = rows.Limitations,
         };
     }
 
@@ -134,7 +144,7 @@ public static class ApplyMatcher
 }
 
 /// <summary>행 단위 대조 결과.</summary>
-internal sealed record RowMatchResult(IReadOnlyList<string> VolatileIgnored, IReadOnlyList<IdentityPair> IdentityPairs);
+internal sealed record RowMatchResult(IReadOnlyList<string> VolatileIgnored, IReadOnlyList<IdentityPair> IdentityPairs, IReadOnlyList<string> Limitations);
 
 /// <summary>
 /// 한 미리보기·기준선에 대한 D7 3·4·6 규칙 재료(테이블 정보, 비결정 열, IDENTITY를 가리키는 FK)와 행 비교. KEYSET 대조도 값 비교에 쓴다.
@@ -313,6 +323,7 @@ internal sealed class MatchRules
         var consumedPreview = new HashSet<NetChange>(ReferenceEqualityComparer.Instance);
         var consumedActual = new HashSet<NetChange>(ReferenceEqualityComparer.Instance);
         var pairedRows = new List<(string Table, NetChange Preview, NetChange Actual, Dictionary<string, string> Replacements)>();
+        var orderedPairing = false;
 
         // D7 4: 새 IDENTITY 행 짝짓기(부모 먼저)
         var identityTables = preview.Concat(actual)
@@ -345,18 +356,25 @@ internal sealed class MatchRules
             foreach (var (sig, ps) in previewGroups)
             {
                 var candidates = actualGroups.GetValueOrDefault(sig) ?? [];
-                if (ps.Count == 1 && candidates.Count == 1)
+                // 같은 서명 행이 양쪽에 같은 개수면 IDENTITY 오름차순으로 순서대로 짝짓는다(같은 문장이 같은 순서로 IDENTITY를 매긴다는 가정).
+                // IDENTITY 값으로 순서를 정할 수 없으면(값 없음·정수 아님·중복) 짝짓지 않는다.
+                if (ps.Count == candidates.Count && OrderByIdentity(ps, identityColumns[0]) is { } orderedPreview
+                    && OrderByIdentity(candidates, identityColumns[0]) is { } orderedActual)
                 {
-                    var (pv, av) = (ps[0], candidates[0]);
-                    var replacements = new Dictionary<string, string>(StringComparer.Ordinal);
-                    foreach (var col in identityColumns)
-                        if (pv.After?.GetValueOrDefault(col) is { } from && av.After?.GetValueOrDefault(col) is { } to)
-                        {
-                            idMap[(table, col, from)] = to;
-                            if (from != to) replacements.TryAdd(from, to);
-                        }
-                    pairs.Add(new IdentityPair { Table = table, PreviewKey = pv.Key, ActualKey = av.Key });
-                    pairedRows.Add((table, pv, av, replacements));
+                    if (ps.Count > 1) orderedPairing = true;
+                    for (var i = 0; i < orderedPreview.Count; i++)
+                    {
+                        var (pv, av) = (orderedPreview[i], orderedActual[i]);
+                        var replacements = new Dictionary<string, string>(StringComparer.Ordinal);
+                        foreach (var col in identityColumns)
+                            if (pv.After?.GetValueOrDefault(col) is { } from && av.After?.GetValueOrDefault(col) is { } to)
+                            {
+                                idMap[(table, col, from)] = to;
+                                if (from != to) replacements.TryAdd(from, to);
+                            }
+                        pairs.Add(new IdentityPair { Table = table, PreviewKey = pv.Key, ActualKey = av.Key });
+                        pairedRows.Add((table, pv, av, replacements));
+                    }
                     continue;
                 }
                 foreach (var n in ps)
@@ -366,7 +384,9 @@ internal sealed class MatchRules
                         Expected = ps.Count.ToString(CultureInfo.InvariantCulture), Actual = candidates.Count.ToString(CultureInfo.InvariantCulture),
                         Message = candidates.Count == 0
                             ? $"{table}의 새 IDENTITY 행과 비결정 열을 뺀 값이 같은 원본 행이 없음"
-                            : $"{table}의 새 IDENTITY 행 짝 후보가 하나로 정해지지 않음(미리보기 {ps.Count}행, 원본 {candidates.Count}행)",
+                            : ps.Count != candidates.Count
+                                ? $"{table}의 비결정 열을 뺀 값이 같은 새 IDENTITY 행 개수가 다름(미리보기 {ps.Count}행, 원본 {candidates.Count}행)"
+                                : $"{table}의 같은 값 새 IDENTITY 행을 IDENTITY 순서로 짝지을 수 없음(IDENTITY 값이 없거나 정수가 아니거나 겹침)",
                     });
             }
             foreach (var (sig, cs) in actualGroups)
@@ -431,7 +451,26 @@ internal sealed class MatchRules
             }
         }
 
-        return new RowMatchResult(ignored.ToList(), pairs);
+        return new RowMatchResult(ignored.ToList(), pairs, orderedPairing ? [ApplyMatcher.IdentityOrderLimitation] : []);
+    }
+
+    /// <summary>
+    /// 새 IDENTITY 행을 IDENTITY 값(정수) 오름차순으로 정렬한 목록. 한 행이면 그대로. 값이 없거나 정수가 아니거나 겹치면 null(순서를 정할 수 없음).
+    /// </summary>
+    static List<NetChange>? OrderByIdentity(List<NetChange> rows, string identityColumn)
+    {
+        if (rows.Count == 1) return rows;
+        var keyed = new List<(BigInteger Value, NetChange Row)>(rows.Count);
+        foreach (var n in rows)
+        {
+            if (n.After?.GetValueOrDefault(identityColumn) is not { } text
+                || !BigInteger.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value)) return null;
+            keyed.Add((value, n));
+        }
+        keyed.Sort((x, y) => x.Value.CompareTo(y.Value));
+        for (var i = 1; i < keyed.Count; i++)
+            if (keyed[i].Value == keyed[i - 1].Value) return null;
+        return keyed.Select(k => k.Row).ToList();
     }
 
     Dictionary<(NetChangeKind Kind, string Image), long> MultisetCounts(

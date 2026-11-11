@@ -2,7 +2,7 @@
 // 입력이 바뀌면 첫 페이지로 돌아가고, 늦게 도착한 응답은 버린다.
 import { ref, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
-import { ApiError, getRows, isAbortError } from '../api/client'
+import { ApiError, CLIENT_ERROR_STATUS, getRows, isAbortError } from '../api/client'
 import type { NetChange, RowChange, RowPage, RowView } from '../api/types'
 
 export type AnyRowPage = RowPage<RowChange> | RowPage<NetChange>
@@ -41,10 +41,10 @@ export function useRowPage(
     loading.value = true
     error.value = null
     try {
-      // 발동 보기만 묶음으로 거른다. 최종 차이 보기는 전체를 읽고, 선택한 묶음은 화면에서 강조한다.
+      // 두 보기 모두 서버가 묶음으로 거른다(net은 explainedBy.firingIds에 포함된 행).
       const res = await getRows(
         id,
-        { view: view.value, firingId: view.value === 'event' ? firingId.value : null, offset: offset.value, limit: limit.value },
+        { view: view.value, firingId: firingId.value, offset: offset.value, limit: limit.value },
         ctrl.signal,
       )
       if (mine !== seq) return
@@ -52,7 +52,7 @@ export function useRowPage(
     } catch (e) {
       if (isAbortError(e) || mine !== seq) return
       page.value = null
-      error.value = e instanceof ApiError ? e : new ApiError(0, null, String(e))
+      error.value = e instanceof ApiError ? e : new ApiError(CLIENT_ERROR_STATUS, null, String(e))
     } finally {
       if (mine === seq) loading.value = false
     }
@@ -60,7 +60,7 @@ export function useRowPage(
 
   // 조건이 바뀌면 첫 페이지부터. 이미 0이면 바로 읽고, 아니면 offset 감시가 읽는다(중복 요청 방지).
   watch(
-    [previewId, view, () => (view.value === 'event' ? firingId.value : null), limit, enabled],
+    [previewId, view, firingId, limit, enabled],
     () => {
       if (offset.value !== 0) offset.value = 0
       else void load()

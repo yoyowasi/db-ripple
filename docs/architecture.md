@@ -1,6 +1,6 @@
 # SQL 실행 전 변경 미리보기 도구 — 아키텍처 설계
 
-> 상태: 설계 v1.4 (2주차 구현 반영, 2026-11-10: SP7 통과, 컴포넌트 시그니처·실행 사용자·오류 판정 규칙 확정. 바꾼 곳마다 "v1.4"를 적었고, 세부 결정은 [week2-plan.md](week2-plan.md) §9에 있다) · v1.3 (1주차 실측 반영, 2026-11-10: SP0~SP6·SP10 결과로 D1·D3·D4 확정, H1~H5 성립. 바꾼 곳마다 "v1.3"과 근거 스파이크를 적었다) · v1.2 작성 2026-11-06(독립 검토 2회 반영) · 조사 기준일 2026-11-06
+> 상태: 설계 v1.5 (3·4주차 코드 반영, 2026-11-11: 3·4주차 범위 코드 완료, **DB 테스트·평가 실행 전**. [적용](C15)·실행 봉투 공유·/catalog/schema·교차 사이트 요청 방어·프로시저 펼치기·M3~M5와 대조군 B0·B2 정의를 확정했다. 바꾼 곳마다 "v1.5"를 적었고, 세부 결정은 [week3-plan.md](week3-plan.md) §2 AD6~AD11, §9 Q24·Q28~Q42에 있다. 평가 보고서 틀은 [evaluation.md](evaluation.md)) · v1.4 (2주차 구현 반영, 2026-11-10: SP7 통과, 컴포넌트 시그니처·실행 사용자·오류 판정 규칙 확정. 바꾼 곳마다 "v1.4"를 적었고, 세부 결정은 [week2-plan.md](week2-plan.md) §9에 있다) · v1.3 (1주차 실측 반영, 2026-11-10: SP0~SP6·SP10 결과로 D1·D3·D4 확정, H1~H5 성립. 바꾼 곳마다 "v1.3"과 근거 스파이크를 적었다) · v1.2 작성 2026-11-06(독립 검토 2회 반영) · 조사 기준일 2026-11-06
 > 범위: 졸업작품, 1인, 약 1달(AI 보조), MVP를 먼저 만들고 계속 개선 · 공개 샘플 DB만 사용
 
 **ID 규칙**
@@ -248,7 +248,7 @@ flowchart LR
 | C12 | 최종 차이 계산기 | 스냅샷과 현재 DB의 테이블별 순 변경을 계산한다. PK로 조인하고, 힙은 다중집합으로 비교하고, 형식을 정규화한다. **열린 트랜잭션을 가진 연결을 받아 그 연결에서 계산한다**(미커밋 변경을 보기 위해). 제품 전용이며 평가 오라클과 코드를 공유하지 않는다. | `Diff(connection, liveDb, snapshotDb, tables)` → `NetChange[]` |
 | C13 | 원인 귀속·그래프 조립 | §7의 단계로 부모 찾기, 원인 종류·확신도 판정, 잔차 귀속을 하고 그래프 DTO를 만든다. | `Resolve(firings, net, catalog, manifest)` → `CausalModel`, `GraphDto` |
 | C14 | 미리보기 저장소 | 미리보기 결과를 메모리와 JSON 파일에 보관한다(활성 1건, 만료 30분). 행 페이지 조회와 내보내기를 제공한다. | `Save`, `Get`, `Page`, `Export` |
-| C15 | 적용 서비스 | §5.3 절차와 일치 규칙(IDENTITY 짝 매핑 포함)을 실행한다. | `Apply(previewId)` → `ApplyResult` |
+| C15 | 적용 서비스 | §5.3 절차와 일치 규칙(IDENTITY 짝 매핑 포함)을 실행한다. | `Apply(previewId)` → `ApplyResult`. v1.5: `ApplyAsync(previewId, request, ct)` → `ApplyResult?` |
 | C16 | 평가 하네스 | 별도 프로젝트다. 오라클 사본 실행(제품 분석기를 거치지 않는 원문 경로 포함), 독립 해시 비교기와 그 자체 검증, 평가 훅, 지표 계산, CSV 출력을 맡는다(§10). | CLI 또는 테스트 실행 |
 
 **v1.4(2026-11-10, 2주차 구현):** 위 인터페이스를 구현하면서 다음을 바꿨다. 계약은 `src/DbRipple.Contracts`, 프로젝트 배치는 week2-plan.md §1에 있다.
@@ -259,6 +259,19 @@ flowchart LR
 - **C11:** 계산 열은 RowChange.derived(COMPUTED)로 둔다(Q7). 키가 바뀐 짝의 key는 새 키이고, 키가 그대로인 UPDATE는 행 수와 상관없이 BY_PK/BY_UNIQUE다(Q11).
 - **C12:** 계산 열은 서버 비교 조건에서 뺀다(SP7: 비지속 계산 열 오버플로 8115 회피). §6.1 JSON→문자열 규칙은 C11과 같은 Core `AuditJson`을 쓴다.
 - **C14:** `Remove`(POST /api/previews/{id}/cancel 204, 없으면 404)를 더했다.
+
+**v1.5(2026-11-11, 3·4주차 코드):** 결정 기록은 week3-plan.md §2(AD6~AD11)와 §9다. 계약 추가는 모두 비파괴(필드·형식 추가만)다.
+- **C15 시그니처(Q24):** `IApplyService.ApplyAsync(previewId, ApplyRequest request, ct)` → `ApplyResult?`. 미리보기가 없거나 만료면 null(404)이고, 잠금 충돌·구축 중은 `PreviewConflictException`(409)이다. 선행 조건 위반·드리프트·불일치·실행 오류는 예외가 아니라 결과 상태다. `ApplyRequest`는 선택 필드 `sqlHash` 하나다. 생성자는 `(connectionString, ApplySettings, IPreviewStore, ISandboxManager, IBatchAnalyzer, IStatementRunner, INetDiffer, TimeProvider)`다. 근거: `src/DbRipple.Contracts/Apply.cs`, `src/DbRipple.Apply/ApplyService.cs`.
+- **AD6 실행 봉투 공유:** `IStatementRunner`(`PrepareAsync`, `RunAsync`)를 C10과 C15가 함께 쓴다. 구현은 Execution `StatementRunner`(매개변수 없는 생성자)다. 순서는 EXECUTE AS → 실행 → @@TRANCOUNT·XACT_STATE·CURRENT_TRANSACTION_ID 확인 → doomed면 ROLLBACK → REVERT이고, 오류 판정은 §5.2 Q27 규칙(ErrorRules)을 재사용한다. 연결이 끊기면 `SandboxUnavailableException`이다. 결과 `StatementRunOutcome`에 `TransactionOpen`, `TransactionReplaced`, `TriggerRollbackConfirmed`(3609 보정용)를 담는다. PreviewExecutor가 이 클래스를 쓰도록 바꾸는 일은 회귀 테스트 뒤로 미뤘다. 그때까지 두 곳의 규칙을 함께 고친다. 근거: `src/DbRipple.Contracts/StatementRunner.cs`, `src/DbRipple.Execution/StatementRunner.cs`.
+- **AD7 Apply 참조:** Apply 프로젝트는 Contracts만 참조하고 Execution·Diff를 참조하지 않는다(Core의 스냅샷 SQL·감사 저장소 판별은 Contracts를 거쳐 쓴다). 실행기와 차이 계산기는 생성자로 받는다(`src/DbRipple.Apply/DbRipple.Apply.csproj`). Host가 조립한다. Apply와 Eval의 IDENTITY 짝 매핑은 서로 독립 구현이다(§10.3).
+- **C5:** `GET /api/catalog/schema`와 `POST /api/previews/{id}/apply`를 실제 엔드포인트로 바꿨다(2주차에는 501). 예외 → 상태 코드는 AD9다(§6.4 v1.5). `/api` 아래 변경 요청에 교차 사이트 요청 방어를 더했다(§6.4 v1.5). 근거: `src/DbRipple.Api/DbRippleApi.cs`, `src/DbRipple.Api/Middleware/`.
+- **AD8 스키마 공급(Q23·Q25·Q37):** /catalog/schema는 Preview `CatalogSchemaProvider`가 만든다. sqlType은 Core를 바꾸지 않고 샌드박스 `sys.columns` 자체 조회와 `SqlTypes.Format`으로 만든다. 길이·정밀도를 읽지 못하면 형식 이름만 두고 그 결과는 캐시하지 않는다. 기준선(BaselineAt + 매니페스트 버전)마다 캐시한다. 행 DTO에는 형식을 싣지 않고 프런트가 스키마로 찾는다. 근거: `src/DbRipple.Contracts/CatalogSchema.cs`, `src/DbRipple.Preview/CatalogSchemaProvider.cs`.
+- **AD10 단일 잠금:** 미리보기와 [적용]은 같은 잠금(`AcquirePreviewLockAsync`)을 쓴다. 새로 고침(`StartRefresh`)은 잠금을 푼 뒤 시작한다.
+- **C6·C7(인계 1):** C7이 프로시저 모듈(`sys.sql_modules`)을 읽고(DbCatalog 끝에 기본값 null인 매개변수로 추가), C6 TriggerAnalyzer가 트리거가 부르는 프로시저를 깊이 4까지 펼친다. `TriggerStaticInfo`에 `ExpandedProcedureCalls`, `UnresolvedProcedureCalls`를 더했다. 귀속 규칙은 §7.2 4단계 v1.5다.
+- **C10(인계 7, Q31):** 실패 경로의 롤백 뒤 비교가 예외로 끝나면 던지지 않고 `RawCapture`·`PreviewResult`의 `residualCheckFailed = true`, `residualCheckMessage`에 담고 샌드박스를 오염으로 둔다.
+- **C10 행 수(Q33):** 미리보기도 [적용]과 같이 문장 끝 `SELECT ROWCOUNT_BIG();` 값을 `rowsAffected`로 쓴다(D7 v1.5).
+- **그대로 둔 것:** 직접 대상 트리거의 SAVE TRAN·균형 잡힌 BEGIN…COMMIT은 거부를 유지한다(Q34, D5 "판정할 수 없으면 닫힌 쪽"). 대소문자만 바꾸는 키 UPDATE는 DB 정렬 규칙대로 UPDATED로 둔다(Q35, 평가 오라클을 정렬 규칙에 맞춤, §10.4 v1.5).
+- **C1~C4 프런트(Q41):** `web/`의 Vue 3 앱이다. 타입은 week3-plan.md §5를 손으로 옮긴 `web/src/api/types.ts`이고, OpenAPI 생성 타입과의 대조는 테스트 라운드에서 한다.
 
 ## 5. 데이터 흐름
 
@@ -334,8 +347,8 @@ sequenceDiagram
   participant PRE as AW_Origin_pre
   participant ND as 최종 차이 계산기
   U->>API: [적용]
-  API->>AS: 적용(previewId)
-  AS->>AS: 선행 조건, 환경 지문 확인
+  API->>AS: 적용(previewId, request)
+  AS->>AS: 잠금, 선행 조건, 환경 지문, 재분석
   AS->>PRE: 남은 스냅샷 삭제, 파일별 경로로 원본 스냅샷 생성
   AS->>ORG: 전용 연결, BEGIN TRAN(도구 계정)
   AS->>ORG: before 행을 UPDLOCK, HOLDLOCK으로 읽고 비교(드리프트)
@@ -349,9 +362,10 @@ sequenceDiagram
   else 불일치 또는 드리프트
     AS->>ORG: ROLLBACK
   end
+  AS->>AS: 커밋이면 잠금 안에서 미리보기 삭제
   AS->>PRE: 스냅샷 삭제
+  AS->>AS: 잠금 해제, 원본이 바뀌었으면 샌드박스 기준선 새로 고침 시작
   AS-->>API: 결과 상태와 검증 내역
-  AS->>AS: 샌드박스 기준선 새로 고침 예약
 ```
 
 **선행 조건(하나라도 어기면 `precondition_failed`)**
@@ -360,10 +374,11 @@ sequenceDiagram
 - SQL 해시가 미리보기와 같다.
 - 미리보기를 만든 지 30분(설정값) 안이다.
 - 원본과 샌드박스의 환경 지문이 같다.
+- v1.5: 원본에 실행 사용자가 있다(Q30). 코드와 기준선 변경 처리는 아래 v1.5 표에 있다.
 
 **드리프트 검사:** 미리보기에 나온 before 행이 원본에서 바뀌었는지 확인하고, 그 행을 커밋까지 잠근다. 다음 두 가지는 이 검사로 잡지 못한다. 기준선 이후 원본에 새로 생겨 WHERE를 만족하게 된 행, 그리고 스냅샷 생성 직후의 변경이다. 이것들은 커밋 전 최종 차이 대조가 잡고, 결과는 `rolled_back_mismatch`가 된다.
 
-**원본 스냅샷을 만들 수 없을 때(FILESTREAM 등, A14)** 검증 모드를 `KEYSET`으로 낮추고 결과에 표시한다.
+**원본 스냅샷을 만들 수 없을 때(FILESTREAM 등, A14)** 검증 모드를 `KEYSET`으로 낮추고 결과에 표시한다. v1.5: 이름 충돌·권한 오류는 낮추지 않고 `error`다(아래 v1.5 표).
 
 - BEGIN TRAN 직후 모든 사용자 테이블의 `COUNT_BIG(*)`를 읽고, 실행 뒤 건수 변화와 비교한다.
 - 미리보기에 나온 키 집합의 after 값을 비교한다.
@@ -372,6 +387,33 @@ sequenceDiagram
 **트리거가 거부하면** 트랜잭션은 이미 끝난 상태다. 원본 스냅샷과 비교해 롤백 뒤 남은 변경을 찾아 결과에 보이고(A22), 상태는 `error`다.
 
 열린 트랜잭션 안에서 스냅샷과 미커밋 상태를 비교할 수 있는지는 SP7로 확인한다. **v1.4:** SP7 통과. 독립 확인 10/10이고, AW 71개 테이블 기준 열린 트랜잭션 안 p50은 1.55~1.65초다([spikes/SP7.md](spikes/SP7.md)).
+
+**v1.5(2026-11-11, C15 구현, DB 테스트 전):** 구현 순서는 `src/DbRipple.Apply/ApplyService.cs` 클래스 주석의 12단계이고 위 그림 순서와 같다. 보완한 규칙은 다음과 같다.
+
+| 항목 | 규칙 | 근거(코드) |
+|---|---|---|
+| 잠금 | 미리보기와 같은 잠금을 잡은 뒤 저장소에서 미리보기를 다시 읽는다. 동시 적용이 이미 지운 건을 다시 적용하지 않기 위해서다(AD10). 잠금 충돌·구축 중은 409다. | `ApplyService.ApplyAsync` |
+| 선행 조건(Q28) | 아래 다섯 코드다. 하나라도 어기면 `precondition_failed`이고 원본에는 아무것도 하지 않는다. | `ApplyService.CheckPreconditionsAsync`, `ApplyPrecondition` |
+| 기준선 변경 | 미리보기를 만든 뒤 기준선이 바뀌었으면(백업 완료 시각이나 DB 이름이 다름) `PREVIEW_EXPIRED`다. 30분이 지난 경우와 같은 코드다. | 같은 곳 |
+| 재분석 | 문장 원문을 얻으려고 다시 분석한다. 거부되거나 문장 수·번호·종류·대상이 미리보기와 다르면 `SQL_HASH_MISMATCH`(메시지로 구분)다. | `ApplyService.SameStatements` |
+| 원본 실행 사용자(Q30) | 원본에 `dbr_preview_user`가 없으면 `EXECUTE_AS_USER_MISSING`이다. [적용] 중에는 원본에 DDL을 하지 않는다. 사용자는 원본 준비 단계(`scripts/restore-aw-origin.ps1`)에서 멱등으로 만든다. 실제 운영 DB라면 미리 만들어 두는 설정 단계에 해당한다. | `OriginDatabase.UserExistsAsync`, `scripts/restore-aw-origin.ps1` |
+| 원본 스냅샷 실패 | 스냅샷을 만들 수 없는 DB(A14: FILESTREAM 등, 그 밖의 SQL 오류)일 때만 `KEYSET`으로 낮추고 `limitations`에 이유를 적는다. 이름 충돌(50001·1801)·권한 오류(262·229·230·297·300·916·15247)·원본 파일 없음은 설정 문제이므로 낮추지 않고 실행 없이 `error`다. 권한 오류 번호는 문서 기준이고 실측 전이다. `ForceKeyset` 설정은 테스트·데모 전용이다. | `ApplySteps.cs` `OriginSnapshot`, `SnapshotOutcome` |
+| 드리프트 | 미리보기 최종 차이의 before 행(UPDATED·DELETED·MULTISET_REMOVED)을 UPDLOCK, HOLDLOCK으로 읽어 비교한다. 다르면 실행하지 않고 ROLLBACK, `drift_detected`다. | `ApplyService.ExecuteAsync` |
+| 문장 실패 | 문장이 ok가 아니거나, 트랜잭션이 끝났거나, 트랜잭션 ID가 바뀌면 ROLLBACK한 뒤 롤백 뒤 남은 변경을 원본 스냅샷과 비교하고 `error`다. 남은 변경이 있는데 `TriggerRollbackConfirmed = false`면 그 문장을 `failed`로 바꾼다(3609 보정). 비교가 예외면 `residualCheckFailed = true`이고, KEYSET은 스냅샷이 없어 늘 `residualCheckFailed = true`다. | `ApplyService.FailAsync`, `ResidualAsync` |
+| 검증 중 예외 | 문장은 모두 성공했고 커밋 전이므로 ROLLBACK하고 `error`다(원본은 실행 전 상태). | `ApplyService.ExecuteAsync` |
+| COMMIT 예외 | 서버가 커밋을 확정한 뒤 응답 전에 연결이 끊겼을 수 있으므로 **커밋 여부 불명**으로 본다. 상태는 `error`이고 메시지와 `limitations`에 "커밋 여부 불명"을 적는다. 닫힌 쪽으로 커밋과 같이 다룬다: 이 미리보기의 재적용을 막고, 저장소에서 지우고, 새로 고침을 시작한다. | `ApplyService.ExecuteAsync`, `MarkAppliedAsync` |
+| 커밋 뒤 | 미리보기를 **잠금 안에서** 저장소에서 지운다(Q36). 잠금을 푼 직후 같은 건이 다시 적용되지 않게 하려는 것이다. 이 서버 프로세스는 커밋한 id를 따로 기억해 저장소 삭제가 실패해도 다시 적용하지 않는다(404). 그 밖의 상태는 미리보기를 남겨 둔다. | `ApplyService.MarkAppliedAsync` |
+| 새로 고침 | 잠금을 푼 뒤, 원본이 바뀌었을 수 있으면(committed, 커밋 여부 불명, 롤백 뒤 남은 변경 있음, 남은 변경 검사 실패) `StartRefresh()`를 부르고 `sandboxRefreshStarted = true`다. 문장을 하나라도 실행한 뒤 예외로 끝나면 새로 고침을 시작하고 예외를 다시 던진다. | `ApplyService.ApplyAsync` |
+
+선행 조건 코드(Q28):
+
+| 코드 | 뜻 |
+|---|---|
+| `PREVIEW_NOT_OK` | 미리보기 상태가 ok가 아니다. truncated(D8 상한 초과)도 여기서 막는다. |
+| `SQL_HASH_MISMATCH` | 저장된 원문의 해시, `PreviewResult.sqlHash`, 요청의 `sqlHash`(보냈을 때) 가운데 다른 것이 있다. 재분석 결과가 달라도 이 코드다. |
+| `PREVIEW_EXPIRED` | 만든 지 30분(설정값)이 지났거나, 기준선이 바뀌었다. 저장소가 이미 지운 건은 404다. |
+| `FINGERPRINT_MISMATCH` | 원본·샌드박스·미리보기의 환경 지문이 같지 않다. |
+| `EXECUTE_AS_USER_MISSING` | 원본에 실행 사용자가 없다(Q30). |
 
 ### 5.4 취소와 새로 고침
 
@@ -708,12 +750,12 @@ INSERT 예시(비결정 열):
 |---|---|---|
 | `GET /api/sandbox` | — | `SandboxStatus` |
 | `POST /api/sandbox/refresh` | — | 202 후 상태 조회 |
-| `GET /api/catalog/schema` | — | 자동완성용 테이블·열 목록 |
+| `GET /api/catalog/schema` | — | 자동완성용 테이블·열 목록. v1.5: 200 `CatalogSchema`, 기준선이 없거나 구축 중이면 409 |
 | `POST /api/analyze` | `{ sql }` | `AnalysisResult`(문장, 거부, 경고, `Diagnostic[]`) |
 | `POST /api/previews` | `{ sql, options: { imageCap } }` | 200 `PreviewResult`. 거부면 422 ProblemDetails |
 | `GET /api/previews/{id}` | — | `PreviewResult` |
 | `GET /api/previews/{id}/rows` | `firingId`, `view=event\|net`, `offset`, `limit` | `RowPage` |
-| `POST /api/previews/{id}/apply` | — | `ApplyResult` |
+| `POST /api/previews/{id}/apply` | — (v1.5: 선택 `{ sqlHash }`) | `ApplyResult`. v1.5: 상태 5종 모두 200, 없거나 만료면 404, 409, 500, 503 |
 | `POST /api/previews/{id}/cancel` | — | 204 |
 | `GET /api/previews/{id}/export` | — | 결과 JSON 파일(평가·제출용) |
 
@@ -765,6 +807,63 @@ MVP의 미리보기 요청은 끝날 때까지 기다리는 동기 방식이다.
 - `status`: `committed`, `rolled_back_mismatch`, `drift_detected`, `precondition_failed`, `error`
 - `verification.mode`: `SNAPSHOT_NETDIFF` 또는 `KEYSET`
 
+**v1.5 ApplyResult 확장(Q24·Q28·Q29·Q31, 근거 `src/DbRipple.Contracts/Apply.cs`):** 위 예시의 필드는 그대로 두고 다음을 더했다. 응답 JSON은 ContractJson 규칙(camelCase, 열거형은 설계 문자열, null 속성도 포함)을 따른다.
+
+| 필드 | 형식 | 뜻 |
+|---|---|---|
+| `previewId`, `finishedAt` | 문자열, ISO 8601 | 적용한 미리보기 id와 처리 끝 시각 |
+| `preconditionFailures` | 코드 배열 | `precondition_failed`일 때 어긴 조건(§5.3 v1.5 표) |
+| `statements` | `StatementResult[]` | 원본에서의 문장 결과(`captureSeqRange`는 늘 null). 실행 전에 끝났으면 빈 배열 |
+| `message` | 문자열 또는 null | 사람이 읽는 요약(오류 원인, 스냅샷 실패 이유, 커밋 여부 불명) |
+| `sandboxRefreshStarted` | bool | 원본이 바뀌었을 수 있어 새로 고침을 시작했는지 |
+| `verification.driftRows[]` | `{ table, key, kind, columns, expected, actual, expectedMultiplicity, actualMultiplicity }` | `kind`: `CHANGED`, `MISSING`, `MULTISET_COUNT`(키 없는 테이블) |
+| `verification.netSummaryMatch` | bool 또는 null | 대조까지 가지 못했거나 KEYSET이면 null |
+| `verification.actualNetSummary` | `NetSummaryRow[]` | 원본 실제 순 변경 건수 |
+| `verification.mismatches[]` | `{ kind, statementIndex, table, key, column, expected, actual, message }` | `kind`: `STATEMENT_ROW_COUNT`, `NET_SUMMARY`, `ROW_VALUE`, `ROW_MISSING`, `ROW_UNEXPECTED`, `IDENTITY_UNPAIRED`, `UNEXPECTED_TABLE`, `VOLATILE_FORMAT`, `KEYSET_TABLE_COUNT` |
+| `verification.identityPairs[]` | `{ table, previewKey, actualKey }` | 새 IDENTITY 행 짝(Q29, D7 v1.5) |
+| `verification.residualCheckFailed` | bool | 롤백 뒤 남은 변경 검사 자체가 실패했는지(Q31). true면 `residualCommitted`를 믿을 수 없다 |
+| `verification.tableCounts[]` | `{ table, before, after, expectedDelta }` | KEYSET의 테이블 건수 대조. SNAPSHOT_NETDIFF면 빈 배열 |
+| `verification.limitations` | 문자열 배열 | 검증 한계(KEYSET으로 낮춘 이유와 놓칠 수 있는 변경, 커밋 여부 불명, IDENTITY 순서 짝짓기 가정) |
+
+`precondition_failed`면 `verification`은 `mode`만 채운 빈 내역이다.
+
+**v1.5 /catalog/schema 형식(Q23·Q25, 근거 `src/DbRipple.Contracts/CatalogSchema.cs`):** 현재 기준선 샌드박스 카탈로그에서 만들고 감사 저장소(audit.*)는 넣지 않는다. 프런트는 `baselineAt`을 캐시 키로 쓴다.
+
+```json
+{ "database": "AW_Origin", "baselineAt": "2026-11-06T09:58:02+09:00", "manifestVersion": "…",
+  "tables": [ { "schema": "Sales", "name": "SalesOrderDetail", "table": "Sales.SalesOrderDetail",
+    "keyKind": "PK", "keyColumns": ["SalesOrderID", "SalesOrderDetailID"], "covered": true, "excludedReason": null,
+    "columns": [ { "name": "UnitPrice", "sqlType": "money", "isNullable": false, "isIdentity": false,
+      "isComputed": false, "isRowVersion": false, "volatile": null, "unobservable": false } ] } ] }
+```
+
+- `sqlType`은 선언형이다(예 `decimal(19,4)`, `nvarchar(50)`, `nvarchar(max)`, `datetime2(7)`). 길이·정밀도를 읽지 못하면 이름만 둔다(예 `decimal`). 프런트는 두 꼴을 모두 받아야 한다.
+- `volatile`은 `IDENTITY`, `NONDETERMINISTIC_DEFAULT`, `ROWVERSION` 가운데 하나이거나 null이다. 매니페스트의 COMPUTED는 `isComputed`로 옮긴다(Q7). `unobservable`은 행 이미지에서 뺀 열(text/ntext/image, JSON 키 충돌)이다.
+- 위 예시 값은 형식 설명용이다(실행해서 얻은 응답이 아니다).
+
+**v1.5 오류 상태 코드(AD9, Q32, 근거 `src/DbRipple.Api/Middleware/ApiExceptionHandler.cs`):** 오류 본문은 모두 ProblemDetails다. 예외 메시지는 응답에 넣지 않고 로그에만 남긴다.
+
+| 상태 | 원인 | 본문 |
+|---|---|---|
+| 403 | 교차 사이트 요청 방어에 걸림(아래) | ProblemDetails(고정 제목·설명, 사유 코드 없음) |
+| 409 | `PreviewConflictException` | 확장 속성 `reason`: `LOCKED`(다른 미리보기·적용이 잠금을 쥠), `BUILDING`(기준선 구축 중), `NO_BASELINE`(기준선 없음), `FINGERPRINT_MISMATCH`(원본·샌드박스 지문 불일치, 미리보기 차단), `DIRTY`(재구축 뒤에도 오염). [적용]의 지문 불일치는 409가 아니라 `precondition_failed`다 |
+| 503 | `SandboxUnavailableException`: SQL Server 연결이 끊기거나 열 수 없음(E20) | ProblemDetails |
+| 400 | `ArgumentException`, 입력 검사(ValidationProblem) | ProblemDetails |
+| 500 | 그 밖의 `InvalidOperationException`(예: 실행 봉투 SET 옵션 점검 실패). 2주차에는 409로 나갔다(인계 7) | ProblemDetails |
+| 501 | `NotImplementedException` | ProblemDetails |
+
+**v1.5 교차 사이트 요청 방어(근거 `src/DbRipple.Api/Middleware/CrossSiteRequestGuard.cs`, `src/DbRipple.Host/appsettings.json`):** 로컬 API(127.0.0.1:5080)를 사용자가 연 다른 웹사이트가 부르는 것을 막는다. 3주차 독립 검토에서 "POST에 CSRF 방어가 없다"고 남긴 항목을 닫은 것이다.
+
+- **범위:** `/api` 아래의 POST·PUT·PATCH·DELETE만 검사한다. GET·HEAD·OPTIONS는 그대로 통과한다.
+- **규칙 1:** 헤더 `X-DbRipple-Request: 1`(값은 정확히 `1`)이 없으면 403이다. 다른 출처에서 사용자 지정 헤더를 붙이면 preflight가 필요한데 서버는 CORS를 허용하지 않으므로 브라우저가 막는다. 웹 클라이언트는 모든 `/api` 요청에 이 헤더를 붙인다(`web/src/api/client.ts`).
+- **규칙 2:** `Origin` 헤더가 있으면 허용 목록 `DbRipple:AllowedOrigins`(appsettings.json 문자열 배열)에 있어야 한다. 기본값은 `http://127.0.0.1:5273`, `http://localhost:5273`, `http://127.0.0.1:5080`, `http://localhost:5080`이다. 대소문자와 끝 슬래시는 무시하고, `null` 출처는 거부한다. 설정한 목록은 기본값을 대체한다. `Origin`이 없는 요청(curl, `.http` 파일, PowerShell)은 규칙 1만 맞으면 통과한다.
+- **규칙 3:** `Sec-Fetch-Site: cross-site`면 403이다. same-origin, same-site, none은 통과한다.
+- **위치:** `AddDbRippleApi`가 IStartupFilter로 앱 파이프라인 맨 앞(ASP.NET Core 기본 Host 필터 바로 다음)에 끼운다. 예외 처리기와 본문 바인딩보다 앞이라 본문이 잘못돼도 403이고 서비스는 불리지 않는다. Host와 TestServer가 같은 경로를 탄다. OpenAPI는 POST 경로 5개에 403을 적는다.
+- **Host 헤더 제한:** appsettings.json `"AllowedHosts": "127.0.0.1;localhost"`(ASP.NET Core 호스트 필터링)로 Host 헤더를 제한한다. DNS 재바인딩으로 다른 사이트가 GET 응답(미리보기 결과)을 읽는 것을 막기 위해서다. Vite 개발 프록시는 `changeOrigin: false`라 Host가 localhost·127.0.0.1(포트 무관)로 와서 통과한다.
+- **개발 서버(Vite):** `web/vite.config.ts`에서 `cors: false`(기본값은 다른 localhost 출처에 CORS를 열어 프록시한 GET 응답을 읽게 한다)와 `strictPort: true`(포트가 바뀌면 출처가 허용 목록에서 벗어나 POST가 모두 403이 된다)를 둔다. 2026-11-11 독립 보안 검토 반영.
+- **남는 위험:** 같은 PC의 브라우저 밖 프로그램은 헤더를 붙여 보낼 수 있다. API에 인증은 없다(R13). `http://[::1]:5273`으로 열면 Host 필터와 Origin 검사가 막는다(허용 목록에 없음). AllowedHosts는 설정 파일에만 있어 환경 변수로 `*`를 주면 재바인딩 방어가 풀린다.
+- **확인 범위:** Api.Tests(TestServer, 가짜 서비스)로 확인했다. 실제 Host를 브라우저로 띄워 확인하지는 않았다. `AllowedHosts` 제한은 테스트 전이다.
+
 ## 7. 원인 귀속과 순서 규칙
 
 ### 7.1 전제 (모두 §13 스파이크로 확인)
@@ -800,6 +899,8 @@ MVP의 미리보기 요청은 끝날 때까지 기다리는 동기 방식이다.
    - 정적 쓰기 대상은 ScriptDom으로 본문의 INSERT/UPDATE/DELETE/MERGE 대상을 뽑아 만든다. 동적 SQL이 있는 트리거는 모든 테이블에 쓸 수 있다고 본다.
    - 후보 1개 → `inferred`, 여러 개 → `ambiguous`(후보 표시), 0개 → `unexplained`
    - **v1.4(2주차 독립 검토):** 저장 프로시저를 부르는 트리거는 쓰기 대상 미상으로 둔다. 모든 테이블에 쓸 수 있다고 보고 3단계의 FK 쓰기 경합으로 치며, 그 트리거의 후보·WRITES는 `ambiguous` 이하다. 프로시저가 자식 다음 부모를 지우면 FK 연쇄와 구별할 수 없기 때문이다. 프로시저 본문 펼치기는 3주차다. AW 영향: SOD 트리거 `iduSalesOrderDetail`이 CATCH에서 `uspLogError`를 부르므로, SOH 삭제에 연쇄된 SOD의 FK_CASCADE는 `inferred`가 된다(Host 실측).
+   - **v1.5 프로시저 펼치기(2026-11-11, 인계 1, DB 테스트 전):** C6이 트리거가 부르는 프로시저 본문(`sys.sql_modules`)을 같은 규칙으로 분석해 쓰기 대상·외부 부작용·ROLLBACK·트랜잭션 제어를 트리거 결과에 합친다. 프로시저 안의 프로시저도 따라가며 깊이 상한은 4다(트리거가 직접 부르는 프로시저가 1). 한 단계에서 멈추면 AW `uspLogError`가 부르는 `uspPrintError`(PRINT만) 때문에 `uspLogError`가 늘 미상이 되기 때문이다. 펼친 호출은 `ExpandedProcedureCalls`, 못 펼친 호출(카탈로그에 없음, 본문 없음, 파싱 실패, 동적 SQL, 재귀, 깊이 초과, 안쪽 호출을 못 펼침)은 `UnresolvedProcedureCalls`다. 근거: `src/DbRipple.Analysis/TriggerAnalyzer.cs`(`MaxProcedureDepth = 4`).
+   - **v1.5 WRITES 하향은 진짜 미상에만:** 트리거 후보·WRITES를 `ambiguous` 이하로 내리는 것은 쓰기 대상 미상(`WriteTargetsUnknown`)이거나, 못 펼친 프로시저가 있고 그 테이블이 정적 쓰기 대상(펼친 프로시저 포함)에 없을 때만이다. 정적 쓰기 대상에 있으면 그 트리거가 쓴 것이 확실하므로 `inferred`를 유지한다(2주차 검토의 AW 정밀도 퇴행 해소). 3단계의 FK 쓰기 경합과 후보 집합에서는 못 펼친 프로시저를 여전히 "어떤 테이블에든 쓸 수 있음"으로 본다. 호환(Q38): `ProcedureCalls`가 있는데 두 목록이 모두 비면(펼치기 전 분석기 결과) 전부 미상으로 본다. 근거: `src/DbRipple.Attribution/CatalogIndex.cs`(`TriggerInfo.IsUnknownFor`, `CanWrite`). 위 v1.4의 AW 영향(SOD FK_CASCADE가 `inferred`)이 바뀌는지는 Host 재실측 전이다.
    - **v1.4 FK certain 조건 보완:** 부모·자식 묶음의 깊이가 같아야 하고(H2), 쓰기 경합은 "그 문장에서 실행될 수 있는 모든 트리거"로 넓게 본다. 둘 다 certain을 더 아끼는 쪽이다.
 5. **직접 대상과 INSTEAD OF**
    - 깊이 1 묶음 가운데 테이블과 연산이 문장의 대상과 같으면 `DIRECT`(`certain`)다.
@@ -1016,6 +1117,14 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 - 미리보기에 없는 테이블에 변경이 있으면 불일치다.
 - 비결정 열은 존재와 형식만 비교한다.
 
+**v1.5 일치 규칙 구현(2026-11-11, 근거 `src/DbRipple.Apply/ApplyMatcher.cs`, DB 테스트 전):** 위 여섯 규칙을 순서대로 `MismatchKind`로 낸다(§6.4 v1.5). 하나라도 있으면 ROLLBACK, `rolled_back_mismatch`다.
+- **1 문장별 행 수(Q33):** 미리보기와 [적용] 모두 문장 끝에 같은 명령으로 `SELECT ROWCOUNT_BIG();`를 붙여 그 값을 `rowsAffected`로 쓴다(`StatementRunner.RowCountSuffix`, `PreviewExecutor`도 같은 상수). NOCOUNT OFF 트리거가 드라이버 행 수를 부풀리는 것을 피하고, 두 쪽을 같은 셈법으로 비교하려는 것이다. INSTEAD OF·문장 앞 세미콜론에서의 실제 값은 테스트 라운드에서 잰다.
+- **2·5 netSummary와 미리보기에 없는 테이블:** 원본 최종 차이를 `ContractFormulas.Summarize`(미리보기와 같은 식)로 세어 테이블별 다섯 건수를 비교한다. 미리보기에 없는 테이블이면 `UNEXPECTED_TABLE`이다.
+- **3 키 행 값:** PK·UNIQUE 키 행은 비결정 열(RowChange.volatile + 매니페스트 volatileColumns)을 뺀 값이 같아야 한다. 계산 열은 식이 결정적이므로 비교에 넣되, 새 IDENTITY 값이나 짝 매핑으로 치환한 FK 값에 기대는 계산 열(예: AW SalesOrderNumber)은 그 값만 짝 값으로 바꿔 비교한다. 미리보기에만 있는 행 변경은 `ROW_MISSING`, 실제에만 있는 행 변경은 `ROW_UNEXPECTED`다. 키 없는 테이블은 비결정 열을 뺀 이미지의 다중집합 개수로 비교한다.
+- **4 IDENTITY 짝:** 새 IDENTITY 행은 비결정 열을 뺀 값(서명)으로 짝짓는다. 부모 테이블부터 짝짓고(FK 위상 순서), 아직 짝짓지 않은 테이블(자기 참조 포함)을 가리키는 FK 열은 서명에서 빼고 값 비교에서 확인한다. 같은 서명 행이 미리보기와 원본에 같은 개수로 있으면 양쪽을 IDENTITY 값 오름차순으로 정렬해 순서대로 짝짓는다(같은 문장이 같은 순서로 IDENTITY를 매긴다는 가정). 이렇게 2행 이상을 짝지었으면 `verification.limitations`에 그 가정을 적는다(`ApplyMatcher.IdentityOrderLimitation`). 개수가 다르거나, IDENTITY 값이 없거나 정수가 아니거나 겹쳐서 순서를 정할 수 없으면 `IDENTITY_UNPAIRED`다. 자식 FK 치환과 계산 열 치환은 이 짝 매핑을 따른다. 순서가 어긋나 자식이 다른 부모를 가리키면 키 있는 자식은 `ROW_VALUE`, IDENTITY 자식은 `IDENTITY_UNPAIRED`로 잡혀 롤백된다. 짝은 결과 `verification.identityPairs`에 싣는다(Q29). 평가 하네스의 IDENTITY 짝 매핑(`eval/DbRipple.Eval/IdentityPairing.cs`)과 코드를 공유하지 않는다(§10.3). 확인 범위: Apply 단위 테스트(DB 없음)만 했다.
+- **6 비결정 열:** 존재(NULL 여부)와 형식만 비교한다(`VOLATILE_FORMAT`). 값 비교에서 뺀 열은 `volatileIgnored`에 "스키마.테이블.열"로 싣는다.
+- **KEYSET:** 문장별 행 수(1)와 테이블 `COUNT_BIG(*)` 변화(`KEYSET_TABLE_COUNT`), 미리보기 키 집합의 after 값을 비교한다. `netSummaryMatch`는 null이다.
+
 **검증 범위:** `SNAPSHOT_NETDIFF`는 전체 사용자 테이블을 비교하고, `KEYSET`의 범위와 한계는 §5.3에 적었다. 클라이언트 타임아웃은 트랜잭션을 롤백하지 않으므로 `XACT_ABORT ON`과 finally 롤백을 쓴다.
 
 **범위 한정:** 이 작품은 공개 샘플 DB의 "원본 역할 사본"에만 적용한다. 실제 운영 DB에 적용하는 것은 범위 밖이며, 하려면 별도 승인이 필요하다.
@@ -1123,6 +1232,8 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 | CL19 | xml·hierarchyid·geography·text 열 | 형식 규칙 |
 | CL20 | Big: 부모 1 : 자식 2 CASCADE + 자식 AFTER 트리거, 행 수 생성기 | M5 |
 
+**v1.5(2026-11-11, CascadeLab CL09~CL20):** 사례 파일은 CL01~CL20 변형 포함 30개다(`cascadelab/cases/`, `cascadelab/README.md` 사례 요약). CL09~CL20은 작성만 했고 DB에서 실행하지 않았다. 손 정답 형식은 answer-format v0.2다(`cascadelab/answer-format.md`, Q40). v0.1에 필드를 더하기만 해서 v0.1 파일은 그대로 v0.2 파일이다. 추가한 것은 IDENTITY 행 표기 `{"match": {비결정 아닌 열: 값}, "identity": ["열"]}`, 새 IDENTITY를 참조하는 열 `identityRefs`, 비결정 셀 `volatile`, 롤백 뒤 남은 변경 `residualCommitted`, `leavesResidue`, M5용 `scaling`(생성 문장·측정 문장 틀), `REPLACES` 간선과 `INSTEAD_OF` 원인 등이다. CL20 대량 데이터는 시드 안 프로시저 `cl20.usp_Generate @parents = N`으로만 만든다(AD11, Q39). 다른 테스트 기준선이 무거워지지 않게 하려는 것이다.
+
 ### 10.3 정답과 오라클
 
 - **1차 정답:** CascadeLab의 손 정답(변경 키 집합, 간선, 기대 오류)이다.
@@ -1150,6 +1261,12 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 | M4 순서 안정성 | 같은 사례를 k회(초깃값 20회, SP5의 초기화 시간으로 조정) 반복한다. 형제 순서를 뺀 인과 그래프가 같은지 보고, `observed_only` 부분이 얼마나 바뀌는지 기록한다. "문서 순서 규칙 위반 수"는 수집 시점과 행 변경 시점이 달라 지표로 쓰지 않는다. |
 | M5 응답 시간 | CL20에서 N = 1, 100, 1천, 1만, 5만, 10만 행 UPDATE/DELETE를 잰다. 워밍업 1회 뒤 5회 반복해 p50·p95를 구한다. 단계는 analyze, execute, readLog, reread, netDiff, resolve, serialize와 브라우저의 첫 그래프·첫 그리드 페이지 렌더다. 수집 오버헤드 비율은 샌드박스 execute ÷ 오라클 execute다. |
 
+**v1.5 실제 정의(2026-11-11, 평가 하네스 코드 기준, 측정 전):** 열 명세와 정의 차이는 `eval/DbRipple.Eval/MetricsCsv.cs` 주석이 기준이고, 보고서 "지표 정의" 절은 `ReportBuilder.DefinitionNotes`가 같은 문장을 싣는다. 요약은 [evaluation.md](evaluation.md) §4다.
+- **M1:** `m1.csv`에 `identity_rows`·`identity_paired`(정답 쪽 IDENTITY 키 INSERTED 행 수와 짝지은 수)를 더했다. 짝 매핑은 `IdentityPairing`이 하고 C15와 독립 구현이다. 같은 서명 행이 여럿이면 양쪽을 IDENTITY 값 오름차순으로 차례로 짝짓는다. 오라클 키 비교는 DB 정렬 규칙에 맞춰 접는다(`KeyFolding`, 인계 6, Q35: 뒤 공백 무시, `_CI`면 대문자, `_AI`면 악센트 제거, 폭·가나 구분은 다루지 않는 근사).
+- **M3:** 간선 키 (문장, 부모, 자식, 종류, 이름) 단위로 확신도(certain, inferred, ambiguous, unexplained, all)별 precision = 맞힌 예측 간선 ÷ 예측 간선, recall = 찾은 정답 간선 ÷ 정답 간선(확신도 무관)을 낸다. `ambiguous` 예측 간선은 (문장, 자식, 종류)로 묶은 후보 집합 가운데 정답 간선이 든 비율을 본다. certain 과신 = certain인데 정답에 없는 간선 + 정답 확신도가 더 약한 certain 간선(목표 0).
+- **M4:** 같은 사례를 k회 반복해 형제 순서를 뺀 정규 그래프 서명이 한 가지인지(안정)와 observed_only 변동률 = (k − 가장 흔한 observed_only 서명 수) ÷ k를 낸다. 파이프라인 예외 반복은 빈 서명이라 넣으면 "모두 예외 = 안정"이 되므로 분모에서 빼고 따로 센다. 거부는 결정적이라 유효 반복이다.
+- **M5:** CL20·CL20b의 N(직접 대상 행 수)마다 워밍업 1회 뒤 5회(기본값) 재서 단계별 p50·p95(선형 보간)를 낸다. 수집 오버헤드 = 샌드박스 execute p50 ÷ 오라클 execute p50이다. **정의 차이:** 분자는 실행 봉투 비용(BEGIN TRAN, 제어 UPDATE, 경계 읽기, EXECUTE AS/REVERT)을 포함하고 분모는 문장 실행만 잰다. 그래서 작은 N에서는 비율이 순수 수집 비용보다 크게 나온다. 브라우저 첫 그래프·첫 그리드 열은 비워 두고 SP9 측정값을 손으로 옮긴다(Q42, [spikes/SP9.md](spikes/SP9.md)).
+
 ### 10.5 대조군 (같은 사례, 같은 지표)
 
 | ID | 대조군 | 기대(추정) |
@@ -1158,6 +1275,14 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 | B1 | FK 메타데이터 정적 예측(실행 없음). WHERE로 부모 키를 SELECT하고 CASCADE/SET NULL 경로를 따라 자식 행을 펼친다. | 트리거를 모르므로 트리거 재현율이 낮을 것이다(M2). 별도 엔진이 필요해 자를 목록 1순위다. |
 | B2 | 사본 + 최종 차이(Data Compare 자동화판) | 행 diff는 비슷하지만 원인·순서는 0이다(M3). 작업량 지표로 "사용자가 직접 찾아 SELECT해야 했을 테이블 수"를 함께 보고한다. |
 | B3 (이후) | 예상 실행 계획이 예측한 테이블 집합 대 실제 변경 테이블 집합 | — |
+
+**v1.5 구현(2026-11-11, 근거 `eval/DbRipple.Eval/Baselines.cs`, 측정 전):** B0·B2만 구현했고 B1은 자를 목록 1순위대로 뺐다. 대조군 행은 제품과 같은 CSV에 `system` 열 `B0`·`B2`로 쓴다. 상태는 둘 다 오라클 상태다.
+- **B0:** 오라클 순 변경을 문장의 직접 대상 테이블로 거른 것을 예측으로 쓴다. 직접 대상은 문장 정규식(스키마로 한정한 대상)과 손 정답 DIRECT 행 테이블의 합집합이다. M3 예측 간선은 손 정답의 DIRECT 간선을 certain으로 둔 것뿐이다.
+- **B2:** 오라클 순 변경을 그대로 예측으로 쓴다(M1은 오라클과 같다). M3 예측 간선은 0개다(precision 빈 칸, recall 0). 작업량 `manual_select_tables` = 직접 대상이 아닌데 바뀐 테이블 수(사용자가 원인을 알려면 직접 찾아 SELECT해야 했을 테이블)를 함께 낸다(B0에도 낸다).
+- **알려진 정의 차이(2026-11-11 검토):**
+  - B0의 M3 precision은 예측 간선이 정답 DIRECT 간선 그대로라 **구성상 1.0**이다. 비교할 값은 recall이다.
+  - B0 필터는 테이블 단위라 직접 대상 테이블에서 같은 테이블 트리거가 바꾼 행도 B0이 찾은 것으로 센다(OUTPUT 기반 도구보다 후하게 잰다).
+  - `DELETE TOP (n) FROM s.t`는 정규식이 못 잡아 손 정답 DIRECT 행에만 기댄다.
 
 ### 10.6 절차와 보고
 
@@ -1172,6 +1297,18 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 7. `cases.csv`에 한 줄을 쓴다.
 
 스위트 단위로 `metrics.csv`와 `env.json`을 남긴다. 보고서 표는 CSV에서만 만들고, 손으로 쓴 수치는 넣지 않는다. 스파이크 결과와 정답 정정 기록은 보고서의 "확인한 사실과 추정" 절에 싣는다.
+
+**v1.5 실행 명령(근거 `eval/DbRipple.Eval.Cli/Program.cs`, 아직 실행하지 않음):** 하네스는 공유 DB(CascadeLab*, AW_*)를 쓰지 않고 `dbrt_eval_*` 전용 DB를 만들고 끝에 지운다.
+
+```powershell
+. .\scripts\env.ps1; dotnet run --project eval\DbRipple.Eval.Cli -- cascadelab --systems preview,B0,B2 --repeat 20 --out logs\week4\eval
+. .\scripts\env.ps1; dotnet run --project eval\DbRipple.Eval.Cli -- m5 --sizes 1,100,1000,10000,50000,100000 --out logs\week4\m5
+dotnet run --project eval\DbRipple.Eval.Cli -- report --run logs\week4\eval\<실행 id> --m5 logs\week4\m5\<실행 id>
+```
+
+- `cascadelab`: 실행마다 `cases.csv`, `m1.csv`, `m2.csv`, `m3.csv`를 쓰고 끝에 `m4.csv`, `metrics.csv`, `env.json`, `differences.txt`(정답 정정 기록 후보)를 쓴다. 롤백 뒤에도 원본에 행이 남는 사례(`leavesResidue`, CL12a)는 맨 뒤에 돈다.
+- `m5`: N마다 전용 원본에 `cl20.usp_Generate`로 데이터를 만든 뒤 기준선을 만들고, 제품 모드(평가 훅 없음)로 잰다. `m5.csv`를 쓴다.
+- `report`: 실행 폴더의 CSV만 읽어 `report.md`를 쓴다(DB 연결 없음).
 
 ### 10.7 데모 시나리오
 
@@ -1259,7 +1396,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 | R10 | 대량 변경에서 수집·비교가 느리다(한 문장이 혼자 상한을 크게 넘는 경우 포함). | 중간 | 중간 | 상한, KEYS 모드, 최종 차이 범위 축소, M5로 보정 | SP9, M5 |
 | R11 | 신규성 반론("사본 + Data Compare", mutation_dry_run) | 중간 | 높음 | 신규성을 원인·순서 귀속으로 좁히고 B2로 정면 비교 | M3 |
 | R12 | 정답과 제품이 같은 결함을 공유한다. | 중간 | 중간 | 오라클 독립 구현과 원문 실행 경로, 손 정답, 비교기 자체 검증 | §10.3 |
-| R13 | 임의 SQL 실행 위험(로컬 도구) | 낮음 | 낮음 | localhost 바인딩, 최소 권한 실행 사용자, 시간 제한, 외부 부작용 트리거 거부 | — |
+| R13 | 임의 SQL 실행 위험(로컬 도구) | 낮음 | 낮음 | localhost 바인딩, 최소 권한 실행 사용자, 시간 제한, 외부 부작용 트리거 거부. v1.5: 교차 사이트 요청 방어와 Host 헤더 제한(§6.4 v1.5). API 인증은 없다 | Api.Tests(TestServer) |
 | R14 | 샌드박스와 원본이 같은 인스턴스라 자원을 나눠 쓴다. | 낮음(데모) | 중간 | 분리 배치는 이후 범위, 환경 지문 | — |
 | R15 | 미리보기를 반복하면 샌드박스 IDENTITY가 원본과 벌어진다. | 낮음 | 높음 | "예상값" 표시, 짝 매핑, [적용] 뒤 자동 새로 고침 | — |
 | R16 | 트리거 거부 뒤 남은 변경이 샌드박스를 오염시킨다(A22). | 중간 | 중간 | 실패 뒤 최종 차이 검사, 오염 표시, 다음 미리보기 전 재구축 | CL12 |
@@ -1279,8 +1416,8 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 | SP5 | 1주차 1~2일 | 기준선 | `RESTORE FILELISTONLY`(FILESTREAM·메모리 최적화 파일 그룹), 전체 텍스트 카탈로그 유무, BACKUP/RESTORE 시간, 스냅샷 생성·되돌리기 시간, 스냅샷이 있을 때 RESTORE가 거부되는지 본다. | FILESTREAM이 없다. 시간을 기록한다. | 다른 .bak이나 Windows 설치로 바꾼다. 평가 초기화는 RESTORE로 한다. |
 | SP6 | 1주차 1~2일 | 형식 변환 | xml, hierarchyid, geography, money, varbinary, datetimeoffset을 FOR JSON으로 직렬화하고 text/ntext/image 처리를 확인한다. | 오류가 없고 값이 보존된다. | 형식별 변환 규칙을 고친다. **결과(2026-11-10): 일부 깨짐 → 규칙을 고쳤다.** float 정밀도, 공간 형식 Z/M, money가 숫자인 점, 열 이름 충돌을 §6.1에 반영했다. |
 | SP7 | 2주차(C12 첫판 직후) | 열린 트랜잭션 안 최종 차이 | REVERT 뒤 같은 연결·트랜잭션에서 미커밋 변경을 스냅샷과 비교해 정확성과 시간을 잰다(AW 전 테이블). | 정확하고, AW 전 테이블 기준 수 초 안에 끝난다(추정 목표). **v1.4: 통과(2026-11-10)** | 재조회와 KEYSET 비교로 낮춘다. |
-| SP8 | 3주차 1일 | 데모 사슬 실측 | AW DM1·DM2·DM3의 실제 전파와 0행 발동 기록을 본다. | 데모 대본을 확정한다. | 시나리오를 바꾼다. |
-| SP9 | 3주차 1일 | 프런트 성능 | Vue Flow + dagre로 노드 50·200·500개, AG Grid로 1만·5만 행을 렌더링한다. | 노드 200개, 페이지 1개 기준으로 체감 지연이 없다(추정 목표). | 노드 묶기 기준을 낮추고 페이지 크기를 줄인다. |
+| SP8 | 3주차 1일 | 데모 사슬 실측 | AW DM1·DM2·DM3의 실제 전파와 0행 발동 기록을 본다. | 데모 대본을 확정한다. **v1.5: 읽기 전용 조회 스크립트 준비(`spikes/sql/sp8-*.sql`), 실행 전** | 시나리오를 바꾼다. |
+| SP9 | 3주차 1일 | 프런트 성능 | Vue Flow + dagre로 노드 50·200·500개, AG Grid로 1만·5만 행을 렌더링한다. | 노드 200개, 페이지 1개 기준으로 체감 지연이 없다(추정 목표). **v1.5: 측정 화면(`/sp9`) 준비, 정식 측정 전(참고값 1회), [spikes/SP9.md](spikes/SP9.md)** | 노드 묶기 기준을 낮추고 페이지 크기를 줄인다. |
 | SP10 | 1주차 1~2일 | 실행 주체 | 열린 트랜잭션 안에서 EXECUTE AS USER/REVERT를 반복할 수 있는지 본다. 사용자 문맥에서 감사 트리거의 헤더 INSERT와 NEXT VALUE FOR가 소유권 체인으로 성공하는지, AW 트리거가 권한 오류 없이 동작하는지 본다. | 원본에서와 같은 결과가 나오고, 감사 기록이 남는다. | 감사 SEQUENCE·테이블에 필요한 최소 권한을 샌드박스에서만 실행 사용자에게 준다(사용자 DML 의미는 바뀌지 않음). **결과(2026-11-10): 통과.** 권한 부여 없이 소유권 체인으로 감사가 기록됐다. doomed 상태에서는 ROLLBACK 뒤 REVERT해야 한다(§5.2). |
 
 ## 부록 A. 출처

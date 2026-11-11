@@ -332,6 +332,8 @@
   ],
   "residualCommitted": [],
   "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
   "capture": {
     "imageCount": 10,
     "cap": 100000,

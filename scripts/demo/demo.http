@@ -12,6 +12,8 @@
 # 아래 기본값은 형식 예시다. SP8 결과로 바꾼 뒤 대본을 확정한다.
 
 @baseUrl = http://127.0.0.1:5080
+# /api의 POST·PUT·PATCH·DELETE에는 교차 사이트 요청 방어 헤더가 필요하다(없으면 403). 값은 항상 1.
+@guard = 1
 @dm1Order = 43659
 @dm2Detail = 1
 @dm3Employee = 1
@@ -28,6 +30,7 @@ GET {{baseUrl}}/api/sandbox
 ### DM1 미리보기
 # @name dm1
 POST {{baseUrl}}/api/previews
+X-DbRipple-Request: {{guard}}
 Content-Type: application/json
 
 { "sql": "DELETE FROM Sales.SalesOrderHeader WHERE SalesOrderID = {{dm1Order}};" }
@@ -46,6 +49,7 @@ GET {{baseUrl}}/api/previews/{{dm1.response.body.$.previewId}}/rows?view=net&off
 ### DM2 미리보기
 # @name dm2
 POST {{baseUrl}}/api/previews
+X-DbRipple-Request: {{guard}}
 Content-Type: application/json
 
 { "sql": "UPDATE Sales.SalesOrderDetail SET OrderQty = OrderQty + 1 WHERE SalesOrderDetailID = {{dm2Detail}};" }
@@ -65,12 +69,14 @@ GET {{baseUrl}}/api/previews/{{dm2.response.body.$.previewId}}/rows?view=net&off
 ### DM3 미리보기
 # @name dm3
 POST {{baseUrl}}/api/previews
+X-DbRipple-Request: {{guard}}
 Content-Type: application/json
 
 { "sql": "DELETE FROM HumanResources.Employee WHERE BusinessEntityID = {{dm3Employee}};" }
 
 ### DM3 [적용] 시도 → 200 ApplyResult status precondition_failed, preconditionFailures [PREVIEW_NOT_OK]
 POST {{baseUrl}}/api/previews/{{dm3.response.body.$.previewId}}/apply
+X-DbRipple-Request: {{guard}}
 
 ########################################################################
 # DM4·DM6: CascadeLab(원본을 CascadeLab으로 바꿔 Host를 다시 띄운다)
@@ -86,6 +92,7 @@ POST {{baseUrl}}/api/previews/{{dm3.response.body.$.previewId}}/apply
 # 보여 줄 것: FK 간선이 certain이 아니라 inferred(동적 SQL 쓰기 경합), RegionLog WRITES ambiguous(후보 2), 경고 WARN_TRIGGER_DYNAMIC_SQL.
 # @name dm4
 POST {{baseUrl}}/api/previews
+X-DbRipple-Request: {{guard}}
 Content-Type: application/json
 
 { "sql": "DELETE FROM cl10.Region WHERE id = 1;" }
@@ -95,10 +102,12 @@ Content-Type: application/json
 # 보여 줄 것: 행 이미지 25만 > 상한 10만 → KEYS 모드, 정확한 건수(netSummary), status truncated, 단계별 timingsMs, [적용] 차단.
 # 끝나면 dm6-generate.sql -Part 2로 시드 크기로 되돌리고 다시 refresh한다.
 POST {{baseUrl}}/api/sandbox/refresh
+X-DbRipple-Request: {{guard}}
 
 ###
 # @name dm6
 POST {{baseUrl}}/api/previews
+X-DbRipple-Request: {{guard}}
 Content-Type: application/json
 
 { "sql": "DELETE FROM cl20.Parent WHERE id <= 50000;", "options": { "imageCap": 100000 } }
@@ -124,6 +133,7 @@ GET {{baseUrl}}/api/previews/{{dm6.response.body.$.previewId}}/rows?view=event&o
 ### DM7-1 미리보기(Product에는 사용자 트리거가 없다)
 # @name dm7
 POST {{baseUrl}}/api/previews
+X-DbRipple-Request: {{guard}}
 Content-Type: application/json
 
 { "sql": "UPDATE Production.Product SET ListPrice = ListPrice + 1.00 WHERE ProductID = 680;" }
@@ -132,9 +142,11 @@ Content-Type: application/json
 #   .\scripts\run-sql.ps1 scripts\demo\dm7-drift.sql -Database AW_Origin -Part 1 -Log logs\week3\dm7-drift.log
 ### DM7-3 [적용] → status drift_detected, verification.driftRows: Production.Product (680) CHANGED ListPrice
 POST {{baseUrl}}/api/previews/{{dm7.response.body.$.previewId}}/apply
+X-DbRipple-Request: {{guard}}
 Content-Type: application/json
 
 { "sqlHash": "{{dm7.response.body.$.sqlHash}}" }
 
 ### DM7-4 되돌리기(PowerShell): .\scripts\run-sql.ps1 scripts\demo\dm7-drift.sql -Database AW_Origin -Part 2 뒤 기준선 새로 고침
 POST {{baseUrl}}/api/sandbox/refresh
+X-DbRipple-Request: {{guard}}

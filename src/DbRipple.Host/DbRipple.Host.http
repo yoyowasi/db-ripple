@@ -1,25 +1,31 @@
 @baseUrl = http://127.0.0.1:5080
+# /api의 POST·PUT·PATCH·DELETE에는 교차 사이트 요청 방어 헤더가 필요하다(없으면 403). 값은 항상 1.
+@guard = 1
 
 ### 샌드박스 상태
 GET {{baseUrl}}/api/sandbox
 
 ### 기준선 새로 고침(202)
 POST {{baseUrl}}/api/sandbox/refresh
+X-DbRipple-Request: {{guard}}
 
 ### 분석
 POST {{baseUrl}}/api/analyze
+X-DbRipple-Request: {{guard}}
 Content-Type: application/json
 
 { "sql": "UPDATE Sales.SalesOrderDetail SET OrderQty = OrderQty + 1 WHERE SalesOrderDetailID = 1;" }
 
 ### 미리보기
 POST {{baseUrl}}/api/previews
+X-DbRipple-Request: {{guard}}
 Content-Type: application/json
 
 { "sql": "DELETE FROM Sales.SalesOrderHeader WHERE SalesOrderID = 43659;", "options": { "imageCap": 100000 } }
 
 ### 거부(422 기대)
 POST {{baseUrl}}/api/previews
+X-DbRipple-Request: {{guard}}
 Content-Type: application/json
 
 { "sql": "TRUNCATE TABLE Sales.SalesOrderDetail;" }
@@ -42,15 +48,18 @@ GET {{baseUrl}}/api/previews/none
 ### [적용](§5.3): 본문 선택. 화면에 보이는 미리보기의 sqlHash를 보내면 편집기 내용이 바뀐 옛 미리보기를 막는다.
 ### 응답 200 ApplyResult(committed, rolled_back_mismatch, drift_detected, precondition_failed, error), 404 없음·만료, 409 reason LOCKED·BUILDING, 503 연결 끊김
 POST {{baseUrl}}/api/previews/pv_00000000_0001/apply
+X-DbRipple-Request: {{guard}}
 Content-Type: application/json
 
 { "sqlHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000" }
 
 ### [적용] 본문 없이(저장된 원문과 PreviewResult.sqlHash만 대조)
 POST {{baseUrl}}/api/previews/pv_00000000_0001/apply
+X-DbRipple-Request: {{guard}}
 
 ### 취소(204)
 POST {{baseUrl}}/api/previews/pv_00000000_0001/cancel
+X-DbRipple-Request: {{guard}}
 
 ### 내보내기
 GET {{baseUrl}}/api/previews/pv_00000000_0001/export

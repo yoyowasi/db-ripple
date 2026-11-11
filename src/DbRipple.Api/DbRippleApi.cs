@@ -12,6 +12,7 @@ namespace DbRipple.Api;
 /// <summary>
 /// C5 REST API(§6.4). 서비스(ISandboxManager, IBatchAnalyzer, IPreviewPipeline, IPreviewStore, ICatalogSchemaProvider, IApplyService)는 호스트가 등록한다.
 /// 경로·상태 코드·본문 형식은 §6.4 계약이다. 응답 JSON은 ContractJson 설정(camelCase, 열거형 문자열, null 포함).
+/// /api 아래의 POST·PUT·PATCH·DELETE는 헤더 <c>X-DbRipple-Request: 1</c>과 허용 출처가 필요하다(없으면 403, <see cref="CrossSiteRequestGuard"/>).
 /// 오류 응답은 모두 ProblemDetails다. 예외 → 상태 코드 매핑은 <see cref="ApiExceptionHandler"/>(AD9): 409(확장 <c>reason</c>), 503, 400, 501, 500.
 /// </summary>
 public static class DbRippleApi
@@ -19,12 +20,13 @@ public static class DbRippleApi
     /// <summary>요청 SQL 최대 길이(문자 수, 열린 질문 Q20). 넘으면 400.</summary>
     public const int MaxSqlLength = 1_000_000;
 
-    /// <summary>ProblemDetails, 예외 처리기, OpenAPI, JSON 설정을 등록한다.</summary>
+    /// <summary>ProblemDetails, 예외 처리기, OpenAPI, JSON 설정, 교차 사이트 요청 방어(<see cref="CrossSiteRequestGuard"/>)를 등록한다.</summary>
     public static IServiceCollection AddDbRippleApi(this IServiceCollection services)
     {
         services.AddProblemDetails();
         services.AddExceptionHandler<ApiExceptionHandler>();
         services.AddOpenApi();
+        services.AddCrossSiteRequestGuard();
         services.ConfigureHttpJsonOptions(o => ContractJson.Apply(o.SerializerOptions));
         return services;
     }
@@ -43,7 +45,8 @@ public static class DbRippleApi
                 sandbox.StartRefresh();
                 return TypedResults.Accepted("/api/sandbox");
             })
-            .WithName("RefreshSandbox").WithSummary("기준선 새로 고침 시작(202 후 GET /api/sandbox로 상태 조회)");
+            .WithName("RefreshSandbox").WithSummary("기준선 새로 고침 시작(202 후 GET /api/sandbox로 상태 조회)")
+            .ProducesProblem(StatusCodes.Status403Forbidden);
 
         api.MapGet("/catalog/schema", async Task<Ok<CatalogSchema>> ([FromServices] ICatalogSchemaProvider provider, CancellationToken ct) =>
                 TypedResults.Ok(await provider.GetSchemaAsync(ct)))
@@ -59,6 +62,7 @@ public static class DbRippleApi
                 return TypedResults.Ok(analyzer.Analyze(request.Sql, baseline));
             })
             .WithName("Analyze").WithSummary("배치 분석(§6.4, 문장·거부·경고·Diagnostic[])")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         api.MapPost("/previews", async Task<Results<Ok<PreviewResult>, ProblemHttpResult, ValidationProblem>> (
@@ -71,6 +75,7 @@ public static class DbRippleApi
                 return outcome.Record is { } record ? TypedResults.Ok(record.Result) : Rejected(outcome.Analysis);
             })
             .WithName("CreatePreview").WithSummary("미리보기 실행(동기). 거부면 422 ProblemDetails + rejects")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
@@ -103,13 +108,15 @@ public static class DbRippleApi
                 await apply.ApplyAsync(id, request ?? new ApplyRequest(), ct) is { } result ? TypedResults.Ok(result) : TypedResults.NotFound())
             .WithName("ApplyPreview").WithSummary("[적용](§5.3, C15): 미리보기를 원본에 반영. 상태 5종(committed, rolled_back_mismatch, drift_detected, precondition_failed, error) 모두 200")
             .WithDescription("본문은 선택({ sqlHash }). 미리보기가 없거나 만료면 404, 다른 미리보기·적용이 실행 중이거나 기준선 구축 중이면 409(reason LOCKED·BUILDING), SQL Server 연결 끊김은 503.")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .ProducesProblem(StatusCodes.Status500InternalServerError);
 
         api.MapPost("/previews/{id}/cancel", async Task<Results<NoContent, NotFound>> (string id, [FromServices] IPreviewStore store, CancellationToken ct) =>
                 await store.RemoveAsync(id, ct) ? TypedResults.NoContent() : TypedResults.NotFound())
-            .WithName("CancelPreview").WithSummary("[취소](§5.4): 결과를 버린다");
+            .WithName("CancelPreview").WithSummary("[취소](§5.4): 결과를 버린다")
+            .ProducesProblem(StatusCodes.Status403Forbidden);
 
         api.MapGet("/previews/{id}/export", async Task<Results<FileContentHttpResult, NotFound>> (string id, [FromServices] IPreviewStore store, CancellationToken ct) =>
             {

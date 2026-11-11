@@ -4,6 +4,7 @@
 정답은 설계 문서 규칙(§2 A번호, §6~§7)과 시드를 손으로 센 결과다.
 - CL01~CL08: 2026-11-10 실DB 대조 11/11 일치([verification/report-2026-11-10.md](verification/report-2026-11-10.md)).
 - CL09~CL20: 2026-11-11 작성, **아직 DB에서 실행하지 않았다**(정적 검토만). 실행 대조는 테스트 라운드에서 한다.
+- `verification/CascadeLab.Verify`는 answer-format v0.1 필드만 읽는다(v0.2의 `match`·`identity`·`identityRefs`·`residualCommitted` 등은 모른다). CL09 이후 사례의 오라클 대조는 평가 하네스(`eval/DbRipple.Eval.Cli -- cascadelab`)로 한다.
 
 ## 구성
 

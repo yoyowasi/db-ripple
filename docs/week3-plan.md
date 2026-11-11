@@ -302,7 +302,7 @@ dotnet build DbRipple.slnx -m:1 -nologo
 . .\scripts\env.ps1; dotnet run --project src\DbRipple.Host       # 그다음 scripts\demo\demo.http의 DM1~DM3 요청
 .\scripts\run-sql.ps1 spikes\sql\sp8-dm2-pick-order.sql -Database AW_Origin -Log spikes\logs\sp8-dm2.log   # 읽기 전용 조회만
 # 3) 프런트(사용자가 설치)
-cd web; npm install; npx vue-tsc --noEmit; npx vite build; npm run dev   # 브라우저: http://localhost:5173, /sp9 = SP9
+cd web; npm install; npx vue-tsc --noEmit; npx vite build; npm run dev   # 브라우저: http://localhost:5273, /sp9 = SP9
 # 4) 평가(옵션 이름은 eval-2 구현 기준)
 . .\scripts\env.ps1; dotnet run --project eval\DbRipple.Eval.Cli -- cascadelab --systems preview,B0,B2 --repeat 20 --out logs\week4\eval
 . .\scripts\env.ps1; dotnet run --project eval\DbRipple.Eval.Cli -- m5 --sizes 1,100,1000,10000,50000,100000 --out logs\week4\m5

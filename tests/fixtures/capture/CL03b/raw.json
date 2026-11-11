@@ -36,6 +36,8 @@
   "netChanges": [],
   "residualCommitted": [],
   "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
   "capture": {
     "imageCount": 0,
     "cap": 100000,

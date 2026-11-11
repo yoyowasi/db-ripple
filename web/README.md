@@ -13,7 +13,7 @@ cd web
 npm install
 npx vue-tsc --noEmit      # 타입 검사
 npx vite build            # 빌드(dist/)
-npm run dev               # 개발 서버 http://localhost:5173
+npm run dev               # 개발 서버 http://localhost:5273
 ```
 
 - 브라우저는 같은 출처의 `/api`만 부른다. Vite 개발 서버가 `/api`를 `http://127.0.0.1:5080`으로 넘기므로 CORS 설정이 없다(`vite.config.ts`).

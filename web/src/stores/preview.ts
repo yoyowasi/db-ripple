@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import {
   ApiError,
+  CLIENT_ERROR_STATUS,
   analyze,
   applyPreview,
   cancelPreview,
@@ -26,7 +27,7 @@ WHERE SalesOrderID = 43659 AND SalesOrderDetailID = 1;
 `
 
 function toApiError(e: unknown): ApiError {
-  return e instanceof ApiError ? e : new ApiError(0, null, String(e))
+  return e instanceof ApiError ? e : new ApiError(CLIENT_ERROR_STATUS, null, String(e))
 }
 
 /** 첫 선택: 행이 있는 묶음 중 수집 순번이 가장 작은 것(0행 묶음은 E23에 따라 기본 숨김). */

@@ -77,7 +77,7 @@ public sealed class ApiTests : IAsyncLifetime
         app.MapOpenApi();
         app.MapDbRippleApi();
         await app.StartAsync();
-        client = app.GetTestClient();
+        client = app.GetTestClient().WithGuardHeader(); // POST는 요청 표지 헤더가 필요하다(CrossSiteRequestGuard)
     }
 
     public async Task DisposeAsync()

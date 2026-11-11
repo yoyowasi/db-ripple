@@ -330,7 +330,7 @@ public sealed class ApplyService : IApplyService
             VolatileIgnored = match.VolatileIgnored,
             IdentityPairs = match.IdentityPairs,
             TableCounts = tableCounts,
-            Limitations = limitations,
+            Limitations = [.. limitations, .. match.Limitations],
         };
 
         // 11. COMMIT 또는 ROLLBACK
@@ -358,7 +358,7 @@ public sealed class ApplyService : IApplyService
             await MarkAppliedAsync(record, run);
             const string unknown = "COMMIT 중 예외가 나서 원본에 커밋됐는지 알 수 없음. 이 미리보기는 다시 적용하지 않으며 샌드박스를 새로 고친다. 원본을 직접 확인할 것";
             return Make(record, ApplyStatus.Error,
-                verification with { Limitations = [.. limitations, unknown] }, statements,
+                verification with { Limitations = [.. verification.Limitations, unknown] }, statements,
                 $"{unknown}: {ex.Message}", run);
         }
         run.Commit = run.Lap();

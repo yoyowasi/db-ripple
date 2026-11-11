@@ -28,6 +28,15 @@ public class SmokeTests
         public void MarkDirty(string reason) { }
     }
 
+    /// <summary>
+    /// /api/analyze가 DI로 받는 분석기. 이 시험에서는 샌드박스 문맥에서 먼저 409가 나므로 호출되지 않는다.
+    /// 등록하지 않으면 DI 해석 실패(InvalidOperationException)가 500으로 나가 409 경로를 시험하지 못한다.
+    /// </summary>
+    sealed class UnusedAnalyzer : IBatchAnalyzer
+    {
+        public AnalysisResult Analyze(string sql, BaselineContext baseline) => throw new NotSupportedException();
+    }
+
     sealed class RejectingPipeline : IPreviewPipeline
     {
         public Task<PreviewOutcome> RunAsync(string sql, PreviewOptions options, IEvaluationHook? hook, CancellationToken ct) =>
@@ -54,6 +63,7 @@ public class SmokeTests
         builder.Services.AddDbRippleApi();
         builder.Services.AddSingleton<ISandboxManager, FakeSandbox>();
         builder.Services.AddSingleton<IPreviewPipeline, RejectingPipeline>();
+        builder.Services.AddSingleton<IBatchAnalyzer, UnusedAnalyzer>();
         builder.Services.AddSingleton<IPreviewStore>(new PreviewStore(Path.GetTempPath(), TimeProvider.System));
         var app = builder.Build();
         app.UseExceptionHandler();
@@ -83,7 +93,7 @@ public class SmokeTests
     public async Task Sandbox_status_rejected_preview_and_bad_query_follow_contract()
     {
         await using var app = await StartAsync();
-        var client = app.GetTestClient();
+        var client = app.GetTestClient().WithGuardHeader(); // POST는 요청 표지 헤더가 필요하다(CrossSiteRequestGuard)
 
         var status = await client.GetAsync("/api/sandbox");
         Assert.Equal(HttpStatusCode.OK, status.StatusCode);
