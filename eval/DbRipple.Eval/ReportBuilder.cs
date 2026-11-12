@@ -14,28 +14,38 @@ public static class ReportBuilder
     public const string FileName = "report.md";
 
     /// <summary>runDir의 CSV로 report.md를 쓰고 경로를 돌려준다. m5Dir가 있으면 거기의 m5.csv도 싣는다(없으면 runDir의 m5.csv).</summary>
-    public static string Write(string runDir, string? m5Dir = null)
+    public static string Write(string runDir, string? m5Dir = null) => Write(runDir, m5Dir is null ? null : [m5Dir]);
+
+    /// <summary>Write와 같고, m5 실행 폴더 여럿의 m5.csv 행을 순서대로 이어 싣는다(크기별로 나눠 돈 M5, 2026-11-12). 값은 다시 계산하지 않는다.</summary>
+    public static string Write(string runDir, IReadOnlyList<string>? m5Dirs)
     {
         var path = Path.Combine(runDir, FileName);
-        File.WriteAllText(path, Build(runDir, m5Dir), MetricsCsv.Utf8NoBom);
+        File.WriteAllText(path, Build(runDir, m5Dirs), MetricsCsv.Utf8NoBom);
         return path;
     }
 
     /// <summary>보고서 본문(Markdown).</summary>
-    public static string Build(string runDir, string? m5Dir = null)
+    public static string Build(string runDir, string? m5Dir = null) => Build(runDir, m5Dir is null ? null : [m5Dir]);
+
+    /// <summary>보고서 본문(Markdown). m5Dirs가 여럿이면 m5.csv 행을 이어 붙인다(헤더는 첫 파일 것).</summary>
+    public static string Build(string runDir, IReadOnlyList<string>? m5Dirs)
     {
         var cases = MetricsCsv.Read(Path.Combine(runDir, "cases.csv"));
         var metrics = MetricsCsv.Read(Path.Combine(runDir, "metrics.csv"));
         var m4 = MetricsCsv.Read(Path.Combine(runDir, "m4.csv"));
-        var m5 = MetricsCsv.Read(Path.Combine(m5Dir ?? runDir, "m5.csv"));
+        var m5Sources = m5Dirs is { Count: > 0 } ? m5Dirs : [runDir];
+        var m5Parts = m5Sources.Select(d => MetricsCsv.Read(Path.Combine(d, "m5.csv"))).OfType<CsvTable>().ToList();
+        var m5 = m5Parts.Count == 0 ? null : m5Parts.Count == 1 ? m5Parts[0] : new CsvTable(m5Parts[0].Header, m5Parts.SelectMany(t => t.Rows)
+            .OrderBy(r => Get(r, "case_id"), StringComparer.Ordinal).ThenBy(r => long.TryParse(Get(r, "n"), CultureInfo.InvariantCulture, out var n) ? n : long.MaxValue).ToList());
         var runIds = new[] { cases, metrics, m4, m5 }.Where(t => t is not null).SelectMany(t => t!.Rows.Select(r => r.GetValueOrDefault("run_id") ?? ""))
             .Where(x => x.Length > 0).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
 
         var sb = new StringBuilder();
         sb.Append("# 평가 보고서").Append(runIds.Count > 0 ? " — " + string.Join(", ", runIds) : "").Append("\n\n");
         sb.Append("이 보고서의 수치는 아래 CSV에서만 옮겼다(손으로 쓴 수치 없음, 설계 §10.6). 열 정의는 `eval/DbRipple.Eval/MetricsCsv.cs` 주석에 있다.\n\n");
-        foreach (var (name, t, dir) in new[] { ("cases.csv", cases, runDir), ("metrics.csv", metrics, runDir), ("m4.csv", m4, runDir), ("m5.csv", m5, m5Dir ?? runDir) })
-            sb.Append("- `").Append(name).Append("`: ").Append(t is null ? "없음" : $"{t.Rows.Count}행").Append(dir != runDir ? $" (`{dir}`)" : "").Append('\n');
+        var m5Where = string.Join(", ", m5Sources.Select(d => Path.GetRelativePath(runDir, d).Replace('\\', '/')));
+        foreach (var (name, t, where) in new[] { ("cases.csv", cases, ""), ("metrics.csv", metrics, ""), ("m4.csv", m4, ""), ("m5.csv", m5, m5Sources.SequenceEqual([runDir]) ? "" : m5Where) })
+            sb.Append("- `").Append(name).Append("`: ").Append(t is null ? "없음" : $"{t.Rows.Count}행").Append(where.Length > 0 ? $" (`{where}`)" : "").Append('\n');
         sb.Append('\n');
 
         Definitions(sb);

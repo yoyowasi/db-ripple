@@ -1,0 +1,23 @@
+{
+  "statements": [
+    {
+      "index": 1,
+      "batch": 1,
+      "position": 1,
+      "kind": "INSERT",
+      "target": "cl12.Doc",
+      "span": {
+        "startLine": 1,
+        "startColumn": 1,
+        "endLine": 1,
+        "endColumn": 44
+      },
+      "sql": "INSERT INTO cl12.Doc (title) VALUES ('d1');",
+      "nondeterministicColumns": []
+    }
+  ],
+  "rejects": [],
+  "warnings": [],
+  "diagnostics": [],
+  "isAccepted": true
+}

@@ -1,0 +1,32 @@
+# spikes\sql\sp8-dm3-employee.sql db=AW_Origin part=0 at=2026-11-12T14:24:57.5901417+09:00 elapsedSec=0.99 exit=0
+trigger_name is_instead_of_trigger is_disabled definition
+------------ --------------------- ----------- ----------
+HumanResources.dEmployee 1 0 
+CREATE TRIGGER [HumanResources].[dEmployee] ON [HumanResources].[Employee]
+INSTEAD OF DELETE NOT FOR REPLICATION AS
+BEGIN
+    DECLARE @Count int;
+
+    SET @Count = @@ROWCOUNT;
+    IF @Count = 0
+        RETURN;
+
+    SET NOCOUNT ON;
+
+    BEGIN
+
+BusinessEntityID JobTitle CurrentFlag
+---------------- -------- -----------
+1 Chief Executive Officer 1
+2 Vice President of Engineering 1
+3 Engineering Manager 1
+4 Senior Tool Designer 1
+5 Design Engineer 1
+fk_name child_table on_delete
+------- ----------- ---------
+FK_Document_Employee_Owner Production.Document NO_ACTION
+FK_EmployeeDepartmentHistory_Employee_BusinessEntityID HumanResources.EmployeeDepartmentHistory NO_ACTION
+FK_EmployeePayHistory_Employee_BusinessEntityID HumanResources.EmployeePayHistory NO_ACTION
+FK_JobCandidate_Employee_BusinessEntityID HumanResources.JobCandidate NO_ACTION
+FK_PurchaseOrderHeader_Employee_EmployeeID Purchasing.PurchaseOrderHeader NO_ACTION
+FK_SalesPerson_Employee_BusinessEntityID Sales.SalesPerson NO_ACTION

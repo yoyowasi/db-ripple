@@ -1,0 +1,198 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "UPDATE",
+        "target": "cl15.Seat",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 55
+        },
+        "status": "ok",
+        "rowsAffected": 2,
+        "captureSeqRange": [
+          13,
+          13
+        ],
+        "error": null
+      },
+      "boundary": 13,
+      "imageCountAfter": 4,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 12,
+  "headers": [
+    {
+      "captureSeq": 13,
+      "tableObjectId": 1234103437,
+      "tableName": "[cl15].[Seat]",
+      "operation": "UPDATE",
+      "insertedCount": 2,
+      "deletedCount": 2,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 13,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":2}",
+      "rowJson": "{\"id\":2,\"label\":\"s2\"}"
+    },
+    {
+      "captureSeq": 13,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"label\":\"s1\"}"
+    },
+    {
+      "captureSeq": 13,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":102}",
+      "rowJson": "{\"id\":102,\"label\":\"s2\"}"
+    },
+    {
+      "captureSeq": 13,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":101}",
+      "rowJson": "{\"id\":101,\"label\":\"s1\"}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl15.Seat",
+      "keyJson": "{\"id\":2}",
+      "rowJson": null
+    },
+    {
+      "table": "cl15.Seat",
+      "keyJson": "{\"id\":1}",
+      "rowJson": null
+    },
+    {
+      "table": "cl15.Seat",
+      "keyJson": "{\"id\":102}",
+      "rowJson": "{\"id\":102,\"label\":\"s2\"}"
+    },
+    {
+      "table": "cl15.Seat",
+      "keyJson": "{\"id\":101}",
+      "rowJson": "{\"id\":101,\"label\":\"s1\"}"
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl15.Seat",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "label": "s1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl15.Seat",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "2",
+        "label": "s2"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl15.Seat",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "101"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "101",
+        "label": "s1"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl15.Seat",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "102"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "102",
+        "label": "s2"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 4,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 23,
+    "readLog": 2,
+    "reread": 3,
+    "netDiff": 10
+  }
+}

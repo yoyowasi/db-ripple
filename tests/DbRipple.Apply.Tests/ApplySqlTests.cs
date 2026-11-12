@@ -104,6 +104,13 @@ sealed class ApplyLab : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        // [적용]이 샌드박스 재구축을 백그라운드로 시작했으면(SandboxRefreshStarted) 끝날 때까지 기다린 뒤 지운다.
+        // 기다리지 않으면 재구축이 지운 뒤의 _sbx를 다시 만들어 dbrt_apl_*_sbx가 남는다(2026-11-12 실측 3개).
+        try
+        {
+            if ((await Manager.GetStatusAsync(default)).State == SandboxState.Building) await Manager.RefreshAsync(default);
+        }
+        catch (Exception) { } // 재구축 실패여도 정리는 계속한다
         await cleanup.DisposeAsync();
         try { Directory.Delete(dir, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }
@@ -117,15 +124,15 @@ public sealed class ApplySqlTests
     [
         "CREATE TABLE dbo.T (id int NOT NULL PRIMARY KEY, v int NOT NULL);",
         "INSERT INTO dbo.T (id, v) VALUES (1, 1), (2, 5), (3, 20);",
-        "CREATE TABLE dbo.Gate (id int NOT NULL PRIMARY KEY, deny bit NOT NULL);",
-        "INSERT INTO dbo.Gate (id, deny) VALUES (1, 0);",
+        "CREATE TABLE dbo.Gate (id int NOT NULL PRIMARY KEY, blocked bit NOT NULL);",
+        "INSERT INTO dbo.Gate (id, blocked) VALUES (1, 0);",
         "CREATE TABLE dbo.Log (id int IDENTITY(1,1) NOT NULL PRIMARY KEY, msg nvarchar(100) NOT NULL);",
-        // Gate.deny = 1이면 ROLLBACK한 뒤 로그를 남긴다(자동 커밋되어 롤백 뒤 남은 변경이 된다, A22·E13).
+        // Gate.blocked = 1이면 ROLLBACK한 뒤 로그를 남긴다(자동 커밋되어 롤백 뒤 남은 변경이 된다, A22·E13).
         """
         CREATE TRIGGER dbo.tr_T_gate ON dbo.T AFTER UPDATE AS
         BEGIN
             SET NOCOUNT ON;
-            IF EXISTS (SELECT 1 FROM dbo.Gate WHERE id = 1 AND deny = 1)
+            IF EXISTS (SELECT 1 FROM dbo.Gate WHERE id = 1 AND blocked = 1)
             BEGIN
                 ROLLBACK;
                 INSERT INTO dbo.Log (msg) VALUES (N'denied');
@@ -192,7 +199,7 @@ public sealed class ApplySqlTests
         // CL12형(트리거 ROLLBACK + 롤백 뒤 기록). 미리보기에서는 통과하고 원본에서만 거부되도록 Gate를 미리보기 뒤에 켠다.
         await using var lab = await ApplyLab.CustomAsync("trig", Custom);
         var record = await lab.PreviewAsync("UPDATE dbo.T SET v = 2 WHERE id = 1;");
-        await lab.ExecOnOriginAsync("UPDATE dbo.Gate SET deny = 1 WHERE id = 1;");
+        await lab.ExecOnOriginAsync("UPDATE dbo.Gate SET blocked = 1 WHERE id = 1;");
 
         var result = await lab.ApplyAsync(record);
 

@@ -1,7 +1,7 @@
 // 평가 실행 CLI(§10.6). 사용(저장소 루트, 한 명령 안에서 점 소싱):
 //   . .\scripts\env.ps1; dotnet run --project eval\DbRipple.Eval.Cli -- cascadelab [--systems preview,B0,B2] [--cases CL01,CL02] [--out logs\week4\eval] [--repeat 20] [--run-id id] [--execute-as dbr_preview_user|none] [--keep-dbs]
 //   . .\scripts\env.ps1; dotnet run --project eval\DbRipple.Eval.Cli -- m5 [--sizes 1,100,1000,10000,50000,100000] [--cases CL20,CL20b] [--repeat 5] [--warmup 1] [--image-cap n] [--out logs\week4\m5] [--run-id id] [--execute-as …] [--keep-dbs]
-//   dotnet run --project eval\DbRipple.Eval.Cli -- report --run <실행 폴더> [--m5 <m5 실행 폴더>]
+//   dotnet run --project eval\DbRipple.Eval.Cli -- report --run <실행 폴더> [--m5 <m5 실행 폴더>[,<m5 실행 폴더>…]]
 // cascadelab: 사례마다 (변형별 전용 기준선) → 미리보기(평가 훅) → 오라클(문장별 + 원문 배치) → 대조군 → 지표 → cases·m1·m2·m3.csv, 끝에 m4.csv·metrics.csv·env.json.
 // m5: N마다 전용 원본에 cl20.usp_Generate @parents = N → 기준선 → 사례(scaling 문장)마다 워밍업 + 반복 측정(제품 모드, 훅 없음) + 오라클 execute 시간 → m5.csv·env.json.
 // report: 실행 폴더의 CSV만 읽어 report.md(DB 연결 없음).
@@ -23,7 +23,7 @@ const string Usage = """
     사용:
       dbripple-eval cascadelab [--systems preview,B0,B2] [--cases CL01,CL02] [--out <dir>] [--repeat n] [--run-id id] [--execute-as <user>|none] [--keep-dbs]
       dbripple-eval m5 [--sizes 1,100,1000,10000,50000,100000] [--cases CL20,CL20b] [--repeat 5] [--warmup 1] [--image-cap n] [--out <dir>] [--run-id id] [--execute-as <user>|none] [--keep-dbs]
-      dbripple-eval report --run <실행 폴더> [--m5 <m5 실행 폴더>]
+      dbripple-eval report --run <실행 폴더> [--m5 <m5 실행 폴더>[,<m5 실행 폴더>…]]
     """;
 
 if (args.Length == 0 || args[0] is "-h" or "--help" || args[0] is not ("cascadelab" or "m5" or "report"))
@@ -46,7 +46,10 @@ if (args[0] == "report")
     if (run is null) { Console.Error.WriteLine(Usage); return 2; }
     var runDir = Path.GetFullPath(Path.IsPathRooted(run) ? run : Path.Combine(RepoPaths.Root, run));
     if (!Directory.Exists(runDir)) { Console.Error.WriteLine($"실행 폴더 없음: {runDir}"); return 2; }
-    var m5 = Opt("--m5") is { } m ? Path.GetFullPath(Path.IsPathRooted(m) ? m : Path.Combine(RepoPaths.Root, m)) : null;
+    // --m5는 쉼표로 여러 실행 폴더를 받는다(크기별로 나눠 돈 M5를 한 표로, 행은 그대로 잇는다).
+    var m5 = Opt("--m5")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(m => Path.GetFullPath(Path.IsPathRooted(m) ? m : Path.Combine(RepoPaths.Root, m))).ToList();
+    if (m5?.FirstOrDefault(d => !Directory.Exists(d)) is { } missing) { Console.Error.WriteLine($"m5 실행 폴더 없음: {missing}"); return 2; }
     Console.WriteLine($"출력: {ReportBuilder.Write(runDir, m5)}");
     return 0;
 }

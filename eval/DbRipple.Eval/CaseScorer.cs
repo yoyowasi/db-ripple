@@ -64,7 +64,7 @@ public sealed class CaseScorer(MetricsCalculator calculator)
         var system = run.System;
         var isPreview = system == Baselines.Systems.Preview;
         var tables = run.Oracle.Tables;
-        var vol = MetricsCalculator.VolatileMap(tables);
+        var vol = VolatileMap(tables, run.Hand); // 카탈로그 비결정 열 + 손 정답 volatile(트리거 GETDATE 같은, answer-format v0.2)
         var folding = KeyFolding.For(tables);
         var oracle = folding.Apply(run.Oracle.Changes);
         var hand = folding.Apply(run.Hand);
@@ -97,7 +97,7 @@ public sealed class CaseScorer(MetricsCalculator calculator)
         }
 
         var handDiff = hand.DiffAgainst(oracle);
-        var rawDiff = run.OracleRawBatch is null ? [] : RawBatchDiff(run.Oracle, run.OracleRawBatch);
+        var rawDiff = run.OracleRawBatch is null ? [] : RawBatchDiff(run.Oracle, run.OracleRawBatch, hand);
         var statusMatch = statusActual == hand.ExpectedStatus;
         suite.AddStatus(system, hand.Id, statusMatch);
         var t = record?.Result.TimingsMs;
@@ -123,7 +123,7 @@ public sealed class CaseScorer(MetricsCalculator calculator)
                 m1Rows.Add([.. head, .. Enumerable.Repeat("", MetricsCsv.M1Columns.Count - head.Count)]);
                 return;
             }
-            var aligned = IdentityPairing.Align(truth, pred.Select(p => p.Row).ToList(), tables, identityRefs);
+            var aligned = IdentityPairing.Align(truth, pred.Select(p => p.Row).ToList(), tables, identityRefs, vol);
             var c = calculator.M1(aligned.Truth, pred, vol) with { IdentityRows = aligned.Rows, IdentityPaired = aligned.Paired };
             if (residual is { } rf) c = c with { ResidualFilledCells = rf.Filled, ResidualBaseCells = rf.Base };
             suite.AddM1(system, hand.Id, comparison, c);
@@ -174,17 +174,41 @@ public sealed class CaseScorer(MetricsCalculator calculator)
                 StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    /// 비결정 열(테이블 → 열): 오라클 카탈로그로 아는 것(IDENTITY, rowversion, 비결정 기본값)에 손 정답 volatile을 더한다
+    /// (예: 트리거가 GETDATE()로 채우는 CL16 OrdLine.added_at, 문장의 SYSDATETIME()인 CL16b touched_at). 테이블 이름은 대소문자 무시.
+    /// </summary>
+    public static IReadOnlyDictionary<string, IReadOnlySet<string>> VolatileMap(IReadOnlyList<OracleTable> tables, HandCase? hand)
+    {
+        var map = tables.ToDictionary(t => t.Display, t => t.VolatileColumns.ToHashSet(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        foreach (var r in hand?.Rows ?? [])
+        {
+            if (r.Volatile.Count == 0) continue;
+            if (!map.TryGetValue(r.Table, out var set)) map[r.Table] = set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            set.UnionWith(r.Volatile);
+        }
+        return map.ToDictionary(p => p.Key, p => (IReadOnlySet<string>)p.Value, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// 문장별 경로와 원문 배치 경로의 차이(상태, 순 변경 집합: 테이블·키·종류·바뀐 열·after 값).
     /// 두 경로는 차례로 실행되고 롤백해도 IDENTITY 값이 되돌아가지 않으므로, 원문 배치 쪽을 문장별 쪽 IDENTITY 값으로 옮긴 뒤 비교한다(IdentityPairing).
+    /// hand가 있으면 그 identityRefs로 IDENTITY를 담는 비 FK 열(CL12c seen_identity)도 옮기고, 비결정 열(VolatileMap, IDENTITY 키 열 제외) 값은 비교하지 않는다
+    /// (두 실행의 시각·시퀀스·NEWID 값은 늘 다르다, CL16·CL16b).
     /// </summary>
-    public static IReadOnlyList<string> RawBatchDiff(OracleResult perStatement, OracleResult raw)
+    public static IReadOnlyList<string> RawBatchDiff(OracleResult perStatement, OracleResult raw, HandCase? hand = null)
     {
-        raw = raw with { Changes = IdentityPairing.Align(raw.Changes, perStatement.Changes, perStatement.Tables).Truth };
+        var vol = VolatileMap(perStatement.Tables, hand);
+        raw = raw with { Changes = IdentityPairing.Align(raw.Changes, perStatement.Changes, perStatement.Tables, hand is null ? null : IdentityRefMap(hand), vol).Truth };
         var d = new List<string>();
         if (perStatement.Status != raw.Status) d.Add($"status: 문장별 {perStatement.Status}, 원문 배치 {raw.Status}");
-        static string Sig(OracleRowChange c) => c.Table.ToUpperInvariant() + "|" + c.Key + "|" + c.Change + "|" + c.Multiplicity + "|" +
+        var idKeys = perStatement.Tables.ToDictionary(t => t.Display, t => t.IdentityKeyColumns, StringComparer.OrdinalIgnoreCase);
+        bool Compared(OracleRowChange c, string column) =>
+            vol.GetValueOrDefault(c.Table) is not { } v || !v.Contains(column)
+            || (idKeys.GetValueOrDefault(c.Table) ?? []).Contains(column, StringComparer.OrdinalIgnoreCase);
+        string Sig(OracleRowChange c) => c.Table.ToUpperInvariant() + "|" + c.Key + "|" + c.Change + "|" + c.Multiplicity + "|" +
             string.Join(",", c.ChangedColumns.Order(StringComparer.Ordinal)) + "|" +
-            string.Join(",", (c.After ?? new Dictionary<string, string?>()).OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => p.Key + "=" + (p.Value ?? "\u0000")));
+            string.Join(",", (c.After ?? new Dictionary<string, string?>()).Where(p => Compared(c, p.Key)).OrderBy(p => p.Key, StringComparer.Ordinal)
+                .Select(p => p.Key + "=" + (p.Value ?? "\u0000")));
         var a = perStatement.Changes.Select(Sig).ToHashSet(StringComparer.Ordinal);
         var b = raw.Changes.Select(Sig).ToHashSet(StringComparer.Ordinal);
         d.AddRange(a.Except(b).Select(x => "문장별에만: " + x));

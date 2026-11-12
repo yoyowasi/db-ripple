@@ -1,0 +1,188 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "INSERT",
+        "target": "cl12.Doc",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 44
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          41,
+          43
+        ],
+        "error": null
+      },
+      "boundary": 43,
+      "imageCountAfter": 3,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 40,
+  "headers": [
+    {
+      "captureSeq": 41,
+      "tableObjectId": 930102354,
+      "tableName": "[cl12].[DocNote]",
+      "operation": "INSERT",
+      "insertedCount": 1,
+      "deletedCount": 0,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 42,
+      "tableObjectId": 978102525,
+      "tableName": "[cl12].[IdentSeen]",
+      "operation": "INSERT",
+      "insertedCount": 1,
+      "deletedCount": 0,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 43,
+      "tableObjectId": 898102240,
+      "tableName": "[cl12].[Doc]",
+      "operation": "INSERT",
+      "insertedCount": 1,
+      "deletedCount": 0,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 41,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"note_id\":101}",
+      "rowJson": "{\"note_id\":101,\"doc_id\":2,\"note\":\"auto\"}"
+    },
+    {
+      "captureSeq": 42,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"title\":\"d1\"}",
+      "rowJson": "{\"title\":\"d1\",\"seen_identity\":101}"
+    },
+    {
+      "captureSeq": 43,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"doc_id\":2}",
+      "rowJson": "{\"doc_id\":2,\"title\":\"d1\"}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl12.Doc",
+      "keyJson": "{\"doc_id\":2}",
+      "rowJson": "{\"doc_id\":2,\"title\":\"d1\"}"
+    },
+    {
+      "table": "cl12.DocNote",
+      "keyJson": "{\"note_id\":101}",
+      "rowJson": "{\"note_id\":101,\"doc_id\":2,\"note\":\"auto\"}"
+    },
+    {
+      "table": "cl12.IdentSeen",
+      "keyJson": "{\"title\":\"d1\"}",
+      "rowJson": "{\"title\":\"d1\",\"seen_identity\":101}"
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl12.Doc",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "doc_id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "doc_id": "2",
+        "title": "d1"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl12.DocNote",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "note_id"
+        ],
+        "values": [
+          "101"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "note_id": "101",
+        "doc_id": "2",
+        "note": "auto"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl12.IdentSeen",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "title"
+        ],
+        "values": [
+          "d1"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "title": "d1",
+        "seen_identity": "101"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 3,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 38,
+    "readLog": 2,
+    "reread": 12,
+    "netDiff": 12
+  }
+}

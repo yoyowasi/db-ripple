@@ -569,4 +569,36 @@ public class Week3MetricsTests
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
     }
+
+    // 크기별로 나눠 돈 M5 실행 폴더 여럿을 한 표로 잇는다(2026-11-12, 10만 행만 따로 실행). 값은 각 m5.csv 그대로, 순서는 (사례, N).
+    [Fact]
+    public void Report_joins_m5_rows_from_several_run_folders_in_case_and_size_order()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "dbripple-eval-tests", Guid.NewGuid().ToString("N"));
+        string M5Dir(string runId, long n, long totalExecute)
+        {
+            var d = Path.Combine(root, runId);
+            var samples = new List<M5Sample> { new("CL20", "DELETE", n, 1, false, "ok", new TimingsMs { Execute = totalExecute }, 1) };
+            foreach (var row in ResponseTime.Rows(runId, samples)) MetricsCsv.Append(Path.Combine(d, "m5.csv"), MetricsCsv.M5Columns, row);
+            return d;
+        }
+        try
+        {
+            var run = Path.Combine(root, "eval");
+            Directory.CreateDirectory(run);
+            var big = M5Dir("m5-big", 100000, 900);
+            var small = M5Dir("m5-small", 10, 7);
+            var md = ReportBuilder.Build(run, [big, small]);
+            Assert.Contains("# 평가 보고서 — m5-big, m5-small", md);
+            Assert.Contains("`m5.csv`: 2행 (`../m5-big, ../m5-small`)", md);
+            var i10 = md.IndexOf("| CL20 | DELETE | 10 | 1 | ok | false | 7.0 |", StringComparison.Ordinal);
+            var i100k = md.IndexOf("| CL20 | DELETE | 100000 | 1 | ok | false | 900.0 |", StringComparison.Ordinal);
+            Assert.True(i10 >= 0 && i100k > i10, md);
+            Assert.Equal(ReportBuilder.Build(run, big), ReportBuilder.Build(run, [big])); // 한 폴더는 기존 호출과 같다
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
 }

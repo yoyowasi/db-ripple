@@ -5,7 +5,8 @@ namespace DbRipple.Attribution;
 /// <summary>
 /// §7.2 3단계 FK 판정(문장 안 전체, 순서와 무관). 짝 없이 집합으로 행을 맞추고, certain은 다음을 모두 만족할 때만 준다:
 /// 일치한 (FK, 부모 묶음) 쌍이 하나, 그 FK·이벤트의 부모 후보 묶음(같은 문장의 부모 테이블·연산 묶음)이 하나, 모든 행이 검증으로 일치,
-/// 같은 문장에서 실행될 수 있는 트리거 가운데 자식 테이블에 쓸 수 있는 것이 없음, 부모·자식 깊이가 같음(H2), 기본값 비교가 확정.
+/// 같은 문장에서 실행될 수 있는 트리거 가운데 자식 테이블에 쓸 수 있는 것이 없음, 부모·자식 깊이가 같음(H2), 기본값 비교가 확정,
+/// 깊이가 다른 후보를 H2로 빼지 않았음. 후보는 자식과 깊이가 같은 부모 묶음이 행을 설명하면 그 깊이 후보로 좁힌다(CL09 K#1, 2026-11-12).
 /// </summary>
 internal sealed class FkJudge(CatalogIndex cat, IReadOnlyDictionary<string, List<RowChange>> rows)
 {
@@ -47,12 +48,29 @@ internal sealed class FkJudge(CatalogIndex cat, IReadOnlyDictionary<string, List
         var rowUnverifiable = childRows.ToDictionary(r => r.Id, _ => new List<Pair>());
         var parentRowIds = new Dictionary<string, List<string>>();
 
-        foreach (var pair in pairs)
+        // 행 일치는 쌍마다 먼저 구한다(집합 판정, 순서와 무관).
+        var results = pairs.Select(pair =>
         {
             var sets = ParentSets(pair);
-            foreach (var rc in childRows)
+            return (Pair: pair, Rows: childRows.Select(rc => (Row: rc, Result: MatchRow(pair, sets, rc))).ToList());
+        }).ToList();
+
+        // H2(SP1 실측: FK 연쇄 자식 묶음은 부모 묶음과 깊이가 같다, 오케스트레이터 결정 2026-11-12): 자식과 깊이가 같은 부모 묶음이
+        // 한 행이라도 설명하면 같은 깊이 후보만 남긴다. 다른 깊이 후보가 실제로 행을 설명하다가 빠졌으면 그 판단은 H2(관측 전제, 문서 보장 아님)에
+        // 기대므로 certain을 주지 않는다. 같은 깊이 후보가 없으면 지금처럼 모든 후보를 쓴다(깊이가 달라 certain도 아님).
+        static bool Explains(IEnumerable<(RowChange Row, (RowMatch M, bool Weak, List<string> Ids) Result)> rows) => rows.Any(x => x.Result.M != RowMatch.NoMatch);
+        var droppedByDepth = false;
+        if (results.Any(x => x.Pair.Parent.Depth == child.Depth && Explains(x.Rows)))
+        {
+            droppedByDepth = results.Any(x => x.Pair.Parent.Depth != child.Depth && Explains(x.Rows));
+            results = results.Where(x => x.Pair.Parent.Depth == child.Depth).ToList();
+            pairs = results.Select(x => x.Pair).ToList();
+        }
+
+        foreach (var (pair, rowsOfPair) in results)
+        {
+            foreach (var (rc, (m, weak, parentIds)) in rowsOfPair)
             {
-                var (m, weak, parentIds) = MatchRow(pair, sets, rc);
                 if (m == RowMatch.Match)
                 {
                     pair.Matched++;
@@ -82,6 +100,7 @@ internal sealed class FkJudge(CatalogIndex cat, IReadOnlyDictionary<string, List
         var distinctParents = active.Select(p => p.Parent.Id).Distinct().Count();
 
         var certain = active.Count == 1
+            && !droppedByDepth
             && primary.CandidateCount == 1
             && unverifiableRows == 0
             && unmatched.Count == 0

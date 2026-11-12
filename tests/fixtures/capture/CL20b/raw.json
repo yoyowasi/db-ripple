@@ -1,0 +1,308 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "UPDATE",
+        "target": "cl20.Child",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 51
+        },
+        "status": "ok",
+        "rowsAffected": 3,
+        "captureSeqRange": [
+          24,
+          25
+        ],
+        "error": null
+      },
+      "boundary": 25,
+      "imageCountAfter": 10,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 23,
+  "headers": [
+    {
+      "captureSeq": 24,
+      "tableObjectId": 1730105204,
+      "tableName": "[cl20].[Parent]",
+      "operation": "UPDATE",
+      "insertedCount": 2,
+      "deletedCount": 2,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 25,
+      "tableObjectId": 1762105318,
+      "tableName": "[cl20].[Child]",
+      "operation": "UPDATE",
+      "insertedCount": 3,
+      "deletedCount": 3,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 24,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":2}",
+      "rowJson": "{\"id\":2,\"total\":2}"
+    },
+    {
+      "captureSeq": 24,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"total\":2}"
+    },
+    {
+      "captureSeq": 24,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":2}",
+      "rowJson": "{\"id\":2,\"total\":3}"
+    },
+    {
+      "captureSeq": 24,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"total\":4}"
+    },
+    {
+      "captureSeq": 25,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":3}",
+      "rowJson": "{\"id\":3,\"parent_id\":2,\"qty\":1}"
+    },
+    {
+      "captureSeq": 25,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":2}",
+      "rowJson": "{\"id\":2,\"parent_id\":1,\"qty\":1}"
+    },
+    {
+      "captureSeq": 25,
+      "imageKind": "DELETED",
+      "ordinal": 3,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"parent_id\":1,\"qty\":1}"
+    },
+    {
+      "captureSeq": 25,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":3}",
+      "rowJson": "{\"id\":3,\"parent_id\":2,\"qty\":2}"
+    },
+    {
+      "captureSeq": 25,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":2}",
+      "rowJson": "{\"id\":2,\"parent_id\":1,\"qty\":2}"
+    },
+    {
+      "captureSeq": 25,
+      "imageKind": "INSERTED",
+      "ordinal": 3,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"parent_id\":1,\"qty\":2}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl20.Child",
+      "keyJson": "{\"id\":3}",
+      "rowJson": "{\"id\":3,\"parent_id\":2,\"qty\":2}"
+    },
+    {
+      "table": "cl20.Child",
+      "keyJson": "{\"id\":2}",
+      "rowJson": "{\"id\":2,\"parent_id\":1,\"qty\":2}"
+    },
+    {
+      "table": "cl20.Child",
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"parent_id\":1,\"qty\":2}"
+    },
+    {
+      "table": "cl20.Parent",
+      "keyJson": "{\"id\":2}",
+      "rowJson": "{\"id\":2,\"total\":3}"
+    },
+    {
+      "table": "cl20.Parent",
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"total\":4}"
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl20.Child",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "parent_id": "1",
+        "qty": "1"
+      },
+      "after": {
+        "id": "1",
+        "parent_id": "1",
+        "qty": "2"
+      },
+      "changedColumns": [
+        "qty"
+      ],
+      "explainedBy": null
+    },
+    {
+      "table": "cl20.Child",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "2",
+        "parent_id": "1",
+        "qty": "1"
+      },
+      "after": {
+        "id": "2",
+        "parent_id": "1",
+        "qty": "2"
+      },
+      "changedColumns": [
+        "qty"
+      ],
+      "explainedBy": null
+    },
+    {
+      "table": "cl20.Child",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "3"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "3",
+        "parent_id": "2",
+        "qty": "1"
+      },
+      "after": {
+        "id": "3",
+        "parent_id": "2",
+        "qty": "2"
+      },
+      "changedColumns": [
+        "qty"
+      ],
+      "explainedBy": null
+    },
+    {
+      "table": "cl20.Parent",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "total": "2"
+      },
+      "after": {
+        "id": "1",
+        "total": "4"
+      },
+      "changedColumns": [
+        "total"
+      ],
+      "explainedBy": null
+    },
+    {
+      "table": "cl20.Parent",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "2",
+        "total": "2"
+      },
+      "after": {
+        "id": "2",
+        "total": "3"
+      },
+      "changedColumns": [
+        "total"
+      ],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 10,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 32,
+    "readLog": 2,
+    "reread": 2,
+    "netDiff": 14
+  }
+}

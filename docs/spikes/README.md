@@ -15,7 +15,7 @@
 | SP6 | FOR JSON 형식 변환 | 일부 깨짐(2026-11-10): float 정밀도, 공간 Z/M, money=숫자 → §6.1 규칙 수정, C9 반영 | DB 실측(컨테이너) | [SP6.md](SP6.md) |
 | SP10 | 트랜잭션 안 EXECUTE AS/REVERT, 소유권 체인 | 성립(2026-11-10). doomed면 ROLLBACK 뒤 REVERT | DB 실측(컨테이너) | [SP10.md](SP10.md) |
 | SP7 | 열린 트랜잭션 안 최종 차이(정확성, AW 전 테이블 시간) | 통과(2026-11-10, 2회): 독립 확인 10/10, p50 1.55~1.65초·p95 2.03~3.70초 | DB 실측(컨테이너) | [SP7.md](SP7.md) |
-| SP8 | AW DM1·DM2·DM3 실제 전파, 데모 대본 확정 | 스크립트 준비, 실행 전 | — (읽기 전용 조회 `spikes/sql/sp8-dm1-pick-order.sql`, `sp8-dm2-pick-order.sql`, `sp8-dm3-employee.sql`) | — |
+| SP8 | AW DM1·DM2·DM3 실제 전파, 데모 대본 확정 | 확정(2026-11-12): DM1 주문 43697, DM2 상세 52, DM3 직원 1. DM2의 SalesYTD는 회계 기간 불일치로 늘 0행 | DB 실측(AW_Origin 읽기 전용 조회 + 전용 사본에서 Host 끝까지) | [SP8.md](SP8.md) |
 | SP9 | 브라우저 렌더 시간(그래프 노드 50·200·500, 그리드 1만·5만 행) | 측정 전(참고값 1회) | 브라우저(측정 화면 `/sp9`) | [SP9.md](SP9.md) |
 
 2026-11-06에는 작업 PC에 Docker Desktop·WSL이 없어 SP4만 실행했다. 2026-11-10에 Docker를 설치하고 나머지를 실측했다. 준비 절차는 [../dev-setup.md](../dev-setup.md)에 있다. 설계 반영은 [../architecture.md](../architecture.md) v1.3에서 "v1.3"으로 표시한 곳이다.

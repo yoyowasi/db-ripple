@@ -1,0 +1,717 @@
+{
+  "version": "m-20261112-1458",
+  "tables": [
+    {
+      "table": "cl01.A",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl01.B",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl01.C",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl01.D",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl02.Dept",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl02.Emp",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl03.Category",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl03.Grp",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl03.Item",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl03.Product",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl04.Ch",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl04.P",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl05.P",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl05.X",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl05.X2",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl05.Y",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl05.Y2",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl06.Line",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl06.LineLog",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl06.Ord",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl07.A",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl07.B",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl07.C",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl07.D",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl08.Acct",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl09.K",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl09.M",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl09.P",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl09.Q",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl10.Counter",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl10.Manager",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl10.Region",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl10.RegionLog",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl10.Shelf",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl10.Slot",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl10.Store",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl11.Item",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl11.ItemLog",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl12.Doc",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "doc_id",
+          "reason": "IDENTITY"
+        }
+      ]
+    },
+    {
+      "table": "cl12.DocNote",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "note_id",
+          "reason": "IDENTITY"
+        }
+      ]
+    },
+    {
+      "table": "cl12.ErrLog",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "log_id",
+          "reason": "IDENTITY"
+        }
+      ]
+    },
+    {
+      "table": "cl12.IdentSeen",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl12.Ord",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl12.OrdHist",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl13.Log",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl13.T",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "NONE"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl13.TC",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl14.Tag",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl15.Emp",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl15.Seat",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl16.Ord",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "id",
+          "reason": "IDENTITY"
+        },
+        {
+          "column": "invoice_no",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "created_at",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        },
+        {
+          "column": "row_guid",
+          "reason": "NONDETERMINISTIC_DEFAULT"
+        }
+      ]
+    },
+    {
+      "table": "cl16.OrdLine",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": [
+        {
+          "column": "id",
+          "reason": "IDENTITY"
+        }
+      ]
+    },
+    {
+      "table": "cl17.Acct",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl17.Txn",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl18.Cust",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl18.Inv",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl18.Note",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl19.Doc",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [
+        "legacy"
+      ],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl20.Child",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl20.ChildLog",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    },
+    {
+      "table": "cl20.Parent",
+      "covered": true,
+      "auditOrder": {
+        "insert": "LAST",
+        "update": "LAST",
+        "delete": "LAST"
+      },
+      "unobservableColumns": [],
+      "volatileColumns": []
+    }
+  ],
+  "excludedTables": [],
+  "notes": []
+}

@@ -1,0 +1,62 @@
+{
+  "firings": [
+    {
+      "id": "f-1",
+      "captureSeq": 1,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl16.Ord",
+      "operation": "UPDATE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-1-1",
+      "firingId": "f-1",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "customer": "s1",
+        "note": null,
+        "invoice_no": "5000",
+        "created_at": "2026-11-12T05:04:16.032",
+        "row_guid": "341A0807-AF87-43D4-9540-11D07494068C",
+        "touched_at": null
+      },
+      "after": {
+        "id": "1",
+        "customer": "s1",
+        "note": "x",
+        "invoice_no": "5000",
+        "created_at": "2026-11-12T05:04:16.032",
+        "row_guid": "341A0807-AF87-43D4-9540-11D07494068C",
+        "touched_at": "2026-11-12T05:04:22.702"
+      },
+      "changedColumns": [
+        "note",
+        "touched_at"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [],
+  "rereadDifferences": []
+}

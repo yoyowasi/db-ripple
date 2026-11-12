@@ -1,0 +1,240 @@
+{
+  "firings": [
+    {
+      "id": "f-14",
+      "captureSeq": 14,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl09.K",
+      "operation": "DELETE",
+      "rowCount": 2,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-15",
+      "captureSeq": 15,
+      "statementIndex": 1,
+      "depth": 2,
+      "table": "cl09.K",
+      "operation": "DELETE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-16",
+      "captureSeq": 16,
+      "statementIndex": 1,
+      "depth": 2,
+      "table": "cl09.Q",
+      "operation": "DELETE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-17",
+      "captureSeq": 17,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl09.M",
+      "operation": "DELETE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-18",
+      "captureSeq": 18,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl09.P",
+      "operation": "DELETE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-14-1",
+      "firingId": "f-14",
+      "operation": "DELETE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "40"
+        ]
+      },
+      "before": {
+        "id": "40",
+        "p_id": "1",
+        "q_id": null
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-14-2",
+      "firingId": "f-14",
+      "operation": "DELETE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "42"
+        ]
+      },
+      "before": {
+        "id": "42",
+        "p_id": "1",
+        "q_id": "30"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-15-1",
+      "firingId": "f-15",
+      "operation": "DELETE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "41"
+        ]
+      },
+      "before": {
+        "id": "41",
+        "p_id": null,
+        "q_id": "30"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-16-1",
+      "firingId": "f-16",
+      "operation": "DELETE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "30"
+        ]
+      },
+      "before": {
+        "id": "30"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-17-1",
+      "firingId": "f-17",
+      "operation": "DELETE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "20"
+        ]
+      },
+      "before": {
+        "id": "20",
+        "p_id": "1",
+        "q_ref": "30"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-18-1",
+      "firingId": "f-18",
+      "operation": "DELETE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [
+    {
+      "childFiringId": "f-15",
+      "candidateParentFiringIds": [
+        "f-17"
+      ],
+      "confidenceCap": "inferred"
+    },
+    {
+      "childFiringId": "f-16",
+      "candidateParentFiringIds": [
+        "f-17"
+      ],
+      "confidenceCap": "inferred"
+    }
+  ],
+  "rereadDifferences": []
+}

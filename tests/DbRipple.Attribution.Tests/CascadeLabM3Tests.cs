@@ -61,7 +61,12 @@ public class CascadeLabM3Tests(ITestOutputHelper output)
         var actual = actualRaw.GroupBy(a => M3.NormalizeKey(a.Key, actKeys)).ToDictionary(g => g.Key, g => g.First());
 
         var missing = expected.Keys.Except(actual.Keys).ToList();
-        var extra = actual.Keys.Except(expected.Keys).ToList();
+        // answer-format v0.2: ambiguous 간선은 실제로 쓴 간선 하나만 적는다. 제품의 나머지 ambiguous 후보(같은 문장·자식·종류)는 후보 집합이라 초과로 세지 않는다(M3 후보 포함률과 같은 묶음).
+        static string Group(string k) { var p = k.Split('|'); return $"{p[0]}|{p[2]}|{p[3]}"; }
+        var ambiguousGroups = expected.Where(e => e.Value.Confidence == "ambiguous").Select(e => Group(e.Key)).ToHashSet();
+        var candidates = actual.Where(a => !expected.ContainsKey(a.Key) && a.Value.Confidence == "ambiguous" && ambiguousGroups.Contains(Group(a.Key)))
+            .Select(a => a.Key).ToList();
+        var extra = actual.Keys.Except(expected.Keys).Except(candidates).ToList();
         var matched = expected.Keys.Intersect(actual.Keys).ToList();
         var confMismatch = matched.Where(k => expected[k].Confidence != actual[k].Confidence)
             .Select(k => $"{k}: exp={expected[k].Confidence} act={actual[k].Confidence}").ToList();
@@ -71,7 +76,8 @@ public class CascadeLabM3Tests(ITestOutputHelper output)
         var over = actual.Where(a => a.Value.Confidence == "certain" && (!expected.TryGetValue(a.Key, out var e) || e.Confidence != "certain")).Count();
         var exact = matched.Count - confMismatch.Count;
         var summary = $"{id}: expected={expected.Count} actual={actual.Count} keyMatch={matched.Count} keyAndConfidenceMatch={exact} missing={missing.Count} extra={extra.Count} certainOverconfidence={over}"
-            + string.Concat(missing.Select(m => "\n  missing " + m)) + string.Concat(extra.Select(m => "\n  extra " + m))
+            + string.Concat(missing.Select(m => "\n  missing " + m)) + string.Concat(extra.Select(m => $"\n  extra {m} ({actual[m].Confidence})"))
+            + string.Concat(candidates.Select(m => "\n  ambiguous candidate " + m))
             + string.Concat(confMismatch.Select(m => "\n  confidence " + m)) + string.Concat(obsMismatch.Select(m => "\n  observed " + m));
         return new CompareReport(summary, over, missing, extra, confMismatch, obsMismatch);
     }

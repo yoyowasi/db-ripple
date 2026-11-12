@@ -83,10 +83,10 @@ public class CascadeLabWeek3Tests
             if (!hc.LeavesResidue && hc.Statements.All(s => !s.Contains('@')))
             {
                 var raw = await runner.RunAsync(cs, db, hc.Statements, rawBatch: true, default);
-                problems.AddRange(CaseScorer.RawBatchDiff(per, raw).Select(x => $"{hc.Id} 원문 배치: {x}"));
+                problems.AddRange(CaseScorer.RawBatchDiff(per, raw, hc).Select(x => $"{hc.Id} 원문 배치: {x}"));
             }
         }
-        Assert.Empty(problems);
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
     }
 
     /// <summary>비교기 자체 검증(§10.3) 추가: geography·geometry·sql_variant 열(CL19, SP6 13604 회피 확인)과 정렬 규칙 키(인계 6).</summary>

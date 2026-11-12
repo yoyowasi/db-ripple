@@ -1,0 +1,160 @@
+# <scratchpad>\sp8-trigger-lines.sql db=AW_Origin part=0 at=2026-11-12T14:25:03.7723711+09:00 elapsedSec=0.85 exit=0
+compatibility_level
+-------------------
+170
+trg ordinal line
+--- ------- ----
+dEmployee 2 CREATE TRIGGER [HumanResources].[dEmployee] ON [HumanResources].[Employee]
+dEmployee 3 INSTEAD OF DELETE NOT FOR REPLICATION AS
+dEmployee 4 BEGIN
+dEmployee 5     DECLARE @Count int;
+dEmployee 7     SET @Count = @@ROWCOUNT;
+dEmployee 8     IF @Count = 0
+dEmployee 9         RETURN;
+dEmployee 11     SET NOCOUNT ON;
+dEmployee 13     BEGIN
+dEmployee 14         RAISERROR
+dEmployee 15             (N'Employees cannot be deleted. They can only be marked as not current.', -- Message
+dEmployee 16             10, -- Severity.
+dEmployee 17             1); -- State.
+dEmployee 19         -- Rollback any active or uncommittable transactions
+dEmployee 20         IF @@TRANCOUNT > 0
+dEmployee 21         BEGIN
+dEmployee 22             ROLLBACK TRANSACTION;
+dEmployee 23         END
+dEmployee 24     END;
+dEmployee 25 END;
+iduSalesOrderDetail 2 CREATE TRIGGER [Sales].[iduSalesOrderDetail] ON [Sales].[SalesOrderDetail]
+iduSalesOrderDetail 3 AFTER INSERT, DELETE, UPDATE AS
+iduSalesOrderDetail 4 BEGIN
+iduSalesOrderDetail 5     DECLARE @Count int;
+iduSalesOrderDetail 7     SET @Count = @@ROWCOUNT;
+iduSalesOrderDetail 8     IF @Count = 0
+iduSalesOrderDetail 9         RETURN;
+iduSalesOrderDetail 11     SET NOCOUNT ON;
+iduSalesOrderDetail 13     BEGIN TRY
+iduSalesOrderDetail 14         -- If inserting or updating these columns
+iduSalesOrderDetail 15         IF UPDATE([ProductID]) OR UPDATE([OrderQty]) OR UPDATE([UnitPrice]) OR UPDATE([UnitPriceDiscount])
+iduSalesOrderDetail 16         -- Insert record into TransactionHistory
+iduSalesOrderDetail 17         BEGIN
+iduSalesOrderDetail 18             INSERT INTO [Production].[TransactionHistory]
+iduSalesOrderDetail 19                 ([ProductID]
+iduSalesOrderDetail 20                 ,[ReferenceOrderID]
+iduSalesOrderDetail 21                 ,[ReferenceOrderLineID]
+iduSalesOrderDetail 22                 ,[TransactionType]
+iduSalesOrderDetail 23                 ,[TransactionDate]
+iduSalesOrderDetail 24                 ,[Quantity]
+iduSalesOrderDetail 25                 ,[ActualCost])
+iduSalesOrderDetail 26             SELECT
+iduSalesOrderDetail 27                 inserted.[ProductID]
+iduSalesOrderDetail 28                 ,inserted.[SalesOrderID]
+iduSalesOrderDetail 29                 ,inserted.[SalesOrderDetailID]
+iduSalesOrderDetail 30                 ,'S'
+iduSalesOrderDetail 31                 ,GETDATE()
+iduSalesOrderDetail 32                 ,inserted.[OrderQty]
+iduSalesOrderDetail 33                 ,inserted.[UnitPrice]
+iduSalesOrderDetail 34             FROM inserted
+iduSalesOrderDetail 35                 INNER JOIN [Sales].[SalesOrderHeader]
+iduSalesOrderDetail 36                 ON inserted.[SalesOrderID] = [Sales].[SalesOrderHeader].[SalesOrderID];
+iduSalesOrderDetail 38             UPDATE [Person].[Person]
+iduSalesOrderDetail 39             SET [Demographics].modify('declare default element namespace
+iduSalesOrderDetail 40                 "http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey";
+iduSalesOrderDetail 41                 replace value of (/IndividualSurvey/TotalPurchaseYTD)[1]
+iduSalesOrderDetail 42                 with data(/IndividualSurvey/TotalPurchaseYTD)[1] + sql:column ("inserted.LineTotal")')
+iduSalesOrderDetail 43             FROM inserted
+iduSalesOrderDetail 44                 INNER JOIN [Sales].[SalesOrderHeader] AS SOH
+iduSalesOrderDetail 45                 ON inserted.[SalesOrderID] = SOH.[SalesOrderID]
+iduSalesOrderDetail 46                 INNER JOIN [Sales].[Customer] AS C
+iduSalesOrderDetail 47                 ON SOH.[CustomerID] = C.[CustomerID]
+iduSalesOrderDetail 48             WHERE C.[PersonID] = [Person].[Person].[BusinessEntityID];
+iduSalesOrderDetail 49         END;
+iduSalesOrderDetail 51         -- Update SubTotal in SalesOrderHeader record. Note that this causes the
+iduSalesOrderDetail 52         -- SalesOrderHeader trigger to fire which will update the RevisionNumber.
+iduSalesOrderDetail 53         UPDATE [Sales].[SalesOrderHeader]
+iduSalesOrderDetail 54         SET [Sales].[SalesOrderHeader].[SubTotal] =
+iduSalesOrderDetail 55             (SELECT SUM([Sales].[SalesOrderDetail].[LineTotal])
+iduSalesOrderDetail 56                 FROM [Sales].[SalesOrderDetail]
+iduSalesOrderDetail 57                 WHERE [Sales].[SalesOrderHeader].[SalesOrderID] = [Sales].[SalesOrderDetail].[SalesOrderID])
+iduSalesOrderDetail 58         WHERE [Sales].[SalesOrderHeader].[SalesOrderID] IN (SELECT inserted.[SalesOrderID] FROM inserted);
+iduSalesOrderDetail 60         UPDATE [Person].[Person]
+iduSalesOrderDetail 61         SET [Demographics].modify('declare default element namespace
+iduSalesOrderDetail 62             "http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey";
+iduSalesOrderDetail 63             replace value of (/IndividualSurvey/TotalPurchaseYTD)[1]
+iduSalesOrderDetail 64             with data(/IndividualSurvey/TotalPurchaseYTD)[1] - sql:column("deleted.LineTotal")')
+iduSalesOrderDetail 65         FROM deleted
+iduSalesOrderDetail 66             INNER JOIN [Sales].[SalesOrderHeader]
+iduSalesOrderDetail 67             ON deleted.[SalesOrderID] = [Sales].[SalesOrderHeader].[SalesOrderID]
+iduSalesOrderDetail 68             INNER JOIN [Sales].[Customer]
+iduSalesOrderDetail 69             ON [Sales].[Customer].[CustomerID] = [Sales].[SalesOrderHeader].[CustomerID]
+iduSalesOrderDetail 70         WHERE [Sales].[Customer].[PersonID] = [Person].[Person].[BusinessEntityID];
+iduSalesOrderDetail 71     END TRY
+iduSalesOrderDetail 72     BEGIN CATCH
+iduSalesOrderDetail 73         EXECUTE [dbo].[uspPrintError];
+iduSalesOrderDetail 75         -- Rollback any active or uncommittable transactions before
+iduSalesOrderDetail 76         -- inserting information in the ErrorLog
+iduSalesOrderDetail 77         IF @@TRANCOUNT > 0
+iduSalesOrderDetail 78         BEGIN
+iduSalesOrderDetail 79             ROLLBACK TRANSACTION;
+iduSalesOrderDetail 80         END
+iduSalesOrderDetail 82         EXECUTE [dbo].[uspLogError];
+iduSalesOrderDetail 83     END CATCH;
+iduSalesOrderDetail 84 END;
+uSalesOrderHeader 2 CREATE TRIGGER [Sales].[uSalesOrderHeader] ON [Sales].[SalesOrderHeader]
+uSalesOrderHeader 3 AFTER UPDATE NOT FOR REPLICATION AS
+uSalesOrderHeader 4 BEGIN
+uSalesOrderHeader 5     DECLARE @Count int;
+uSalesOrderHeader 7     SET @Count = @@ROWCOUNT;
+uSalesOrderHeader 8     IF @Count = 0
+uSalesOrderHeader 9         RETURN;
+uSalesOrderHeader 11     SET NOCOUNT ON;
+uSalesOrderHeader 13     BEGIN TRY
+uSalesOrderHeader 14         -- Update RevisionNumber for modification of any field EXCEPT the Status.
+uSalesOrderHeader 15         IF NOT UPDATE([Status])
+uSalesOrderHeader 16         BEGIN
+uSalesOrderHeader 17             UPDATE [Sales].[SalesOrderHeader]
+uSalesOrderHeader 18             SET [Sales].[SalesOrderHeader].[RevisionNumber] =
+uSalesOrderHeader 19                 [Sales].[SalesOrderHeader].[RevisionNumber] + 1
+uSalesOrderHeader 20             WHERE [Sales].[SalesOrderHeader].[SalesOrderID] IN
+uSalesOrderHeader 21                 (SELECT inserted.[SalesOrderID] FROM inserted);
+uSalesOrderHeader 22         END;
+uSalesOrderHeader 24         -- Update the SalesPerson SalesYTD when SubTotal is updated
+uSalesOrderHeader 25         IF UPDATE([SubTotal])
+uSalesOrderHeader 26         BEGIN
+uSalesOrderHeader 27             DECLARE @StartDate datetime,
+uSalesOrderHeader 28                     @EndDate datetime
+uSalesOrderHeader 30             SET @StartDate = [dbo].[ufnGetAccountingStartDate]();
+uSalesOrderHeader 31             SET @EndDate = [dbo].[ufnGetAccountingEndDate]();
+uSalesOrderHeader 33             UPDATE [Sales].[SalesPerson]
+uSalesOrderHeader 34             SET [Sales].[SalesPerson].[SalesYTD] =
+uSalesOrderHeader 35                 (SELECT SUM([Sales].[SalesOrderHeader].[SubTotal])
+uSalesOrderHeader 36                 FROM [Sales].[SalesOrderHeader]
+uSalesOrderHeader 37                 WHERE [Sales].[SalesPerson].[BusinessEntityID] = [Sales].[SalesOrderHeader].[SalesPersonID]
+uSalesOrderHeader 38                     AND ([Sales].[SalesOrderHeader].[Status] = 5) -- Shipped
+uSalesOrderHeader 39                     AND [Sales].[SalesOrderHeader].[OrderDate] BETWEEN @StartDate AND @EndDate)
+uSalesOrderHeader 40             WHERE [Sales].[SalesPerson].[BusinessEntityID]
+uSalesOrderHeader 41                 IN (SELECT DISTINCT inserted.[SalesPersonID] FROM inserted
+uSalesOrderHeader 42                     WHERE inserted.[OrderDate] BETWEEN @StartDate AND @EndDate);
+uSalesOrderHeader 44             -- Update the SalesTerritory SalesYTD when SubTotal is updated
+uSalesOrderHeader 45             UPDATE [Sales].[SalesTerritory]
+uSalesOrderHeader 46             SET [Sales].[SalesTerritory].[SalesYTD] =
+uSalesOrderHeader 47                 (SELECT SUM([Sales].[SalesOrderHeader].[SubTotal])
+uSalesOrderHeader 48                 FROM [Sales].[SalesOrderHeader]
+uSalesOrderHeader 49                 WHERE [Sales].[SalesTerritory].[TerritoryID] = [Sales].[SalesOrderHeader].[TerritoryID]
+uSalesOrderHeader 50                     AND ([Sales].[SalesOrderHeader].[Status] = 5) -- Shipped
+uSalesOrderHeader 51                     AND [Sales].[SalesOrderHeader].[OrderDate] BETWEEN @StartDate AND @EndDate)
+uSalesOrderHeader 52             WHERE [Sales].[SalesTerritory].[TerritoryID]
+uSalesOrderHeader 53                 IN (SELECT DISTINCT inserted.[TerritoryID] FROM inserted
+uSalesOrderHeader 54                     WHERE inserted.[OrderDate] BETWEEN @StartDate AND @EndDate);
+uSalesOrderHeader 55         END;
+uSalesOrderHeader 56     END TRY
+uSalesOrderHeader 57     BEGIN CATCH
+uSalesOrderHeader 58         EXECUTE [dbo].[uspPrintError];
+uSalesOrderHeader 60         -- Rollback any active or uncommittable transactions before
+uSalesOrderHeader 61         -- inserting information in the ErrorLog
+uSalesOrderHeader 62         IF @@TRANCOUNT > 0
+uSalesOrderHeader 63         BEGIN
+uSalesOrderHeader 64             ROLLBACK TRANSACTION;
+uSalesOrderHeader 65         END
+uSalesOrderHeader 67         EXECUTE [dbo].[uspLogError];
+uSalesOrderHeader 68     END CATCH;
+uSalesOrderHeader 69 END;

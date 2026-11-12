@@ -1,0 +1,127 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "UPDATE",
+        "target": "cl14.Tag",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 53
+        },
+        "status": "ok",
+        "rowsAffected": 2,
+        "captureSeqRange": [
+          45,
+          45
+        ],
+        "error": null
+      },
+      "boundary": 45,
+      "imageCountAfter": 4,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 44,
+  "headers": [
+    {
+      "captureSeq": 45,
+      "tableObjectId": 1218103380,
+      "tableName": "[cl14].[Tag]",
+      "operation": "UPDATE",
+      "insertedCount": 2,
+      "deletedCount": 2,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 45,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": null,
+      "rowJson": "{\"name\":\"a\",\"qty\":1}"
+    },
+    {
+      "captureSeq": 45,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": null,
+      "rowJson": "{\"name\":\"a\",\"qty\":1}"
+    },
+    {
+      "captureSeq": 45,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": null,
+      "rowJson": "{\"name\":\"a\",\"qty\":11}"
+    },
+    {
+      "captureSeq": 45,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": null,
+      "rowJson": "{\"name\":\"a\",\"qty\":11}"
+    }
+  ],
+  "rereads": [],
+  "netChanges": [
+    {
+      "table": "cl14.Tag",
+      "key": {
+        "kind": "ROW",
+        "columns": [],
+        "values": []
+      },
+      "change": "MULTISET_ADDED",
+      "multiplicity": 2,
+      "before": null,
+      "after": {
+        "name": "a",
+        "qty": "11"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl14.Tag",
+      "key": {
+        "kind": "ROW",
+        "columns": [],
+        "values": []
+      },
+      "change": "MULTISET_REMOVED",
+      "multiplicity": 2,
+      "before": {
+        "name": "a",
+        "qty": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 4,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 20,
+    "readLog": 1,
+    "reread": 0,
+    "netDiff": 17
+  }
+}

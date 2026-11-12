@@ -1,0 +1,313 @@
+{
+  "firings": [
+    {
+      "id": "f-19",
+      "captureSeq": 19,
+      "statementIndex": 1,
+      "depth": 2,
+      "table": "cl20.ChildLog",
+      "operation": "INSERT",
+      "rowCount": 4,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-20",
+      "captureSeq": 20,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl20.Child",
+      "operation": "DELETE",
+      "rowCount": 4,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-21",
+      "captureSeq": 21,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl20.Parent",
+      "operation": "DELETE",
+      "rowCount": 2,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-19-1",
+      "firingId": "f-19",
+      "operation": "INSERT",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "child_id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": null,
+      "after": {
+        "child_id": "1",
+        "parent_id": "1",
+        "qty": "1"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-19-2",
+      "firingId": "f-19",
+      "operation": "INSERT",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "child_id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "before": null,
+      "after": {
+        "child_id": "2",
+        "parent_id": "1",
+        "qty": "1"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-19-3",
+      "firingId": "f-19",
+      "operation": "INSERT",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "child_id"
+        ],
+        "values": [
+          "3"
+        ]
+      },
+      "before": null,
+      "after": {
+        "child_id": "3",
+        "parent_id": "2",
+        "qty": "1"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-19-4",
+      "firingId": "f-19",
+      "operation": "INSERT",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "child_id"
+        ],
+        "values": [
+          "4"
+        ]
+      },
+      "before": null,
+      "after": {
+        "child_id": "4",
+        "parent_id": "2",
+        "qty": "1"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-20-1",
+      "firingId": "f-20",
+      "operation": "DELETE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "parent_id": "1",
+        "qty": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-20-2",
+      "firingId": "f-20",
+      "operation": "DELETE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "before": {
+        "id": "2",
+        "parent_id": "1",
+        "qty": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-20-3",
+      "firingId": "f-20",
+      "operation": "DELETE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "3"
+        ]
+      },
+      "before": {
+        "id": "3",
+        "parent_id": "2",
+        "qty": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-20-4",
+      "firingId": "f-20",
+      "operation": "DELETE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "4"
+        ]
+      },
+      "before": {
+        "id": "4",
+        "parent_id": "2",
+        "qty": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-21-1",
+      "firingId": "f-21",
+      "operation": "DELETE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "total": "2"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-21-2",
+      "firingId": "f-21",
+      "operation": "DELETE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "before": {
+        "id": "2",
+        "total": "2"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [
+    {
+      "childFiringId": "f-19",
+      "candidateParentFiringIds": [
+        "f-20"
+      ],
+      "confidenceCap": "inferred"
+    }
+  ],
+  "rereadDifferences": []
+}

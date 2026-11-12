@@ -1,0 +1,62 @@
+{
+  "firings": [
+    {
+      "id": "f-40",
+      "captureSeq": 40,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl19.Doc",
+      "operation": "UPDATE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-40-1",
+      "firingId": "f-40",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "body": "<a>1</a>",
+        "node": "/1/1/",
+        "loc": "POINT (127 37.5)",
+        "loc@srid": "4326",
+        "note": "n1"
+      },
+      "after": {
+        "id": "1",
+        "body": "<a>9</a>",
+        "node": "/2/1/",
+        "loc": "POINT (128 36)",
+        "loc@srid": "4326",
+        "note": "n9"
+      },
+      "changedColumns": [
+        "body",
+        "node",
+        "loc",
+        "note"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [],
+  "rereadDifferences": []
+}

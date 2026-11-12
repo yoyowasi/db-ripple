@@ -1,0 +1,131 @@
+{
+  "firings": [
+    {
+      "id": "f-35",
+      "captureSeq": 35,
+      "statementIndex": 1,
+      "depth": 2,
+      "table": "cl11.Item",
+      "operation": "UPDATE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-36",
+      "captureSeq": 36,
+      "statementIndex": 1,
+      "depth": 2,
+      "table": "cl11.ItemLog",
+      "operation": "INSERT",
+      "rowCount": 2,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-35-1",
+      "firingId": "f-35",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "name": "A",
+        "qty": "5"
+      },
+      "after": {
+        "id": "1",
+        "name": "A",
+        "qty": "2"
+      },
+      "changedColumns": [
+        "qty"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-36-1",
+      "firingId": "f-36",
+      "operation": "INSERT",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "item_id",
+          "action"
+        ],
+        "values": [
+          "1",
+          "U"
+        ]
+      },
+      "before": null,
+      "after": {
+        "item_id": "1",
+        "action": "U"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-36-2",
+      "firingId": "f-36",
+      "operation": "INSERT",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "item_id",
+          "action"
+        ],
+        "values": [
+          "2",
+          "R"
+        ]
+      },
+      "before": null,
+      "after": {
+        "item_id": "2",
+        "action": "R"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [
+    {
+      "childFiringId": "f-35",
+      "candidateParentFiringIds": [],
+      "confidenceCap": "inferred"
+    },
+    {
+      "childFiringId": "f-36",
+      "candidateParentFiringIds": [],
+      "confidenceCap": "inferred"
+    }
+  ],
+  "rereadDifferences": []
+}

@@ -1,0 +1,390 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "DELETE",
+        "target": "cl13.T",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 33
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          5,
+          10
+        ],
+        "error": null
+      },
+      "boundary": 10,
+      "imageCountAfter": 8,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 4,
+  "headers": [
+    {
+      "captureSeq": 5,
+      "tableObjectId": 1122103038,
+      "tableName": "[cl13].[Log]",
+      "operation": "INSERT",
+      "insertedCount": 2,
+      "deletedCount": 0,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 6,
+      "tableObjectId": 1074102867,
+      "tableName": "[cl13].[TC]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 2,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 7,
+      "tableObjectId": 1122103038,
+      "tableName": "[cl13].[Log]",
+      "operation": "INSERT",
+      "insertedCount": 1,
+      "deletedCount": 0,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 8,
+      "tableObjectId": 1042102753,
+      "tableName": "[cl13].[T]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 9,
+      "tableObjectId": 1122103038,
+      "tableName": "[cl13].[Log]",
+      "operation": "INSERT",
+      "insertedCount": 1,
+      "deletedCount": 0,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 10,
+      "tableObjectId": 1122103038,
+      "tableName": "[cl13].[Log]",
+      "operation": "INSERT",
+      "insertedCount": 1,
+      "deletedCount": 0,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 5,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":4050}",
+      "rowJson": "{\"id\":4050,\"ref\":50,\"src\":\"trg_TC_1\"}"
+    },
+    {
+      "captureSeq": 5,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":4051}",
+      "rowJson": "{\"id\":4051,\"ref\":51,\"src\":\"trg_TC_1\"}"
+    },
+    {
+      "captureSeq": 6,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":51}",
+      "rowJson": "{\"id\":51,\"t_id\":1}"
+    },
+    {
+      "captureSeq": 6,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":50}",
+      "rowJson": "{\"id\":50,\"t_id\":1}"
+    },
+    {
+      "captureSeq": 7,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1001}",
+      "rowJson": "{\"id\":1001,\"ref\":1,\"src\":\"trg_T_1\"}"
+    },
+    {
+      "captureSeq": 8,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"name\":\"t1\"}"
+    },
+    {
+      "captureSeq": 9,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":2001}",
+      "rowJson": "{\"id\":2001,\"ref\":1,\"src\":\"trg_T_2\"}"
+    },
+    {
+      "captureSeq": 10,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":3001}",
+      "rowJson": "{\"id\":3001,\"ref\":1,\"src\":\"trg_T_3\"}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl13.Log",
+      "keyJson": "{\"id\":4050}",
+      "rowJson": "{\"id\":4050,\"ref\":50,\"src\":\"trg_TC_1\"}"
+    },
+    {
+      "table": "cl13.Log",
+      "keyJson": "{\"id\":4051}",
+      "rowJson": "{\"id\":4051,\"ref\":51,\"src\":\"trg_TC_1\"}"
+    },
+    {
+      "table": "cl13.Log",
+      "keyJson": "{\"id\":1001}",
+      "rowJson": "{\"id\":1001,\"ref\":1,\"src\":\"trg_T_1\"}"
+    },
+    {
+      "table": "cl13.Log",
+      "keyJson": "{\"id\":2001}",
+      "rowJson": "{\"id\":2001,\"ref\":1,\"src\":\"trg_T_2\"}"
+    },
+    {
+      "table": "cl13.Log",
+      "keyJson": "{\"id\":3001}",
+      "rowJson": "{\"id\":3001,\"ref\":1,\"src\":\"trg_T_3\"}"
+    },
+    {
+      "table": "cl13.T",
+      "keyJson": "{\"id\":1}",
+      "rowJson": null
+    },
+    {
+      "table": "cl13.TC",
+      "keyJson": "{\"id\":51}",
+      "rowJson": null
+    },
+    {
+      "table": "cl13.TC",
+      "keyJson": "{\"id\":50}",
+      "rowJson": null
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl13.Log",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1001"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "1001",
+        "ref": "1",
+        "src": "trg_T_1"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl13.Log",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "2001"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "2001",
+        "ref": "1",
+        "src": "trg_T_2"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl13.Log",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "3001"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "3001",
+        "ref": "1",
+        "src": "trg_T_3"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl13.Log",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "4050"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "4050",
+        "ref": "50",
+        "src": "trg_TC_1"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl13.Log",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "4051"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "4051",
+        "ref": "51",
+        "src": "trg_TC_1"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl13.T",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "name": "t1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl13.TC",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "50"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "50",
+        "t_id": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl13.TC",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "51"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "51",
+        "t_id": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 8,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 59,
+    "readLog": 2,
+    "reread": 15,
+    "netDiff": 30
+  }
+}

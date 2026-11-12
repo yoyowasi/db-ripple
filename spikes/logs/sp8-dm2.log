@@ -1,0 +1,70 @@
+# spikes\sql\sp8-dm2-pick-order.sql db=AW_Origin part=0 at=2026-11-12T14:24:41.3189768+09:00 elapsedSec=1.06 exit=0
+accounting_start accounting_end orders_in_period shipped_with_salesperson min_order_date max_order_date
+---------------- -------------- ---------------- ------------------------ -------------- --------------
+2003-07-01 00:00:00.000 2004-06-30 23:59:59.997 0 0 2022-05-30 00:00:00.000 2025-06-29 00:00:00.000
+SalesOrderDetailID SalesOrderID ProductID OrderQty line_delta SalesPersonID TerritoryID OrderDate PersonID person_has_total_purchase_ytd salesperson_ytd_now salesperson_ytd_projected salesperson_ytd_changes territory_ytd_now territory_ytd_projected territory_ytd_changes
+------------------ ------------ --------- -------- ---------- ------------- ----------- --------- -------- ----------------------------- ------------------- ------------------------- ----------------------- ----------------- ----------------------- ---------------------
+duplicated_detail_ids
+---------------------
+0
+module_name definition
+----------- ----------
+dbo.ufnGetAccountingStartDate 
+CREATE FUNCTION [dbo].[ufnGetAccountingStartDate]()
+RETURNS [datetime]
+AS
+BEGIN
+    RETURN CONVERT(datetime, '20030701', 112);
+END;
+
+dbo.ufnGetAccountingEndDate 
+CREATE FUNCTION [dbo].[ufnGetAccountingEndDate]()
+RETURNS [datetime]
+AS
+BEGIN
+    RETURN DATEADD(millisecond, -2, CONVERT(datetime, '20040701', 112));
+END;
+
+trigger_name definition
+------------ ----------
+Person.iuPerson 
+CREATE TRIGGER [Person].[iuPerson] ON [Person].[Person]
+AFTER INSERT, UPDATE NOT FOR REPLICATION AS
+BEGIN
+    DECLARE @Count int;
+
+    SET @Count = @@ROWCOUNT;
+    IF @Count = 0
+        RETURN;
+
+    SET NOCOUNT ON;
+
+    IF UPDATE([BusinessEnti
+Sales.iduSalesOrderDetail 
+CREATE TRIGGER [Sales].[iduSalesOrderDetail] ON [Sales].[SalesOrderDetail]
+AFTER INSERT, DELETE, UPDATE AS
+BEGIN
+    DECLARE @Count int;
+
+    SET @Count = @@ROWCOUNT;
+    IF @Count = 0
+        RETURN;
+
+    SET NOCOUNT ON;
+
+    BEGIN TRY
+     
+Sales.uSalesOrderHeader 
+CREATE TRIGGER [Sales].[uSalesOrderHeader] ON [Sales].[SalesOrderHeader]
+AFTER UPDATE NOT FOR REPLICATION AS
+BEGIN
+    DECLARE @Count int;
+
+    SET @Count = @@ROWCOUNT;
+    IF @Count = 0
+        RETURN;
+
+    SET NOCOUNT ON;
+
+    BEGIN TRY
+   

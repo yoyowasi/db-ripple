@@ -902,6 +902,7 @@ MVP의 미리보기 요청은 끝날 때까지 기다리는 동기 방식이다.
    - **v1.5 프로시저 펼치기(2026-11-11, 인계 1, DB 테스트 전):** C6이 트리거가 부르는 프로시저 본문(`sys.sql_modules`)을 같은 규칙으로 분석해 쓰기 대상·외부 부작용·ROLLBACK·트랜잭션 제어를 트리거 결과에 합친다. 프로시저 안의 프로시저도 따라가며 깊이 상한은 4다(트리거가 직접 부르는 프로시저가 1). 한 단계에서 멈추면 AW `uspLogError`가 부르는 `uspPrintError`(PRINT만) 때문에 `uspLogError`가 늘 미상이 되기 때문이다. 펼친 호출은 `ExpandedProcedureCalls`, 못 펼친 호출(카탈로그에 없음, 본문 없음, 파싱 실패, 동적 SQL, 재귀, 깊이 초과, 안쪽 호출을 못 펼침)은 `UnresolvedProcedureCalls`다. 근거: `src/DbRipple.Analysis/TriggerAnalyzer.cs`(`MaxProcedureDepth = 4`).
    - **v1.5 WRITES 하향은 진짜 미상에만:** 트리거 후보·WRITES를 `ambiguous` 이하로 내리는 것은 쓰기 대상 미상(`WriteTargetsUnknown`)이거나, 못 펼친 프로시저가 있고 그 테이블이 정적 쓰기 대상(펼친 프로시저 포함)에 없을 때만이다. 정적 쓰기 대상에 있으면 그 트리거가 쓴 것이 확실하므로 `inferred`를 유지한다(2주차 검토의 AW 정밀도 퇴행 해소). 3단계의 FK 쓰기 경합과 후보 집합에서는 못 펼친 프로시저를 여전히 "어떤 테이블에든 쓸 수 있음"으로 본다. 호환(Q38): `ProcedureCalls`가 있는데 두 목록이 모두 비면(펼치기 전 분석기 결과) 전부 미상으로 본다. 근거: `src/DbRipple.Attribution/CatalogIndex.cs`(`TriggerInfo.IsUnknownFor`, `CanWrite`). 위 v1.4의 AW 영향(SOD FK_CASCADE가 `inferred`)이 바뀌는지는 Host 재실측 전이다.
    - **v1.4 FK certain 조건 보완:** 부모·자식 묶음의 깊이가 같아야 하고(H2), 쓰기 경합은 "그 문장에서 실행될 수 있는 모든 트리거"로 넓게 본다. 둘 다 certain을 더 아끼는 쪽이다.
+   - **v1.5 보완(2026-11-12, 근거: CascadeLab CL09, SP1 H2):** 부모 후보는 깊이로 좁힌다. 자식 묶음과 깊이가 같은 부모 후보 묶음이 한 행이라도 설명하면(일치 또는 검증 불가), 깊이가 다른 후보는 버리고 FK 간선도 그리지 않는다(H2: 문장이나 트리거 안 DML이 시작한 FK 연쇄의 자식 묶음은 부모 묶음과 깊이가 같다). 같은 깊이 후보가 하나도 없으면 지금처럼 모든 후보를 쓴다(깊이가 달라 `certain`이 아니다). 행을 설명하던 다른 깊이 후보를 이 규칙으로 뺐다면, 남은 후보가 하나여도 `certain`을 주지 않고 `inferred`로 둔다. H2는 관측이지 문서 보장이 아니기 때문이다. 예: CL09에서 K#1(깊이 1)의 행 42는 트리거가 지운 Q(깊이 2)의 키에도 맞지만, 깊이 1 부모 P가 두 행을 모두 설명하므로 간선은 P→K#1(`inferred`) 하나다. 근거: `src/DbRipple.Attribution/FkJudge.cs`.
 5. **직접 대상과 INSTEAD OF**
    - 깊이 1 묶음 가운데 테이블과 연산이 문장의 대상과 같으면 `DIRECT`(`certain`)다.
    - 대상에 그 연산의 INSTEAD OF 트리거가 있으면 직접 묶음이 생기지 않는다. 그 문장 안에서 깊이 1 부모가 없는 깊이 2 묶음은 모두 가상 INSTEAD OF 실행 노드(`REPLACES` 간선, `parentFiringId = null`)의 자식으로 두고 `inferred`로 귀속한다. 그 아래 깊이 3 이상은 2~4단계를 그대로 쓴다.
@@ -920,7 +921,7 @@ MVP의 미리보기 요청은 끝날 때까지 기다리는 동기 방식이다.
 | 등급 | 조건 | 평가에서 |
 |---|---|---|
 | `certain` | 결정적으로 검증된다: 문장의 직접 대상, 또는 3단계의 `certain` 조건(FK 메타데이터 + 키 값 일치 + 부모 후보 1개 + 같은 문맥의 쓰기 경합 없음) | 정답과 다르면 "과신 오류"로 센다. 목표 0 |
-| `inferred` | 규칙상 후보가 하나다: 괄호 추론 + 정적 쓰기 대상, INSTEAD OF, 같은 테이블 트리거 잔차, 루트가 여럿인 FK | 정밀도를 따로 보고한다. |
+| `inferred` | 규칙상 후보가 하나다: 괄호 추론 + 정적 쓰기 대상, INSTEAD OF, 같은 테이블 트리거 잔차, 루트가 여럿인 FK, H2로 다른 깊이 후보를 뺀 FK(v1.5) | 정밀도를 따로 보고한다. |
 | `ambiguous` | 후보가 여럿이다(같은 테이블의 트리거 여러 개, 감사 트리거가 Last가 아님) | 정답이 후보 안에 들었는지 비율을 보고한다. |
 | `unexplained` | 후보 없음 | 개수를 보고한다. |
 
@@ -1118,7 +1119,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 - 비결정 열은 존재와 형식만 비교한다.
 
 **v1.5 일치 규칙 구현(2026-11-11, 근거 `src/DbRipple.Apply/ApplyMatcher.cs`, DB 테스트 전):** 위 여섯 규칙을 순서대로 `MismatchKind`로 낸다(§6.4 v1.5). 하나라도 있으면 ROLLBACK, `rolled_back_mismatch`다.
-- **1 문장별 행 수(Q33):** 미리보기와 [적용] 모두 문장 끝에 같은 명령으로 `SELECT ROWCOUNT_BIG();`를 붙여 그 값을 `rowsAffected`로 쓴다(`StatementRunner.RowCountSuffix`, `PreviewExecutor`도 같은 상수). NOCOUNT OFF 트리거가 드라이버 행 수를 부풀리는 것을 피하고, 두 쪽을 같은 셈법으로 비교하려는 것이다. INSTEAD OF·문장 앞 세미콜론에서의 실제 값은 테스트 라운드에서 잰다.
+- **1 문장별 행 수(Q33):** 미리보기와 [적용] 모두 문장 끝에 같은 명령으로 `SELECT ROWCOUNT_BIG();`를 붙여 그 값을 `rowsAffected`로 쓴다(`StatementRunner.RowCountSuffix`, `PreviewExecutor`도 같은 상수). NOCOUNT OFF 트리거가 드라이버 행 수를 부풀리는 것을 피하고, 두 쪽을 같은 셈법으로 비교하려는 것이다. **DB 실측(2026-11-12):** 문장 앞 세미콜론은 문장 끝에 `;`가 있어도 없어도 문법 오류가 없고 값도 맞다. INSTEAD OF 대상에서는 트리거 마지막 문장의 행 수도, 트리거가 실제로 반영한 행 수도 아니고 **원래 문장이 지정한 대상 행 수**가 나온다(CL11 INSERT 1, CL11b UPDATE 2. 대상 2행 가운데 트리거가 1행만 반영하고 다른 테이블에 5행을 넣어도 2). 문서가 보장한 값이 아니라 관측값이다. 미리보기와 [적용]이 같은 셈법이므로 D7 1 비교에는 지장이 없다.
 - **2·5 netSummary와 미리보기에 없는 테이블:** 원본 최종 차이를 `ContractFormulas.Summarize`(미리보기와 같은 식)로 세어 테이블별 다섯 건수를 비교한다. 미리보기에 없는 테이블이면 `UNEXPECTED_TABLE`이다.
 - **3 키 행 값:** PK·UNIQUE 키 행은 비결정 열(RowChange.volatile + 매니페스트 volatileColumns)을 뺀 값이 같아야 한다. 계산 열은 식이 결정적이므로 비교에 넣되, 새 IDENTITY 값이나 짝 매핑으로 치환한 FK 값에 기대는 계산 열(예: AW SalesOrderNumber)은 그 값만 짝 값으로 바꿔 비교한다. 미리보기에만 있는 행 변경은 `ROW_MISSING`, 실제에만 있는 행 변경은 `ROW_UNEXPECTED`다. 키 없는 테이블은 비결정 열을 뺀 이미지의 다중집합 개수로 비교한다.
 - **4 IDENTITY 짝:** 새 IDENTITY 행은 비결정 열을 뺀 값(서명)으로 짝짓는다. 부모 테이블부터 짝짓고(FK 위상 순서), 아직 짝짓지 않은 테이블(자기 참조 포함)을 가리키는 FK 열은 서명에서 빼고 값 비교에서 확인한다. 같은 서명 행이 미리보기와 원본에 같은 개수로 있으면 양쪽을 IDENTITY 값 오름차순으로 정렬해 순서대로 짝짓는다(같은 문장이 같은 순서로 IDENTITY를 매긴다는 가정). 이렇게 2행 이상을 짝지었으면 `verification.limitations`에 그 가정을 적는다(`ApplyMatcher.IdentityOrderLimitation`). 개수가 다르거나, IDENTITY 값이 없거나 정수가 아니거나 겹쳐서 순서를 정할 수 없으면 `IDENTITY_UNPAIRED`다. 자식 FK 치환과 계산 열 치환은 이 짝 매핑을 따른다. 순서가 어긋나 자식이 다른 부모를 가리키면 키 있는 자식은 `ROW_VALUE`, IDENTITY 자식은 `IDENTITY_UNPAIRED`로 잡혀 롤백된다. 짝은 결과 `verification.identityPairs`에 싣는다(Q29). 평가 하네스의 IDENTITY 짝 매핑(`eval/DbRipple.Eval/IdentityPairing.cs`)과 코드를 공유하지 않는다(§10.3). 확인 범위: Apply 단위 테스트(DB 없음)만 했다.
@@ -1232,7 +1233,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 | CL19 | xml·hierarchyid·geography·text 열 | 형식 규칙 |
 | CL20 | Big: 부모 1 : 자식 2 CASCADE + 자식 AFTER 트리거, 행 수 생성기 | M5 |
 
-**v1.5(2026-11-11, CascadeLab CL09~CL20):** 사례 파일은 CL01~CL20 변형 포함 30개다(`cascadelab/cases/`, `cascadelab/README.md` 사례 요약). CL09~CL20은 작성만 했고 DB에서 실행하지 않았다. 손 정답 형식은 answer-format v0.2다(`cascadelab/answer-format.md`, Q40). v0.1에 필드를 더하기만 해서 v0.1 파일은 그대로 v0.2 파일이다. 추가한 것은 IDENTITY 행 표기 `{"match": {비결정 아닌 열: 값}, "identity": ["열"]}`, 새 IDENTITY를 참조하는 열 `identityRefs`, 비결정 셀 `volatile`, 롤백 뒤 남은 변경 `residualCommitted`, `leavesResidue`, M5용 `scaling`(생성 문장·측정 문장 틀), `REPLACES` 간선과 `INSTEAD_OF` 원인 등이다. CL20 대량 데이터는 시드 안 프로시저 `cl20.usp_Generate @parents = N`으로만 만든다(AD11, Q39). 다른 테스트 기준선이 무거워지지 않게 하려는 것이다.
+**v1.5(2026-11-11, CascadeLab CL09~CL20):** 사례 파일은 CL01~CL20 변형 포함 30개다(`cascadelab/cases/`, `cascadelab/README.md` 사례 요약). CL09~CL20은 2026-11-12 DB 테스트에서 실행했다(오라클 대 손 정답의 순 변경·상태·오류 번호 일치, 간선은 CL09 1건을 고친 뒤 일치). 테스트는 dbrt_ 전용 DB에 `cl*.sql`을 직접 시드하므로 공유 CascadeLab DB를 다시 설치할 필요가 없다. 손 정답 형식은 answer-format v0.2다(`cascadelab/answer-format.md`, Q40). v0.1에 필드를 더하기만 해서 v0.1 파일은 그대로 v0.2 파일이다. 추가한 것은 IDENTITY 행 표기 `{"match": {비결정 아닌 열: 값}, "identity": ["열"]}`, 새 IDENTITY를 참조하는 열 `identityRefs`, 비결정 셀 `volatile`, 롤백 뒤 남은 변경 `residualCommitted`, `leavesResidue`, M5용 `scaling`(생성 문장·측정 문장 틀), `REPLACES` 간선과 `INSTEAD_OF` 원인 등이다. CL20 대량 데이터는 시드 안 프로시저 `cl20.usp_Generate @parents = N`으로만 만든다(AD11, Q39). 다른 테스트 기준선이 무거워지지 않게 하려는 것이다.
 
 ### 10.3 정답과 오라클
 
@@ -1255,7 +1256,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 
 | 지표 | 정의와 계산 |
 |---|---|
-| M1 일치율 | 단위는 (테이블, 키, 열)이다. 셀 정밀도·재현율·F1과 행 완전 일치율을 구한다. 비결정 셀은 "존재·형식 일치율"로 따로 보고하고, IDENTITY는 짝 매핑 뒤 비교한다. 오차는 셋으로 나눈다.<br/>• **E_total**: 미리보기 대 오라클<br/>• **E_obs**: 평가 훅이 기록한 샌드박스 순 변경 대 오라클 순 변경(관찰자 효과, 목표 0)<br/>• **E_cap**: 미리보기 재구성 대 평가 훅의 샌드박스 순 변경(수집·재구성 오류)<br/>잔차로 메운 비율도 따로 보고한다. |
+| M1 일치율 | 단위는 (테이블, 키, 열)이다. 셀 정밀도·재현율·F1과 행 완전 일치율을 구한다. 비결정 셀은 "존재·형식 일치율"로 따로 보고하고, IDENTITY는 짝 매핑 뒤 비교한다. **v1.5(2026-11-12):** 비결정 열은 카탈로그로 아는 것(IDENTITY, SEQUENCE·비결정 기본값, rowversion)에 손 정답의 `volatile`(트리거·문장이 채우는 시각 값 등)을 더한 것이다. 오라클의 원문 배치 비교도 이 열을 빼고, 새 IDENTITY를 참조하는 열은 손 정답 `identityRefs`로 맞춰 비교한다. 오차는 셋으로 나눈다.<br/>• **E_total**: 미리보기 대 오라클<br/>• **E_obs**: 평가 훅이 기록한 샌드박스 순 변경 대 오라클 순 변경(관찰자 효과, 목표 0)<br/>• **E_cap**: 미리보기 재구성 대 평가 훅의 샌드박스 순 변경(수집·재구성 오류)<br/>잔차로 메운 비율도 따로 보고한다. |
 | M2 탐지 | 원인 유형별(DIRECT, FK_*, TRIGGER, SAME_TABLE_TRIGGER 잔차)로 정답 변경 행 가운데 찾은 수와 재현율을 구한다. 사례별 연쇄 변경 행 수와 트리거 변경 행 수의 절대값을 표로 낸다. (테이블, 키)당 한 번만 센다. |
 | M3 귀속 정확도 | 간선 키(문장, 부모, 자식, 종류, FK 또는 트리거 이름)로 정밀도·재현율을 구해 확신도별로 나눈다. `ambiguous`는 정답이 후보에 든 비율을 본다. `certain`의 과신 오류는 목표 0이다. |
 | M4 순서 안정성 | 같은 사례를 k회(초깃값 20회, SP5의 초기화 시간으로 조정) 반복한다. 형제 순서를 뺀 인과 그래프가 같은지 보고, `observed_only` 부분이 얼마나 바뀌는지 기록한다. "문서 순서 규칙 위반 수"는 수집 시점과 행 변경 시점이 달라 지표로 쓰지 않는다. |
@@ -1313,6 +1314,13 @@ dotnet run --project eval\DbRipple.Eval.Cli -- report --run logs\week4\eval\<실
 ### 10.7 데모 시나리오
 
 실제 전파는 SP8에서 실행으로 확정한다. 아래는 트리거 정의를 읽어 세운 예상이다.
+
+**v1.5 SP8·Host 실측(2026-11-12, [spikes/SP8.md](spikes/SP8.md), `logs/e2e/`):** 전용 원본 사본(`dbrt_e2e_origin`)으로 실제 Host를 끝까지 돌려 확정했다.
+- **DM1:** 주문 43697 DELETE. FK_CASCADE `certain` 2개(SalesOrderDetail 1행, SalesOrderHeaderSalesReason 2행)와 iduSalesOrderDetail의 0행 UPDATE(`inferred`)가 나오고, [적용]은 `committed`였다(원본에서 실제로 지워진 것을 독립 SQL로 확인).
+- **DM2:** SalesOrderDetail 52 OrderQty UPDATE. 트리거 사슬 묶음 12개가 나오고 [적용]은 `committed`였다. **SalesPerson·SalesTerritory의 SalesYTD는 바뀌지 않는다.** 트리거가 쓰는 회계 기간 함수가 2003-07-01~2004-06-30을 돌려주는데 AW2025 주문 날짜는 2022-05-30~2025-06-29라서, 그 단계는 늘 0행 UPDATE다. 데모는 "SalesYTD UPDATE가 0행으로 발동한다"로 보여 준다.
+- **DM3:** Employee 1 DELETE는 `trigger_blocked`(3609)이고 [적용]은 `precondition_failed`다.
+- **DM7:** 미리보기 뒤 원본 Product 680 ListPrice를 바꾸면 [적용]은 `drift_detected`이고 원본 값은 커밋되지 않는다.
+- 데모 값은 `scripts/demo/demo.http`의 `@dm1Order = 43697`, `@dm2Detail = 52`, `@dm3Employee = 1`이다.
 
 **v1.3 주의(2026-11-10, 재현 `logs/week1/aw-uworkorder-repro.log`):** AW 샘플의 `uWorkOrder`는 ProductID·OrderQty를 UPDATE하면 TransactionHistory에 ActualCost(NOT NULL, 기본값 없음)를 넣지 않아 515로 실패한다. CATCH에서 ROLLBACK한 뒤 `uspLogError`가 ErrorLog에 트랜잭션 밖 행 1개를 남기고, 호출 쪽은 3609("The transaction ended in the trigger")를 받는다. 샌드박스를 오염시키므로 일반 데모·평가 사례에서는 이 경로를 쓰지 않는다. 대신 E13·A22의 "롤백 뒤 남은 변경" 시연 후보로 쓸 수 있다(DM3 보조).
 

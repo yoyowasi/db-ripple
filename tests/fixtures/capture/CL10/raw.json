@@ -1,0 +1,568 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "DELETE",
+        "target": "cl10.Region",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 38
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          26,
+          32
+        ],
+        "error": null
+      },
+      "boundary": 32,
+      "imageCountAfter": 15,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 25,
+  "headers": [
+    {
+      "captureSeq": 26,
+      "tableObjectId": 562101043,
+      "tableName": "[cl10].[Manager]",
+      "operation": "UPDATE",
+      "insertedCount": 2,
+      "deletedCount": 2,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 27,
+      "tableObjectId": 514100872,
+      "tableName": "[cl10].[Slot]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 2,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 28,
+      "tableObjectId": 466100701,
+      "tableName": "[cl10].[Shelf]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 3,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 29,
+      "tableObjectId": 418100530,
+      "tableName": "[cl10].[Store]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 2,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 30,
+      "tableObjectId": 610101214,
+      "tableName": "[cl10].[Counter]",
+      "operation": "UPDATE",
+      "insertedCount": 1,
+      "deletedCount": 1,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 31,
+      "tableObjectId": 642101328,
+      "tableName": "[cl10].[RegionLog]",
+      "operation": "INSERT",
+      "insertedCount": 1,
+      "deletedCount": 0,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 32,
+      "tableObjectId": 386100416,
+      "tableName": "[cl10].[Region]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 26,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":501}",
+      "rowJson": "{\"id\":501,\"region_id\":1,\"name\":\"m501\"}"
+    },
+    {
+      "captureSeq": 26,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":500}",
+      "rowJson": "{\"id\":500,\"region_id\":1,\"name\":\"m500\"}"
+    },
+    {
+      "captureSeq": 26,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":501}",
+      "rowJson": "{\"id\":501,\"region_id\":null,\"name\":\"m501\"}"
+    },
+    {
+      "captureSeq": 26,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":500}",
+      "rowJson": "{\"id\":500,\"region_id\":null,\"name\":\"m500\"}"
+    },
+    {
+      "captureSeq": 27,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1001}",
+      "rowJson": "{\"id\":1001,\"shelf_id\":101}"
+    },
+    {
+      "captureSeq": 27,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":1000}",
+      "rowJson": "{\"id\":1000,\"shelf_id\":100}"
+    },
+    {
+      "captureSeq": 28,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":110}",
+      "rowJson": "{\"id\":110,\"store_id\":11}"
+    },
+    {
+      "captureSeq": 28,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":101}",
+      "rowJson": "{\"id\":101,\"store_id\":10}"
+    },
+    {
+      "captureSeq": 28,
+      "imageKind": "DELETED",
+      "ordinal": 3,
+      "keyJson": "{\"id\":100}",
+      "rowJson": "{\"id\":100,\"store_id\":10}"
+    },
+    {
+      "captureSeq": 29,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":11}",
+      "rowJson": "{\"id\":11,\"region_id\":1}"
+    },
+    {
+      "captureSeq": 29,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":10}",
+      "rowJson": "{\"id\":10,\"region_id\":1}"
+    },
+    {
+      "captureSeq": 30,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"name\":\"region_deleted\"}",
+      "rowJson": "{\"name\":\"region_deleted\",\"n\":0}"
+    },
+    {
+      "captureSeq": 30,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"name\":\"region_deleted\"}",
+      "rowJson": "{\"name\":\"region_deleted\",\"n\":1}"
+    },
+    {
+      "captureSeq": 31,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"region_id\":1}",
+      "rowJson": "{\"region_id\":1,\"name\":\"r1\"}"
+    },
+    {
+      "captureSeq": 32,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"name\":\"r1\"}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl10.Counter",
+      "keyJson": "{\"name\":\"region_deleted\"}",
+      "rowJson": "{\"name\":\"region_deleted\",\"n\":1}"
+    },
+    {
+      "table": "cl10.Manager",
+      "keyJson": "{\"id\":501}",
+      "rowJson": "{\"id\":501,\"region_id\":null,\"name\":\"m501\"}"
+    },
+    {
+      "table": "cl10.Manager",
+      "keyJson": "{\"id\":500}",
+      "rowJson": "{\"id\":500,\"region_id\":null,\"name\":\"m500\"}"
+    },
+    {
+      "table": "cl10.Region",
+      "keyJson": "{\"id\":1}",
+      "rowJson": null
+    },
+    {
+      "table": "cl10.RegionLog",
+      "keyJson": "{\"region_id\":1}",
+      "rowJson": "{\"region_id\":1,\"name\":\"r1\"}"
+    },
+    {
+      "table": "cl10.Shelf",
+      "keyJson": "{\"id\":110}",
+      "rowJson": null
+    },
+    {
+      "table": "cl10.Shelf",
+      "keyJson": "{\"id\":101}",
+      "rowJson": null
+    },
+    {
+      "table": "cl10.Shelf",
+      "keyJson": "{\"id\":100}",
+      "rowJson": null
+    },
+    {
+      "table": "cl10.Slot",
+      "keyJson": "{\"id\":1001}",
+      "rowJson": null
+    },
+    {
+      "table": "cl10.Slot",
+      "keyJson": "{\"id\":1000}",
+      "rowJson": null
+    },
+    {
+      "table": "cl10.Store",
+      "keyJson": "{\"id\":11}",
+      "rowJson": null
+    },
+    {
+      "table": "cl10.Store",
+      "keyJson": "{\"id\":10}",
+      "rowJson": null
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl10.Counter",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "name"
+        ],
+        "values": [
+          "region_deleted"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "name": "region_deleted",
+        "n": "0"
+      },
+      "after": {
+        "name": "region_deleted",
+        "n": "1"
+      },
+      "changedColumns": [
+        "n"
+      ],
+      "explainedBy": null
+    },
+    {
+      "table": "cl10.Manager",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "500"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "500",
+        "region_id": "1",
+        "name": "m500"
+      },
+      "after": {
+        "id": "500",
+        "region_id": null,
+        "name": "m500"
+      },
+      "changedColumns": [
+        "region_id"
+      ],
+      "explainedBy": null
+    },
+    {
+      "table": "cl10.Manager",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "501"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "501",
+        "region_id": "1",
+        "name": "m501"
+      },
+      "after": {
+        "id": "501",
+        "region_id": null,
+        "name": "m501"
+      },
+      "changedColumns": [
+        "region_id"
+      ],
+      "explainedBy": null
+    },
+    {
+      "table": "cl10.Region",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "name": "r1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl10.RegionLog",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "region_id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "region_id": "1",
+        "name": "r1"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl10.Shelf",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "100"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "100",
+        "store_id": "10"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl10.Shelf",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "101"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "101",
+        "store_id": "10"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl10.Shelf",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "110"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "110",
+        "store_id": "11"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl10.Slot",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1000"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1000",
+        "shelf_id": "100"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl10.Slot",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1001"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1001",
+        "shelf_id": "101"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl10.Store",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "10"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "10",
+        "region_id": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl10.Store",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "11"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "11",
+        "region_id": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 15,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 113,
+    "readLog": 3,
+    "reread": 34,
+    "netDiff": 29
+  }
+}

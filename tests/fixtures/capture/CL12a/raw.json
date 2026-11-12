@@ -1,0 +1,76 @@
+{
+  "status": "trigger_blocked",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "UPDATE",
+        "target": "cl12.Ord",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 49
+        },
+        "status": "trigger_blocked",
+        "rowsAffected": null,
+        "captureSeqRange": null,
+        "error": {
+          "errorNumber": 3609,
+          "message": "The transaction ended in the trigger. The batch has been aborted.",
+          "procedure": null,
+          "isToolFault": false
+        }
+      },
+      "boundary": null,
+      "imageCountAfter": 0,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 0,
+  "headers": [],
+  "images": [],
+  "rereads": [],
+  "netChanges": [],
+  "residualCommitted": [
+    {
+      "table": "cl12.ErrLog",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "log_id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "log_id": "1",
+        "ord_id": "1",
+        "msg": "negative qty"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "sandboxDirty": true,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 0,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 63,
+    "readLog": 0,
+    "reread": 0,
+    "netDiff": 746
+  }
+}

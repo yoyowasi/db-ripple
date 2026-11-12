@@ -1,0 +1,23 @@
+{
+  "statements": [
+    {
+      "index": 1,
+      "batch": 1,
+      "position": 1,
+      "kind": "INSERT",
+      "target": "cl11.Item",
+      "span": {
+        "startLine": 1,
+        "startColumn": 1,
+        "endLine": 1,
+        "endColumn": 58
+      },
+      "sql": "INSERT INTO cl11.Item (id, name, qty) VALUES (3, 'c', 4);",
+      "nondeterministicColumns": []
+    }
+  ],
+  "rejects": [],
+  "warnings": [],
+  "diagnostics": [],
+  "isAccepted": true
+}

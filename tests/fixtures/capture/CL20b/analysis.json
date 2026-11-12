@@ -1,0 +1,23 @@
+{
+  "statements": [
+    {
+      "index": 1,
+      "batch": 1,
+      "position": 1,
+      "kind": "UPDATE",
+      "target": "cl20.Child",
+      "span": {
+        "startLine": 1,
+        "startColumn": 1,
+        "endLine": 1,
+        "endColumn": 51
+      },
+      "sql": "UPDATE cl20.Child SET qty = qty + 1 WHERE id <= 3;",
+      "nondeterministicColumns": []
+    }
+  ],
+  "rejects": [],
+  "warnings": [],
+  "diagnostics": [],
+  "isAccepted": true
+}

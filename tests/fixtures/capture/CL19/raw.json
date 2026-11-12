@@ -1,0 +1,125 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "UPDATE",
+        "target": "cl19.Doc",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 166
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          40,
+          40
+        ],
+        "error": null
+      },
+      "boundary": 40,
+      "imageCountAfter": 2,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 39,
+  "headers": [
+    {
+      "captureSeq": 40,
+      "tableObjectId": 1698105090,
+      "tableName": "[cl19].[Doc]",
+      "operation": "UPDATE",
+      "insertedCount": 1,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 40,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"body\":\"<a>1<\\/a>\",\"node\":\"\\/1\\/1\\/\",\"loc\":\"POINT (127 37.5)\",\"loc@srid\":4326,\"note\":\"n1\"}"
+    },
+    {
+      "captureSeq": 40,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"body\":\"<a>9<\\/a>\",\"node\":\"\\/2\\/1\\/\",\"loc\":\"POINT (128 36)\",\"loc@srid\":4326,\"note\":\"n9\"}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl19.Doc",
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"body\":\"<a>9<\\/a>\",\"node\":\"\\/2\\/1\\/\",\"loc\":\"POINT (128 36)\",\"loc@srid\":4326,\"note\":\"n9\"}"
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl19.Doc",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "body": "<a>1</a>",
+        "node": "/1/1/",
+        "loc": "POINT (127 37.5)",
+        "loc@srid": "4326",
+        "legacy": "old text",
+        "note": "n1"
+      },
+      "after": {
+        "id": "1",
+        "body": "<a>9</a>",
+        "node": "/2/1/",
+        "loc": "POINT (128 36)",
+        "loc@srid": "4326",
+        "legacy": "new text",
+        "note": "n9"
+      },
+      "changedColumns": [
+        "body",
+        "node",
+        "loc",
+        "legacy",
+        "note"
+      ],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 2,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 34,
+    "readLog": 2,
+    "reread": 7,
+    "netDiff": 11
+  }
+}

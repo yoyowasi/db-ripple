@@ -1,0 +1,23 @@
+{
+  "statements": [
+    {
+      "index": 1,
+      "batch": 1,
+      "position": 1,
+      "kind": "UPDATE",
+      "target": "cl14.Tag",
+      "span": {
+        "startLine": 1,
+        "startColumn": 1,
+        "endLine": 1,
+        "endColumn": 53
+      },
+      "sql": "UPDATE cl14.Tag SET qty = qty + 10 WHERE name = 'a';",
+      "nondeterministicColumns": []
+    }
+  ],
+  "rejects": [],
+  "warnings": [],
+  "diagnostics": [],
+  "isAccepted": true
+}

@@ -1,0 +1,8 @@
+# <scratchpad>\e2e-check-dm2.sql db=dbrt_e2e_origin part=0 at=2026-11-12T14:29:07.3305623+09:00 elapsedSec=1.1 exit=0
+src OrderQty LineTotal RevisionNumber SubTotal TotalDue person_total_purchase_ytd salesperson_ytd territory_ytd
+--- -------- --------- -------------- -------- -------- ------------------------- --------------- -------------
+e2e 2 838.917800 11 838.9178 891.7697 -3996.7435 4251368.5497 10510853.8739
+AW_Origin 1 419.458900 10 419.4589 472.3108 -4416.2024 4251368.5497 10510853.8739
+TransactionID ProductID ReferenceOrderID ReferenceOrderLineID TransactionType Quantity ActualCost
+------------- --------- ---------------- -------------------- --------------- -------- ----------
+213443 760 43663 52 S 2 419.4589

@@ -1,0 +1,85 @@
+{
+  "firings": [
+    {
+      "id": "f-12",
+      "captureSeq": 12,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl15.Emp",
+      "operation": "UPDATE",
+      "rowCount": 2,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-12-1",
+      "firingId": "f-12",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "101"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "badge": "B001",
+        "name": "e1"
+      },
+      "after": {
+        "id": "101",
+        "badge": "B001",
+        "name": "e1"
+      },
+      "changedColumns": [
+        "id"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_UNIQUE",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-12-2",
+      "firingId": "f-12",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "102"
+        ]
+      },
+      "before": {
+        "id": "2",
+        "badge": "B002",
+        "name": "e2"
+      },
+      "after": {
+        "id": "102",
+        "badge": "B002",
+        "name": "e2"
+      },
+      "changedColumns": [
+        "id"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_UNIQUE",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [],
+  "rereadDifferences": []
+}

@@ -1,0 +1,9 @@
+# <scratchpad>\e2e-check-dm1.sql db=dbrt_e2e_origin part=0 at=2026-11-12T14:28:08.0693677+09:00 elapsedSec=0.9 exit=0
+db soh_rows sod_rows sohsr_rows sod_353_rows soh_total sod_total sohsr_total
+-- -------- -------- ---------- ------------ --------- --------- -----------
+dbrt_e2e_origin 1 1 2 1 31465 121317 27647
+name
+----
+dbrt_e2e_base
+dbrt_e2e_origin
+dbrt_e2e_sbx

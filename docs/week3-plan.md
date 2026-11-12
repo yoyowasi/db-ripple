@@ -28,7 +28,7 @@
 **테스트 라운드 우선순위:** §7 명령에 더해,
 1. 프런트 설치·타입 검사(패키지 버전 일부는 기억으로 고정: @vue-flow/core 1.48.0, @dagrejs/dagre 3.1.0, ag-grid 36.0.0, @codemirror/view 6.36.8).
 2. Execution: `Runner_matches_preview_executor_on_q27_cases`, ROWCOUNT_BIG 실측(INSTEAD OF CL11·CL11b, 문장 앞 `;`), 3609 두 경우.
-3. CascadeLab 재설치(cl01~cl20) 뒤 Analysis → Execution(`DBR_WRITE_FIXTURES=1`) → Attribution 순서로 픽스처와 회귀. CL19의 `hierarchyid::Parse`·`geography::Point` 수락 여부, 손 정답 확신도 두 곳(CL09 Q→K#2, CL10 Counter).
+3. (2026-11-12: 공유 CascadeLab 재설치는 필요 없었다. 테스트가 dbrt_ DB에 cl*.sql을 직접 시드한다.) Analysis → Execution(`DBR_WRITE_FIXTURES=1`) → Attribution 순서로 픽스처와 회귀. CL19의 `hierarchyid::Parse`·`geography::Point` 수락 여부, 손 정답 확신도 두 곳(CL09 Q→K#2, CL10 Counter).
 4. Apply 단위·DB 테스트(`-p:ApplyIntegration=true`), 권한·스냅샷 불가 오류 번호 실측, AW DM1~DM3 [적용] committed와 DM7 drift_detected.
 5. Host DI 실제 기동, /apply 빈 본문, OpenAPI와 손 TS 타입 대조.
 6. 평가: `cascadelab --systems preview,B0,B2 --repeat 20`, `m5`, `report`.

@@ -1,0 +1,23 @@
+{
+  "statements": [
+    {
+      "index": 1,
+      "batch": 1,
+      "position": 1,
+      "kind": "UPDATE",
+      "target": "cl15.Emp",
+      "span": {
+        "startLine": 1,
+        "startColumn": 1,
+        "endLine": 1,
+        "endColumn": 54
+      },
+      "sql": "UPDATE cl15.Emp SET id = id + 100 WHERE id IN (1, 2);",
+      "nondeterministicColumns": []
+    }
+  ],
+  "rejects": [],
+  "warnings": [],
+  "diagnostics": [],
+  "isAccepted": true
+}

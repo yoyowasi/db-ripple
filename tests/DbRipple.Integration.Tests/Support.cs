@@ -142,7 +142,10 @@ public sealed record HandCase(
     static List<HandCase> Load()
     {
         var list = new List<HandCase>();
-        foreach (var f in Directory.GetFiles(Path.Combine(RepoPaths.CascadeLab, "cases"), "CL*.json").Order(StringComparer.Ordinal))
+        // 이 통합 테스트의 범위는 CL01~CL08b(answer-format v0.1 모양: changes 행마다 key)다. CL09 이후는 v0.2 모양(IDENTITY ref·키 없는 다중집합·residualCommitted)이라
+        // Execution.Tests Week3 회귀와 평가 하네스가 맡는다.
+        foreach (var f in Directory.GetFiles(Path.Combine(RepoPaths.CascadeLab, "cases"), "CL*.json").Order(StringComparer.Ordinal)
+                     .Where(f => string.CompareOrdinal(Path.GetFileName(f), "CL09") < 0))
         {
             using var doc = JsonDocument.Parse(File.ReadAllText(f));
             var r = doc.RootElement;

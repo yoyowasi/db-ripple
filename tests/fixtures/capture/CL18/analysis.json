@@ -1,0 +1,53 @@
+{
+  "statements": [
+    {
+      "index": 1,
+      "batch": 1,
+      "position": 1,
+      "kind": "UPDATE",
+      "target": "cl18.Cust",
+      "span": {
+        "startLine": 1,
+        "startColumn": 1,
+        "endLine": 1,
+        "endColumn": 46
+      },
+      "sql": "UPDATE cl18.Cust SET name = 'x' WHERE id = 2;",
+      "nondeterministicColumns": []
+    },
+    {
+      "index": 2,
+      "batch": 1,
+      "position": 2,
+      "kind": "DELETE",
+      "target": "cl18.Cust",
+      "span": {
+        "startLine": 2,
+        "startColumn": 1,
+        "endLine": 2,
+        "endColumn": 36
+      },
+      "sql": "DELETE FROM cl18.Cust WHERE id = 1;",
+      "nondeterministicColumns": []
+    },
+    {
+      "index": 3,
+      "batch": 1,
+      "position": 3,
+      "kind": "UPDATE",
+      "target": "cl18.Cust",
+      "span": {
+        "startLine": 3,
+        "startColumn": 1,
+        "endLine": 3,
+        "endColumn": 46
+      },
+      "sql": "UPDATE cl18.Cust SET name = 'y' WHERE id = 3;",
+      "nondeterministicColumns": []
+    }
+  ],
+  "rejects": [],
+  "warnings": [],
+  "diagnostics": [],
+  "isAccepted": true
+}

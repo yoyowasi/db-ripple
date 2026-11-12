@@ -1,0 +1,121 @@
+{
+  "firings": [
+    {
+      "id": "f-13",
+      "captureSeq": 13,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl15.Seat",
+      "operation": "UPDATE",
+      "rowCount": 2,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-13-1",
+      "firingId": "f-13",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "label": "s1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "UNPAIRED",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-13-2",
+      "firingId": "f-13",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "before": {
+        "id": "2",
+        "label": "s2"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "UNPAIRED",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-13-3",
+      "firingId": "f-13",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "101"
+        ]
+      },
+      "before": null,
+      "after": {
+        "id": "101",
+        "label": "s1"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "UNPAIRED",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-13-4",
+      "firingId": "f-13",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "102"
+        ]
+      },
+      "before": null,
+      "after": {
+        "id": "102",
+        "label": "s2"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "UNPAIRED",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [],
+  "rereadDifferences": []
+}

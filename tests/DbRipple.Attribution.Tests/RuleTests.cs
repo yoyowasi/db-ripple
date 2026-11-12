@@ -71,6 +71,49 @@ public class RuleTests
     }
 
     [Fact]
+    public void Fk_other_depth_candidate_is_dropped_when_same_depth_parent_explains_rows()
+    {
+        // CL09 K#1 모양: 깊이 1 자식(행 2개)을 깊이 1 부모 P가 모두 설명하고, 트리거가 만든 깊이 2 부모 Q도 행 하나를 설명한다.
+        // H2로 Q 후보와 그 FK 간선은 빠지고, 빠진 판단이 관측 전제(H2)에 기대므로 P 간선은 certain이 아닌 inferred다.
+        var s = new Scenario();
+        s.Cat.Table("t.P", ["id"], "id").Table("t.Q", ["id"], "id").Table("t.M", ["id"], "id", "q_ref?")
+             .Table("t.K", ["id"], "id", "p_id?", "q_id?")
+             .Fk("FK_K_P", "t.K", "p_id", "t.P", "id", "CASCADE").Fk("FK_K_Q", "t.K", "q_id", "t.Q", "id", "CASCADE");
+        s.Cat.Trigger("t.trg_M_del", "t.M", [Op.Delete], ["t.Q"]);
+        s.Statement(1, Op.Delete, "t.P");
+        s.Firing(10, 1, 2, "t.Q", Op.Delete, ("id=30", null))
+         .Firing(11, 1, 1, "t.K", Op.Delete, ("id=40,p_id=1,q_id=null", null), ("id=42,p_id=1,q_id=30", null))
+         .Firing(12, 1, 1, "t.P", Op.Delete, ("id=1", null));
+        var r = s.Resolve();
+        var c = F(r, 11).Cause!;
+        Assert.Equal((CauseKind.FkCascade, Confidence.Inferred, "f-12", "FK_K_P"), (c.Kind, c.Confidence, c.ParentFiringId, c.ForeignKey!.Name));
+        Assert.Equal((2L, 0L), (c.ForeignKey.MatchedRows, c.ForeignKey.UnmatchedRows));
+        var fkEdges = r.Graph.Edges.Where(e => e.Kind == EdgeKind.Fk && e.Target == "f-11").ToList();
+        var e1 = Assert.Single(fkEdges);
+        Assert.Equal(("f-12", "FK_K_P", Confidence.Inferred), (e1.Source, e1.Fk, e1.Confidence));
+    }
+
+    [Fact]
+    public void Fk_without_same_depth_parent_keeps_all_candidates_and_is_not_certain()
+    {
+        // 같은 깊이 부모가 없으면(깊이 2 자식, 깊이 1 부모만) 지금처럼 모든 후보를 쓰고 certain을 주지 않는다.
+        var s = new Scenario();
+        s.Cat.Table("t.P", ["id"], "id").Table("t.Q", ["id"], "id").Table("t.K", ["id"], "id", "p_id?", "q_id?")
+             .Fk("FK_K_P", "t.K", "p_id", "t.P", "id", "CASCADE").Fk("FK_K_Q", "t.K", "q_id", "t.Q", "id", "CASCADE");
+        s.Statement(1, Op.Delete, "t.P");
+        s.Firing(10, 1, 2, "t.K", Op.Delete, ("id=40,p_id=1,q_id=null", null), ("id=42,p_id=null,q_id=30", null))
+         .Firing(11, 1, 1, "t.Q", Op.Delete, ("id=30", null))
+         .Firing(12, 1, 1, "t.P", Op.Delete, ("id=1", null));
+        var r = s.Resolve();
+        var c = F(r, 10).Cause!;
+        Assert.Equal(CauseKind.FkCascade, c.Kind);
+        Assert.Equal(Confidence.Inferred, c.Confidence);
+        var fkEdges = r.Graph.Edges.Where(e => e.Kind == EdgeKind.Fk && e.Target == "f-10").Select(e => (e.Source, e.Fk)).Order().ToList();
+        Assert.Equal([("f-11", "FK_K_Q"), ("f-12", "FK_K_P")], fkEdges);
+        Assert.All(r.Graph.Edges.Where(e => e.Kind == EdgeKind.Fk), e => Assert.NotEqual(Confidence.Certain, e.Confidence));
+    }
+
+    [Fact]
     public void Fk_with_trigger_that_can_write_child_is_inferred()
     {
         // 같은 문맥의 트리거가 자식 테이블에 쓸 수 있으면 certain을 주지 않는다(쓰기 경합).

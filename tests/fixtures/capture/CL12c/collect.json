@@ -1,0 +1,148 @@
+{
+  "firings": [
+    {
+      "id": "f-41",
+      "captureSeq": 41,
+      "statementIndex": 1,
+      "depth": 2,
+      "table": "cl12.DocNote",
+      "operation": "INSERT",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-42",
+      "captureSeq": 42,
+      "statementIndex": 1,
+      "depth": 2,
+      "table": "cl12.IdentSeen",
+      "operation": "INSERT",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-43",
+      "captureSeq": 43,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl12.Doc",
+      "operation": "INSERT",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-41-1",
+      "firingId": "f-41",
+      "operation": "INSERT",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "note_id"
+        ],
+        "values": [
+          "101"
+        ]
+      },
+      "before": null,
+      "after": {
+        "note_id": "101",
+        "doc_id": "2",
+        "note": "auto"
+      },
+      "changedColumns": [],
+      "volatile": [
+        {
+          "column": "note_id",
+          "reason": "IDENTITY"
+        }
+      ],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-42-1",
+      "firingId": "f-42",
+      "operation": "INSERT",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "title"
+        ],
+        "values": [
+          "d1"
+        ]
+      },
+      "before": null,
+      "after": {
+        "title": "d1",
+        "seen_identity": "101"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-43-1",
+      "firingId": "f-43",
+      "operation": "INSERT",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "doc_id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "before": null,
+      "after": {
+        "doc_id": "2",
+        "title": "d1"
+      },
+      "changedColumns": [],
+      "volatile": [
+        {
+          "column": "doc_id",
+          "reason": "IDENTITY"
+        }
+      ],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [
+    {
+      "childFiringId": "f-41",
+      "candidateParentFiringIds": [
+        "f-43"
+      ],
+      "confidenceCap": "inferred"
+    },
+    {
+      "childFiringId": "f-42",
+      "candidateParentFiringIds": [
+        "f-43"
+      ],
+      "confidenceCap": "inferred"
+    }
+  ],
+  "rereadDifferences": []
+}

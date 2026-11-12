@@ -1,0 +1,28 @@
+# spikes\sql\sp8-dm1-pick-order.sql db=AW_Origin part=0 at=2026-11-12T14:24:36.8443991+09:00 elapsedSec=1.12 exit=0
+fk_name child_table on_delete is_disabled
+------- ----------- --------- -----------
+FK_SalesOrderDetail_SalesOrderHeader_SalesOrderID Sales.SalesOrderDetail CASCADE 0
+FK_SalesOrderHeaderSalesReason_SalesOrderHeader_SalesOrderID Sales.SalesOrderHeaderSalesReason CASCADE 0
+table_name trigger_name event_type is_first is_last is_instead_of_trigger is_disabled
+---------- ------------ ---------- -------- ------- --------------------- -----------
+Person.Person iuPerson INSERT 0 0 0 0
+Person.Person iuPerson UPDATE 0 0 0 0
+Sales.SalesOrderDetail iduSalesOrderDetail DELETE 0 0 0 0
+Sales.SalesOrderDetail iduSalesOrderDetail INSERT 0 0 0 0
+Sales.SalesOrderDetail iduSalesOrderDetail UPDATE 0 0 0 0
+Sales.SalesOrderHeader uSalesOrderHeader UPDATE 0 0 0 0
+SalesOrderID Status CustomerID PersonID detail_rows reason_rows person_has_total_purchase_ytd
+------------ ------ ---------- -------- ----------- ----------- -----------------------------
+43697 5 21768 14078 1 2 1
+43702 5 27645 13514 1 2 1
+43703 5 16624 14897 1 2 1
+43706 5 27621 4229 1 2 1
+43707 5 27616 11853 1 2 1
+43709 5 16351 4916 1 2 1
+43710 5 16517 16362 1 2 1
+43711 5 27606 9351 1 2 1
+43712 5 13513 12797 1 2 1
+43713 5 27601 2835 1 2 1
+SalesOrderID detail_rows reason_rows
+------------ ----------- -----------
+43659 12 0

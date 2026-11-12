@@ -1,0 +1,122 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "UPDATE",
+        "target": "cl16.Ord",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 73
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          1,
+          1
+        ],
+        "error": null
+      },
+      "boundary": 1,
+      "imageCountAfter": 2,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 0,
+  "headers": [
+    {
+      "captureSeq": 1,
+      "tableObjectId": 1330103779,
+      "tableName": "[cl16].[Ord]",
+      "operation": "UPDATE",
+      "insertedCount": 1,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 1,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"customer\":\"s1\",\"note\":null,\"invoice_no\":5000,\"created_at\":\"2026-11-12T05:04:16.032\",\"row_guid\":\"341A0807-AF87-43D4-9540-11D07494068C\",\"touched_at\":null}"
+    },
+    {
+      "captureSeq": 1,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"customer\":\"s1\",\"note\":\"x\",\"invoice_no\":5000,\"created_at\":\"2026-11-12T05:04:16.032\",\"row_guid\":\"341A0807-AF87-43D4-9540-11D07494068C\",\"touched_at\":\"2026-11-12T05:04:22.702\"}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl16.Ord",
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"customer\":\"s1\",\"note\":\"x\",\"invoice_no\":5000,\"created_at\":\"2026-11-12T05:04:16.032\",\"row_guid\":\"341A0807-AF87-43D4-9540-11D07494068C\",\"touched_at\":\"2026-11-12T05:04:22.702\"}"
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl16.Ord",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "customer": "s1",
+        "note": null,
+        "invoice_no": "5000",
+        "created_at": "2026-11-12T05:04:16.032",
+        "row_guid": "341A0807-AF87-43D4-9540-11D07494068C",
+        "touched_at": null
+      },
+      "after": {
+        "id": "1",
+        "customer": "s1",
+        "note": "x",
+        "invoice_no": "5000",
+        "created_at": "2026-11-12T05:04:16.032",
+        "row_guid": "341A0807-AF87-43D4-9540-11D07494068C",
+        "touched_at": "2026-11-12T05:04:22.702"
+      },
+      "changedColumns": [
+        "note",
+        "touched_at"
+      ],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 2,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 87,
+    "readLog": 8,
+    "reread": 12,
+    "netDiff": 30
+  }
+}

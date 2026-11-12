@@ -44,7 +44,9 @@ public class TestDbTests
             (origin, sandbox, snapshot) = (tb.Origin, tb.Sandbox, tb.Snapshot);
             Assert.True(tb.Result.FingerprintMatch);
             Assert.Contains(tb.Result.Install.Manifest.Tables, t => t.Table == "cl07.A");
-            Assert.All(tb.Result.Install.Manifest.Tables, t => Assert.Equal(new AuditOrderInfo("LAST", "LAST", "LAST"), t.AuditOrder));
+            // CL13(cl13.T)은 사용자 Last DELETE 트리거가 있어 감사 DELETE 순서가 NONE인 것이 사례의 의도다(A6, E15)
+            Assert.All(tb.Result.Install.Manifest.Tables.Where(t => t.Table != "cl13.T"), t => Assert.Equal(new AuditOrderInfo("LAST", "LAST", "LAST"), t.AuditOrder));
+            Assert.Equal(new AuditOrderInfo("LAST", "LAST", "NONE"), Assert.Single(tb.Result.Install.Manifest.Tables, t => t.Table == "cl13.T").AuditOrder);
             await using var conn = await TestDb.OpenAsync(sandbox);
             Assert.Equal(0, await TestDb.ScalarAsync<int>(conn, "SELECT COUNT(*) FROM audit.AuditHeader;"));
             Assert.Equal(1, await TestDb.ScalarAsync<int>(conn, $"SELECT COUNT(*) FROM sys.databases WHERE name = N'{snapshot}' AND source_database_id = DB_ID();"));

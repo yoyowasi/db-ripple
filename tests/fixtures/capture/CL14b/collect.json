@@ -1,0 +1,42 @@
+{
+  "firings": [
+    {
+      "id": "f-44",
+      "captureSeq": 44,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl14.Tag",
+      "operation": "DELETE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-44-1",
+      "firingId": "f-44",
+      "operation": "DELETE",
+      "key": {
+        "kind": "ROW",
+        "columns": [],
+        "values": []
+      },
+      "before": {
+        "name": "a",
+        "qty": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "SINGLE_ROW",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [],
+  "rereadDifferences": []
+}

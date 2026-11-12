@@ -1,0 +1,97 @@
+{
+  "status": "failed",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "UPDATE",
+        "target": "cl18.Cust",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 46
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": null,
+        "error": null
+      },
+      "boundary": 11,
+      "imageCountAfter": 2,
+      "modeAfter": "FULL"
+    },
+    {
+      "result": {
+        "index": 2,
+        "batch": 1,
+        "position": 2,
+        "kind": "DELETE",
+        "target": "cl18.Cust",
+        "span": {
+          "startLine": 2,
+          "startColumn": 1,
+          "endLine": 2,
+          "endColumn": 36
+        },
+        "status": "failed",
+        "rowsAffected": null,
+        "captureSeqRange": null,
+        "error": {
+          "errorNumber": 547,
+          "message": "The DELETE statement conflicted with the REFERENCE constraint \"FK_cl18_Inv_Cust\". The conflict occurred in database \"dbrt_exe_cl_608dcda0_sbx\", table \"cl18.Inv\", column 'cust_id'.",
+          "procedure": null,
+          "isToolFault": false
+        }
+      },
+      "boundary": null,
+      "imageCountAfter": 2,
+      "modeAfter": "FULL"
+    },
+    {
+      "result": {
+        "index": 3,
+        "batch": 1,
+        "position": 3,
+        "kind": "UPDATE",
+        "target": "cl18.Cust",
+        "span": {
+          "startLine": 3,
+          "startColumn": 1,
+          "endLine": 3,
+          "endColumn": 46
+        },
+        "status": "not_run",
+        "rowsAffected": null,
+        "captureSeqRange": null,
+        "error": null
+      },
+      "boundary": null,
+      "imageCountAfter": 2,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 10,
+  "headers": [],
+  "images": [],
+  "rereads": [],
+  "netChanges": [],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 0,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 46,
+    "readLog": 0,
+    "reread": 0,
+    "netDiff": 329
+  }
+}

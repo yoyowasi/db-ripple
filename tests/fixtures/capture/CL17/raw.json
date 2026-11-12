@@ -1,0 +1,202 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "INSERT",
+        "target": "cl17.Txn",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 61
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          2,
+          2
+        ],
+        "error": null
+      },
+      "boundary": 2,
+      "imageCountAfter": 1,
+      "modeAfter": "FULL"
+    },
+    {
+      "result": {
+        "index": 2,
+        "batch": 1,
+        "position": 2,
+        "kind": "UPDATE",
+        "target": "cl17.Acct",
+        "span": {
+          "startLine": 2,
+          "startColumn": 1,
+          "endLine": 2,
+          "endColumn": 116
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          3,
+          3
+        ],
+        "error": null
+      },
+      "boundary": 3,
+      "imageCountAfter": 3,
+      "modeAfter": "FULL"
+    },
+    {
+      "result": {
+        "index": 3,
+        "batch": 1,
+        "position": 3,
+        "kind": "DELETE",
+        "target": "cl17.Txn",
+        "span": {
+          "startLine": 3,
+          "startColumn": 1,
+          "endLine": 3,
+          "endColumn": 37
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          4,
+          4
+        ],
+        "error": null
+      },
+      "boundary": 4,
+      "imageCountAfter": 4,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 1,
+  "headers": [
+    {
+      "captureSeq": 2,
+      "tableObjectId": 1522104463,
+      "tableName": "[cl17].[Txn]",
+      "operation": "INSERT",
+      "insertedCount": 1,
+      "deletedCount": 0,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 3,
+      "tableObjectId": 1490104349,
+      "tableName": "[cl17].[Acct]",
+      "operation": "UPDATE",
+      "insertedCount": 1,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 4,
+      "tableObjectId": 1522104463,
+      "tableName": "[cl17].[Txn]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 1,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 2,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":900}",
+      "rowJson": "{\"id\":900,\"acct_id\":1,\"amt\":50}"
+    },
+    {
+      "captureSeq": 3,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"bal\":100}"
+    },
+    {
+      "captureSeq": 3,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"bal\":150}"
+    },
+    {
+      "captureSeq": 4,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":900}",
+      "rowJson": "{\"id\":900,\"acct_id\":1,\"amt\":50}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl17.Acct",
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"bal\":150}"
+    },
+    {
+      "table": "cl17.Txn",
+      "keyJson": "{\"id\":900}",
+      "rowJson": null
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl17.Acct",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "bal": "100"
+      },
+      "after": {
+        "id": "1",
+        "bal": "150"
+      },
+      "changedColumns": [
+        "bal"
+      ],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 4,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 65,
+    "readLog": 2,
+    "reread": 8,
+    "netDiff": 22
+  }
+}

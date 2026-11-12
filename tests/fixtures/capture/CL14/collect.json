@@ -1,0 +1,105 @@
+{
+  "firings": [
+    {
+      "id": "f-45",
+      "captureSeq": 45,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl14.Tag",
+      "operation": "UPDATE",
+      "rowCount": 2,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-45-1",
+      "firingId": "f-45",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "ROW",
+        "columns": [],
+        "values": []
+      },
+      "before": {
+        "name": "a",
+        "qty": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "UNPAIRED",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-45-2",
+      "firingId": "f-45",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "ROW",
+        "columns": [],
+        "values": []
+      },
+      "before": {
+        "name": "a",
+        "qty": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "UNPAIRED",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-45-3",
+      "firingId": "f-45",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "ROW",
+        "columns": [],
+        "values": []
+      },
+      "before": null,
+      "after": {
+        "name": "a",
+        "qty": "11"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "UNPAIRED",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-45-4",
+      "firingId": "f-45",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "ROW",
+        "columns": [],
+        "values": []
+      },
+      "before": null,
+      "after": {
+        "name": "a",
+        "qty": "11"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "UNPAIRED",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [],
+  "rereadDifferences": []
+}

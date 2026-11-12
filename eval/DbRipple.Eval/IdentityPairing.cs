@@ -12,7 +12,7 @@ public sealed record IdentityAlignment(IReadOnlyList<OracleRowChange> Truth, lon
 /// <list type="bullet">
 /// <item>대상: 키에 IDENTITY 열이 있는 테이블(OracleTable.IdentityKeyColumns)의 INSERTED 행.</item>
 /// <item>순서: FK로 부모 테이블부터(자기 참조는 무시). 서로 참조하면 남은 것은 이름 순.</item>
-/// <item>짝 서명: after 값 가운데 IDENTITY 열, 비결정 열(VolatileColumns), 아직 짝을 안 지은 IDENTITY 테이블을 참조하는 FK 열을 뺀 나머지. 이미 짝지은 부모를 참조하는 FK 열은
+/// <item>짝 서명: after 값 가운데 IDENTITY 열, 비결정 열(VolatileColumns와 extraVolatile: 손 정답 volatile, 예 CL16 트리거가 GETDATE()로 채우는 OrdLine.added_at), 아직 짝을 안 지은 IDENTITY 테이블을 참조하는 FK 열을 뺀 나머지. 이미 짝지은 부모를 참조하는 FK 열은
 /// 정답 값을 짝 매핑으로 바꾼 뒤 비교한다(D7 "자식 FK 값은 짝 매핑으로 치환").</item>
 /// <item>서명이 같은 행이 여럿이면 양쪽 모두 IDENTITY 값 오름차순으로 차례대로 짝짓는다.</item>
 /// <item>다시 쓰기: 짝지은 정답 행의 키를 예측 키로, IDENTITY 열 값을 예측 값으로 바꾼다. 모든 정답 행에서 IDENTITY 테이블을 참조하는 FK 열 값(before·after·키)이
@@ -25,7 +25,8 @@ public static class IdentityPairing
 {
     /// <summary>정답(truth)을 예측(predicted)의 IDENTITY 값으로 옮긴다. tables는 오라클이 읽은 테이블(FK 포함).</summary>
     public static IdentityAlignment Align(IReadOnlyList<OracleRowChange> truth, IReadOnlyList<OracleRowChange> predicted, IReadOnlyList<OracleTable> tables,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? extraRefs = null)
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? extraRefs = null,
+        IReadOnlyDictionary<string, IReadOnlySet<string>>? extraVolatile = null)
     {
         var byName = tables.ToDictionary(t => t.Display, StringComparer.OrdinalIgnoreCase);
         // 손 정답 identityRefs를 FK처럼 다룬다(열 하나짜리 가상 FK).
@@ -54,6 +55,7 @@ public static class IdentityPairing
         {
             var idCols = t.IdentityKeyColumns;
             var excluded = new HashSet<string>(t.VolatileColumns, StringComparer.OrdinalIgnoreCase);
+            if (extraVolatile?.GetValueOrDefault(t.Display) is { } ev) excluded.UnionWith(ev);
             foreach (var c in idCols) excluded.Add(c);
             var translate = new Dictionary<string, (string Table, string Column)>(StringComparer.OrdinalIgnoreCase);
             foreach (var fk in t.ForeignKeys)

@@ -1,0 +1,227 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "INSERT",
+        "target": "cl16.Ord",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 55
+        },
+        "status": "ok",
+        "rowsAffected": 2,
+        "captureSeqRange": [
+          33,
+          34
+        ],
+        "error": null
+      },
+      "boundary": 34,
+      "imageCountAfter": 4,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 32,
+  "headers": [
+    {
+      "captureSeq": 33,
+      "tableObjectId": 1410104064,
+      "tableName": "[cl16].[OrdLine]",
+      "operation": "INSERT",
+      "insertedCount": 2,
+      "deletedCount": 0,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 34,
+      "tableObjectId": 1330103779,
+      "tableName": "[cl16].[Ord]",
+      "operation": "INSERT",
+      "insertedCount": 2,
+      "deletedCount": 0,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 33,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":4}",
+      "rowJson": "{\"id\":4,\"ord_id\":3,\"line_no\":1,\"qty\":1,\"memo\":\"c1\",\"added_at\":\"2026-11-12T05:04:36.493\"}"
+    },
+    {
+      "captureSeq": 33,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":3}",
+      "rowJson": "{\"id\":3,\"ord_id\":4,\"line_no\":1,\"qty\":1,\"memo\":\"c2\",\"added_at\":\"2026-11-12T05:04:36.493\"}"
+    },
+    {
+      "captureSeq": 34,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":4}",
+      "rowJson": "{\"id\":4,\"customer\":\"c2\",\"note\":null,\"invoice_no\":5003,\"created_at\":\"2026-11-12T05:04:36.489\",\"row_guid\":\"D67AD5F9-A503-4365-989A-44B8BE6BE662\",\"touched_at\":null}"
+    },
+    {
+      "captureSeq": 34,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":3}",
+      "rowJson": "{\"id\":3,\"customer\":\"c1\",\"note\":null,\"invoice_no\":5002,\"created_at\":\"2026-11-12T05:04:36.489\",\"row_guid\":\"758A7A48-E5C4-47DC-820E-29F0ECB88CC5\",\"touched_at\":null}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl16.Ord",
+      "keyJson": "{\"id\":4}",
+      "rowJson": "{\"id\":4,\"customer\":\"c2\",\"note\":null,\"invoice_no\":5003,\"created_at\":\"2026-11-12T05:04:36.489\",\"row_guid\":\"D67AD5F9-A503-4365-989A-44B8BE6BE662\",\"touched_at\":null}"
+    },
+    {
+      "table": "cl16.Ord",
+      "keyJson": "{\"id\":3}",
+      "rowJson": "{\"id\":3,\"customer\":\"c1\",\"note\":null,\"invoice_no\":5002,\"created_at\":\"2026-11-12T05:04:36.489\",\"row_guid\":\"758A7A48-E5C4-47DC-820E-29F0ECB88CC5\",\"touched_at\":null}"
+    },
+    {
+      "table": "cl16.OrdLine",
+      "keyJson": "{\"id\":4}",
+      "rowJson": "{\"id\":4,\"ord_id\":3,\"line_no\":1,\"qty\":1,\"memo\":\"c1\",\"added_at\":\"2026-11-12T05:04:36.493\"}"
+    },
+    {
+      "table": "cl16.OrdLine",
+      "keyJson": "{\"id\":3}",
+      "rowJson": "{\"id\":3,\"ord_id\":4,\"line_no\":1,\"qty\":1,\"memo\":\"c2\",\"added_at\":\"2026-11-12T05:04:36.493\"}"
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl16.Ord",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "3"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "3",
+        "customer": "c1",
+        "note": null,
+        "invoice_no": "5002",
+        "created_at": "2026-11-12T05:04:36.489",
+        "row_guid": "758A7A48-E5C4-47DC-820E-29F0ECB88CC5",
+        "touched_at": null
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl16.Ord",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "4"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "4",
+        "customer": "c2",
+        "note": null,
+        "invoice_no": "5003",
+        "created_at": "2026-11-12T05:04:36.489",
+        "row_guid": "D67AD5F9-A503-4365-989A-44B8BE6BE662",
+        "touched_at": null
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl16.OrdLine",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "3"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "3",
+        "ord_id": "4",
+        "line_no": "1",
+        "qty": "1",
+        "memo": "c2",
+        "added_at": "2026-11-12T05:04:36.493"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl16.OrdLine",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "4"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "4",
+        "ord_id": "3",
+        "line_no": "1",
+        "qty": "1",
+        "memo": "c1",
+        "added_at": "2026-11-12T05:04:36.493"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 4,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 34,
+    "readLog": 2,
+    "reread": 7,
+    "netDiff": 19
+  }
+}

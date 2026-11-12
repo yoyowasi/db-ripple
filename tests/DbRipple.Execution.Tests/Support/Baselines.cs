@@ -168,14 +168,28 @@ public static class Stmts
         }).ToList(),
     };
 
-    /// <summary>"UPDATE x.Y ..."에서 연산과 대상을 뽑는다(테스트 문장 전용).</summary>
+    /// <summary>
+    /// "UPDATE x.Y ..."에서 연산과 대상을 뽑는다(테스트 문장 전용). "DELETE TOP (n) FROM x.Y"의 TOP 절과
+    /// "UPDATE a ... FROM x.Y AS a"처럼 별칭이 대상인 문장(CL14b, CL17)은 실제 테이블 이름으로 바꾼다.
+    /// </summary>
     public static (string, ChangeOperation, string) Parse(string sql)
     {
-        var words = sql.Replace(";", " ").Split((char[])[' ', '\n', '\r', '\t'], StringSplitOptions.RemoveEmptyEntries);
+        var words = sql.Replace(";", " ").Split((char[])[' ', '\n', '\r', '\t'], StringSplitOptions.RemoveEmptyEntries).ToList();
         var kind = words[0].ToUpperInvariant() switch { "INSERT" => ChangeOperation.Insert, "UPDATE" => ChangeOperation.Update, _ => ChangeOperation.Delete };
+        if (words[1].StartsWith("TOP", StringComparison.OrdinalIgnoreCase))
+        {
+            var end = words.FindIndex(1, w => w.EndsWith(')'));
+            words.RemoveRange(1, end);
+        }
         var skip = words[1].Equals("FROM", StringComparison.OrdinalIgnoreCase) || words[1].Equals("INTO", StringComparison.OrdinalIgnoreCase);
-        var target = kind == ChangeOperation.Update || !skip ? words[1] : words[2];
-        return (sql, kind, target.Split('(')[0]);
+        var target = (kind == ChangeOperation.Update || !skip ? words[1] : words[2]).Split('(')[0];
+        if (!target.Contains('.'))
+            for (var i = 2; i + 1 < words.Count; i++)
+            {
+                var alias = words[i + 1].Equals("AS", StringComparison.OrdinalIgnoreCase) && i + 2 < words.Count ? words[i + 2] : words[i + 1];
+                if (words[i].Contains('.') && alias.Equals(target, StringComparison.OrdinalIgnoreCase)) { target = words[i]; break; }
+            }
+        return (sql, kind, target);
     }
 
     public static AnalysisResult Sql(params string[] sql) => Of(sql.Select(Parse).ToArray());

@@ -1,0 +1,426 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "DELETE",
+        "target": "cl20.Parent",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 39
+        },
+        "status": "ok",
+        "rowsAffected": 2,
+        "captureSeqRange": [
+          19,
+          21
+        ],
+        "error": null
+      },
+      "boundary": 21,
+      "imageCountAfter": 10,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 18,
+  "headers": [
+    {
+      "captureSeq": 19,
+      "tableObjectId": 1810105489,
+      "tableName": "[cl20].[ChildLog]",
+      "operation": "INSERT",
+      "insertedCount": 4,
+      "deletedCount": 0,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 20,
+      "tableObjectId": 1762105318,
+      "tableName": "[cl20].[Child]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 4,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 21,
+      "tableObjectId": 1730105204,
+      "tableName": "[cl20].[Parent]",
+      "operation": "DELETE",
+      "insertedCount": 0,
+      "deletedCount": 2,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 19,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"child_id\":1}",
+      "rowJson": "{\"child_id\":1,\"parent_id\":1,\"qty\":1}"
+    },
+    {
+      "captureSeq": 19,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"child_id\":2}",
+      "rowJson": "{\"child_id\":2,\"parent_id\":1,\"qty\":1}"
+    },
+    {
+      "captureSeq": 19,
+      "imageKind": "INSERTED",
+      "ordinal": 3,
+      "keyJson": "{\"child_id\":3}",
+      "rowJson": "{\"child_id\":3,\"parent_id\":2,\"qty\":1}"
+    },
+    {
+      "captureSeq": 19,
+      "imageKind": "INSERTED",
+      "ordinal": 4,
+      "keyJson": "{\"child_id\":4}",
+      "rowJson": "{\"child_id\":4,\"parent_id\":2,\"qty\":1}"
+    },
+    {
+      "captureSeq": 20,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":4}",
+      "rowJson": "{\"id\":4,\"parent_id\":2,\"qty\":1}"
+    },
+    {
+      "captureSeq": 20,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":3}",
+      "rowJson": "{\"id\":3,\"parent_id\":2,\"qty\":1}"
+    },
+    {
+      "captureSeq": 20,
+      "imageKind": "DELETED",
+      "ordinal": 3,
+      "keyJson": "{\"id\":2}",
+      "rowJson": "{\"id\":2,\"parent_id\":1,\"qty\":1}"
+    },
+    {
+      "captureSeq": 20,
+      "imageKind": "DELETED",
+      "ordinal": 4,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"parent_id\":1,\"qty\":1}"
+    },
+    {
+      "captureSeq": 21,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":2}",
+      "rowJson": "{\"id\":2,\"total\":2}"
+    },
+    {
+      "captureSeq": 21,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"total\":2}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl20.Child",
+      "keyJson": "{\"id\":4}",
+      "rowJson": null
+    },
+    {
+      "table": "cl20.Child",
+      "keyJson": "{\"id\":3}",
+      "rowJson": null
+    },
+    {
+      "table": "cl20.Child",
+      "keyJson": "{\"id\":2}",
+      "rowJson": null
+    },
+    {
+      "table": "cl20.Child",
+      "keyJson": "{\"id\":1}",
+      "rowJson": null
+    },
+    {
+      "table": "cl20.ChildLog",
+      "keyJson": "{\"child_id\":1}",
+      "rowJson": "{\"child_id\":1,\"parent_id\":1,\"qty\":1}"
+    },
+    {
+      "table": "cl20.ChildLog",
+      "keyJson": "{\"child_id\":2}",
+      "rowJson": "{\"child_id\":2,\"parent_id\":1,\"qty\":1}"
+    },
+    {
+      "table": "cl20.ChildLog",
+      "keyJson": "{\"child_id\":3}",
+      "rowJson": "{\"child_id\":3,\"parent_id\":2,\"qty\":1}"
+    },
+    {
+      "table": "cl20.ChildLog",
+      "keyJson": "{\"child_id\":4}",
+      "rowJson": "{\"child_id\":4,\"parent_id\":2,\"qty\":1}"
+    },
+    {
+      "table": "cl20.Parent",
+      "keyJson": "{\"id\":2}",
+      "rowJson": null
+    },
+    {
+      "table": "cl20.Parent",
+      "keyJson": "{\"id\":1}",
+      "rowJson": null
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl20.Child",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "parent_id": "1",
+        "qty": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl20.Child",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "2",
+        "parent_id": "1",
+        "qty": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl20.Child",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "3"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "3",
+        "parent_id": "2",
+        "qty": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl20.Child",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "4"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "4",
+        "parent_id": "2",
+        "qty": "1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl20.ChildLog",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "child_id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "child_id": "1",
+        "parent_id": "1",
+        "qty": "1"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl20.ChildLog",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "child_id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "child_id": "2",
+        "parent_id": "1",
+        "qty": "1"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl20.ChildLog",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "child_id"
+        ],
+        "values": [
+          "3"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "child_id": "3",
+        "parent_id": "2",
+        "qty": "1"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl20.ChildLog",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "child_id"
+        ],
+        "values": [
+          "4"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "child_id": "4",
+        "parent_id": "2",
+        "qty": "1"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl20.Parent",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "total": "2"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl20.Parent",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "2",
+        "total": "2"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 10,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 41,
+    "readLog": 4,
+    "reread": 12,
+    "netDiff": 20
+  }
+}

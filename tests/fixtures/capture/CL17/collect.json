@@ -1,0 +1,129 @@
+{
+  "firings": [
+    {
+      "id": "f-2",
+      "captureSeq": 2,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl17.Txn",
+      "operation": "INSERT",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-3",
+      "captureSeq": 3,
+      "statementIndex": 2,
+      "depth": 1,
+      "table": "cl17.Acct",
+      "operation": "UPDATE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-4",
+      "captureSeq": 4,
+      "statementIndex": 3,
+      "depth": 1,
+      "table": "cl17.Txn",
+      "operation": "DELETE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-2-1",
+      "firingId": "f-2",
+      "operation": "INSERT",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "900"
+        ]
+      },
+      "before": null,
+      "after": {
+        "id": "900",
+        "acct_id": "1",
+        "amt": "50"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-3-1",
+      "firingId": "f-3",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "before": {
+        "id": "1",
+        "bal": "100"
+      },
+      "after": {
+        "id": "1",
+        "bal": "150"
+      },
+      "changedColumns": [
+        "bal"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-4-1",
+      "firingId": "f-4",
+      "operation": "DELETE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "900"
+        ]
+      },
+      "before": {
+        "id": "900",
+        "acct_id": "1",
+        "amt": "50"
+      },
+      "after": null,
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [],
+  "rereadDifferences": []
+}

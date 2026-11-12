@@ -103,7 +103,9 @@ public class ComparerSelfTests
             Assert.DoesNotContain(result.Changes, c => c.Table == "dbo.t_hid" && c.Key == K("id", "2"));
 
             // NOT NULL 유일 키, '.' 이름 열(FOR JSON PATH 중첩·13601을 위치 별칭으로 피함)
-            Assert.Equal(["v"], ch[("dbo.t_uq", K("code", "a"), ChangeKinds.Updated)].ChangedColumns);
+            // 인계 6(Q35): 문자 키 값은 정렬 규칙대로 접힌다(기본 *_CI_AS면 대문자)
+            var uqKey = K("code", KeyFolding.Fold(tables.Single(t => t.Name == "t_uq").Columns.Single(c => c.Name == "code").Collation, "a"));
+            Assert.Equal(["v"], ch[("dbo.t_uq", uqKey, ChangeKinds.Updated)].ChangedColumns);
             Assert.Equal(["a.b"], ch[("dbo.t_dot", K("id", "1"), ChangeKinds.Updated)].ChangedColumns);
 
             // 감사 스키마는 결과에 없음, 그 밖의 변경도 없음

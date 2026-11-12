@@ -1,0 +1,465 @@
+[
+  {
+    "trigger": "cl06.trg_Line_del",
+    "objectId": 2085582468,
+    "table": "cl06.Line",
+    "events": [
+      "DELETE"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl06.LineLog"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl07.trg_A_upd",
+    "objectId": 82099333,
+    "table": "cl07.A",
+    "events": [
+      "UPDATE"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl07.B"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl07.trg_B_upd",
+    "objectId": 98099390,
+    "table": "cl07.B",
+    "events": [
+      "UPDATE"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl07.C"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl07.trg_C_ins",
+    "objectId": 114099447,
+    "table": "cl07.C",
+    "events": [
+      "INSERT"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl07.D"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl08.trg_Acct_upd",
+    "objectId": 178099675,
+    "table": "cl08.Acct",
+    "events": [
+      "UPDATE"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl08.Acct"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl09.trg_M_del",
+    "objectId": 370100359,
+    "table": "cl09.M",
+    "events": [
+      "DELETE"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl09.Q"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl10.trg_Region_del_dyn",
+    "objectId": 674101442,
+    "table": "cl10.Region",
+    "events": [
+      "DELETE"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": true,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl10.trg_Region_del_log",
+    "objectId": 690101499,
+    "table": "cl10.Region",
+    "events": [
+      "DELETE"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl10.RegionLog"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl11.trg_Item_ioi",
+    "objectId": 770101784,
+    "table": "cl11.Item",
+    "events": [
+      "INSERT"
+    ],
+    "isInsteadOf": true,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl11.Item",
+      "cl11.ItemLog"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl11.trg_Item_iou",
+    "objectId": 786101841,
+    "table": "cl11.Item",
+    "events": [
+      "UPDATE"
+    ],
+    "isInsteadOf": true,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl11.Item",
+      "cl11.ItemLog"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl12.trg_Doc_ins",
+    "objectId": 1026102696,
+    "table": "cl12.Doc",
+    "events": [
+      "INSERT"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl12.DocNote",
+      "cl12.IdentSeen"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl12.trg_Ord_check",
+    "objectId": 1010102639,
+    "table": "cl12.Ord",
+    "events": [
+      "UPDATE"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl12.ErrLog",
+      "cl12.OrdHist"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": true,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl13.trg_T_1",
+    "objectId": 1154103152,
+    "table": "cl13.T",
+    "events": [
+      "DELETE"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl13.Log"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl13.trg_T_2",
+    "objectId": 1170103209,
+    "table": "cl13.T",
+    "events": [
+      "DELETE"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl13.Log"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl13.trg_T_3",
+    "objectId": 1186103266,
+    "table": "cl13.T",
+    "events": [
+      "DELETE"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl13.Log"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl13.trg_TC_1",
+    "objectId": 1202103323,
+    "table": "cl13.TC",
+    "events": [
+      "DELETE"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl13.Log"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl16.trg_Ord_ins",
+    "objectId": 1474104292,
+    "table": "cl16.Ord",
+    "events": [
+      "INSERT"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl16.OrdLine"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": [
+      {
+        "table": "cl16.OrdLine",
+        "column": "added_at"
+      }
+    ]
+  },
+  {
+    "trigger": "cl20.trg_Child_del",
+    "objectId": 1842105603,
+    "table": "cl20.Child",
+    "events": [
+      "DELETE"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl20.ChildLog"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  },
+  {
+    "trigger": "cl20.trg_Child_upd",
+    "objectId": 1858105660,
+    "table": "cl20.Child",
+    "events": [
+      "UPDATE"
+    ],
+    "isInsteadOf": false,
+    "isDisabled": false,
+    "isEncrypted": false,
+    "isAuditTrigger": false,
+    "writeTargets": [
+      "cl20.Parent"
+    ],
+    "writeTargetsUnknown": false,
+    "hasDynamicSql": false,
+    "hasRollback": false,
+    "hasTransactionControl": false,
+    "externalSideEffects": [],
+    "procedureCalls": [],
+    "expandedProcedureCalls": [],
+    "unresolvedProcedureCalls": [],
+    "nondeterministicWrites": []
+  }
+]

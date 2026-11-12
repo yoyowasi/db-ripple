@@ -1,0 +1,9 @@
+# <scratchpad>\e2e-check-dm7.sql db=dbrt_e2e_origin part=0 at=2026-11-12T14:30:03.7512997+09:00 elapsedSec=0.77 exit=0
+ProductID ListPrice
+--------- ---------
+680 1431.5100
+name
+----
+dbrt_e2e_base
+dbrt_e2e_origin
+dbrt_e2e_sbx

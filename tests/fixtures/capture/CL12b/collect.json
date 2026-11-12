@@ -1,0 +1,110 @@
+{
+  "firings": [
+    {
+      "id": "f-37",
+      "captureSeq": 37,
+      "statementIndex": 1,
+      "depth": 1,
+      "table": "cl12.Ord",
+      "operation": "UPDATE",
+      "rowCount": 0,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-38",
+      "captureSeq": 38,
+      "statementIndex": 2,
+      "depth": 2,
+      "table": "cl12.OrdHist",
+      "operation": "INSERT",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-39",
+      "captureSeq": 39,
+      "statementIndex": 2,
+      "depth": 1,
+      "table": "cl12.Ord",
+      "operation": "UPDATE",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-38-1",
+      "firingId": "f-38",
+      "operation": "INSERT",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "ord_id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "before": null,
+      "after": {
+        "ord_id": "2",
+        "qty": "8"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-39-1",
+      "firingId": "f-39",
+      "operation": "UPDATE",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "before": {
+        "id": "2",
+        "qty": "7"
+      },
+      "after": {
+        "id": "2",
+        "qty": "8"
+      },
+      "changedColumns": [
+        "qty"
+      ],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [
+    {
+      "childFiringId": "f-38",
+      "candidateParentFiringIds": [
+        "f-39"
+      ],
+      "confidenceCap": "inferred"
+    }
+  ],
+  "rereadDifferences": []
+}

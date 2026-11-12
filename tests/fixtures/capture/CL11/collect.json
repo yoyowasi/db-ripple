@@ -1,0 +1,98 @@
+{
+  "firings": [
+    {
+      "id": "f-22",
+      "captureSeq": 22,
+      "statementIndex": 1,
+      "depth": 2,
+      "table": "cl11.Item",
+      "operation": "INSERT",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    },
+    {
+      "id": "f-23",
+      "captureSeq": 23,
+      "statementIndex": 1,
+      "depth": 2,
+      "table": "cl11.ItemLog",
+      "operation": "INSERT",
+      "rowCount": 1,
+      "imageMode": "FULL",
+      "auditOrder": "LAST",
+      "cause": null,
+      "orderGuarantee": null
+    }
+  ],
+  "rowChanges": [
+    {
+      "id": "rc-22-1",
+      "firingId": "f-22",
+      "operation": "INSERT",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "3"
+        ]
+      },
+      "before": null,
+      "after": {
+        "id": "3",
+        "name": "C",
+        "qty": "4"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    },
+    {
+      "id": "rc-23-1",
+      "firingId": "f-23",
+      "operation": "INSERT",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "item_id",
+          "action"
+        ],
+        "values": [
+          "3",
+          "I"
+        ]
+      },
+      "before": null,
+      "after": {
+        "item_id": "3",
+        "action": "I"
+      },
+      "changedColumns": [],
+      "volatile": [],
+      "derived": [],
+      "pairing": "BY_PK",
+      "finalAfterSource": "AUDIT",
+      "parentRowIds": []
+    }
+  ],
+  "contextLinks": [
+    {
+      "childFiringId": "f-22",
+      "candidateParentFiringIds": [],
+      "confidenceCap": "inferred"
+    },
+    {
+      "childFiringId": "f-23",
+      "candidateParentFiringIds": [],
+      "confidenceCap": "inferred"
+    }
+  ],
+  "rereadDifferences": []
+}

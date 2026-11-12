@@ -30,3 +30,6 @@ Thumbs.db
 
 # 로컬 개발 데이터(.bak 다운로드 등)
 .data/
+
+# M5 측정의 원본 미리보기 덤프(수십~수백 MB). 수치는 m5.csv·env.json으로 재현한다
+logs/eval-m5/*/store/

@@ -427,6 +427,16 @@ public class Week3EngineTests(LabFixture lab)
         return d;
     }
 
+    /// <summary>Analysis.Tests가 쓴 CascadeLab 사용자 트리거 정적 분석(tests/fixtures/capture/triggers-cascadelab.json) 가운데 이 기준선 카탈로그에 있는 테이블의 것.</summary>
+    static List<TriggerStaticInfo> LabTriggers(BaselineContext ctx)
+    {
+        var path = Path.Combine(RepoPaths.Root, "tests", "fixtures", "capture", "triggers-cascadelab.json");
+        Assert.True(File.Exists(path), "픽스처 없음: " + path + " (먼저 DBR_WRITE_FIXTURES=1로 Analysis.Tests Write_trigger_static_info_fixture를 돌린다)");
+        var tables = ctx.Catalog.Tables.Select(t => t.Schema + "." + t.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return JsonSerializer.Deserialize<List<TriggerStaticInfo>>(File.ReadAllText(path), FixtureFiles.Options)!
+            .Where(t => tables.Contains(t.Table)).ToList();
+    }
+
     static bool LeavesResidue(string id)
     {
         var f = Directory.GetFiles(Path.Combine(RepoPaths.CascadeLab, "cases"), id + "-*.json").Single();
@@ -458,8 +468,10 @@ public class Week3EngineTests(LabFixture lab)
             else (b, ctx) = lab.For(c);
 
             var analysis = Stmts.Sql([.. c.Statements]);
+            // 제품(SandboxManager)은 C6 트리거 정적 분석을 문맥에 채운다. 3609의 ROLLBACK 확인(ErrorRules.EndedByRollback)이 이것을 쓰므로
+            // 실행에만 Analysis.Tests가 쓴 triggers-cascadelab.json을 넣는다(픽스처 baseline의 Triggers는 빈 배열 그대로).
             var raw = await new PreviewExecutor(TestDb.ConnectionString(), new ExecutionSettings { ExecuteAsUser = PreviewUserSql.UserName }, ExceptNetDiffer.Create())
-                .ExecuteAsync(analysis, ctx, new PreviewOptions(), null, default);
+                .ExecuteAsync(analysis, ctx with { Triggers = LabTriggers(ctx) }, new PreviewOptions(), null, default);
             Assert.Equal(c.Status, raw.Status switch
             {
                 PreviewStatus.Ok => "ok", PreviewStatus.Failed => "failed", PreviewStatus.TriggerBlocked => "trigger_blocked", _ => "truncated",

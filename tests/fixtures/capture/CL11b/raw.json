@@ -1,0 +1,194 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "UPDATE",
+        "target": "cl11.Item",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 55
+        },
+        "status": "ok",
+        "rowsAffected": 2,
+        "captureSeqRange": [
+          35,
+          36
+        ],
+        "error": null
+      },
+      "boundary": 36,
+      "imageCountAfter": 4,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 34,
+  "headers": [
+    {
+      "captureSeq": 35,
+      "tableObjectId": 706101556,
+      "tableName": "[cl11].[Item]",
+      "operation": "UPDATE",
+      "insertedCount": 1,
+      "deletedCount": 1,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 36,
+      "tableObjectId": 738101670,
+      "tableName": "[cl11].[ItemLog]",
+      "operation": "INSERT",
+      "insertedCount": 2,
+      "deletedCount": 0,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 35,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"name\":\"A\",\"qty\":5}"
+    },
+    {
+      "captureSeq": 35,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"name\":\"A\",\"qty\":2}"
+    },
+    {
+      "captureSeq": 36,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"item_id\":2,\"action\":\"R\"}",
+      "rowJson": "{\"item_id\":2,\"action\":\"R\"}"
+    },
+    {
+      "captureSeq": 36,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"item_id\":1,\"action\":\"U\"}",
+      "rowJson": "{\"item_id\":1,\"action\":\"U\"}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl11.Item",
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"name\":\"A\",\"qty\":2}"
+    },
+    {
+      "table": "cl11.ItemLog",
+      "keyJson": "{\"item_id\":2,\"action\":\"R\"}",
+      "rowJson": "{\"item_id\":2,\"action\":\"R\"}"
+    },
+    {
+      "table": "cl11.ItemLog",
+      "keyJson": "{\"item_id\":1,\"action\":\"U\"}",
+      "rowJson": "{\"item_id\":1,\"action\":\"U\"}"
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl11.Item",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "UPDATED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "name": "A",
+        "qty": "5"
+      },
+      "after": {
+        "id": "1",
+        "name": "A",
+        "qty": "2"
+      },
+      "changedColumns": [
+        "qty"
+      ],
+      "explainedBy": null
+    },
+    {
+      "table": "cl11.ItemLog",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "item_id",
+          "action"
+        ],
+        "values": [
+          "1",
+          "U"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "item_id": "1",
+        "action": "U"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl11.ItemLog",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "item_id",
+          "action"
+        ],
+        "values": [
+          "2",
+          "R"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "item_id": "2",
+        "action": "R"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 4,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 32,
+    "readLog": 2,
+    "reread": 3,
+    "netDiff": 20
+  }
+}

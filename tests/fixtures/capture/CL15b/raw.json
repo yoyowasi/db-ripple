@@ -1,0 +1,202 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "UPDATE",
+        "target": "cl15.Emp",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 54
+        },
+        "status": "ok",
+        "rowsAffected": 2,
+        "captureSeqRange": [
+          12,
+          12
+        ],
+        "error": null
+      },
+      "boundary": 12,
+      "imageCountAfter": 4,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 11,
+  "headers": [
+    {
+      "captureSeq": 12,
+      "tableObjectId": 1266103551,
+      "tableName": "[cl15].[Emp]",
+      "operation": "UPDATE",
+      "insertedCount": 2,
+      "deletedCount": 2,
+      "nestLevel": 1,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 12,
+      "imageKind": "DELETED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":2}",
+      "rowJson": "{\"id\":2,\"badge\":\"B002\",\"name\":\"e2\"}"
+    },
+    {
+      "captureSeq": 12,
+      "imageKind": "DELETED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":1}",
+      "rowJson": "{\"id\":1,\"badge\":\"B001\",\"name\":\"e1\"}"
+    },
+    {
+      "captureSeq": 12,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":102}",
+      "rowJson": "{\"id\":102,\"badge\":\"B002\",\"name\":\"e2\"}"
+    },
+    {
+      "captureSeq": 12,
+      "imageKind": "INSERTED",
+      "ordinal": 2,
+      "keyJson": "{\"id\":101}",
+      "rowJson": "{\"id\":101,\"badge\":\"B001\",\"name\":\"e1\"}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl15.Emp",
+      "keyJson": "{\"id\":2}",
+      "rowJson": null
+    },
+    {
+      "table": "cl15.Emp",
+      "keyJson": "{\"id\":1}",
+      "rowJson": null
+    },
+    {
+      "table": "cl15.Emp",
+      "keyJson": "{\"id\":102}",
+      "rowJson": "{\"id\":102,\"badge\":\"B002\",\"name\":\"e2\"}"
+    },
+    {
+      "table": "cl15.Emp",
+      "keyJson": "{\"id\":101}",
+      "rowJson": "{\"id\":101,\"badge\":\"B001\",\"name\":\"e1\"}"
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl15.Emp",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "1"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "1",
+        "badge": "B001",
+        "name": "e1"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl15.Emp",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "2"
+        ]
+      },
+      "change": "DELETED",
+      "multiplicity": 1,
+      "before": {
+        "id": "2",
+        "badge": "B002",
+        "name": "e2"
+      },
+      "after": null,
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl15.Emp",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "101"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "101",
+        "badge": "B001",
+        "name": "e1"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl15.Emp",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "102"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "102",
+        "badge": "B002",
+        "name": "e2"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 4,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 28,
+    "readLog": 2,
+    "reread": 3,
+    "netDiff": 11
+  }
+}

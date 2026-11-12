@@ -1,0 +1,53 @@
+{
+  "statements": [
+    {
+      "index": 1,
+      "batch": 1,
+      "position": 1,
+      "kind": "INSERT",
+      "target": "cl17.Txn",
+      "span": {
+        "startLine": 1,
+        "startColumn": 1,
+        "endLine": 1,
+        "endColumn": 61
+      },
+      "sql": "INSERT INTO cl17.Txn (id, acct_id, amt) VALUES (900, 1, 50);",
+      "nondeterministicColumns": []
+    },
+    {
+      "index": 2,
+      "batch": 1,
+      "position": 2,
+      "kind": "UPDATE",
+      "target": "cl17.Acct",
+      "span": {
+        "startLine": 2,
+        "startColumn": 1,
+        "endLine": 2,
+        "endColumn": 116
+      },
+      "sql": "UPDATE a SET bal = a.bal + t.amt FROM cl17.Acct AS a INNER JOIN cl17.Txn AS t ON t.acct_id = a.id WHERE t.id = 900;",
+      "nondeterministicColumns": []
+    },
+    {
+      "index": 3,
+      "batch": 1,
+      "position": 3,
+      "kind": "DELETE",
+      "target": "cl17.Txn",
+      "span": {
+        "startLine": 3,
+        "startColumn": 1,
+        "endLine": 3,
+        "endColumn": 37
+      },
+      "sql": "DELETE FROM cl17.Txn WHERE id = 900;",
+      "nondeterministicColumns": []
+    }
+  ],
+  "rejects": [],
+  "warnings": [],
+  "diagnostics": [],
+  "isAccepted": true
+}

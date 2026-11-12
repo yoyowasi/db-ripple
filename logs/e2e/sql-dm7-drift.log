@@ -1,0 +1,7 @@
+# <scratchpad>\e2e-dm7-drift.sql db=dbrt_e2e_origin part=0 at=2026-11-12T14:29:46.0963860+09:00 elapsedSec=0.75 exit=0
+ProductID before_list_price
+--------- -----------------
+680 1431.5000
+ProductID after_list_price
+--------- ----------------
+680 1431.5100

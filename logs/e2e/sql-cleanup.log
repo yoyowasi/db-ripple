@@ -1,0 +1,20 @@
+# <scratchpad>\e2e-drop.sql db=master part=0 at=2026-11-12T14:33:25.4413789+09:00 elapsedSec=1.5 exit=0
+dropped dbrt_e2e_base
+dropped dbrt_e2e_origin
+dropped dbrt_e2e_sbx
+dbrt_count
+----------
+0
+name
+----
+AW_Origin
+AW_Sandbox
+AW_Sandbox_base
+AW_SpikeA
+AW_SpikeB
+CascadeLab
+CascadeLab_RT
+CascadeLab_RT_Sandbox
+CascadeLab_RT_Sandbox_base
+CascadeLab_Sandbox
+CascadeLab_Sandbox_base

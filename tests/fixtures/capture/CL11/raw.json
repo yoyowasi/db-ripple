@@ -1,0 +1,146 @@
+{
+  "status": "ok",
+  "executions": [
+    {
+      "result": {
+        "index": 1,
+        "batch": 1,
+        "position": 1,
+        "kind": "INSERT",
+        "target": "cl11.Item",
+        "span": {
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 1,
+          "endColumn": 58
+        },
+        "status": "ok",
+        "rowsAffected": 1,
+        "captureSeqRange": [
+          22,
+          23
+        ],
+        "error": null
+      },
+      "boundary": 23,
+      "imageCountAfter": 2,
+      "modeAfter": "FULL"
+    }
+  ],
+  "boundary0": 21,
+  "headers": [
+    {
+      "captureSeq": 22,
+      "tableObjectId": 706101556,
+      "tableName": "[cl11].[Item]",
+      "operation": "INSERT",
+      "insertedCount": 1,
+      "deletedCount": 0,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    },
+    {
+      "captureSeq": 23,
+      "tableObjectId": 738101670,
+      "tableName": "[cl11].[ItemLog]",
+      "operation": "INSERT",
+      "insertedCount": 1,
+      "deletedCount": 0,
+      "nestLevel": 2,
+      "tranCount": 2,
+      "imageMode": "FULL"
+    }
+  ],
+  "images": [
+    {
+      "captureSeq": 22,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"id\":3}",
+      "rowJson": "{\"id\":3,\"name\":\"C\",\"qty\":4}"
+    },
+    {
+      "captureSeq": 23,
+      "imageKind": "INSERTED",
+      "ordinal": 1,
+      "keyJson": "{\"item_id\":3,\"action\":\"I\"}",
+      "rowJson": "{\"item_id\":3,\"action\":\"I\"}"
+    }
+  ],
+  "rereads": [
+    {
+      "table": "cl11.Item",
+      "keyJson": "{\"id\":3}",
+      "rowJson": "{\"id\":3,\"name\":\"C\",\"qty\":4}"
+    },
+    {
+      "table": "cl11.ItemLog",
+      "keyJson": "{\"item_id\":3,\"action\":\"I\"}",
+      "rowJson": "{\"item_id\":3,\"action\":\"I\"}"
+    }
+  ],
+  "netChanges": [
+    {
+      "table": "cl11.Item",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "id"
+        ],
+        "values": [
+          "3"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "id": "3",
+        "name": "C",
+        "qty": "4"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    },
+    {
+      "table": "cl11.ItemLog",
+      "key": {
+        "kind": "PK",
+        "columns": [
+          "item_id",
+          "action"
+        ],
+        "values": [
+          "3",
+          "I"
+        ]
+      },
+      "change": "INSERTED",
+      "multiplicity": 1,
+      "before": null,
+      "after": {
+        "item_id": "3",
+        "action": "I"
+      },
+      "changedColumns": [],
+      "explainedBy": null
+    }
+  ],
+  "residualCommitted": [],
+  "sandboxDirty": false,
+  "residualCheckFailed": false,
+  "residualCheckMessage": null,
+  "capture": {
+    "imageCount": 2,
+    "cap": 100000,
+    "truncated": false,
+    "manifestVersion": "m-20261112-1404"
+  },
+  "timings": {
+    "execute": 28,
+    "readLog": 2,
+    "reread": 7,
+    "netDiff": 13
+  }
+}
