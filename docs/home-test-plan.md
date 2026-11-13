@@ -31,7 +31,7 @@
 ## 1. 준비
 
 - [ ] Docker Desktop 실행. 컨테이너 둘(샌드박스 6GB, 원본 모사 3GB 상한)을 쓰므로 Docker Desktop 메모리를 10GB 이상으로.
-- [ ] 저장소 최신(`git status`로 미커밋 변경이 남아 있는지 확인: 이 문서의 변경은 미커밋이다).
+- [ ] 저장소 최신(`git pull`, main이 2026-11-13 마지막 커밋 이후인지 확인. Codex로 진행하면 `docs/codex-home-prompt.md`의 프롬프트를 붙여 넣는다).
 - [ ] `.env` 존재, `MSSQL_SA_PASSWORD` 채움(`.env.example` 참고). 비밀번호에 `$`를 쓰지 않는다.
 - [ ] AdventureWorks 준비(N1 AW, SP14 AW 판, SP21 D에 필요):
   ```powershell
