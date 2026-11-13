@@ -14,6 +14,7 @@ public sealed class CatalogBuilder
     readonly List<CatalogSynonym> synonyms = [];
     readonly List<CatalogView> views = [];
     readonly List<CatalogTableFunction> tableFunctions = [];
+    readonly List<CatalogIndexedView> indexedViews = [];
     readonly List<CatalogForeignKeyColumn> foreignKeys = [];
     int nextId = 1000;
 
@@ -91,5 +92,14 @@ public sealed class CatalogBuilder
         return this;
     }
 
-    public DbCatalog Build() => new(tables, columns, [], foreignKeys, triggers, [], procedures, functions, synonyms, views, tableFunctions);
+    /// <summary>인덱싱된 뷰와 기준 테이블(2026-11-13). 뷰 본문은 View()로 따로 준다.</summary>
+    public CatalogBuilder IndexedView(string view, string table)
+    {
+        var v = view.Split('.');
+        var t = table.Split('.');
+        indexedViews.Add(new CatalogIndexedView(v[0], v[1], t[0], t[1]));
+        return this;
+    }
+
+    public DbCatalog Build() => new(tables, columns, [], foreignKeys, triggers, [], procedures, functions, synonyms, views, tableFunctions, indexedViews);
 }

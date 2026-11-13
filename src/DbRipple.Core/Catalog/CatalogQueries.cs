@@ -119,5 +119,16 @@ public static class CatalogQueries
         ORDER BY table_schema, table_name, d.referenced_entity_name;
         """;
 
-    public static IReadOnlyList<string> All => [Tables, Columns, KeyIndexes, ForeignKeys, Triggers, Files, Procedures, Functions, Synonyms, Views, TableFunctions];
+    // 2026-11-13: 인덱싱된 뷰(클러스터형 인덱스 index_id = 1)와 그 뷰가 참조하는 기준 테이블. 기준 테이블에 쓰면 뷰가 갱신되며 뷰 안의 함수가 실행된다.
+    public const string IndexedViews = """
+        SELECT DISTINCT SCHEMA_NAME(v.schema_id) AS view_schema, v.name AS view_name, SCHEMA_NAME(t.schema_id) AS table_schema, t.name AS table_name
+        FROM sys.views AS v
+        JOIN sys.indexes AS i ON i.object_id = v.object_id AND i.index_id = 1
+        JOIN sys.sql_expression_dependencies AS d ON d.referencing_id = v.object_id
+        JOIN sys.tables AS t ON t.object_id = d.referenced_id
+        WHERE v.is_ms_shipped = 0
+        ORDER BY view_schema, view_name, table_schema, table_name;
+        """;
+
+    public static IReadOnlyList<string> All => [Tables, Columns, KeyIndexes, ForeignKeys, Triggers, Files, Procedures, Functions, Synonyms, Views, TableFunctions, IndexedViews];
 }

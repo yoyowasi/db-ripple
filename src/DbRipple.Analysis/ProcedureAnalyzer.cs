@@ -245,7 +245,20 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
 
     string? CheckTable(string? schema, string name, string callerSchema, int depth, HashSet<int> stack)
     {
-        if (catalog.TableFunctionModules.Count == 0 || name.StartsWith('#') || name.StartsWith('@')) return null;
+        if (name.StartsWith('#') || name.StartsWith('@')) return null;
+        bool SameTable(string tSchema, string tName) => tName.Equals(name, StringComparison.OrdinalIgnoreCase)
+            && (schema is not null ? tSchema.Equals(schema, StringComparison.OrdinalIgnoreCase)
+                : tSchema.Equals(callerSchema, StringComparison.OrdinalIgnoreCase) || tSchema.Equals("dbo", StringComparison.OrdinalIgnoreCase));
+        // 인덱싱된 뷰: 기준 테이블에 쓰면 뷰가 갱신되며 뷰 안의 함수가 실행된다(2026-11-13). 읽기에도 보는 것은 닫힌 쪽.
+        if (catalog.ViewsKnown)
+            foreach (var iv in catalog.IndexedViewModules.Where(iv => SameTable(iv.TableSchema, iv.TableName)))
+            {
+                var (v, _) = FindView(iv.ViewSchema, iv.ViewName, iv.ViewSchema);
+                if (v is null) return $"테이블 {iv.TableSchema}.{iv.TableName}의 인덱싱된 뷰 {iv.ViewSchema}.{iv.ViewName}: 카탈로그에 뷰 본문이 없음";
+                if (stack.Contains(v.ObjectId)) continue; // 지금 판정 중인 그 뷰 자신(뷰가 기준 테이블을 읽는 것은 당연하다)
+                if (CheckView(v, depth, stack) is { } ivWhy) return $"테이블 {iv.TableSchema}.{iv.TableName}의 인덱싱된 뷰 {iv.ViewSchema}.{iv.ViewName}: {ivWhy}";
+            }
+        if (catalog.TableFunctionModules.Count == 0) return null;
         var deps = catalog.TableFunctionModules.Where(d => d.TableName.Equals(name, StringComparison.OrdinalIgnoreCase)
             && (schema is not null ? d.TableSchema.Equals(schema, StringComparison.OrdinalIgnoreCase)
                 : d.TableSchema.Equals(callerSchema, StringComparison.OrdinalIgnoreCase) || d.TableSchema.Equals("dbo", StringComparison.OrdinalIgnoreCase)));

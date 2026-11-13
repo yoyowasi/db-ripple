@@ -281,6 +281,27 @@ public class FunctionGateTests
         Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("순환"));
     }
 
+    // ---- 인덱싱된 뷰(2026-11-13): 기준 테이블에 쓰면 뷰가 갱신되며 뷰 안의 함수가 실행된다 ----
+
+    [Fact]
+    public void Writing_a_table_under_an_indexed_view_with_clr_function_is_rejected()
+    {
+        var r = Run(Ctx("UPDATE dbo.U SET y = 1;", b => b
+            .View("dbo", "vIdx", "CREATE VIEW dbo.vIdx WITH SCHEMABINDING AS SELECT y, dbo.clr(y) AS z FROM dbo.U;")
+            .IndexedView("dbo.vIdx", "dbo.U").Function("dbo", "clr", null, "FS")));
+        Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("인덱싱된 뷰 dbo.vIdx") && d.Message.Contains("CLR"));
+    }
+
+    [Fact]
+    public void Clean_indexed_view_and_old_baseline_are_allowed()
+    {
+        Assert.True(Run(Ctx("UPDATE dbo.U SET y = 1;", b => b
+            .View("dbo", "vIdx", "CREATE VIEW dbo.vIdx WITH SCHEMABINDING AS SELECT y, COUNT_BIG(*) AS n FROM dbo.U GROUP BY y;")
+            .IndexedView("dbo.vIdx", "dbo.U"))).IsAccepted);
+        var ctx = Ctx("UPDATE dbo.U SET y = 1;", b => b.IndexedView("dbo.vIdx", "dbo.U"));
+        Assert.True(Run(ctx with { Catalog = ctx.Catalog with { Views = null } }).IsAccepted); // 뷰 목록이 없는 예전 기준선은 판정하지 않는다
+    }
+
     [Fact]
     public void Ambiguous_function_names_are_rejected()
     {
