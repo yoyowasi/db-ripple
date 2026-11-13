@@ -110,14 +110,22 @@ const pageRows = computed<GridRow[]>(() => {
   })
 })
 
-const pageLabel = computed(() => {
+/** 지금 고른 보기·묶음·테이블의 페이지. 바꾼 직후 새 페이지가 오기 전의 옛 페이지는 null이라 행 수·안내·[다음]이 옛 total을 쓰지 않는다. */
+const currentPage = computed(() => {
   const p = page.value
+  if (!p || p.view !== props.view) return null
+  if (p.view === 'net') return p.rows.length === 0 || (p.rows as NetChange[])[0].table === netTable.value ? p : null
+  return (p.rows as RowChange[]).every((r) => r.firingId === props.selectedFiringId) ? p : null
+})
+
+const pageLabel = computed(() => {
+  const p = currentPage.value
   if (!p || p.total === 0) return '0행'
   const to = Math.min(p.offset + p.rows.length, p.total)
   return `${formatCount(p.offset + 1)}–${formatCount(to)} / ${formatCount(p.total)}행`
 })
 const canPrev = computed(() => !props.consumed && offset.value > 0)
-const canNext = computed(() => !props.consumed && !!page.value && offset.value + limit.value < page.value.total)
+const canNext = computed(() => !props.consumed && !!currentPage.value && offset.value + limit.value < currentPage.value.total)
 
 // ---- 발동 보기 ----
 const zeroCount = computed(() => firings.value.filter((f) => f.rowCount === 0).length)
@@ -144,8 +152,11 @@ const hasUnpaired = computed(() => pageRows.value.some((r) => r.unpaired))
 // 서버가 이미 그 테이블만 준다. 테이블을 바꾼 직후 늦게 도착하는 옛 페이지만 걸러 낸다.
 const netRows = computed(() => pageRows.value.filter((r) => r.table === netTable.value))
 // 한 페이지가 전체가 아니면 [이전]/[다음]으로 넘긴다는 안내를 한다(total은 이 테이블의 행 수).
-const netPartial = computed(() => !!page.value && (page.value.offset > 0 || page.value.total > page.value.rows.length))
-const netLabel = computed(() => (netPartial.value ? pageLabel.value : `${formatCount(page.value?.total ?? netRows.value.length)}행`))
+const netPartial = computed(() => {
+  const p = currentPage.value
+  return !!p && (p.offset > 0 || p.total > p.rows.length)
+})
+const netLabel = computed(() => (netPartial.value ? pageLabel.value : `${formatCount(currentPage.value?.total ?? netRows.value.length)}행`))
 const netKeysOnly = computed(() => firings.value.some((f) => f.table === netTable.value && f.imageMode === 'KEYS'))
 
 // E6: 키 없는 테이블의 다중집합 문구. 최종 차이 보기는 고른 테이블, 발동 보기는 고른 묶음의 테이블만.

@@ -393,6 +393,7 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
         Position = st.Position,
         Kind = st.Kind,
         Target = st.Target,
+        Procedure = st.Procedure,
         Span = st.Span,
         Status = status,
         Plan = st.Plan,

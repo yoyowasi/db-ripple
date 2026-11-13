@@ -94,6 +94,49 @@ public class FunctionGateTests
         Assert.False(r.IsAccepted, Show(r));
     }
 
+    // ---- 보안 검토(review-fn-1, 2026-11-13) 재현 ----
+
+    [Theory]
+    [InlineData("SELECT * FROM tempdb.dbo.evil();", "다른 DB")] // BodyVisitor는 tempdb를 외부로 보지 않는다
+    [InlineData("SELECT * FROM tempdb..evil();", "다른 DB")]
+    [InlineData("SELECT dbo.ClrT::Ping();", "사용자 정의 형식 메서드")]
+    [InlineData("DECLARE @x dbo.ClrT; SELECT @x.Ping();", "식의 메서드")]
+    [InlineData("DECLARE @x dbo.ClrT; SELECT @x.Prop;", "속성")]
+    public void Unjudgeable_call_forms_in_procedure_body_are_rejected(string body, string reason)
+    {
+        var r = Run(Ctx(body, _ => { }));
+        Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains(reason));
+    }
+
+    [Fact]
+    public void Xml_variable_methods_stay_allowed()
+    {
+        var r = Run(Ctx("DECLARE @x xml = N'<a>1</a>'; UPDATE dbo.U SET y = @x.value('(/a)[1]', 'int');", _ => { }));
+        Assert.True(r.IsAccepted, Show(r));
+    }
+
+    [Theory]
+    [InlineData("CREATE FUNCTION dbo.f(@a int) RETURNS int AS BEGIN RETURN dbo.ClrT::Ping(); END;", "사용자 정의 형식 메서드")]
+    [InlineData("CREATE FUNCTION dbo.f(@a int) RETURNS int AS BEGIN DECLARE @x dbo.ClrT; RETURN @x.Ping(); END;", "식의 메서드")]
+    [InlineData("CREATE FUNCTION dbo.f(@a int) RETURNS int AS BEGIN RETURN @@TRANCOUNT; END;", "@@TRANCOUNT")]
+    [InlineData("CREATE FUNCTION dbo.f(@a int) RETURNS int AS BEGIN RETURN XACT_STATE(); END;", "XACT_STATE")]
+    public void Unjudgeable_forms_inside_function_body_are_rejected(string definition, string reason)
+    {
+        var r = Run(Ctx("UPDATE dbo.U SET y = dbo.f(y);", b => b.Function("dbo", "f", definition)));
+        Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("dbo.f") && d.Message.Contains(reason));
+    }
+
+    [Fact]
+    public void One_part_table_function_with_two_candidate_schemas_is_ambiguous()
+    {
+        var ctx = BatchAnalyzerTests.Ctx(more: b => b
+            .Procedure("s", "q", "CREATE PROCEDURE s.q AS BEGIN SET NOCOUNT ON; DELETE dbo.T WHERE a IN (SELECT y FROM tvf(1)); END;")
+            .Function("s", "tvf", "CREATE FUNCTION s.tvf(@a int) RETURNS TABLE AS RETURN SELECT y FROM dbo.U;", "IF")
+            .Function("dbo", "tvf", null, "FT"));
+        var r = new BatchAnalyzer().Analyze("EXEC s.q;", ctx with { Triggers = new TriggerAnalyzer().Analyze(ctx.Catalog) });
+        Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("모호"));
+    }
+
     [Fact]
     public void Ambiguous_function_names_are_rejected()
     {

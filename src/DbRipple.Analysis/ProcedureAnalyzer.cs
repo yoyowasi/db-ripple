@@ -220,8 +220,15 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
         return CheckFunction(f, 1, []);
     }
 
-    CatalogFunction? Find(string? schema, string name, string callerSchema) =>
-        schema is not null ? One(schema, name) : One(callerSchema, name) ?? One("dbo", name);
+    // 한 부분 이름(테이블 값 함수)은 부르는 모듈 스키마와 dbo 후보가 둘 다 있으면 실제 해석 순서를 몰라 모호로 본다(검토 2026-11-13).
+    CatalogFunction? Find(string? schema, string name, string callerSchema)
+    {
+        if (schema is not null) return One(schema, name);
+        var own = One(callerSchema, name);
+        var dbo = One("dbo", name);
+        if (own is not null && dbo is not null && own.ObjectId != dbo.ObjectId) return null;
+        return own ?? dbo;
+    }
 
     CatalogFunction? One(string schema, string name) =>
         byName.TryGetValue((schema.ToUpperInvariant(), name.ToUpperInvariant()), out var l) && l.Count == 1 ? l[0] : null;
@@ -253,6 +260,7 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
 
         var inner = new FunctionCallCollector();
         fragment.Accept(inner);
+        if (inner.Unjudgeable.Count > 0) return inner.Unjudgeable[0];
         stack.Add(f.ObjectId);
         try
         {
@@ -277,9 +285,21 @@ internal sealed class FunctionCallCollector : TSqlFragmentVisitor
     public readonly record struct Call(string? Schema, string Name, string Display, bool MultiPart);
 
     public readonly List<Call> Calls = [];
+    /// <summary>판정할 수 없어 거부할 이유(CLR 사용자 형식 메서드·속성, xml이 아닌 식 메서드, 트랜잭션 상태 읽기).</summary>
+    public readonly List<string> Unjudgeable = [];
+
+    public override void Visit(UserDefinedTypePropertyAccess node) => Unjudgeable.Add(ExecRulesVisitor.UdtPropertyReason);
+
+    public override void Visit(GlobalVariableExpression node)
+    {
+        if (node.Name.Equals("@@TRANCOUNT", StringComparison.OrdinalIgnoreCase)) Unjudgeable.Add("함수 본문이 @@TRANCOUNT를 읽음(도구 트랜잭션 안이라 값이 원본과 다름)");
+    }
 
     public override void Visit(FunctionCall node)
     {
+        if (node.CallTarget is null && node.FunctionName.Value.Equals("XACT_STATE", StringComparison.OrdinalIgnoreCase))
+            Unjudgeable.Add("함수 본문이 XACT_STATE()를 읽음(도구 트랜잭션 안이라 값이 원본과 다름)");
+        if (ExecRulesVisitor.UnjudgeableCallTarget(node) is { } why) { Unjudgeable.Add(why); return; }
         if (node.CallTarget is not MultiPartIdentifierCallTarget t) return;
         var ids = t.MultiPartIdentifier.Identifiers;
         var display = string.Join('.', ids.Select(i => i.Value)) + "." + node.FunctionName.Value;
@@ -613,7 +633,12 @@ internal sealed class ExecRulesVisitor(Accumulator a, string module, FunctionGat
     {
         var so = node.SchemaObject;
         if (string.Equals(so.SchemaIdentifier?.Value, "sys", StringComparison.OrdinalIgnoreCase)) return;
-        if (so.DatabaseIdentifier != null || so.ServerIdentifier != null) return; // 다른 DB 이름은 BodyVisitor가 외부 부작용으로 표시한다
+        // 다른 DB·서버 함수는 판정할 수 없다. BodyVisitor는 tempdb를 외부로 보지 않으므로 여기서 직접 거부한다(검토 2026-11-13).
+        if (so.DatabaseIdentifier != null || so.ServerIdentifier != null)
+        {
+            Reject(AnalysisRules.RejectProcUnresolvedCall, $"사용자 정의 함수 {SqlSyntax.Name(so)}(다른 DB 함수라 판정할 수 없음)");
+            return;
+        }
         if (functions.Check(so.SchemaIdentifier?.Value, so.BaseIdentifier.Value, a.TriggerSchema) is { } why)
             Reject(AnalysisRules.RejectProcUnresolvedCall, $"사용자 정의 함수 {SqlSyntax.Name(so)}({why})");
     }
@@ -675,6 +700,7 @@ internal sealed class ExecRulesVisitor(Accumulator a, string module, FunctionGat
     public override void Visit(FunctionCall node)
     {
         if (node.CallTarget is null && node.FunctionName.Value.Equals("XACT_STATE", StringComparison.OrdinalIgnoreCase)) TranState("XACT_STATE()");
+        if (UnjudgeableCallTarget(node) is { } unjudgeable) { Reject(AnalysisRules.RejectProcUnresolvedCall, unjudgeable); return; }
         // 스키마로 한정한 호출 = 사용자 정의 스칼라 함수·집계. 두 부분 이상(다른 DB 함수, 열의 xml·CLR 형식 메서드)은 판정할 수 없어 거부한다(닫힌 쪽).
         if (node.CallTarget is MultiPartIdentifierCallTarget t)
         {
@@ -684,6 +710,22 @@ internal sealed class ExecRulesVisitor(Accumulator a, string module, FunctionGat
             if (why is not null) Reject(AnalysisRules.RejectProcUnresolvedCall, $"사용자 정의 함수 {display}({why})");
         }
     }
+
+    public override void Visit(UserDefinedTypePropertyAccess node) => Reject(AnalysisRules.RejectProcUnresolvedCall, UdtPropertyReason);
+
+    internal const string UdtPropertyReason = "사용자 정의 형식 속성 접근(CLR 형식이면 코드가 실행됨, 판정할 수 없음)";
+    static readonly HashSet<string> XmlMethods = new(["value", "query", "exist", "nodes", "modify"], StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// CLR 사용자 형식의 정적 메서드(<c>dbo.T::M()</c>)와, 변수·식의 메서드(<c>@x.M()</c>) 가운데 xml 메서드가 아닌 것은 판정할 수 없다(검토 2026-11-13, 닫힌 쪽:
+    /// 공간·hierarchyid 형식 메서드도 여기서 거부된다). 거부 이유, 판정할 수 있으면 null.
+    /// </summary>
+    internal static string? UnjudgeableCallTarget(FunctionCall node) => node.CallTarget switch
+    {
+        UserDefinedTypeCallTarget u => $"사용자 정의 형식 메서드 {SqlSyntax.Name(u.SchemaObjectName)}::{node.FunctionName.Value}(CLR 코드가 실행됨, 판정할 수 없음)",
+        ExpressionCallTarget when !XmlMethods.Contains(node.FunctionName.Value) => $"식의 메서드 호출 .{node.FunctionName.Value}()(CLR 형식 메서드일 수 있어 판정할 수 없음)",
+        _ => null,
+    };
 
     // 도구 트랜잭션 안이라 성공 경로의 @@TRANCOUNT·XACT_STATE() 값은 원본과 다르다(SP16 뒤 재검토).
     void TranState(string what)

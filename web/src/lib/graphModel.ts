@@ -105,6 +105,11 @@ function procedureView(n: Extract<GraphNode, { type: 'procedureCall' }>): NodeVi
   }
 }
 
+/** EXEC 노드의 화면 낭독 문구: 상태·반환 값·안쪽 호출·관측 안 된 쓰기 대상까지(화면에서는 말줄임·툴팁으로만 보이는 정보). */
+function procedureAria(sentence: string, v: Extract<NodeView, { kind: 'procedureCall' }>): string {
+  return [sentence, v.line2, v.calls && `안쪽 호출 ${v.calls}`, v.unobserved && `관측 안 됨: ${v.unobserved}`].filter(Boolean).join('. ')
+}
+
 function firingView(n: Extract<GraphNode, { type: 'firing' }>, f: Firing | null): NodeView {
   const zero = n.rowCount === 0
   const [schema, name] = splitTable(n.table)
@@ -379,7 +384,7 @@ export function buildFlow(
       type: 'ripple',
       position: layout.positions.get(n.id) ?? { x: 0, y: 0 },
       data: { node: n, firing, flags, view, order: ord, sentence: s, width: w, boxHeight: h, zeroChip },
-      ariaLabel: ord !== null ? `${s} (표시 순번 ${ord})` : s,
+      ariaLabel: ord !== null ? `${s} (표시 순번 ${ord})` : view.kind === 'procedureCall' ? procedureAria(s, view) : s,
       draggable: false,
       connectable: false,
       selectable: false,

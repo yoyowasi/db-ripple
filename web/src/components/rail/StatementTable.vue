@@ -3,7 +3,7 @@
 import type { StatementResult } from '../../api/types'
 import { STATEMENT_STATUS_LABEL, errorHead, execResultParts, formatCount } from '../../lib/format'
 
-/** procedures: EXEC 문장 번호 → "스키마.프로시저". StatementResult에는 이름이 없어(target null) graph의 procedureCall 노드에서 받는다. */
+/** procedures: EXEC 문장 번호 → "스키마.프로시저". StatementResult.procedure를 우선하고, 없으면 graph의 procedureCall 노드에서 채운 맵(PreviewSummary). */
 defineProps<{ statements: StatementResult[]; procedures?: ReadonlyMap<number, string> }>()
 
 function chip(s: StatementResult): string {

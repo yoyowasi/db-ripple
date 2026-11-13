@@ -32,6 +32,9 @@ public sealed record StatementResult
     public required StatementStatus Status { get; init; }
     /// <summary>드라이버 영향 행 수(SqlCommand 결과, A9·SP2(c)). not_run·실패면 null. EXEC는 늘 null(A9: EXECUTE는 이전 @@ROWCOUNT를 유지).</summary>
     public long? RowsAffected { get; init; }
+    /// <summary>EXEC: 부른 프로시저 "스키마.이름"(AnalyzedStatement.Procedure 그대로, 2026-11-13). DML이면 JSON에서 빠진다(기존 픽스처·계약 모양 유지).</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? Procedure { get; init; }
     /// <summary>EXEC: 프로시저 반환 값(RETURN). 그 밖·실패면 null.</summary>
     public int? ReturnValue { get; init; }
     /// <summary>EXEC: 프로시저가 낸 결과 집합 수(내용은 버린다). 그 밖·실패면 null.</summary>

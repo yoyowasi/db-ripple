@@ -50,13 +50,14 @@ const footLine = computed(() => {
 const inferredTrigger = computed(() =>
   props.preview.firings.some((f) => f.cause.kind === 'TRIGGER' && f.cause.confidence === 'inferred'),
 )
-// EXEC 문장의 프로시저 이름: StatementResult에는 없고 graph의 procedureCall 노드에 있다.
-const procedures = computed(
-  () =>
-    new Map(
-      props.preview.graph.nodes.flatMap((n) => (n.type === 'procedureCall' ? [[n.statementIndex, n.procedure] as [number, string]] : [])),
-    ),
-)
+// EXEC 문장의 프로시저 이름: StatementResult.procedure가 우선이고, 없으면(예전 응답) graph의 procedureCall 노드에서 읽는다.
+const procedures = computed(() => {
+  const m = new Map(
+    props.preview.graph.nodes.flatMap((n) => (n.type === 'procedureCall' ? [[n.statementIndex, n.procedure] as [number, string]] : [])),
+  )
+  for (const s of props.preview.statements) if (s.procedure) m.set(s.index, s.procedure)
+  return m
+})
 const showStatements = computed(
   () => props.preview.statements.length > 1 || props.preview.statements.some((s) => s.status !== 'ok' || s.kind === 'EXEC'),
 )

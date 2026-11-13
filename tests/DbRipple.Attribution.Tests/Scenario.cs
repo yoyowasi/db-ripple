@@ -30,7 +30,7 @@ internal sealed class Scenario
     {
         _st.Add(new StatementResult
         {
-            Index = index, Batch = 1, Position = index, Kind = ChangeOperation.Exec, Target = null,
+            Index = index, Batch = 1, Position = index, Kind = ChangeOperation.Exec, Target = null, Procedure = procedure,
             Span = new SourceSpan { StartLine = index, StartColumn = 1, EndLine = index, EndColumn = 10 }, Status = status,
             ReturnValue = status == StatementStatus.Ok ? returnValue : null, ResultSetCount = status == StatementStatus.Ok ? 0 : null,
             Plan = plan ? new ProcedurePlan { Procedure = procedure, ExecSql = "x", WriteTargets = writes, ExpandedCalls = ["dbo.inner"] } : null,

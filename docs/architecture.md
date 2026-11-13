@@ -556,7 +556,7 @@ sequenceDiagram
 
 `status`는 `ok`, `failed`, `trigger_blocked`, `not_run`(앞 문장 실패로 실행하지 않음) 중 하나다.
 
-**v1.6 EXEC(2026-11-13):** `kind`가 `EXEC`면 `target`은 null이고 `rowsAffected`는 늘 null이다. 결과에는 `returnValue`(프로시저 반환값, 정수 또는 null)와 `resultSetCount`(낸 결과 집합 수, 내용은 버린다)가 더해진다. 분석 결과(`AnalysisResult.statements`)의 EXEC 문장에는 `procedure`("스키마.이름")와 `parameters[]`(원문 매개변수 목록, 표시용)가 있다. 실행 SQL·정적 쓰기 대상을 담은 `ProcedurePlan`은 JSON에 내보내지 않는다.
+**v1.6 EXEC(2026-11-13):** `kind`가 `EXEC`면 `target`은 null이고(프로시저 이름은 `procedure`, DML이면 이 필드는 JSON에 없다) `rowsAffected`는 늘 null이다. 결과에는 `returnValue`(프로시저 반환값, 정수 또는 null)와 `resultSetCount`(낸 결과 집합 수, 내용은 버린다)가 더해진다. 분석 결과(`AnalysisResult.statements`)의 EXEC 문장에는 `procedure`("스키마.이름")와 `parameters[]`(원문 매개변수 목록, 표시용)가 있다. 실행 SQL·정적 쓰기 대상을 담은 `ProcedurePlan`은 JSON에 내보내지 않는다.
 
 **Firing (변경 묶음)**
 
@@ -1171,11 +1171,11 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 - **예전 규칙과의 관계:** `EXEC dbo.x`처럼 카탈로그에 없는 호출은 예전 `REJECT_EXEC`가 아니라 `REJECT_PROC_NOT_FOUND`다. `REJECT_EXEC`는 동적 SQL(`EXEC('…')`, `EXEC @변수`, sp_executesql 계열)과 `INSERT … EXEC`에만 남는다.
 - **도달 폐포(위 v1.4 거부 추가의 2026-11-13 수정과 같은 검사):** 프로시저의 정적 쓰기 대상마다 세 연산(INSERT·UPDATE·DELETE)으로 같은 검사를 한다. 닿는 트리거가 외부 부작용·불투명·COMMIT/BEGIN/SAVE이면 규칙 ID는 `REJECT_PROC_*`가 아니라 `REJECT_TRIGGER_*`다.
 - **외부 부작용 보강(트리거·프로시저 본문 공용):** 다른 DB 3부분 이름(tempdb 제외), Service Broker 문장(BEGIN DIALOG, SEND, RECEIVE, END CONVERSATION 등), 카탈로그 밖의 `sp_`·`sys.`·`master.`·`xp_` 호출을 외부 부작용으로 표시한다. 트리거 본문에 있으면 `REJECT_TRIGGER_EXTERNAL_EFFECT`, 프로시저 본문에 있으면 `REJECT_PROC_EXTERNAL_EFFECT`다.
-- **계약:** 분석 문장 `kind = "EXEC"`, `target = null`, `procedure`, `parameters[]`. 결과 문장 `rowsAffected = null`, `returnValue`, `resultSetCount`(§6.2). 프로시저가 트랜잭션 수를 바꾸면 failed, `isToolFault = false`이고, 남은 변경 없이 롤백된 것이 확인되면 "프로시저가 트랜잭션을 롤백함"이다(§5.2 v1.6). 원인 `PROC_DIRECT`(§7.2 5단계), 그래프 노드 `procedureCall`과 간선 `PROC_DIRECT`(문장 노드와 S→P 간선 없음, §6.3). 실행 사용자는 CALLER로 도는 T-SQL 사용자 프로시저마다 `EXECUTE`를 받는다(`GRANT EXECUTE ON OBJECT::`, 함수 제외, 첫 판의 스키마 단위 권한이 남아 있으면 REVOKE, `src/DbRipple.Core/Baseline/PreviewUserSql.cs`). 그래서 DML 미리보기에서 사용자 함수가 새로 실행되지 않는다.
+- **계약:** 분석 문장 `kind = "EXEC"`, `target = null`, `procedure`, `parameters[]`. 결과 문장 `rowsAffected = null`, `procedure`(EXEC만, DML이면 필드 없음, 2026-11-13 추가), `returnValue`, `resultSetCount`(§6.2). 프로시저가 트랜잭션 수를 바꾸면 failed, `isToolFault = false`이고, 남은 변경 없이 롤백된 것이 확인되면 "프로시저가 트랜잭션을 롤백함"이다(§5.2 v1.6). 원인 `PROC_DIRECT`(§7.2 5단계), 그래프 노드 `procedureCall`과 간선 `PROC_DIRECT`(문장 노드와 S→P 간선 없음, §6.3). 실행 사용자는 CALLER로 도는 T-SQL 사용자 프로시저마다 `EXECUTE`를 받는다(`GRANT EXECUTE ON OBJECT::`, 함수 제외, 첫 판의 스키마 단위 권한이 남아 있으면 REVOKE, `src/DbRipple.Core/Baseline/PreviewUserSql.cs`). 그래서 DML 미리보기에서 사용자 함수가 새로 실행되지 않는다.
 - **[적용]은 2차:** 미리보기에 EXEC 문장이 있으면 선행 조건 `PROC_APPLY_NOT_SUPPORTED`로 막는다(`ApplyService`, `ApplyPrecondition`). 원본에서 프로시저를 다시 돌려 미리보기와 대조하는 경로가 아직 없다.
 - **`@@TRANCOUNT`·`XACT_STATE()`:** CATCH 밖에서 읽으면 거부, CATCH 안 검사는 경고다. 미리보기는 도구 트랜잭션 안에서 돌아 사용자의 단독 실행(보통 자동 커밋)과 값이 다를 수 있다. SP16 뒤 재검토한다.
 - **알려진 한계(코드 구조에서 나온 것이고 DB로는 확인하지 않았다):**
-  - 사용자 정의 함수: 카탈로그가 함수 목록(`sys.objects` FN·IF·TF·FS·FT·AF + `sys.sql_modules`, `CatalogQueries.Functions`)을 읽는다. T-SQL 함수는 언어 규칙상 테이블에 쓸 수 없으므로, CLR이 아니고 CALLER로 돌며 본문(안쪽 함수 포함)에 외부 부작용·동적 SQL·프로시저 호출이 없으면 허용한다(`FunctionGate`, 2026-11-13). 그 밖은 `REJECT_PROC_UNRESOLVED_CALL`. 함수 목록이 없는 예전 기준선은 다시 만들기 전까지 함수 호출을 거부한다. `xml` 열 메서드(`t.col.value(...)`)는 함수와 구별하지 못해 거부한다. 함수에는 `EXECUTE` 권한을 주지 않는다(프로시저 소유권 체인으로만 실행). 카탈로그 쿼리는 DB로 확인하지 않았다.
+  - 사용자 정의 함수: 카탈로그가 함수 목록(`sys.objects` FN·IF·TF·FS·FT·AF + `sys.sql_modules`, `CatalogQueries.Functions`)을 읽는다. T-SQL 함수는 언어 규칙상 테이블에 쓸 수 없으므로, CLR이 아니고 CALLER로 돌며 본문(안쪽 함수 포함)에 외부 부작용·동적 SQL·프로시저 호출이 없으면 허용한다(`FunctionGate`, 2026-11-13). 그 밖은 `REJECT_PROC_UNRESOLVED_CALL`. 함수 목록이 없는 예전 기준선은 다시 만들기 전까지 함수 호출을 거부한다. `xml` 열 메서드(`t.col.value(...)`)는 함수와 구별하지 못해 거부한다(변수의 xml 메서드 `@x.value(...)`는 허용). 보안 검토 뒤(같은 날) 더 막은 것: 다른 DB(tempdb 포함)의 테이블 값 함수, CLR 사용자 형식의 정적 메서드(`dbo.T::M()`)·속성, xml이 아닌 식 메서드(`@x.M()`, 공간·hierarchyid 메서드도 닫힌 쪽으로 거부), 함수 본문의 `@@TRANCOUNT`·`XACT_STATE()`, 부르는 모듈 스키마와 dbo에 같은 이름이 있는 한 부분 테이블 값 함수(실제 해석 순서를 모름). 남은 한계: 뷰·계산 열·DEFAULT·CHECK 안에 숨은 함수는 판정하지 않는다(뷰를 펼치지 않는다), 대소문자 구분 정렬 DB에서 함수와 대소문자만 다른 동의어는 구별하지 못한다(카탈로그에 동의어 정보 없음). 함수에는 `EXECUTE` 권한을 주지 않는다(프로시저 소유권 체인으로만 실행). 카탈로그 쿼리는 DB로 확인하지 않았다.
   - EXECUTE AS OWNER 등 CALLER가 아닌 프로시저는 권한을 받지 않는다(어차피 `REJECT_PROC_EXECUTE_AS`).
   - INSTEAD OF 트리거가 있는 테이블에 쓰는 프로시저는 깊이 2 묶음이 `UNEXPLAINED`가 된다.
   - 시노님·함수·뷰를 거치는 쓰기는 펼치지 않는다. 다른 DB의 스칼라 함수는 표시하지 못한다.

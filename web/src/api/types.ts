@@ -195,8 +195,10 @@ export interface StatementResult {
   batch: number
   position: number
   kind: StatementKind
-  /** "스키마.테이블". EXEC면 null. 프로시저 이름은 이 DTO에 없다(계약): graph의 procedureCall 노드(statementIndex)에서 읽는다. */
+  /** "스키마.테이블". EXEC면 null(프로시저 이름은 procedure). */
   target: string | null
+  /** EXEC: "스키마.프로시저"(2026-11-13 추가). DML이면 필드가 없다. 예전 서버 응답에는 없을 수 있어 화면은 graph의 procedureCall 노드로 보완한다. */
+  procedure?: string | null
   span: SourceSpan
   status: StatementStatus
   /** EXEC는 늘 null */

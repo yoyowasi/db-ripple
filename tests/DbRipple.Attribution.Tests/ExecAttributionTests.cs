@@ -146,6 +146,8 @@ public class ExecAttributionTests
         Assert.Contains("\"target\":null", stJson);
         Assert.Contains("\"returnValue\":0", stJson);
         Assert.Contains("\"resultSetCount\":0", stJson);
+        Assert.Contains("\"procedure\":\"dbo.usp\"", stJson); // 2026-11-13: 문장 결과만으로 프로시저 이름을 안다
+        Assert.DoesNotContain("\"procedure\"", JsonSerializer.Serialize(st with { Kind = Op.Update, Target = "t.A", Procedure = null }, ContractJson.Options)); // DML은 필드 없음
         Assert.DoesNotContain("plan", stJson, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("execSql", stJson, StringComparison.OrdinalIgnoreCase);
 

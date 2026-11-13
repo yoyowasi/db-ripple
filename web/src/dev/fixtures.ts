@@ -1087,6 +1087,7 @@ function execResult(
     position,
     kind: 'EXEC',
     target: null,
+    procedure: a.procedure, // 2026-11-13: 문장 결과에도 프로시저 이름이 온다
     span,
     status,
     rowsAffected: null, // EXEC는 늘 null(계약)
