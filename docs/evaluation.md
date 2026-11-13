@@ -124,13 +124,13 @@ CL21~CL25의 정답은 정답 형식 v0.3을 쓴다. 노드 `P:<스키마.프로
 
 ## 5. 대조군
 
-근거: `eval/DbRipple.Eval/Baselines.cs`. 대조군 행은 제품과 같은 CSV에 `system` 열 `B0`·`B2`로 쓴다. 상태는 둘 다 오라클 상태다. 평가 훅이 없으므로 M1은 `total`만 채운다.
+근거: `eval/DbRipple.Eval/Baselines.cs`. 대조군 행은 제품과 같은 CSV에 `system` 열 `B0`·`B1`·`B2`로 쓴다. 상태는 모두 오라클 상태다. 평가 훅이 없으므로 M1은 `total`만 채운다.
 
 | ID | 정의 | 기대(추정) |
 |---|---|---|
 | B0 | 직접 대상만 본다(OUTPUT 기반 도구 모사). 오라클 순 변경을 문장의 직접 대상 테이블로 거른 것을 예측으로 쓴다. EXEC 문장의 직접 대상은 프로시저의 정적 쓰기 대상(손 정답 `PROC_DIRECT` 행의 테이블)으로 본다. M3 예측 간선은 손 정답 DIRECT 간선(certain)뿐이고 `PROC_DIRECT` 간선은 넣지 않는다 | 연쇄·트리거 재현율(M2)이 낮을 것이다 |
 | B2 | 사본 + 최종 차이(Data Compare 자동화판). 오라클 순 변경을 그대로 예측으로 쓴다. M3 예측 간선은 0개다 | M1·M2는 제품과 비슷하고 M3 recall은 0이다. 작업량 `manual_select_tables`(직접 대상이 아닌데 바뀐 테이블 수)를 함께 본다 |
-| B1 | FK 메타데이터 정적 예측 | 구현하지 않았다(자를 목록 1순위) |
+| B1 | FK 메타데이터 정적 예측(`FkStaticBaseline.cs`, 순수 함수 `Predict`). 문장의 직접 대상과 그 연산(INSERT·UPDATE·DELETE, 문장 원문)에서 시작해 DB의 활성(`is_disabled = 0`) FK 참조 동작만 따라 고정점까지 넓힌다. 부모 DELETE + CASCADE → 자식 DELETE, 부모 DELETE + SET NULL·SET DEFAULT → 자식 UPDATE, 부모 UPDATE + ON UPDATE CASCADE·SET NULL·SET DEFAULT → 자식 UPDATE이고 NO ACTION·INSERT는 넓히지 않는다. 열과 트리거는 보지 않는다. EXEC 문장은 B0처럼 손 정답 `PROC_DIRECT` 행의 테이블을 직접 대상으로 보고 연산은 그 행의 변경 종류로 정한다. 예측 변경 = 오라클 순 변경을 (직접 대상 ∪ FK로 닿은 테이블)로 거른 것. M3 예측 간선 = B0의 DIRECT 간선 + FK 간선(parent·child는 묶음 노드, name = FK 이름, certain, 같은 (테이블, 연산)은 `#k` 없이 한 노드). FK 목록은 CLI가 사례 DB의 `sys.foreign_keys`에서 DB마다 한 번 읽는다. 작업량 `manual_select_tables` = 예측 범위(직접 대상 ∪ FK로 닿은 테이블) 밖인데 바뀐 테이블 수(B0·B2는 직접 대상 밖). 실행: `--systems preview,B0,B1,B2` | FK 연쇄(M2 `FK_CASCADE`·`FK_SET_NULL`·`FK_SET_DEFAULT`)는 맞히고 트리거 변경과 그 뒤의 연쇄는 놓칠 것이다. 열을 안 보므로 키 열이 아닌 UPDATE에도 ON UPDATE CASCADE를 따라가고(거짓 양성), 프로시저가 자식을 직접 지운 경우(CL22)에도 FK 간선을 낸다. 손 정답이 같은 묶음을 `#1`·`#2`로 나눈 사례(CL09)는 간선 키가 어긋난다. **DB 연결 없이 짠 코드라 첫 실행 전까지 실행 결과는 없다** |
 
 ## 6. 결과
 

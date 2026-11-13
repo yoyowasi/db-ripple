@@ -200,7 +200,8 @@ Invoke-Step 'Eval' '평가 빠른 실행과 이전 결과 비교(M1~M4)' {
     $runDir = Join-Path $evalOut $runId
     if (Test-Path $runDir) { Remove-Item $runDir -Recurse -Force }
     $log = Join-Path $outDir 'eval-run.log'
-    $evalArgs = @('run', '--project', 'eval\DbRipple.Eval.Cli', '-c', 'Release', '--', 'cascadelab', '--systems', 'preview,B0,B2', '--repeat', [string]$EvalRepeat, '--out', $evalOut, '--run-id', $runId)
+    # B1(FK 메타데이터 정적 예측, 2026-11-13)은 이전 결과에 없는 시스템이라 비교에서 NEW로만 기록된다.
+    $evalArgs = @('run', '--project', 'eval\DbRipple.Eval.Cli', '-c', 'Release', '--', 'cascadelab', '--systems', 'preview,B0,B1,B2', '--repeat', [string]$EvalRepeat, '--out', $evalOut, '--run-id', $runId)
     if (-not $IncludeExec) { $evalArgs += @('--cases', ($ids -join ',')) }
     Write-Log ('평가 실행: 사례 ' + $ids.Count + '개, 반복 ' + $EvalRepeat + '회(몇 분 걸린다)')
     $code = Invoke-Native 'dotnet' $evalArgs $log

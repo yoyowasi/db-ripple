@@ -352,8 +352,9 @@ public class Week3MetricsTests
         Assert.Equal(2, Baselines.ManualSelectTables(hand, oracle));
         Assert.Equal([EdgeKeys.Compose(1, "S", "F:cl.A:DELETE", "DIRECT", null)], Baselines.B0Edges(hand).Select(e => e.Key));
         Assert.Equal(["preview", "B0", "B2"], Baselines.ParseSystems("preview, b0,B2,B0"));
+        Assert.Equal(["preview", "B0", "B1", "B2"], Baselines.ParseSystems("preview,B0,b1,B2"));
         Assert.Equal(["preview"], Baselines.ParseSystems(null));
-        Assert.Throws<ArgumentException>(() => Baselines.ParseSystems("preview,B1"));
+        Assert.Throws<ArgumentException>(() => Baselines.ParseSystems("preview,B3"));
     }
 
     [Fact]

@@ -138,6 +138,40 @@ public class CatalogTests
         Assert.Equal(cat.ProcedureModules, back.ProcedureModules);
     }
 
+    // 2026-11-13: 함수 목록도 끝의 기본값 null 매개변수다. 예전 기준선(null)은 "함수 정보 없음"이라 EXEC 본문의 함수 호출을 거부한다.
+    [Fact]
+    public void Function_modules_are_optional_and_null_means_unknown()
+    {
+        var old = new DbCatalog([], [], [], [], [], []);
+        Assert.False(old.FunctionsKnown);
+        Assert.Empty(old.FunctionModules);
+        var cat = old with { Functions = [new(9, "dbo", "ufnX", "FN", "CREATE FUNCTION dbo.ufnX() RETURNS int AS BEGIN RETURN 1; END;", true), new(10, "dbo", "clrY", "FS", null, true)] };
+        Assert.True(cat.FunctionsKnown);
+        Assert.True(cat.FunctionModules[0].IsTSql);
+        Assert.False(cat.FunctionModules[1].IsTSql);
+        Assert.True((old with { Functions = [] }).FunctionsKnown); // 빈 목록 = 읽었는데 없음
+        Assert.Contains(CatalogQueries.Functions, CatalogQueries.All);
+        var json = System.Text.Json.JsonSerializer.Serialize(cat);
+        Assert.DoesNotContain("FunctionModules", json);
+        Assert.DoesNotContain("FunctionsKnown", json);
+        var back = System.Text.Json.JsonSerializer.Deserialize<DbCatalog>(json)!;
+        Assert.Equal(cat.FunctionModules, back.FunctionModules);
+        Assert.False(System.Text.Json.JsonSerializer.Deserialize<DbCatalog>(System.Text.Json.JsonSerializer.Serialize(old))!.FunctionsKnown);
+    }
+
+    // AW: 사용자 정의 함수 목록(2026-11-13). 스칼라 dbo.ufnLeadingZeros(FN), 다중 문 테이블 값 dbo.ufnGetContactInformation(TF). 읽기만.
+    [SqlFact]
+    public async Task Reads_adventureworks_function_modules()
+    {
+        await using var conn = await TestSql.OpenAsync("AW_Origin");
+        var cat = await CatalogReader.ReadAsync(conn);
+        Assert.True(cat.FunctionsKnown);
+        var lz = Assert.Single(cat.FunctionModules, f => f.Schema == "dbo" && f.Name == "ufnLeadingZeros");
+        Assert.Equal("FN", lz.Type);
+        Assert.True(lz.IsTSql && lz.ExecuteAsCaller && lz.Definition is not null);
+        Assert.Equal("TF", Assert.Single(cat.FunctionModules, f => f.Schema == "dbo" && f.Name == "ufnGetContactInformation").Type);
+    }
+
     // AW: 트리거들이 CATCH에서 부르는 dbo.uspLogError와 그것이 부르는 dbo.uspPrintError의 본문을 읽는다(읽기만).
     [SqlFact]
     public async Task Reads_adventureworks_procedure_modules()

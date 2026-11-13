@@ -9,9 +9,10 @@ namespace DbRipple.Eval;
 /// EXEC 문장(v0.3)의 직접 대상은 프로시저의 정적 쓰기 대상(손 정답 PROC_DIRECT 행 테이블 근사, DirectTargets 주석)이다. B0의 M3 간선은 PROC_DIRECT 간선을 넣지 않는다(DIRECT 간선만).</item>
 /// <item>B2(사본 + 최종 차이, Data Compare 자동화판): 오라클 순 변경을 그대로 예측으로 쓴다(M1은 오라클과 같다). 원인·순서는 없으므로 M3 예측 간선은 0개다.
 /// 작업량 지표 manual_select_tables = 직접 대상이 아닌데 바뀐 테이블 수(사용자가 원인을 알려면 직접 찾아 SELECT해야 했을 테이블).</item>
-/// <item>B1(FK 메타데이터 정적 예측)은 구현하지 않았다(자를 목록 1순위, §11.4).</item>
+/// <item>B1(FK 메타데이터 정적 예측, FkStaticBaseline): 직접 대상과 활성 FK의 참조 동작만 따라 고정점까지 넓힌 정적 예측이다. 트리거·열은 보지 않는다.
+/// 예측 변경 = 오라클 순 변경을 (직접 대상 ∪ FK로 닿은 테이블)로 거른 것, M3 예측 간선 = B0의 DIRECT 간선 + FK 간선(certain). FK 목록은 CLI가 사례 DB에서 읽어 CaseRun.ForeignKeys로 준다.</item>
 /// </list>
-/// 상태(status_actual)는 둘 다 오라클 상태다.
+/// 상태(status_actual)는 모두 오라클 상태다.
 /// </summary>
 public static class Baselines
 {
@@ -22,14 +23,16 @@ public static class Baselines
         public const string Preview = "preview";
         /// <summary>직접 대상만.</summary>
         public const string B0 = "B0";
+        /// <summary>FK 메타데이터 정적 예측.</summary>
+        public const string B1 = "B1";
         /// <summary>사본 + 최종 차이.</summary>
         public const string B2 = "B2";
-        /// <summary>CLI가 받는 값.</summary>
-        public static readonly IReadOnlyList<string> All = [Preview, B0, B2];
+        /// <summary>CLI가 받는 값(기본 --systems는 Preview 하나다).</summary>
+        public static readonly IReadOnlyList<string> All = [Preview, B0, B1, B2];
     }
 
     // 스키마로 한정한 대상 이름만 잡는다(별칭 UPDATE a … FROM t a는 손 정답 DIRECT 행으로 보완).
-    static readonly Regex Target = new(
+    internal static readonly Regex Target = new(
         @"^\s*(?:UPDATE|DELETE(?:\s+FROM)?|INSERT(?:\s+INTO)?|MERGE(?:\s+INTO)?)\s+(?:TOP\s*\([^)]*\)\s*(?:PERCENT\s+)?)?(?<t>(?:\[[^\]]+\]|[\w#@$]+)(?:\s*\.\s*(?:\[[^\]]+\]|[\w#@$]+))+)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline);
 
@@ -73,7 +76,7 @@ public static class Baselines
         return oracle.Select(o => o.Table).Distinct(StringComparer.OrdinalIgnoreCase).Count(t => !direct.Contains(t));
     }
 
-    /// <summary>"preview,B0,B2" 형식을 읽는다. 모르는 값이면 ArgumentException.</summary>
+    /// <summary>"preview,B0,B1,B2" 형식을 읽는다. 모르는 값이면 ArgumentException.</summary>
     public static IReadOnlyList<string> ParseSystems(string? list)
     {
         if (string.IsNullOrWhiteSpace(list)) return [Systems.Preview];
@@ -81,7 +84,7 @@ public static class Baselines
         foreach (var s in list.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             var hit = Systems.All.FirstOrDefault(x => string.Equals(x, s, StringComparison.OrdinalIgnoreCase))
-                      ?? throw new ArgumentException($"모르는 system {s}(허용: {string.Join(",", Systems.All)}, B1은 구현하지 않음)");
+                      ?? throw new ArgumentException($"모르는 system {s}(허용: {string.Join(",", Systems.All)})");
             if (!result.Contains(hit)) result.Add(hit);
         }
         return result;

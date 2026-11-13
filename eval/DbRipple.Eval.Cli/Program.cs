@@ -1,5 +1,5 @@
 // 평가 실행 CLI(§10.6). 사용(저장소 루트, 한 명령 안에서 점 소싱):
-//   . .\scripts\env.ps1; dotnet run --project eval\DbRipple.Eval.Cli -- cascadelab [--systems preview,B0,B2] [--cases CL01,CL02] [--out logs\week4\eval] [--repeat 20] [--run-id id] [--execute-as dbr_preview_user|none] [--keep-dbs]
+//   . .\scripts\env.ps1; dotnet run --project eval\DbRipple.Eval.Cli -- cascadelab [--systems preview,B0,B1,B2] [--cases CL01,CL02] [--out logs\week4\eval] [--repeat 20] [--run-id id] [--execute-as dbr_preview_user|none] [--keep-dbs]
 //   . .\scripts\env.ps1; dotnet run --project eval\DbRipple.Eval.Cli -- m5 [--sizes 1,100,1000,10000,50000,100000] [--cases CL20,CL20b] [--repeat 5] [--warmup 1] [--image-cap n] [--out logs\week4\m5] [--run-id id] [--execute-as …] [--keep-dbs]
 //   dotnet run --project eval\DbRipple.Eval.Cli -- report --run <실행 폴더> [--m5 <m5 실행 폴더>[,<m5 실행 폴더>…]]
 // cascadelab: 사례마다 (변형별 전용 기준선) → 미리보기(평가 훅) → 오라클(문장별 + 원문 배치) → 대조군 → 지표 → cases·m1·m2·m3.csv, 끝에 m4.csv·metrics.csv·env.json.
@@ -21,7 +21,7 @@ using DbRipple.TestSupport;
 
 const string Usage = """
     사용:
-      dbripple-eval cascadelab [--systems preview,B0,B2] [--cases CL01,CL02] [--out <dir>] [--repeat n] [--run-id id] [--execute-as <user>|none] [--keep-dbs]
+      dbripple-eval cascadelab [--systems preview,B0,B1,B2] [--cases CL01,CL02] [--out <dir>] [--repeat n] [--run-id id] [--execute-as <user>|none] [--keep-dbs]
       dbripple-eval m5 [--sizes 1,100,1000,10000,50000,100000] [--cases CL20,CL20b] [--repeat 5] [--warmup 1] [--image-cap n] [--out <dir>] [--run-id id] [--execute-as <user>|none] [--keep-dbs]
       dbripple-eval report --run <실행 폴더> [--m5 <m5 실행 폴더>[,<m5 실행 폴더>…]]
     """;
@@ -190,6 +190,8 @@ async Task RunCascadeLabAsync()
                 var store = new PreviewStore(Path.Combine(outDir, "store", d.Origin), TimeProvider.System);
                 pipeline = new PreviewPipeline(sandbox, new BatchAnalyzer(), executor, new ChangeCollector(), new CausalResolver(), store, TimeProvider.System);
             }
+            // B1: 전용 원본의 FK 목록을 DB(변형)마다 한 번 읽어 캐시한다(읽기 전용 SELECT, 사례 사이에 FK는 바뀌지 않는다).
+            var foreignKeys = systems.Contains(Baselines.Systems.B1) ? await FkStaticBaseline.ReadAsync(connection, d.Origin, ct) : null;
             var dbPart = await EvalEnvironment.ReadAsync(connection, withPreview ? new[] { d.Origin, d.Sandbox } : new[] { d.Origin }, null, ct);
             foreach (var (k, v) in dbPart["databases"]!.AsObject().ToList()) dbEnv[k] = v?.DeepClone();
 
@@ -236,6 +238,7 @@ async Task RunCascadeLabAsync()
                             Outcome = isPreview ? outcome : null,
                             PreviewError = isPreview ? previewError : null,
                             HookChanges = isPreview ? hook?.LastSandboxChanges : null,
+                            ForeignKeys = system == Baselines.Systems.B1 ? foreignKeys : null,
                             Oracle = oracle,
                             OracleRawBatch = raw,
                             RecordPath = isPreview && recordPath is not null ? Path.GetRelativePath(outDir, recordPath) : null,

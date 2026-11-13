@@ -125,6 +125,8 @@ internal sealed class ProcedureExpander(DbCatalog catalog, TableResolver resolve
 {
     public readonly ProcedureIndex Index = new(catalog);
     readonly Dictionary<(int ObjectId, int Depth), Expansion> memo = [];
+    FunctionGate? functions;
+    FunctionGate Functions => functions ??= new FunctionGate(catalog, resolver, Index);
 
     public static ProcedureStatementBody? ParseBody(CatalogModule module)
     {
@@ -159,7 +161,7 @@ internal sealed class ProcedureExpander(DbCatalog catalog, TableResolver resolve
         var body = proc.StatementList;
         body.Accept(new CtePrepass(a.CteDefinitions));
         body.Accept(new BodyVisitor(a));
-        var rules = new ExecRulesVisitor(a, name);
+        var rules = new ExecRulesVisitor(a, name, Functions);
         body.Accept(rules);
         rules.Finish(body);
 
@@ -191,6 +193,105 @@ internal sealed class ProcedureExpander(DbCatalog catalog, TableResolver resolve
         var result = new Expansion(resolved, a, pathDependent);
         if (!pathDependent) memo[(module.ObjectId, depth)] = result;
         return result;
+    }
+}
+
+/// <summary>
+/// 프로시저 본문의 사용자 정의 함수 호출 판정(2026-11-13). T-SQL 함수는 언어 규칙상 테이블에 쓸 수 없다(테이블 변수만).
+/// 그래서 CLR이 아니고, 본문을 읽을 수 있고, CALLER로 돌고, 본문에 외부 부작용(확장 프로시저·OPENQUERY·다른 DB 이름 등)·동적 SQL·프로시저 호출이 없고,
+/// 안쪽 함수도 같은 조건이면 허용한다. 카탈로그에 함수 목록이 없으면(예전 기준선) 판정할 수 없어 거부한다(닫힌 쪽).
+/// 결과는 함수마다 메모한다. 재귀 함수 사슬은 거부한다.
+/// </summary>
+internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, ProcedureIndex procedures)
+{
+    const int MaxDepth = ProcedureAnalyzer.MaxProcedureDepth;
+
+    readonly Dictionary<(string Schema, string Name), List<CatalogFunction>> byName = catalog.FunctionModules
+        .GroupBy(f => (Schema: f.Schema.ToUpperInvariant(), Name: f.Name.ToUpperInvariant()))
+        .ToDictionary(g => g.Key, g => g.ToList());
+    readonly Dictionary<int, string?> memo = [];
+
+    /// <summary>거부 이유. 허용이면 null. schema가 null이면 부르는 모듈 스키마, 없으면 dbo에서 찾는다(테이블 값 함수의 한 부분 이름).</summary>
+    public string? Check(string? schema, string name, string callerSchema)
+    {
+        if (!catalog.FunctionsKnown) return "카탈로그에 함수 정보가 없음(기준선을 다시 만들면 읽는다)";
+        var f = Find(schema, name, callerSchema);
+        if (f is null) return "카탈로그에 없는 함수이거나 이름이 모호함";
+        return CheckFunction(f, 1, []);
+    }
+
+    CatalogFunction? Find(string? schema, string name, string callerSchema) =>
+        schema is not null ? One(schema, name) : One(callerSchema, name) ?? One("dbo", name);
+
+    CatalogFunction? One(string schema, string name) =>
+        byName.TryGetValue((schema.ToUpperInvariant(), name.ToUpperInvariant()), out var l) && l.Count == 1 ? l[0] : null;
+
+    string? CheckFunction(CatalogFunction f, int depth, HashSet<int> stack)
+    {
+        if (memo.TryGetValue(f.ObjectId, out var hit)) return hit;
+        if (depth > MaxDepth) return $"함수 중첩 깊이 상한 {MaxDepth} 초과";
+        var why = Inspect(f, depth, stack);
+        memo[f.ObjectId] = why;
+        return why;
+    }
+
+    string? Inspect(CatalogFunction f, int depth, HashSet<int> stack)
+    {
+        if (!f.IsTSql) return "CLR 함수";
+        if (f.Definition is null) return "본문을 읽을 수 없음(암호화)";
+        if (!f.ExecuteAsCaller) return "EXECUTE AS 함수(CALLER가 아님)";
+        TSqlFragment? fragment;
+        try { fragment = SqlSyntax.Parse(f.Definition, out var errors); if (errors.Count > 0) fragment = null; }
+        catch (Exception) { fragment = null; }
+        if (fragment is null) return "본문 파싱 실패";
+
+        var a = new Accumulator(f.Schema, resolver, catalog, procedures);
+        fragment.Accept(new BodyVisitor(a));
+        if (a.External.Count > 0) return "외부 부작용: " + string.Join(", ", a.External);
+        if (a.DynamicSql) return "동적 SQL";
+        if (a.Calls.Count > 0) return "프로시저 호출: " + string.Join(", ", a.Calls.Select(c => c.Name));
+
+        var inner = new FunctionCallCollector();
+        fragment.Accept(inner);
+        stack.Add(f.ObjectId);
+        try
+        {
+            foreach (var call in inner.Calls)
+            {
+                if (call.Schema is null && call.MultiPart) return $"안쪽 함수 {call.Display}: 다른 DB 함수이거나 열 메서드";
+                var g = Find(call.Schema, call.Name, f.Schema);
+                if (g is null) return $"안쪽 함수 {call.Display}: 카탈로그에 없거나 이름이 모호함";
+                if (stack.Contains(g.ObjectId)) return $"안쪽 함수 {call.Display}: 재귀 함수";
+                if (CheckFunction(g, depth + 1, stack) is { } why) return $"안쪽 함수 {call.Display}: {why}";
+            }
+        }
+        finally { stack.Remove(f.ObjectId); }
+        return null;
+    }
+}
+
+/// <summary>본문에서 사용자 정의 함수 호출을 모은다: 스키마로 한정한 스칼라 함수 호출, sys가 아닌 테이블 값 함수.</summary>
+internal sealed class FunctionCallCollector : TSqlFragmentVisitor
+{
+    /// <summary>MultiPart = 두 부분 이상 대상(다른 DB 함수, 열의 xml·CLR 형식 메서드)이라 판정할 수 없는 호출.</summary>
+    public readonly record struct Call(string? Schema, string Name, string Display, bool MultiPart);
+
+    public readonly List<Call> Calls = [];
+
+    public override void Visit(FunctionCall node)
+    {
+        if (node.CallTarget is not MultiPartIdentifierCallTarget t) return;
+        var ids = t.MultiPartIdentifier.Identifiers;
+        var display = string.Join('.', ids.Select(i => i.Value)) + "." + node.FunctionName.Value;
+        Calls.Add(ids.Count == 1 ? new(ids[0].Value, node.FunctionName.Value, display, false) : new(null, node.FunctionName.Value, display, true));
+    }
+
+    public override void Visit(SchemaObjectFunctionTableReference node)
+    {
+        var so = node.SchemaObject;
+        if (string.Equals(so.SchemaIdentifier?.Value, "sys", StringComparison.OrdinalIgnoreCase)) return;
+        var multi = so.DatabaseIdentifier != null || so.ServerIdentifier != null;
+        Calls.Add(new(multi ? null : so.SchemaIdentifier?.Value, so.BaseIdentifier.Value, SqlSyntax.Name(so), multi));
     }
 }
 
@@ -462,7 +563,7 @@ internal static class TranFlow
 /// EXEC 미리보기 본문 규칙(프로시저 모듈 하나). 허용 목록 방식: 아는 문장만 통과시키고 나머지는 거부 사실로 남긴다.
 /// "성공 경로"는 CATCH 블록 밖 전부로 본다(SP16 전까지 닫힌 쪽: TRY 밖의 @@TRANCOUNT 분기도 도구 트랜잭션 때문에 원본과 갈린다).
 /// </summary>
-internal sealed class ExecRulesVisitor(Accumulator a, string module) : TSqlFragmentVisitor
+internal sealed class ExecRulesVisitor(Accumulator a, string module, FunctionGate functions) : TSqlFragmentVisitor
 {
     int catchDepth;
     int begins;
@@ -507,11 +608,14 @@ internal sealed class ExecRulesVisitor(Accumulator a, string module) : TSqlFragm
             Reject(AnalysisRules.RejectProcStatementNotAllowed, $"OUTPUT ... INTO 실제 테이블 {SqlSyntax.Name(nt.SchemaObject)}: 샌드박스 감사 트리거 때문에 원본과 달리 실패할 수 있음(E11)");
     }
 
-    // 사용자 정의 함수는 카탈로그에 본문·EXECUTE AS·CLR 여부가 없어 펼치지 못한다. 프로시저 소유권 체인으로 실행되므로 닫힌 쪽으로 거부한다.
+    // 사용자 정의 함수는 프로시저 소유권 체인으로 실행된다. 카탈로그 함수 정보로 판정해(FunctionGate) 안전하다고 볼 수 없으면 거부한다(2026-11-13).
     public override void Visit(SchemaObjectFunctionTableReference node)
     {
-        if (!string.Equals(node.SchemaObject.SchemaIdentifier?.Value, "sys", StringComparison.OrdinalIgnoreCase))
-            Reject(AnalysisRules.RejectProcUnresolvedCall, $"사용자 정의 함수 {SqlSyntax.Name(node.SchemaObject)}(본문을 펼치지 않음: CLR·EXECUTE AS 함수일 수 있음)");
+        var so = node.SchemaObject;
+        if (string.Equals(so.SchemaIdentifier?.Value, "sys", StringComparison.OrdinalIgnoreCase)) return;
+        if (so.DatabaseIdentifier != null || so.ServerIdentifier != null) return; // 다른 DB 이름은 BodyVisitor가 외부 부작용으로 표시한다
+        if (functions.Check(so.SchemaIdentifier?.Value, so.BaseIdentifier.Value, a.TriggerSchema) is { } why)
+            Reject(AnalysisRules.RejectProcUnresolvedCall, $"사용자 정의 함수 {SqlSyntax.Name(so)}({why})");
     }
 
     public override void ExplicitVisit(TryCatchStatement node)
@@ -571,10 +675,14 @@ internal sealed class ExecRulesVisitor(Accumulator a, string module) : TSqlFragm
     public override void Visit(FunctionCall node)
     {
         if (node.CallTarget is null && node.FunctionName.Value.Equals("XACT_STATE", StringComparison.OrdinalIgnoreCase)) TranState("XACT_STATE()");
-        // 스키마로 한정한 호출 = 사용자 정의 스칼라 함수·집계(열의 xml·CLR 형식 메서드도 여기 걸린다, 닫힌 쪽)
+        // 스키마로 한정한 호출 = 사용자 정의 스칼라 함수·집계. 두 부분 이상(다른 DB 함수, 열의 xml·CLR 형식 메서드)은 판정할 수 없어 거부한다(닫힌 쪽).
         if (node.CallTarget is MultiPartIdentifierCallTarget t)
-            Reject(AnalysisRules.RejectProcUnresolvedCall,
-                $"사용자 정의 함수 {string.Join('.', t.MultiPartIdentifier.Identifiers.Select(i => i.Value))}.{node.FunctionName.Value}(본문을 펼치지 않음: CLR·EXECUTE AS 함수일 수 있음)");
+        {
+            var ids = t.MultiPartIdentifier.Identifiers;
+            var display = string.Join('.', ids.Select(i => i.Value)) + "." + node.FunctionName.Value;
+            var why = ids.Count == 1 ? functions.Check(ids[0].Value, node.FunctionName.Value, a.TriggerSchema) : "다른 DB 함수이거나 열 메서드라 판정할 수 없음";
+            if (why is not null) Reject(AnalysisRules.RejectProcUnresolvedCall, $"사용자 정의 함수 {display}({why})");
+        }
     }
 
     // 도구 트랜잭션 안이라 성공 경로의 @@TRANCOUNT·XACT_STATE() 값은 원본과 다르다(SP16 뒤 재검토).

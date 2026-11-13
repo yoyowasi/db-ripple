@@ -10,6 +10,7 @@ public sealed class CatalogBuilder
     readonly List<CatalogColumn> columns = [];
     readonly List<CatalogTriggerEvent> triggers = [];
     readonly List<CatalogModule> procedures = [];
+    readonly List<CatalogFunction> functions = [];
     readonly List<CatalogForeignKeyColumn> foreignKeys = [];
     int nextId = 1000;
 
@@ -56,5 +57,13 @@ public sealed class CatalogBuilder
         return this;
     }
 
-    public DbCatalog Build() => new(tables, columns, [], foreignKeys, triggers, [], procedures);
+    /// <summary>사용자 정의 함수(2026-11-13). type은 sys.objects.type(FN·IF·TF는 T-SQL, FS·FT·AF는 CLR). definition이 null이면 암호화·CLR.</summary>
+    public CatalogBuilder Function(string schema, string name, string? definition, string type = "FN", bool executeAsCaller = true)
+    {
+        functions.Add(new CatalogFunction(nextId++, schema, name, type, definition, executeAsCaller));
+        return this;
+    }
+
+    /// <summary>함수 목록은 늘 "읽음"(빈 목록 포함)으로 만든다. 예전 기준선(함수 정보 없음)은 <c>Build() with { Functions = null }</c>.</summary>
+    public DbCatalog Build() => new(tables, columns, [], foreignKeys, triggers, [], procedures, functions);
 }

@@ -77,5 +77,16 @@ public static class CatalogQueries
         ORDER BY schema_name, p.name;
         """;
 
-    public static IReadOnlyList<string> All => [Tables, Columns, KeyIndexes, ForeignKeys, Triggers, Files, Procedures];
+    // 2026-11-13: EXEC 미리보기가 프로시저 본문의 함수 호출을 판정하려고 읽는다. CLR(FS·FT·AF)은 sql_modules 행이 없어 definition NULL이다.
+    // execute_as_principal_id NULL = CALLER(-2는 OWNER, 그 밖은 사용자). 시스템 제공(is_ms_shipped)은 뺀다.
+    public const string Functions = """
+        SELECT o.object_id, SCHEMA_NAME(o.schema_id) AS schema_name, o.name, RTRIM(o.type) AS type, m.definition,
+               CAST(CASE WHEN m.execute_as_principal_id IS NULL THEN 1 ELSE 0 END AS bit) AS execute_as_caller
+        FROM sys.objects AS o
+        LEFT JOIN sys.sql_modules AS m ON m.object_id = o.object_id
+        WHERE o.type IN ('FN', 'IF', 'TF', 'FS', 'FT', 'AF') AND o.is_ms_shipped = 0
+        ORDER BY schema_name, o.name;
+        """;
+
+    public static IReadOnlyList<string> All => [Tables, Columns, KeyIndexes, ForeignKeys, Triggers, Files, Procedures, Functions];
 }

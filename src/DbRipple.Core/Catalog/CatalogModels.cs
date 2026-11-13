@@ -46,6 +46,16 @@ public sealed record CatalogModule(int ObjectId, string Schema, string Name, str
     public bool IsEncrypted => Definition is null;
 }
 
+/// <summary>
+/// 사용자 정의 함수 1개(sys.objects FN·IF·TF·FS·FT·AF + sys.sql_modules, 2026-11-13). EXEC 미리보기가 프로시저 본문의 함수 호출을 판정할 때 쓴다.
+/// Type은 sys.objects.type(FN 스칼라, IF 인라인 테이블 값, TF 다중 문 테이블 값, FS·FT CLR, AF CLR 집계). ExecuteAsCaller는 sql_modules.execute_as_principal_id가 NULL.
+/// </summary>
+public sealed record CatalogFunction(int ObjectId, string Schema, string Name, string Type, string? Definition, bool ExecuteAsCaller)
+{
+    /// <summary>T-SQL 함수(본문을 읽을 수 있으면 펼칠 수 있다). CLR은 아니다.</summary>
+    public bool IsTSql => Type is "FN" or "IF" or "TF";
+}
+
 /// <summary>C7 카탈로그 스냅샷.</summary>
 public sealed record DbCatalog(
     IReadOnlyList<CatalogTable> Tables,
@@ -54,8 +64,17 @@ public sealed record DbCatalog(
     IReadOnlyList<CatalogForeignKeyColumn> ForeignKeys,
     IReadOnlyList<CatalogTriggerEvent> Triggers,
     IReadOnlyList<CatalogFile> Files,
-    IReadOnlyList<CatalogModule>? Procedures = null)
+    IReadOnlyList<CatalogModule>? Procedures = null,
+    IReadOnlyList<CatalogFunction>? Functions = null)
 {
+    /// <summary>사용자 정의 함수(2026-11-13). 생략했으면(예전 기준선) 빈 목록이고 <see cref="FunctionsKnown"/>가 false다.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<CatalogFunction> FunctionModules => Functions ?? [];
+
+    /// <summary>카탈로그를 읽을 때 함수 목록도 읽었는가. false면 함수 호출을 판정할 수 없다(닫힌 쪽으로 거부).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool FunctionsKnown => Functions is not null;
+
     /// <summary>프로시저 모듈(인계 1). 생성자에서 생략했으면(3주차 이전 호출자) 빈 목록 = "펼칠 본문 없음"이다.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public IReadOnlyList<CatalogModule> ProcedureModules => Procedures ?? [];

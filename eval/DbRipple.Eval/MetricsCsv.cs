@@ -6,7 +6,7 @@ namespace DbRipple.Eval;
 /// <summary>
 /// 평가 CSV 열 명세(§10.4 M1~M5, §10.6 cases.csv·metrics.csv). 보고서 표는 이 CSV에서만 만든다(손으로 쓴 수치 금지, ReportBuilder).
 /// 공통 규칙: UTF-8(BOM 없음), 쉼표 구분, RFC 4180 인용, 소수는 InvariantCulture 소수점 4자리, 분모 0인 비율은 빈 칸.
-/// system 열: preview(제품), B0(직접 대상만), B2(사본 + 최종 차이). 대조군도 같은 파일·같은 열을 쓴다(§10.5, Baselines). B1은 구현하지 않았다(자를 목록 1순위).
+/// system 열: preview(제품), B0(직접 대상만), B1(FK 메타데이터 정적 예측), B2(사본 + 최종 차이). 대조군도 같은 파일·같은 열을 쓴다(§10.5, Baselines).
 /// 파일: cases.csv·m1.csv·m2.csv·m3.csv·metrics.csv(cascadelab 실행마다), m4.csv(cascadelab, 반복 k회 묶음), m5.csv(m5 명령), report.md(report 명령, CSV만 읽음).
 /// </summary>
 public static class MetricsCsv

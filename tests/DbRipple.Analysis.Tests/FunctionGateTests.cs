@@ -1,0 +1,103 @@
+using DbRipple.Contracts;
+using DbRipple.Core.Catalog;
+
+namespace DbRipple.Analysis.Tests;
+
+/// <summary>
+/// EXEC 본문의 사용자 정의 함수 판정(2026-11-13): 카탈로그 함수 정보(종류·EXECUTE AS·본문)로 안전한 T-SQL 함수만 허용한다.
+/// </summary>
+public class FunctionGateTests
+{
+    static BaselineContext Ctx(string procBody, Action<CatalogBuilder> functions, bool functionsKnown = true)
+    {
+        var ctx = BatchAnalyzerTests.Ctx(more: b =>
+        {
+            b.Procedure("dbo", "q", $"CREATE PROCEDURE dbo.q AS BEGIN SET NOCOUNT ON; {procBody} END;");
+            functions(b);
+        });
+        ctx = ctx with { Triggers = new TriggerAnalyzer().Analyze(ctx.Catalog) };
+        return functionsKnown ? ctx : ctx with { Catalog = ctx.Catalog with { Functions = null } };
+    }
+
+    static AnalysisResult Run(BaselineContext ctx) => new BatchAnalyzer().Analyze("EXEC dbo.q;", ctx);
+    static string Show(AnalysisResult r) => string.Join(" | ", r.Rejects.Select(d => d.RuleId + ": " + d.Message));
+
+    const string Scalar = "CREATE FUNCTION dbo.f(@a int) RETURNS int AS BEGIN RETURN @a + 1; END;";
+    const string Inline = "CREATE FUNCTION dbo.tvf(@a int) RETURNS TABLE AS RETURN SELECT y FROM dbo.U WHERE y > @a;";
+
+    [Fact]
+    public void Clean_tsql_scalar_and_inline_functions_are_allowed()
+    {
+        var r = Run(Ctx("UPDATE dbo.U SET y = dbo.f(y); DELETE dbo.T WHERE a IN (SELECT y FROM dbo.tvf(1));",
+            b => b.Function("dbo", "f", Scalar).Function("dbo", "tvf", Inline, "IF")));
+        Assert.True(r.IsAccepted, Show(r));
+    }
+
+    [Fact]
+    public void Multi_statement_table_function_writing_its_table_variable_is_allowed()
+    {
+        const string tf = "CREATE FUNCTION dbo.mtf() RETURNS @t TABLE (a int) AS BEGIN INSERT @t (a) SELECT y FROM dbo.U; RETURN; END;";
+        var r = Run(Ctx("SELECT a FROM dbo.mtf();", b => b.Function("dbo", "mtf", tf, "TF")));
+        Assert.DoesNotContain(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall);
+    }
+
+    [Theory]
+    [InlineData("FS", null, true, "CLR 함수")]
+    [InlineData("FN", null, true, "암호화")]
+    [InlineData("FN", Scalar, false, "EXECUTE AS")]
+    [InlineData("FN", "CREATE FUNCTION dbo.f(@a int) RETURNS int AS BEGIN EXEC master.dbo.xp_logevent 60000, N'x'; RETURN @a; END;", true, "외부 부작용")]
+    [InlineData("FN", "CREATE FUNCTION dbo.f(@a int) RETURNS int AS BEGIN RETURN (SELECT COUNT(*) FROM OtherDb.dbo.T); END;", true, "외부 부작용")]
+    [InlineData("FN", "CREATE FUNCTION dbo.f(@a int) RETURNS int AS BEGIN RETURN (SELECT COUNT(*) FROM OPENQUERY(Lnk, 'select 1')); END;", true, "외부 부작용")]
+    [InlineData("FN", "CREATE FUNCTION dbo.f(@a int) RETURNS int WITH ENCRYPTION AS BEGIN RETURN @a; END; garbage(", true, "파싱")]
+    public void Unsafe_or_unreadable_functions_are_rejected(string type, string? definition, bool caller, string reason)
+    {
+        var r = Run(Ctx("UPDATE dbo.U SET y = dbo.f(y);", b => b.Function("dbo", "f", definition, type, caller)));
+        Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("dbo.f") && d.Message.Contains(reason));
+    }
+
+    [Fact]
+    public void Nested_functions_are_checked_recursively()
+    {
+        const string outer = "CREATE FUNCTION dbo.f(@a int) RETURNS int AS BEGIN RETURN dbo.g(@a) * 2; END;";
+        const string clean = "CREATE FUNCTION dbo.g(@a int) RETURNS int AS BEGIN RETURN @a; END;";
+        Assert.True(Run(Ctx("SELECT dbo.f(1);", b => b.Function("dbo", "f", outer).Function("dbo", "g", clean))).IsAccepted);
+
+        var clr = Run(Ctx("SELECT dbo.f(1);", b => b.Function("dbo", "f", outer).Function("dbo", "g", null, "FS")));
+        Assert.Contains(clr.Rejects, d => d.Message.Contains("안쪽 함수 dbo.g") && d.Message.Contains("CLR"));
+
+        var missing = Run(Ctx("SELECT dbo.f(1);", b => b.Function("dbo", "f", outer)));
+        Assert.Contains(missing.Rejects, d => d.Message.Contains("안쪽 함수 dbo.g"));
+    }
+
+    [Fact]
+    public void Recursive_function_chain_is_rejected_and_terminates()
+    {
+        const string f = "CREATE FUNCTION dbo.f(@a int) RETURNS int AS BEGIN RETURN CASE WHEN @a > 0 THEN dbo.g(@a - 1) ELSE 0 END; END;";
+        const string g = "CREATE FUNCTION dbo.g(@a int) RETURNS int AS BEGIN RETURN dbo.f(@a); END;";
+        var r = Run(Ctx("SELECT dbo.f(3);", b => b.Function("dbo", "f", f).Function("dbo", "g", g)));
+        Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("재귀"));
+    }
+
+    [Fact]
+    public void Unknown_function_catalog_keeps_the_closed_side()
+    {
+        var r = Run(Ctx("SELECT dbo.f(1);", b => b.Function("dbo", "f", Scalar), functionsKnown: false));
+        Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("함수 정보가 없음"));
+    }
+
+    [Theory]
+    [InlineData("SELECT OtherDb.dbo.f(1);")] // 다른 DB 함수
+    [InlineData("SELECT x.col.value('(/a)[1]', 'int') FROM dbo.U AS x;")] // 열 메서드(판정할 수 없어 닫힌 쪽)
+    public void Multi_part_call_targets_stay_rejected(string body)
+    {
+        var r = Run(Ctx(body, b => b.Function("dbo", "f", Scalar)));
+        Assert.False(r.IsAccepted, Show(r));
+    }
+
+    [Fact]
+    public void Ambiguous_function_names_are_rejected()
+    {
+        var r = Run(Ctx("SELECT dbo.f(1);", b => b.Function("dbo", "f", Scalar).Function("dbo", "F", Scalar)));
+        Assert.Contains(r.Rejects, d => d.Message.Contains("모호"));
+    }
+}

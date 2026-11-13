@@ -280,7 +280,7 @@ flowchart LR
 - **C5:** `GET /api/catalog/schema`와 `POST /api/previews/{id}/apply`를 실제 엔드포인트로 바꿨다(2주차에는 501). 예외 → 상태 코드는 AD9다(§6.4 v1.5). `/api` 아래 변경 요청에 교차 사이트 요청 방어를 더했다(§6.4 v1.5). 근거: `src/DbRipple.Api/DbRippleApi.cs`, `src/DbRipple.Api/Middleware/`.
 - **AD8 스키마 공급(Q23·Q25·Q37):** /catalog/schema는 Preview `CatalogSchemaProvider`가 만든다. sqlType은 Core를 바꾸지 않고 샌드박스 `sys.columns` 자체 조회와 `SqlTypes.Format`으로 만든다. 길이·정밀도를 읽지 못하면 형식 이름만 두고 그 결과는 캐시하지 않는다. 기준선(BaselineAt + 매니페스트 버전)마다 캐시한다. 행 DTO에는 형식을 싣지 않고 프런트가 스키마로 찾는다. 근거: `src/DbRipple.Contracts/CatalogSchema.cs`, `src/DbRipple.Preview/CatalogSchemaProvider.cs`.
 - **AD10 단일 잠금:** 미리보기와 [적용]은 같은 잠금(`AcquirePreviewLockAsync`)을 쓴다. 새로 고침(`StartRefresh`)은 잠금을 푼 뒤 시작한다.
-- **C6·C7(인계 1):** C7이 프로시저 모듈(`sys.sql_modules`)을 읽고(DbCatalog 끝에 기본값 null인 매개변수로 추가), C6 TriggerAnalyzer가 트리거가 부르는 프로시저를 깊이 4까지 펼친다. `TriggerStaticInfo`에 `ExpandedProcedureCalls`, `UnresolvedProcedureCalls`를 더했다. 귀속 규칙은 §7.2 4단계 v1.5다.
+- **C6·C7(인계 1):** C7이 프로시저 모듈(`sys.sql_modules`)을 읽고(DbCatalog 끝에 기본값 null인 매개변수로 추가), C6 TriggerAnalyzer가 트리거가 부르는 프로시저를 깊이 4까지 펼친다. `TriggerStaticInfo`에 `ExpandedProcedureCalls`, `UnresolvedProcedureCalls`를 더했다. 귀속 규칙은 §7.2 4단계 v1.5다. 2026-11-13: C7이 사용자 정의 함수 목록(`Functions`, 끝에 기본값 null 매개변수 하나 더, null이면 "함수 정보 없음")도 읽는다(EXEC 본문의 함수 호출 판정용, D5 EXEC 결정).
 - **C10(인계 7, Q31):** 실패 경로의 롤백 뒤 비교가 예외로 끝나면 던지지 않고 `RawCapture`·`PreviewResult`의 `residualCheckFailed = true`, `residualCheckMessage`에 담고 샌드박스를 오염으로 둔다.
 - **C10 행 수(Q33):** 미리보기도 [적용]과 같이 문장 끝 `SELECT ROWCOUNT_BIG();` 값을 `rowsAffected`로 쓴다(D7 v1.5).
 - **그대로 둔 것:** 직접 대상 트리거의 SAVE TRAN·균형 잡힌 BEGIN…COMMIT은 거부를 유지한다(Q34, D5 "판정할 수 없으면 닫힌 쪽"). 대소문자만 바꾸는 키 UPDATE는 DB 정렬 규칙대로 UPDATED로 둔다(Q35, 평가 오라클을 정렬 규칙에 맞춤, §10.4 v1.5).
@@ -1150,7 +1150,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 | `REJECT_PROC_EXECUTE_AS` | 모듈에 EXECUTE AS OWNER·SELF·사용자 절이 있다 |
 | `REJECT_PROC_PARAMETER` | 없는 매개변수 이름, 기본값 없는 필수 매개변수 누락, OUTPUT·READONLY 매개변수가 있는 프로시저(1차 범위 밖) |
 | `REJECT_PROC_DYNAMIC_SQL` | 펼친 본문의 동적 SQL(EXEC 문자열, EXEC @변수, sp_executesql·sp_prepare 계열) |
-| `REJECT_PROC_UNRESOLVED_CALL` | 펼치지 못한 안쪽 호출(카탈로그에 없음, 본문 없음, 재귀, 깊이 4 초과, 이름이 모호함), 사용자 정의 함수 호출(스키마를 붙인 스칼라 함수, sys가 아닌 테이블 값 함수: 카탈로그에 함수 정보가 없어 CLR·EXECUTE AS 함수일 수 있으므로 닫힌 쪽) |
+| `REJECT_PROC_UNRESOLVED_CALL` | 펼치지 못한 안쪽 호출(카탈로그에 없음, 본문 없음, 재귀, 깊이 4 초과, 이름이 모호함), 안전하다고 판정할 수 없는 사용자 정의 함수 호출(CLR 함수, 암호화·파싱 실패, EXECUTE AS 함수, 본문에 외부 부작용·동적 SQL·프로시저 호출, 재귀·깊이 4 초과, 카탈로그에 없거나 모호함, 다른 DB 함수·열 메서드, 함수 정보가 없는 예전 기준선) |
 | `REJECT_PROC_EXTERNAL_EFFECT` | 외부 부작용(다른 DB 3·4부분 이름, msdb, OPENQUERY, 시스템 프로시저, Service Broker, RAISERROR WITH LOG) |
 | `REJECT_PROC_SAVEPOINT` | SAVE TRAN 또는 저장점으로 ROLLBACK |
 | `REJECT_PROC_UNBALANCED_COMMIT` | COMMIT 앞에 확실히 열린 BEGIN TRAN이 없다(구조 기반: 분기·반복·TRY 안에서만 열린 BEGIN은 밖에서 세지 않고, CATCH는 TRY 앞에서 열린 것만 센다). 반복문 본문의 COMMIT이 열린 수를 줄이거나, GOTO가 있는 모듈의 COMMIT도 거부. 도구 트랜잭션을 확정할 수 있어서다 |
@@ -1175,7 +1175,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 - **[적용]은 2차:** 미리보기에 EXEC 문장이 있으면 선행 조건 `PROC_APPLY_NOT_SUPPORTED`로 막는다(`ApplyService`, `ApplyPrecondition`). 원본에서 프로시저를 다시 돌려 미리보기와 대조하는 경로가 아직 없다.
 - **`@@TRANCOUNT`·`XACT_STATE()`:** CATCH 밖에서 읽으면 거부, CATCH 안 검사는 경고다. 미리보기는 도구 트랜잭션 안에서 돌아 사용자의 단독 실행(보통 자동 커밋)과 값이 다를 수 있다. SP16 뒤 재검토한다.
 - **알려진 한계(코드 구조에서 나온 것이고 DB로는 확인하지 않았다):**
-  - 사용자 정의 함수를 부르는 프로시저는 모두 거부된다(카탈로그에 함수 종류·EXECUTE AS·본문 정보가 없어서. 카탈로그에 넣으면 풀 수 있다).
+  - 사용자 정의 함수: 카탈로그가 함수 목록(`sys.objects` FN·IF·TF·FS·FT·AF + `sys.sql_modules`, `CatalogQueries.Functions`)을 읽는다. T-SQL 함수는 언어 규칙상 테이블에 쓸 수 없으므로, CLR이 아니고 CALLER로 돌며 본문(안쪽 함수 포함)에 외부 부작용·동적 SQL·프로시저 호출이 없으면 허용한다(`FunctionGate`, 2026-11-13). 그 밖은 `REJECT_PROC_UNRESOLVED_CALL`. 함수 목록이 없는 예전 기준선은 다시 만들기 전까지 함수 호출을 거부한다. `xml` 열 메서드(`t.col.value(...)`)는 함수와 구별하지 못해 거부한다. 함수에는 `EXECUTE` 권한을 주지 않는다(프로시저 소유권 체인으로만 실행). 카탈로그 쿼리는 DB로 확인하지 않았다.
   - EXECUTE AS OWNER 등 CALLER가 아닌 프로시저는 권한을 받지 않는다(어차피 `REJECT_PROC_EXECUTE_AS`).
   - INSTEAD OF 트리거가 있는 테이블에 쓰는 프로시저는 깊이 2 묶음이 `UNEXPLAINED`가 된다.
   - 시노님·함수·뷰를 거치는 쓰기는 펼치지 않는다. 다른 DB의 스칼라 함수는 표시하지 못한다.

@@ -7,7 +7,7 @@ public sealed record CaseRun
 {
     /// <summary>실행 id.</summary>
     public required string RunId { get; init; }
-    /// <summary>preview, B0, B2(Baselines.Systems). 대조군이면 Outcome·HookChanges를 쓰지 않고 오라클과 손 정답만으로 예측을 만든다.</summary>
+    /// <summary>preview, B0, B1, B2(Baselines.Systems). 대조군이면 Outcome·HookChanges를 쓰지 않고 오라클과 손 정답만으로 예측을 만든다.</summary>
     public string System { get; init; } = Baselines.Systems.Preview;
     /// <summary>반복 번호(1부터).</summary>
     public int Repeat { get; init; } = 1;
@@ -19,6 +19,8 @@ public sealed record CaseRun
     public string? PreviewError { get; init; }
     /// <summary>평가 훅 샌드박스 순 변경. 훅이 불리지 않았으면 null(실패 사례 Q13 등).</summary>
     public IReadOnlyList<OracleRowChange>? HookChanges { get; init; }
+    /// <summary>B1이 읽는 사례 DB의 FK 목록(CLI가 DB별로 한 번 읽어 준다). System이 B1일 때만 쓰고, 그때 null이면 예외다.</summary>
+    public IReadOnlyList<ForeignKeyMeta>? ForeignKeys { get; init; }
     /// <summary>오라클(문장별 경로).</summary>
     public required OracleResult Oracle { get; init; }
     /// <summary>오라클 원문 배치 경로. 적용하지 않으면 null.</summary>
@@ -56,7 +58,7 @@ public sealed record CaseScore(IReadOnlyList<string?> CaseRow, IReadOnlyList<IRe
 /// <item>M1 세 비교 모두 정답 쪽을 예측 쪽 IDENTITY 값으로 옮긴 뒤 비교한다(IdentityPairing, E2).</item>
 /// <item>M2: 손 정답의 IDENTITY 행(v0.2 match)을 예측 쪽 키에 묶은 뒤 센다(HandCase.Bind).</item>
 /// <item>M3: 제품 그래프(GraphEdges) 대 손 정답 간선(AttributionMetrics).</item>
-/// <item>대조군(B0·B2): 예측은 Baselines가 오라클·손 정답에서 만들고, 상태·오류·문장 상태는 오라클 값이다. obs·cap은 빈 칸이다.</item>
+/// <item>대조군(B0·B1·B2): 예측은 Baselines가 오라클·손 정답에서 만들고, 상태·오류·문장 상태는 오라클 값이다. obs·cap은 빈 칸이다.</item>
 /// <item>훅이 불리지 않았으면 obs·cap 행의 지표 칸은 빈 칸이다. 미리보기가 거부·예외면 예측은 빈 집합이다.</item>
 /// <item>status_actual: 미리보기 상태, 거부면 "rejected", 예외면 "error".</item>
 /// <item>oracle_vs_hand_keys_match: HandCase.DiffAgainst가 비었는지. raw_batch_match: 원문 배치 경로와 문장별 경로의 순 변경·상태가 같은지.</item>
@@ -95,9 +97,20 @@ public sealed class CaseScorer(MetricsCalculator calculator)
         }
         else
         {
-            predicted = (system == Baselines.Systems.B0 ? Baselines.B0Changes(hand, oracle) : oracle).Select(PredictedChange.Plain).ToList();
-            edges = system == Baselines.Systems.B0 ? Baselines.B0Edges(hand) : [];
-            manualSelect = Baselines.ManualSelectTables(hand, oracle);
+            if (system == Baselines.Systems.B1)
+            {
+                var b1 = FkStaticBaseline.Predict(FkStaticBaseline.Seeds(hand),
+                    run.ForeignKeys ?? throw new InvalidOperationException("B1은 CaseRun.ForeignKeys(사례 DB의 FK 목록)가 필요하다"));
+                predicted = FkStaticBaseline.Changes(hand, oracle, b1).Select(PredictedChange.Plain).ToList();
+                edges = FkStaticBaseline.Edges(hand, b1);
+                manualSelect = FkStaticBaseline.ManualSelectTables(hand, oracle, b1);
+            }
+            else
+            {
+                predicted = (system == Baselines.Systems.B0 ? Baselines.B0Changes(hand, oracle) : oracle).Select(PredictedChange.Plain).ToList();
+                edges = system == Baselines.Systems.B0 ? Baselines.B0Edges(hand) : [];
+                manualSelect = Baselines.ManualSelectTables(hand, oracle);
+            }
             statusActual = run.Oracle.Status;
             errorActual = run.Oracle.ErrorNumbers.Count > 0 ? run.Oracle.ErrorNumbers[0] : null;
             stMatch = run.Oracle.Statements.Count(s => hand.ExpectedStatementStatus.TryGetValue(s.Index, out var e) && e == s.Status);
