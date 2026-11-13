@@ -15,6 +15,7 @@ public sealed class CatalogBuilder
     readonly List<CatalogView> views = [];
     readonly List<CatalogTableFunction> tableFunctions = [];
     readonly List<CatalogIndexedView> indexedViews = [];
+    readonly List<CatalogComputedColumn> computed = [];
     readonly List<CatalogForeignKeyColumn> foreignKeys = [];
     int nextId = 1000;
 
@@ -101,5 +102,13 @@ public sealed class CatalogBuilder
         return this;
     }
 
-    public DbCatalog Build() => new(tables, columns, [], foreignKeys, triggers, [], procedures, functions, synonyms, views, tableFunctions, indexedViews);
+    /// <summary>계산 열 정의(2026-11-13). table은 "스키마.테이블".</summary>
+    public CatalogBuilder ComputedColumn(string table, string column, string definition)
+    {
+        var t = table.Split('.');
+        computed.Add(new CatalogComputedColumn(t[0], t[1], column, definition));
+        return this;
+    }
+
+    public DbCatalog Build() => new(tables, columns, [], foreignKeys, triggers, [], procedures, functions, synonyms, views, tableFunctions, indexedViews, computed);
 }

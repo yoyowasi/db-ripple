@@ -258,6 +258,10 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
                 if (stack.Contains(v.ObjectId)) continue; // 지금 판정 중인 그 뷰 자신(뷰가 기준 테이블을 읽는 것은 당연하다)
                 if (CheckView(v, depth, stack) is { } ivWhy) return $"테이블 {iv.TableSchema}.{iv.TableName}의 인덱싱된 뷰 {iv.ViewSchema}.{iv.ViewName}: {ivWhy}";
             }
+        // 계산 열 정의 안의 메서드 호출(CLR 형식 메서드·속성): 함수 의존에 잡히지 않으므로 정의를 파싱해 본다(2026-11-13).
+        // 스키마로 한정한 함수 호출(dbo.f())은 TableFunctions가 맡으므로 여기서는 판정할 수 없는 형태만 거부한다.
+        foreach (var cc in catalog.ComputedColumnModules.Where(cc => SameTable(cc.TableSchema, cc.TableName)))
+            if (ComputedColumnProblem(cc) is { } ccWhy) return $"테이블 {cc.TableSchema}.{cc.TableName}의 계산 열 {cc.Column}: {ccWhy}";
         if (catalog.TableFunctionModules.Count == 0) return null;
         var deps = catalog.TableFunctionModules.Where(d => d.TableName.Equals(name, StringComparison.OrdinalIgnoreCase)
             && (schema is not null ? d.TableSchema.Equals(schema, StringComparison.OrdinalIgnoreCase)
@@ -274,6 +278,33 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
             if (CheckFunction(f, depth, stack) is { } why) return $"테이블 {d.TableSchema}.{d.TableName}의 계산 열·제약 함수 {display}: {why}";
         }
         return null;
+    }
+
+    readonly Dictionary<CatalogComputedColumn, string?> computedMemo = [];
+
+    string? ComputedColumnProblem(CatalogComputedColumn cc)
+    {
+        if (computedMemo.TryGetValue(cc, out var hit)) return hit;
+        string? why;
+        if (Parse("SELECT " + cc.Definition + ";") is not { } fragment) why = "정의 파싱 실패";
+        else
+        {
+            var calls = new FunctionCallCollector();
+            fragment.Accept(calls);
+            // 한 부분 대상(MultiPart가 아님)은 스키마.함수 호출이라 TableFunctions가 판정한다. 열.메서드()는 스키마 이름이 열 이름이라 함수 목록에 없다.
+            var tableColumns = catalog.Tables.Where(t => t.Schema.Equals(cc.TableSchema, StringComparison.OrdinalIgnoreCase) && t.Name.Equals(cc.TableName, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(t => catalog.Columns.Where(c => c.ObjectId == t.ObjectId).Select(c => c.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var columnMethod = calls.Calls.FirstOrDefault(c => c.MultiPart || (c.Schema is { } s && tableColumns.Contains(s)));
+            // 계산 열은 다른 테이블을 가리킬 수 없고 열을 테이블 이름으로 한정하지도 않는다. 두 부분 이상인 열 참조([col].[Prop])는 CLR 형식 속성 접근이다.
+            var props = new ColumnPathCollector();
+            fragment.Accept(props);
+            why = calls.Unjudgeable.Count > 0 ? calls.Unjudgeable[0]
+                : columnMethod != default ? $"열 메서드 호출 {columnMethod.Display}(CLR 형식 메서드일 수 있어 판정할 수 없음)"
+                : props.First is { } p ? $"열 속성 접근 {p}(CLR 형식 속성일 수 있어 판정할 수 없음)"
+                : null;
+        }
+        computedMemo[cc] = why;
+        return why;
     }
 
     (CatalogView? View, bool Ambiguous) FindView(string? schema, string name, string callerSchema)
@@ -381,6 +412,16 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
         }
         finally { stack.Remove(objectId); }
         return null;
+    }
+}
+
+/// <summary>두 부분 이상인 열 참조(계산 열 정의 안에서는 CLR 형식 속성 접근)의 첫 번째.</summary>
+internal sealed class ColumnPathCollector : TSqlFragmentVisitor
+{
+    public string? First;
+    public override void Visit(ColumnReferenceExpression node)
+    {
+        if (First is null && node.MultiPartIdentifier is { Count: > 1 } m) First = string.Join('.', m.Identifiers.Select(i => i.Value));
     }
 }
 

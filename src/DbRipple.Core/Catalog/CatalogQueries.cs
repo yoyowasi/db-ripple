@@ -130,5 +130,14 @@ public static class CatalogQueries
         ORDER BY view_schema, view_name, table_schema, table_name;
         """;
 
-    public static IReadOnlyList<string> All => [Tables, Columns, KeyIndexes, ForeignKeys, Triggers, Files, Procedures, Functions, Synonyms, Views, TableFunctions, IndexedViews];
+    // 2026-11-13: 계산 열 정의. 함수 의존(TableFunctions)에 잡히지 않는 열의 CLR 형식 메서드 호출을 분석기가 정의를 파싱해 찾는다.
+    public const string ComputedColumns = """
+        SELECT SCHEMA_NAME(t.schema_id) AS table_schema, t.name AS table_name, c.name AS column_name, c.definition
+        FROM sys.computed_columns AS c
+        JOIN sys.tables AS t ON t.object_id = c.object_id
+        WHERE t.is_ms_shipped = 0
+        ORDER BY table_schema, table_name, c.column_id;
+        """;
+
+    public static IReadOnlyList<string> All => [Tables, Columns, KeyIndexes, ForeignKeys, Triggers, Files, Procedures, Functions, Synonyms, Views, TableFunctions, IndexedViews, ComputedColumns];
 }

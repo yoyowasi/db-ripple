@@ -302,6 +302,20 @@ public class FunctionGateTests
         Assert.True(Run(ctx with { Catalog = ctx.Catalog with { Views = null } }).IsAccepted); // 뷰 목록이 없는 예전 기준선은 판정하지 않는다
     }
 
+    // ---- 계산 열 안의 열 메서드(CLR 형식 메서드, 2026-11-13) ----
+
+    [Theory]
+    [InlineData("([y].[Ping]())", false)] // 열의 CLR 형식 메서드: 함수 의존에 잡히지 않는다
+    [InlineData("([y].[Prop])", false)] // 계산 열 안의 두 부분 열 참조 = CLR 형식 속성 접근
+    [InlineData("([y]+(1))", true)]
+    [InlineData("([dbo].[f]([y]))", true)] // 스키마.함수는 TableFunctions가 맡는다(여기선 의존 목록이 없음)
+    public void Computed_column_method_calls_are_rejected(string definition, bool accepted)
+    {
+        var r = Run(Ctx("UPDATE dbo.U SET y = 1;", b => b.ComputedColumn("dbo.U", "z", definition)));
+        if (accepted) Assert.True(r.IsAccepted, Show(r));
+        else Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("계산 열 z"));
+    }
+
     [Fact]
     public void Ambiguous_function_names_are_rejected()
     {

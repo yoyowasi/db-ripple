@@ -37,7 +37,8 @@ public static class CatalogReader
         var tableFunctions = await Read(conn, CatalogQueries.TableFunctions, r => new CatalogTableFunction(
             r.GetString(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4)), ct);
         var indexedViews = await Read(conn, CatalogQueries.IndexedViews, r => new CatalogIndexedView(r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3)), ct);
-        return new DbCatalog(tables, columns, keys, fks, triggers, files, procedures, functions, synonyms, views, tableFunctions, indexedViews);
+        var computed = await Read(conn, CatalogQueries.ComputedColumns, r => new CatalogComputedColumn(r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3)), ct);
+        return new DbCatalog(tables, columns, keys, fks, triggers, files, procedures, functions, synonyms, views, tableFunctions, indexedViews, computed);
     }
 
     static async Task<List<T>> Read<T>(SqlConnection conn, string sql, Func<DbDataReader, T> map, CancellationToken ct)

@@ -71,6 +71,9 @@ public sealed record CatalogTableFunction(string TableSchema, string TableName, 
 /// <summary>인덱싱된 뷰(클러스터형 인덱스가 있는 뷰)와 그 기준 테이블 1쌍(2026-11-13). 기준 테이블에 쓰면 뷰가 함께 갱신되어 뷰 안의 함수가 실행된다.</summary>
 public sealed record CatalogIndexedView(string ViewSchema, string ViewName, string TableSchema, string TableName);
 
+/// <summary>계산 열 1개의 정의(sys.computed_columns, 2026-11-13). 열의 CLR 형식 메서드 호출(<c>[col].M()</c>)처럼 함수 의존에 잡히지 않는 코드를 찾는 데 쓴다.</summary>
+public sealed record CatalogComputedColumn(string TableSchema, string TableName, string Column, string Definition);
+
 /// <summary>C7 카탈로그 스냅샷.</summary>
 public sealed record DbCatalog(
     IReadOnlyList<CatalogTable> Tables,
@@ -84,8 +87,13 @@ public sealed record DbCatalog(
     IReadOnlyList<CatalogSynonym>? Synonyms = null,
     IReadOnlyList<CatalogView>? Views = null,
     IReadOnlyList<CatalogTableFunction>? TableFunctions = null,
-    IReadOnlyList<CatalogIndexedView>? IndexedViews = null)
+    IReadOnlyList<CatalogIndexedView>? IndexedViews = null,
+    IReadOnlyList<CatalogComputedColumn>? ComputedColumns = null)
 {
+    /// <summary>계산 열 정의(2026-11-13). 생략했으면(예전 기준선) 빈 목록이다.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<CatalogComputedColumn> ComputedColumnModules => ComputedColumns ?? [];
+
     /// <summary>인덱싱된 뷰와 기준 테이블(2026-11-13). 생략했으면(예전 기준선) 빈 목록이다.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public IReadOnlyList<CatalogIndexedView> IndexedViewModules => IndexedViews ?? [];
