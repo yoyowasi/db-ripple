@@ -56,6 +56,9 @@ public sealed record CatalogFunction(int ObjectId, string Schema, string Name, s
     public bool IsTSql => Type is "FN" or "IF" or "TF";
 }
 
+/// <summary>동의어 1개(sys.synonyms, 2026-11-13). 함수·프로시저 이름과 대소문자만 다르게 겹치면 대소문자 구분 정렬 DB에서 다른 개체를 가리킬 수 있다.</summary>
+public sealed record CatalogSynonym(string Schema, string Name, string BaseObjectName);
+
 /// <summary>C7 카탈로그 스냅샷.</summary>
 public sealed record DbCatalog(
     IReadOnlyList<CatalogTable> Tables,
@@ -65,8 +68,17 @@ public sealed record DbCatalog(
     IReadOnlyList<CatalogTriggerEvent> Triggers,
     IReadOnlyList<CatalogFile> Files,
     IReadOnlyList<CatalogModule>? Procedures = null,
-    IReadOnlyList<CatalogFunction>? Functions = null)
+    IReadOnlyList<CatalogFunction>? Functions = null,
+    IReadOnlyList<CatalogSynonym>? Synonyms = null)
 {
+    /// <summary>동의어(2026-11-13). 생략했으면(예전 기준선) 빈 목록이다.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<CatalogSynonym> SynonymModules => Synonyms ?? [];
+
+    /// <summary>(스키마, 이름)이 동의어와 겹치는가(대소문자 무시).</summary>
+    public bool IsSynonymName(string schema, string name) =>
+        SynonymModules.Any(s => s.Schema.Equals(schema, StringComparison.OrdinalIgnoreCase) && s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>사용자 정의 함수(2026-11-13). 생략했으면(예전 기준선) 빈 목록이고 <see cref="FunctionsKnown"/>가 false다.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public IReadOnlyList<CatalogFunction> FunctionModules => Functions ?? [];

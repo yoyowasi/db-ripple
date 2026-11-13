@@ -88,5 +88,12 @@ public static class CatalogQueries
         ORDER BY schema_name, o.name;
         """;
 
-    public static IReadOnlyList<string> All => [Tables, Columns, KeyIndexes, ForeignKeys, Triggers, Files, Procedures, Functions];
+    // 2026-11-13: 함수·프로시저 이름과 대소문자만 다른 동의어를 찾으려고 읽는다(대소문자 구분 정렬 DB에서 다른 개체일 수 있음).
+    public const string Synonyms = """
+        SELECT SCHEMA_NAME(schema_id) AS schema_name, name, base_object_name
+        FROM sys.synonyms
+        ORDER BY schema_name, name;
+        """;
+
+    public static IReadOnlyList<string> All => [Tables, Columns, KeyIndexes, ForeignKeys, Triggers, Files, Procedures, Functions, Synonyms];
 }

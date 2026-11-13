@@ -11,6 +11,7 @@ public sealed class CatalogBuilder
     readonly List<CatalogTriggerEvent> triggers = [];
     readonly List<CatalogModule> procedures = [];
     readonly List<CatalogFunction> functions = [];
+    readonly List<CatalogSynonym> synonyms = [];
     readonly List<CatalogForeignKeyColumn> foreignKeys = [];
     int nextId = 1000;
 
@@ -65,5 +66,12 @@ public sealed class CatalogBuilder
     }
 
     /// <summary>함수 목록은 늘 "읽음"(빈 목록 포함)으로 만든다. 예전 기준선(함수 정보 없음)은 <c>Build() with { Functions = null }</c>.</summary>
-    public DbCatalog Build() => new(tables, columns, [], foreignKeys, triggers, [], procedures, functions);
+    /// <summary>동의어(2026-11-13).</summary>
+    public CatalogBuilder Synonym(string schema, string name, string baseObject)
+    {
+        synonyms.Add(new CatalogSynonym(schema, name, baseObject));
+        return this;
+    }
+
+    public DbCatalog Build() => new(tables, columns, [], foreignKeys, triggers, [], procedures, functions, synonyms);
 }

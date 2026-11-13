@@ -137,6 +137,29 @@ public class FunctionGateTests
         Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("모호"));
     }
 
+    // 대소문자 구분 정렬 DB에서 dbo.F 동의어가 다른 DB·CLR 함수를 가리킬 수 있다(카탈로그 dbo.f로 판정하면 어긋남).
+    [Fact]
+    public void Function_name_clashing_with_a_synonym_is_rejected()
+    {
+        var r = Run(Ctx("SELECT dbo.F(1);", b => b.Function("dbo", "f", Scalar).Synonym("dbo", "F", "[OtherDb].[dbo].[evil]")));
+        Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("동의어"));
+        const string outer = "CREATE FUNCTION dbo.g(@a int) RETURNS int AS BEGIN RETURN dbo.F(@a); END;";
+        var inner = Run(Ctx("SELECT dbo.g(1);", b => b.Function("dbo", "g", outer).Function("dbo", "f", Scalar).Synonym("dbo", "F", "x")));
+        Assert.Contains(inner.Rejects, d => d.Message.Contains("안쪽 함수 dbo.F") && d.Message.Contains("동의어"));
+    }
+
+    [Fact]
+    public void Procedure_name_clashing_with_a_synonym_is_not_resolved()
+    {
+        var ctx = BatchAnalyzerTests.Ctx(more: b => b
+            .Procedure("dbo", "p", "CREATE PROCEDURE dbo.p AS UPDATE dbo.U SET y = 1;")
+            .Procedure("dbo", "q", "CREATE PROCEDURE dbo.q AS BEGIN SET NOCOUNT ON; EXEC dbo.P; END;")
+            .Synonym("dbo", "P", "[OtherDb].[dbo].[evil]"));
+        ctx = ctx with { Triggers = new TriggerAnalyzer().Analyze(ctx.Catalog) };
+        Assert.Contains(new BatchAnalyzer().Analyze("EXEC dbo.P;", ctx).Rejects, d => d.RuleId == AnalysisRules.RejectProcNotFound);
+        Assert.Contains(new BatchAnalyzer().Analyze("EXEC dbo.q;", ctx).Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall);
+    }
+
     [Fact]
     public void Ambiguous_function_names_are_rejected()
     {

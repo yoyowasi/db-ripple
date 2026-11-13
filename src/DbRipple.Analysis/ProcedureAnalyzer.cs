@@ -114,7 +114,9 @@ internal sealed class ProcedureIndex(DbCatalog catalog)
         return One("dbo", name);
     }
 
-    CatalogModule? One(string schema, string name) => byName.TryGetValue((schema, name), out var l) && l.Count == 1 ? l[0] : null;
+    // 동의어와 이름이 겹치면(대소문자 무시) 대소문자 구분 정렬 DB에서 동의어가 실행될 수 있어 찾지 못한 것으로 본다(2026-11-13).
+    CatalogModule? One(string schema, string name) =>
+        byName.TryGetValue((schema, name), out var l) && l.Count == 1 && !catalog.IsSynonymName(schema, name) ? l[0] : null;
 }
 
 /// <summary>
@@ -215,6 +217,7 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
     public string? Check(string? schema, string name, string callerSchema)
     {
         if (!catalog.FunctionsKnown) return "카탈로그에 함수 정보가 없음(기준선을 다시 만들면 읽는다)";
+        if (SynonymClash(schema, name, callerSchema)) return "동의어와 이름이 겹침(대소문자 구분 정렬에서 다른 개체가 실행될 수 있음)";
         var f = Find(schema, name, callerSchema);
         if (f is null) return "카탈로그에 없는 함수이거나 이름이 모호함";
         return CheckFunction(f, 1, []);
@@ -229,6 +232,9 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
         if (own is not null && dbo is not null && own.ObjectId != dbo.ObjectId) return null;
         return own ?? dbo;
     }
+
+    bool SynonymClash(string? schema, string name, string callerSchema) =>
+        schema is not null ? catalog.IsSynonymName(schema, name) : catalog.IsSynonymName(callerSchema, name) || catalog.IsSynonymName("dbo", name);
 
     CatalogFunction? One(string schema, string name) =>
         byName.TryGetValue((schema.ToUpperInvariant(), name.ToUpperInvariant()), out var l) && l.Count == 1 ? l[0] : null;
@@ -267,6 +273,7 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
             foreach (var call in inner.Calls)
             {
                 if (call.Schema is null && call.MultiPart) return $"안쪽 함수 {call.Display}: 다른 DB 함수이거나 열 메서드";
+                if (SynonymClash(call.Schema, call.Name, f.Schema)) return $"안쪽 함수 {call.Display}: 동의어와 이름이 겹침";
                 var g = Find(call.Schema, call.Name, f.Schema);
                 if (g is null) return $"안쪽 함수 {call.Display}: 카탈로그에 없거나 이름이 모호함";
                 if (stack.Contains(g.ObjectId)) return $"안쪽 함수 {call.Display}: 재귀 함수";

@@ -512,6 +512,12 @@ ins {
   color: var(--muted);
   font-weight: 500;
 }
+/* 연산·숫자 칸은 줄바꿈하지 않는다(좁은 레일에서 "삭제"가 한 글자씩 꺾이던 문제). 긴 테이블 이름 칸만 꺾인다. */
+.cmp thead th,
+.cmp td {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
 .cmp tbody th {
   font-weight: 500;
   font-family: var(--mono);
