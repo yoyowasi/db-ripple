@@ -152,6 +152,9 @@ public class CatalogTests
         Assert.True((old with { Functions = [] }).FunctionsKnown); // 빈 목록 = 읽었는데 없음
         Assert.Contains(CatalogQueries.Functions, CatalogQueries.All);
         Assert.Contains(CatalogQueries.Synonyms, CatalogQueries.All);
+        Assert.Contains(CatalogQueries.Views, CatalogQueries.All);
+        Assert.False(old.ViewsKnown);
+        Assert.True((old with { Views = [] }).ViewsKnown);
         Assert.Empty(old.SynonymModules);
         Assert.True((old with { Synonyms = [new("dbo", "F", "x")] }).IsSynonymName("DBO", "f")); // 대소문자 무시
         var json = System.Text.Json.JsonSerializer.Serialize(cat);

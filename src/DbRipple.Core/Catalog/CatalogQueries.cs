@@ -95,5 +95,14 @@ public static class CatalogQueries
         ORDER BY schema_name, name;
         """;
 
-    public static IReadOnlyList<string> All => [Tables, Columns, KeyIndexes, ForeignKeys, Triggers, Files, Procedures, Functions, Synonyms];
+    // 2026-11-13: 프로시저·함수가 읽는 뷰 안의 함수·외부 참조를 판정하려고 읽는다. 암호화면 definition NULL. 시스템 제공은 뺀다.
+    public const string Views = """
+        SELECT v.object_id, SCHEMA_NAME(v.schema_id) AS schema_name, v.name, m.definition
+        FROM sys.views AS v
+        LEFT JOIN sys.sql_modules AS m ON m.object_id = v.object_id
+        WHERE v.is_ms_shipped = 0
+        ORDER BY schema_name, v.name;
+        """;
+
+    public static IReadOnlyList<string> All => [Tables, Columns, KeyIndexes, ForeignKeys, Triggers, Files, Procedures, Functions, Synonyms, Views];
 }

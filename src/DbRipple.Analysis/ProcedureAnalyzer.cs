@@ -212,6 +212,50 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
         .GroupBy(f => (Schema: f.Schema.ToUpperInvariant(), Name: f.Name.ToUpperInvariant()))
         .ToDictionary(g => g.Key, g => g.ToList());
     readonly Dictionary<int, string?> memo = [];
+    readonly Dictionary<(string Schema, string Name), List<CatalogView>> views = catalog.ViewModules
+        .GroupBy(v => (Schema: v.Schema.ToUpperInvariant(), Name: v.Name.ToUpperInvariant()))
+        .ToDictionary(g => g.Key, g => g.ToList());
+
+    /// <summary>
+    /// 읽는 이름이 뷰면 뷰 본문(안쪽 뷰·함수 포함)을 함수와 같은 기준으로 판정한다(2026-11-13). 뷰가 아니거나 뷰 목록이 없는 예전 기준선이면 null(판정 안 함).
+    /// </summary>
+    public string? CheckViewReference(SchemaObjectName so, string callerSchema)
+    {
+        if (!catalog.ViewsKnown || so.DatabaseIdentifier != null || so.ServerIdentifier != null) return null;
+        var baseName = so.BaseIdentifier.Value;
+        if (baseName.StartsWith('#') || baseName.StartsWith('@')) return null;
+        var (v, ambiguous) = FindView(so.SchemaIdentifier?.Value, baseName, callerSchema);
+        if (ambiguous) return "같은 이름의 뷰가 부르는 모듈 스키마와 dbo에 모두 있어 모호함";
+        return v is null ? null : CheckView(v, 1, []);
+    }
+
+    (CatalogView? View, bool Ambiguous) FindView(string? schema, string name, string callerSchema)
+    {
+        CatalogView? OneView(string s) => views.TryGetValue((s.ToUpperInvariant(), name.ToUpperInvariant()), out var l) && l.Count == 1 ? l[0] : null;
+        if (schema is not null) return (OneView(schema), false);
+        var own = OneView(callerSchema);
+        var dbo = OneView("dbo");
+        if (own is not null && dbo is not null && own.ObjectId != dbo.ObjectId) return (null, true);
+        return (own ?? dbo, false);
+    }
+
+    string? CheckView(CatalogView v, int depth, HashSet<int> stack)
+    {
+        if (memo.TryGetValue(v.ObjectId, out var hit)) return hit;
+        if (depth > MaxDepth) return $"뷰·함수 중첩 깊이 상한 {MaxDepth} 초과";
+        string? why;
+        if (v.Definition is null) why = "뷰 본문을 읽을 수 없음(암호화)";
+        else if (Parse(v.Definition) is not { } fragment) why = "뷰 본문 파싱 실패";
+        else why = InspectFragment(fragment, v.Schema, v.ObjectId, depth, stack);
+        memo[v.ObjectId] = why;
+        return why;
+    }
+
+    static TSqlFragment? Parse(string definition)
+    {
+        try { var f = SqlSyntax.Parse(definition, out var errors); return errors.Count > 0 ? null : f; }
+        catch (Exception) { return null; }
+    }
 
     /// <summary>거부 이유. 허용이면 null. schema가 null이면 부르는 모듈 스키마, 없으면 dbo에서 찾는다(테이블 값 함수의 한 부분 이름).</summary>
     public string? Check(string? schema, string name, string callerSchema)
@@ -253,12 +297,14 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
         if (!f.IsTSql) return "CLR 함수";
         if (f.Definition is null) return "본문을 읽을 수 없음(암호화)";
         if (!f.ExecuteAsCaller) return "EXECUTE AS 함수(CALLER가 아님)";
-        TSqlFragment? fragment;
-        try { fragment = SqlSyntax.Parse(f.Definition, out var errors); if (errors.Count > 0) fragment = null; }
-        catch (Exception) { fragment = null; }
-        if (fragment is null) return "본문 파싱 실패";
+        if (Parse(f.Definition) is not { } fragment) return "본문 파싱 실패";
+        return InspectFragment(fragment, f.Schema, f.ObjectId, depth, stack);
+    }
 
-        var a = new Accumulator(f.Schema, resolver, catalog, procedures);
+    /// <summary>함수·뷰 본문 공통 판정: 외부 부작용·동적 SQL·프로시저 호출·판정할 수 없는 호출 형태, 안쪽 함수와 읽는 뷰(재귀적으로).</summary>
+    string? InspectFragment(TSqlFragment fragment, string moduleSchema, int objectId, int depth, HashSet<int> stack)
+    {
+        var a = new Accumulator(moduleSchema, resolver, catalog, procedures);
         fragment.Accept(new BodyVisitor(a));
         if (a.External.Count > 0) return "외부 부작용: " + string.Join(", ", a.External);
         if (a.DynamicSql) return "동적 SQL";
@@ -267,20 +313,33 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
         var inner = new FunctionCallCollector();
         fragment.Accept(inner);
         if (inner.Unjudgeable.Count > 0) return inner.Unjudgeable[0];
-        stack.Add(f.ObjectId);
+        var refs = new NamedReferenceCollector();
+        fragment.Accept(refs);
+        stack.Add(objectId);
         try
         {
             foreach (var call in inner.Calls)
             {
                 if (call.Schema is null && call.MultiPart) return $"안쪽 함수 {call.Display}: 다른 DB 함수이거나 열 메서드";
-                if (SynonymClash(call.Schema, call.Name, f.Schema)) return $"안쪽 함수 {call.Display}: 동의어와 이름이 겹침";
-                var g = Find(call.Schema, call.Name, f.Schema);
+                if (SynonymClash(call.Schema, call.Name, moduleSchema)) return $"안쪽 함수 {call.Display}: 동의어와 이름이 겹침";
+                var g = Find(call.Schema, call.Name, moduleSchema);
                 if (g is null) return $"안쪽 함수 {call.Display}: 카탈로그에 없거나 이름이 모호함";
                 if (stack.Contains(g.ObjectId)) return $"안쪽 함수 {call.Display}: 재귀 함수";
                 if (CheckFunction(g, depth + 1, stack) is { } why) return $"안쪽 함수 {call.Display}: {why}";
             }
+            if (catalog.ViewsKnown)
+                foreach (var r in refs.Refs)
+                {
+                    var so = r.SchemaObject;
+                    if (so.DatabaseIdentifier != null || so.ServerIdentifier != null) continue; // 다른 DB 이름은 BodyVisitor가 이미 외부로 표시했다
+                    var (v, ambiguous) = FindView(so.SchemaIdentifier?.Value, so.BaseIdentifier.Value, moduleSchema);
+                    if (ambiguous) return $"읽는 뷰 {SqlSyntax.Name(so)}: 이름이 모호함";
+                    if (v is null) continue;
+                    if (stack.Contains(v.ObjectId)) return $"읽는 뷰 {SqlSyntax.Name(so)}: 순환 참조";
+                    if (CheckView(v, depth + 1, stack) is { } why) return $"읽는 뷰 {SqlSyntax.Name(so)}: {why}";
+                }
         }
-        finally { stack.Remove(f.ObjectId); }
+        finally { stack.Remove(objectId); }
         return null;
     }
 }
@@ -719,6 +778,13 @@ internal sealed class ExecRulesVisitor(Accumulator a, string module, FunctionGat
     }
 
     public override void Visit(UserDefinedTypePropertyAccess node) => Reject(AnalysisRules.RejectProcUnresolvedCall, UdtPropertyReason);
+
+    // 프로시저 본문이 읽는 뷰 안의 함수·외부 참조도 판정한다(2026-11-13). 뷰에 쓰는 것은 따로 REJECT_PROC_WRITE_TARGET이다.
+    public override void Visit(NamedTableReference node)
+    {
+        if (functions.CheckViewReference(node.SchemaObject, a.TriggerSchema) is { } why)
+            Reject(AnalysisRules.RejectProcUnresolvedCall, $"뷰 {SqlSyntax.Name(node.SchemaObject)}({why})");
+    }
 
     internal const string UdtPropertyReason = "사용자 정의 형식 속성 접근(CLR 형식이면 코드가 실행됨, 판정할 수 없음)";
     static readonly HashSet<string> XmlMethods = new(["value", "query", "exist", "nodes", "modify"], StringComparer.OrdinalIgnoreCase);

@@ -12,6 +12,7 @@ public sealed class CatalogBuilder
     readonly List<CatalogModule> procedures = [];
     readonly List<CatalogFunction> functions = [];
     readonly List<CatalogSynonym> synonyms = [];
+    readonly List<CatalogView> views = [];
     readonly List<CatalogForeignKeyColumn> foreignKeys = [];
     int nextId = 1000;
 
@@ -73,5 +74,12 @@ public sealed class CatalogBuilder
         return this;
     }
 
-    public DbCatalog Build() => new(tables, columns, [], foreignKeys, triggers, [], procedures, functions, synonyms);
+    /// <summary>뷰(2026-11-13). definition이 null이면 암호화.</summary>
+    public CatalogBuilder View(string schema, string name, string? definition)
+    {
+        views.Add(new CatalogView(nextId++, schema, name, definition));
+        return this;
+    }
+
+    public DbCatalog Build() => new(tables, columns, [], foreignKeys, triggers, [], procedures, functions, synonyms, views);
 }

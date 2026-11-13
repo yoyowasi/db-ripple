@@ -160,6 +160,53 @@ public class FunctionGateTests
         Assert.Contains(new BatchAnalyzer().Analyze("EXEC dbo.q;", ctx).Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall);
     }
 
+    // ---- 뷰 안에 숨은 함수·외부 참조(2026-11-13) ----
+
+    const string ClrView = "CREATE VIEW dbo.vClr AS SELECT y, dbo.clr(y) AS z FROM dbo.U;";
+
+    [Fact]
+    public void Clean_view_read_is_allowed()
+    {
+        var r = Run(Ctx("UPDATE dbo.U SET y = 1 WHERE y IN (SELECT y FROM dbo.vClean);", b => b.View("dbo", "vClean", "CREATE VIEW dbo.vClean AS SELECT y, dbo.f(y) AS z FROM dbo.U;").Function("dbo", "f", Scalar)));
+        Assert.True(r.IsAccepted, Show(r));
+    }
+
+    [Theory]
+    [InlineData("UPDATE dbo.U SET y = 1 WHERE y IN (SELECT y FROM dbo.vClr);")]
+    [InlineData("UPDATE dbo.U SET y = 1 WHERE y IN (SELECT y FROM vClr);")] // 한 부분 이름
+    [InlineData("UPDATE dbo.U SET y = 1 WHERE y IN (SELECT y FROM dbo.vOuter);")] // 뷰 → 뷰 → CLR 함수
+    public void View_hiding_a_clr_function_is_rejected(string body)
+    {
+        var r = Run(Ctx(body, b => b.View("dbo", "vClr", ClrView).View("dbo", "vOuter", "CREATE VIEW dbo.vOuter AS SELECT y FROM dbo.vClr;").Function("dbo", "clr", null, "FS")));
+        Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("뷰") && d.Message.Contains("CLR"));
+    }
+
+    [Theory]
+    [InlineData("CREATE VIEW dbo.vX AS SELECT * FROM OPENQUERY(Lnk, 'select 1');", "외부 부작용")]
+    [InlineData("CREATE VIEW dbo.vX AS SELECT a FROM OtherDb.dbo.T;", "외부 부작용")]
+    [InlineData(null, "암호화")]
+    public void Unsafe_or_unreadable_views_are_rejected(string? definition, string reason)
+    {
+        var r = Run(Ctx("SELECT * FROM dbo.vX;", b => b.View("dbo", "vX", definition)));
+        Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("dbo.vX") && d.Message.Contains(reason));
+    }
+
+    [Fact]
+    public void Function_reading_a_view_with_a_clr_function_is_rejected()
+    {
+        const string f = "CREATE FUNCTION dbo.f(@a int) RETURNS int AS BEGIN RETURN (SELECT COUNT(*) FROM dbo.vClr); END;";
+        var r = Run(Ctx("UPDATE dbo.U SET y = dbo.f(y);", b => b.Function("dbo", "f", f).View("dbo", "vClr", ClrView).Function("dbo", "clr", null, "FS")));
+        Assert.Contains(r.Rejects, d => d.Message.Contains("dbo.f") && d.Message.Contains("읽는 뷰 dbo.vClr") && d.Message.Contains("CLR"));
+    }
+
+    [Fact]
+    public void Old_baseline_without_views_keeps_previous_behavior()
+    {
+        var ctx = Ctx("UPDATE dbo.U SET y = 1 WHERE y IN (SELECT y FROM dbo.vClr);", b => b.View("dbo", "vClr", ClrView).Function("dbo", "clr", null, "FS"));
+        var r = Run(ctx with { Catalog = ctx.Catalog with { Views = null } });
+        Assert.True(r.IsAccepted, Show(r)); // 뷰 목록이 없으면 판정하지 않는다(오늘 전과 같음). 기준선을 다시 만들면 판정한다
+    }
+
     [Fact]
     public void Ambiguous_function_names_are_rejected()
     {

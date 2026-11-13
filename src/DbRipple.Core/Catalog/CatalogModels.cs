@@ -59,6 +59,9 @@ public sealed record CatalogFunction(int ObjectId, string Schema, string Name, s
 /// <summary>동의어 1개(sys.synonyms, 2026-11-13). 함수·프로시저 이름과 대소문자만 다르게 겹치면 대소문자 구분 정렬 DB에서 다른 개체를 가리킬 수 있다.</summary>
 public sealed record CatalogSynonym(string Schema, string Name, string BaseObjectName);
 
+/// <summary>뷰 1개(sys.views + sys.sql_modules, 2026-11-13). EXEC 미리보기가 프로시저·함수가 읽는 뷰 안의 함수·외부 참조를 판정할 때 쓴다. Definition이 NULL이면 암호화.</summary>
+public sealed record CatalogView(int ObjectId, string Schema, string Name, string? Definition);
+
 /// <summary>C7 카탈로그 스냅샷.</summary>
 public sealed record DbCatalog(
     IReadOnlyList<CatalogTable> Tables,
@@ -69,8 +72,17 @@ public sealed record DbCatalog(
     IReadOnlyList<CatalogFile> Files,
     IReadOnlyList<CatalogModule>? Procedures = null,
     IReadOnlyList<CatalogFunction>? Functions = null,
-    IReadOnlyList<CatalogSynonym>? Synonyms = null)
+    IReadOnlyList<CatalogSynonym>? Synonyms = null,
+    IReadOnlyList<CatalogView>? Views = null)
 {
+    /// <summary>뷰(2026-11-13). 생략했으면(예전 기준선) 빈 목록이고 <see cref="ViewsKnown"/>가 false다.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<CatalogView> ViewModules => Views ?? [];
+
+    /// <summary>카탈로그를 읽을 때 뷰 목록도 읽었는가. false면 뷰 안을 판정하지 않는다(그 전과 같은 동작).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool ViewsKnown => Views is not null;
+
     /// <summary>동의어(2026-11-13). 생략했으면(예전 기준선) 빈 목록이다.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public IReadOnlyList<CatalogSynonym> SynonymModules => Synonyms ?? [];
