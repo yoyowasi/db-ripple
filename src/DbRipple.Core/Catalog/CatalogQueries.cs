@@ -104,5 +104,19 @@ public static class CatalogQueries
         ORDER BY schema_name, v.name;
         """;
 
-    public static IReadOnlyList<string> All => [Tables, Columns, KeyIndexes, ForeignKeys, Triggers, Files, Procedures, Functions, Synonyms, Views];
+    // 2026-11-13: 테이블의 계산 열(참조하는 쪽 = 테이블)·CHECK(C)·DEFAULT(D) 제약이 부르는 함수. 같은 DB 함수는 sys.objects 형식으로 가리고,
+    // 다른 DB를 가리키면(referenced_database_name) 형식을 알 수 없으므로 그대로 싣는다(분석기가 거부한다).
+    public const string TableFunctions = """
+        SELECT DISTINCT SCHEMA_NAME(t.schema_id) AS table_schema, t.name AS table_name,
+               d.referenced_schema_name, d.referenced_entity_name, d.referenced_database_name
+        FROM sys.sql_expression_dependencies AS d
+        JOIN sys.objects AS src ON src.object_id = d.referencing_id
+        JOIN sys.tables AS t ON t.object_id = CASE WHEN src.type = 'U' THEN src.object_id ELSE src.parent_object_id END
+        LEFT JOIN sys.objects AS ro ON ro.object_id = d.referenced_id
+        WHERE src.type IN ('U', 'C', 'D') AND t.is_ms_shipped = 0 AND d.referenced_entity_name IS NOT NULL
+          AND (ro.type IN ('FN', 'IF', 'TF', 'FS', 'FT', 'AF') OR (d.referenced_database_name IS NOT NULL AND d.referenced_database_name <> DB_NAME()))
+        ORDER BY table_schema, table_name, d.referenced_entity_name;
+        """;
+
+    public static IReadOnlyList<string> All => [Tables, Columns, KeyIndexes, ForeignKeys, Triggers, Files, Procedures, Functions, Synonyms, Views, TableFunctions];
 }

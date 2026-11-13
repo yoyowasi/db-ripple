@@ -13,6 +13,7 @@ public sealed class CatalogBuilder
     readonly List<CatalogFunction> functions = [];
     readonly List<CatalogSynonym> synonyms = [];
     readonly List<CatalogView> views = [];
+    readonly List<CatalogTableFunction> tableFunctions = [];
     readonly List<CatalogForeignKeyColumn> foreignKeys = [];
     int nextId = 1000;
 
@@ -81,5 +82,14 @@ public sealed class CatalogBuilder
         return this;
     }
 
-    public DbCatalog Build() => new(tables, columns, [], foreignKeys, triggers, [], procedures, functions, synonyms, views);
+    /// <summary>테이블 계산 열·DEFAULT·CHECK가 부르는 함수(2026-11-13). database가 있으면 다른 DB 함수.</summary>
+    public CatalogBuilder TableFunction(string table, string function, string? database = null)
+    {
+        var t = table.Split('.');
+        var f = function.Split('.');
+        tableFunctions.Add(new CatalogTableFunction(t[0], t[1], f.Length > 1 ? f[0] : null, f[^1], database));
+        return this;
+    }
+
+    public DbCatalog Build() => new(tables, columns, [], foreignKeys, triggers, [], procedures, functions, synonyms, views, tableFunctions);
 }

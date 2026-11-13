@@ -229,6 +229,33 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
         return v is null ? null : CheckView(v, 1, []);
     }
 
+    /// <summary>
+    /// 읽거나 쓰는 테이블의 계산 열·DEFAULT·CHECK가 부르는 함수를 판정한다(2026-11-13). 거부 이유, 없거나 판정할 것이 없으면 null.
+    /// 테이블 이름은 카탈로그 철자와 대소문자 무시로 맞춘다(TableResolver와 같은 기준: 스키마가 없으면 부르는 모듈 스키마, 없으면 dbo).
+    /// </summary>
+    public string? CheckTableReference(SchemaObjectName so, string callerSchema) =>
+        so.DatabaseIdentifier != null || so.ServerIdentifier != null ? null : CheckTable(so.SchemaIdentifier?.Value, so.BaseIdentifier.Value, callerSchema, 1, []);
+
+    string? CheckTable(string? schema, string name, string callerSchema, int depth, HashSet<int> stack)
+    {
+        if (catalog.TableFunctionModules.Count == 0 || name.StartsWith('#') || name.StartsWith('@')) return null;
+        var deps = catalog.TableFunctionModules.Where(d => d.TableName.Equals(name, StringComparison.OrdinalIgnoreCase)
+            && (schema is not null ? d.TableSchema.Equals(schema, StringComparison.OrdinalIgnoreCase)
+                : d.TableSchema.Equals(callerSchema, StringComparison.OrdinalIgnoreCase) || d.TableSchema.Equals("dbo", StringComparison.OrdinalIgnoreCase)));
+        foreach (var d in deps)
+        {
+            var display = (d.ReferencedDatabase is { } db ? db + "." : "") + (d.FunctionSchema ?? "dbo") + "." + d.FunctionName;
+            if (d.ReferencedDatabase is not null) return $"테이블 {d.TableSchema}.{d.TableName}의 계산 열·제약이 다른 DB 함수 {display}를 부름";
+            if (!catalog.FunctionsKnown) return $"테이블 {d.TableSchema}.{d.TableName}의 계산 열·제약이 함수 {display}를 부르는데 함수 정보가 없음";
+            if (SynonymClash(d.FunctionSchema ?? "dbo", d.FunctionName, d.TableSchema)) return $"테이블 {d.TableSchema}.{d.TableName}의 계산 열·제약 함수 {display}: 동의어와 이름이 겹침";
+            var f = One(d.FunctionSchema ?? "dbo", d.FunctionName);
+            if (f is null) return $"테이블 {d.TableSchema}.{d.TableName}의 계산 열·제약 함수 {display}: 카탈로그에 없거나 이름이 모호함";
+            if (stack.Contains(f.ObjectId)) continue; // 판정 중인 함수 자신(순환은 함수 판정이 따로 잡는다)
+            if (CheckFunction(f, depth, stack) is { } why) return $"테이블 {d.TableSchema}.{d.TableName}의 계산 열·제약 함수 {display}: {why}";
+        }
+        return null;
+    }
+
     (CatalogView? View, bool Ambiguous) FindView(string? schema, string name, string callerSchema)
     {
         CatalogView? OneView(string s) => views.TryGetValue((s.ToUpperInvariant(), name.ToUpperInvariant()), out var l) && l.Count == 1 ? l[0] : null;
@@ -327,11 +354,12 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
                 if (stack.Contains(g.ObjectId)) return $"안쪽 함수 {call.Display}: 재귀 함수";
                 if (CheckFunction(g, depth + 1, stack) is { } why) return $"안쪽 함수 {call.Display}: {why}";
             }
-            if (catalog.ViewsKnown)
-                foreach (var r in refs.Refs)
+            foreach (var r in refs.Refs)
                 {
                     var so = r.SchemaObject;
                     if (so.DatabaseIdentifier != null || so.ServerIdentifier != null) continue; // 다른 DB 이름은 BodyVisitor가 이미 외부로 표시했다
+                    if (CheckTable(so.SchemaIdentifier?.Value, so.BaseIdentifier.Value, moduleSchema, depth + 1, stack) is { } tableWhy) return $"읽는 {tableWhy}";
+                    if (!catalog.ViewsKnown) continue;
                     var (v, ambiguous) = FindView(so.SchemaIdentifier?.Value, so.BaseIdentifier.Value, moduleSchema);
                     if (ambiguous) return $"읽는 뷰 {SqlSyntax.Name(so)}: 이름이 모호함";
                     if (v is null) continue;
@@ -784,6 +812,9 @@ internal sealed class ExecRulesVisitor(Accumulator a, string module, FunctionGat
     {
         if (functions.CheckViewReference(node.SchemaObject, a.TriggerSchema) is { } why)
             Reject(AnalysisRules.RejectProcUnresolvedCall, $"뷰 {SqlSyntax.Name(node.SchemaObject)}({why})");
+        // 읽거나 쓰는 테이블의 계산 열·DEFAULT·CHECK 안 함수(2026-11-13)
+        if (functions.CheckTableReference(node.SchemaObject, a.TriggerSchema) is { } tableWhy)
+            Reject(AnalysisRules.RejectProcUnresolvedCall, tableWhy);
     }
 
     internal const string UdtPropertyReason = "사용자 정의 형식 속성 접근(CLR 형식이면 코드가 실행됨, 판정할 수 없음)";

@@ -207,6 +207,47 @@ public class FunctionGateTests
         Assert.True(r.IsAccepted, Show(r)); // 뷰 목록이 없으면 판정하지 않는다(오늘 전과 같음). 기준선을 다시 만들면 판정한다
     }
 
+    // ---- 테이블 계산 열·DEFAULT·CHECK 안 함수(2026-11-13) ----
+
+    [Theory]
+    [InlineData("UPDATE dbo.U SET y = 1;")] // 쓰기: CHECK·DEFAULT·계산 열
+    [InlineData("DELETE dbo.T WHERE a IN (SELECT y FROM dbo.U);")] // 읽기: 계산 열
+    [InlineData("UPDATE U SET y = 1;")] // 스키마 없는 이름
+    public void Table_whose_constraint_calls_a_clr_function_is_rejected(string body)
+    {
+        var r = Run(Ctx(body, b => b.Function("dbo", "clr", null, "FS").TableFunction("dbo.U", "dbo.clr")));
+        Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("dbo.U") && d.Message.Contains("계산 열·제약") && d.Message.Contains("CLR"));
+    }
+
+    [Fact]
+    public void Table_whose_constraint_calls_a_clean_function_is_allowed()
+    {
+        var r = Run(Ctx("UPDATE dbo.U SET y = 1;", b => b.Function("dbo", "f", Scalar).TableFunction("dbo.U", "dbo.f")));
+        Assert.True(r.IsAccepted, Show(r));
+    }
+
+    [Fact]
+    public void Table_whose_constraint_calls_another_database_function_is_rejected()
+    {
+        var r = Run(Ctx("UPDATE dbo.U SET y = 1;", b => b.TableFunction("dbo.U", "dbo.g", database: "OtherDb")));
+        Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("다른 DB 함수"));
+    }
+
+    [Fact]
+    public void Function_reading_a_table_with_clr_computed_column_is_rejected()
+    {
+        const string f = "CREATE FUNCTION dbo.f(@a int) RETURNS int AS BEGIN RETURN (SELECT COUNT(*) FROM dbo.U); END;";
+        var r = Run(Ctx("DELETE dbo.T WHERE a = dbo.f(1);", b => b.Function("dbo", "f", f).Function("dbo", "clr", null, "FS").TableFunction("dbo.U", "dbo.clr")));
+        Assert.Contains(r.Rejects, d => d.Message.Contains("dbo.f") && d.Message.Contains("읽는 테이블 dbo.U") && d.Message.Contains("CLR"));
+    }
+
+    [Fact]
+    public void Old_baseline_without_table_function_dependencies_keeps_previous_behavior()
+    {
+        var ctx = Ctx("UPDATE dbo.U SET y = 1;", b => b.Function("dbo", "clr", null, "FS").TableFunction("dbo.U", "dbo.clr"));
+        Assert.True(Run(ctx with { Catalog = ctx.Catalog with { TableFunctions = null } }).IsAccepted);
+    }
+
     [Fact]
     public void Ambiguous_function_names_are_rejected()
     {

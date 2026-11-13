@@ -62,6 +62,12 @@ public sealed record CatalogSynonym(string Schema, string Name, string BaseObjec
 /// <summary>뷰 1개(sys.views + sys.sql_modules, 2026-11-13). EXEC 미리보기가 프로시저·함수가 읽는 뷰 안의 함수·외부 참조를 판정할 때 쓴다. Definition이 NULL이면 암호화.</summary>
 public sealed record CatalogView(int ObjectId, string Schema, string Name, string? Definition);
 
+/// <summary>
+/// 테이블의 계산 열·DEFAULT·CHECK 제약이 부르는 함수 1건(sys.sql_expression_dependencies, 2026-11-13).
+/// 그 테이블을 읽거나 쓰면 함수가 실행될 수 있다. ReferencedDatabase가 있으면 다른 DB 함수다.
+/// </summary>
+public sealed record CatalogTableFunction(string TableSchema, string TableName, string? FunctionSchema, string FunctionName, string? ReferencedDatabase);
+
 /// <summary>C7 카탈로그 스냅샷.</summary>
 public sealed record DbCatalog(
     IReadOnlyList<CatalogTable> Tables,
@@ -73,8 +79,13 @@ public sealed record DbCatalog(
     IReadOnlyList<CatalogModule>? Procedures = null,
     IReadOnlyList<CatalogFunction>? Functions = null,
     IReadOnlyList<CatalogSynonym>? Synonyms = null,
-    IReadOnlyList<CatalogView>? Views = null)
+    IReadOnlyList<CatalogView>? Views = null,
+    IReadOnlyList<CatalogTableFunction>? TableFunctions = null)
 {
+    /// <summary>테이블 계산 열·제약의 함수 의존(2026-11-13). 생략했으면(예전 기준선) 빈 목록이다.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<CatalogTableFunction> TableFunctionModules => TableFunctions ?? [];
+
     /// <summary>뷰(2026-11-13). 생략했으면(예전 기준선) 빈 목록이고 <see cref="ViewsKnown"/>가 false다.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public IReadOnlyList<CatalogView> ViewModules => Views ?? [];

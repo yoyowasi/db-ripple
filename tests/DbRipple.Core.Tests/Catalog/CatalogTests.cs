@@ -153,6 +153,8 @@ public class CatalogTests
         Assert.Contains(CatalogQueries.Functions, CatalogQueries.All);
         Assert.Contains(CatalogQueries.Synonyms, CatalogQueries.All);
         Assert.Contains(CatalogQueries.Views, CatalogQueries.All);
+        Assert.Contains(CatalogQueries.TableFunctions, CatalogQueries.All);
+        Assert.Empty(old.TableFunctionModules);
         Assert.False(old.ViewsKnown);
         Assert.True((old with { Views = [] }).ViewsKnown);
         Assert.Empty(old.SynonymModules);
