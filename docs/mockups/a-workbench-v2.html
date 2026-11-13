@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#e6ebee">
+<title>시안 A v2 · 워크벤치 — db-ripple</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* 방향: 정밀 계측기. 눈금 종이 같은 밝은 면 위에 청록 신호선, 식별자는 고정폭, 설명은 본문 글꼴 */
+:root{color-scheme:light;--ui:"IBM Plex Sans KR","Malgun Gothic","Segoe UI",sans-serif;--mono:"JetBrains Mono","Cascadia Mono",Consolas,"D2Coding",monospace;--fs:13px;
+--bg:#e6ebee;--panel:#fbfcfc;--sunk:#eef2f4;--fg:#14212a;--muted:#4f5f6b;--line:#c7d1d7;--accent:#00697a;--accent-fg:#fff;
+--ok:#0f6e3a;--ok-bg:#dff3e7;--warn:#85500a;--warn-bg:#fff1cf;--err:#b3261e;--err-bg:#fde8e6;--vol:#5d38ae;--vol-bg:#ece5fa;
+--del-bg:#fbdbd8;--del-fg:#8c1b14;--add-bg:#d6f0de;--add-fg:#12603a;--chg-bg:#ffe8a0;
+--bg-fk:#dde8fb;--bg-trg:#fde9cc;--bg-inst:#efe3f8;--r:3px;--rb:3px;
+--nd:#fff;--nd-s:#7d909c;--nd-stmt:#e3f1f4;--nd-stmt-s:#00697a;--nd-trig:#fff2d8;--nd-proc:#dff3e7;--nd-proc-s:#0f6e3a;--nd-t:#14212a;--nd-t2:#4f5f6b;--halo:#f6f9fa;
+--k-fk:#1456c8;--k-fires:#a15000;--k-repl:#7b3fb8;--k-direct:#445560;--k-call:#0f6e3a;
+--scope:#f6f9fa;--grid1:#e1e9ed;--grid2:#cfdbe1;--tick:#9db0bb;--code-kw:#0a55b5;--code-num:#a63f00;--code-cm:#6b7c88}
+:root[data-theme=dark]{color-scheme:dark;--bg:#091116;--panel:#0f1a21;--sunk:#15232b;--fg:#dce8ee;--muted:#8da2af;--line:#25363f;--accent:#3cc8d6;--accent-fg:#031f24;
+--ok:#5fd391;--ok-bg:#123626;--warn:#f2b95a;--warn-bg:#3a2d10;--err:#ff8b90;--err-bg:#431a1f;--vol:#c4a9ff;--vol-bg:#2b244b;
+--del-bg:#4a1d24;--del-fg:#ff9fa4;--add-bg:#12402b;--add-fg:#86e6ad;--chg-bg:#4b4010;
+--bg-fk:#18305a;--bg-trg:#3b2b10;--bg-inst:#31224c;
+--nd:#142531;--nd-s:#4c6272;--nd-stmt:#0e3a41;--nd-stmt-s:#3cc8d6;--nd-trig:#3a2c12;--nd-proc:#0f3a2b;--nd-proc-s:#5fd391;--nd-t:#e8f1f5;--nd-t2:#9bb0bc;--halo:#0b151b;
+--k-fk:#6aa8ff;--k-fires:#ffb454;--k-repl:#c792ea;--k-direct:#9fb1bc;--k-call:#3cc8d6;
+--scope:#0b151b;--grid1:#13222b;--grid2:#1d3340;--tick:#46606f;--code-kw:#7db4ff;--code-num:#ffb27a;--code-cm:#74899a}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font:var(--fs,13px)/1.5 var(--ui);color:var(--fg);background:var(--bg)}
+code,pre,input{font-family:var(--mono)}code{font-size:.92em}
+button,input{font-size:inherit}button{cursor:pointer;font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3,h4,p{margin:0}
+.hint{color:var(--muted);font-size:.9em;margin-top:6px}
+.badge{display:inline-block;padding:0 6px;border-radius:var(--rb,3px);font-size:.86em;line-height:1.6;font-weight:600;white-space:nowrap;border:1px solid transparent}
+.b-certain{color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok)}
+.b-inferred{color:var(--warn);background:var(--warn-bg);border:1px dashed var(--warn)}
+.b-ambig{color:var(--err);background:var(--err-bg);border:1px dotted var(--err)}
+.b-fk{color:var(--k-fk);background:var(--bg-fk)}.b-trg{color:var(--k-fires);background:var(--bg-trg)}.b-inst{color:var(--k-repl);background:var(--bg-inst)}
+.b-dir{color:var(--muted);background:var(--sunk)}
+.b-exp{color:var(--vol);background:var(--vol-bg)}.b-der{color:var(--muted);background:var(--sunk);font-style:italic}
+.b-assume{color:var(--warn);background:var(--warn-bg);border:1px dashed var(--warn)}
+table{border-collapse:collapse}
+.grid{width:100%;margin:0 0 10px;font-variant-numeric:tabular-nums}
+.grid caption{text-align:left;font-weight:700;padding:6px 0 4px}
+.grid th{background:var(--sunk);text-align:left;font-weight:600;padding:4px 8px;border:1px solid var(--line);white-space:nowrap}
+.grid td{padding:4px 8px;border:1px solid var(--line);vertical-align:top}
+.grid .op{font-weight:700;width:1%;white-space:nowrap}
+del{background:var(--del-bg);color:var(--del-fg);text-decoration:line-through;text-decoration-thickness:1px}
+ins{background:var(--add-bg);color:var(--add-fg);text-decoration:none}
+td.chg{background:var(--chg-bg)}
+tr.rdel .op{color:var(--del-fg)}tr.radd .op{color:var(--add-fg)}
+tr.zero td{color:var(--muted);border-style:dashed}
+.btn{padding:5px 12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:var(--r,4px)}
+.btn:hover{background:var(--sunk)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600}
+.btn.danger{background:var(--err);border-color:var(--err);color:#fff;font-weight:600}
+.btn.ghost{background:transparent}.btn[disabled]{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r,4px);overflow:hidden;margin-bottom:8px}
+.seg button{border:0;background:var(--panel);color:var(--muted);padding:4px 12px}.seg button.on{background:var(--accent);color:var(--accent-fg);font-weight:600}
+.sbx{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center}
+.sbx .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px var(--ok-bg);margin-right:-10px}
+.sbx b{margin-left:2px}.sbx code{background:var(--sunk);padding:1px 5px;border-radius:3px}
+.sum{width:100%;font-variant-numeric:tabular-nums}.sum th{text-align:left;font-weight:600;color:var(--muted);padding:3px 6px;border-bottom:1px solid var(--line)}
+.sum td{padding:3px 6px;border-bottom:1px solid var(--line)}.sum td:nth-child(n+2),.sum th:nth-child(n+2){text-align:right;white-space:nowrap}
+.sum tfoot td{font-weight:700;border-bottom:0}.sum tr.zero td{color:var(--muted)}.sum i{font-style:normal;color:var(--muted);font-size:.9em}
+.warns{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.warns li{padding:6px 10px;border-radius:var(--r,4px);border-left:3px solid}
+.warns .w{background:var(--warn-bg);border-color:var(--warn);color:var(--fg)}.warns .i{background:var(--sunk);border-color:var(--line);color:var(--muted)}
+.warns b{color:var(--warn)}.warns .i b{color:var(--muted)}
+.gate{list-style:none;margin:8px 0;padding:0;display:grid;gap:3px}
+.gate li::before{display:inline-block;width:1.4em;font-weight:700}
+.gate .ok::before{content:"✓";color:var(--ok)}.gate .no::before{content:"✕";color:var(--err)}.gate .no{color:var(--err)}
+.confirm{margin-top:10px;padding:10px;border:1px solid var(--err);background:var(--err-bg);border-radius:var(--r,4px)}.confirm p{margin-bottom:8px}
+.offex{margin-top:10px;color:var(--muted)}.offex summary{cursor:pointer}.offex .btn{margin-top:6px}
+.proc .assume{margin-bottom:8px}
+.params{width:100%;margin-bottom:8px}.params th{text-align:left;font-weight:600;color:var(--muted);padding:3px 6px;border-bottom:1px solid var(--line)}
+.params td{padding:3px 6px;border-bottom:1px solid var(--line);white-space:nowrap}.params td:nth-child(3){width:48%}
+.params input{width:100%;padding:3px 6px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:3px}
+.params .req{color:var(--muted);font-size:.9em}
+.sqlbox{margin:0 0 8px;padding:8px 10px;background:var(--sunk);border:1px solid var(--line);border-radius:var(--r,4px);white-space:pre-wrap;font-size:.95em}
+.mock-note{color:var(--muted);font-size:11px}
+details>summary{cursor:pointer}
+.sum td:first-child{word-break:break-word}.sum{table-layout:auto}
+[hidden]{display:none!important}
+
+
+.graph{display:block;width:100%;height:auto}
+.graph .nd{fill:var(--nd);stroke:var(--nd-s);stroke-width:1.2}
+.graph .nd-stmt .nd{fill:var(--nd-stmt);stroke:var(--nd-stmt-s)}
+.graph .nd-trig .nd{fill:var(--nd-trig);stroke:var(--k-fires)}
+.graph .nd-proc .nd{fill:var(--nd-proc);stroke:var(--nd-proc-s);stroke-width:2}
+.graph .dim .nd{stroke-dasharray:3 3;opacity:.7}.graph .dim text{opacity:.75}
+.graph .t1{font:600 11px var(--ui);fill:var(--nd-t)}.graph .t2{font:10.5px var(--ui);fill:var(--nd-t2)}
+.graph .edge{fill:none;stroke-width:2;stroke:var(--k-fk)}
+.graph .k-direct{stroke:var(--k-direct)}.graph .k-fires{stroke:var(--k-fires)}.graph .k-writes{stroke:var(--k-fires)}.graph .k-repl{stroke:var(--k-repl)}.graph .k-call{stroke:var(--k-call)}
+.edge.certain{stroke-dasharray:none}.edge.inferred{stroke-dasharray:8 5}.edge.ambiguous{stroke-dasharray:2 5;stroke-linecap:round}
+.graph .elab{font:10px var(--ui);fill:var(--nd-t2);paint-order:stroke;stroke:var(--halo);stroke-width:4px}
+.graph .seq circle{fill:var(--halo);stroke:var(--nd-t2);stroke-width:1}.graph .seq text{font:9.5px var(--mono);fill:var(--nd-t)}
+.graph .note{font:10.5px var(--ui);fill:var(--nd-t2)}
+.graph .node{cursor:default}
+.legend{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center}
+.legend li{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.lg{width:30px;height:8px}.lg .edge{fill:none;stroke-width:2.2;stroke:var(--k-direct)}.lg .k-fk{stroke:var(--k-fk)}.lg .k-fires{stroke:var(--k-fires)}.lg .k-repl{stroke:var(--k-repl)}
+.lg .edge.inferred{stroke-dasharray:6 4}.lg .edge.ambiguous{stroke-dasharray:1.5 4;stroke-linecap:round}
+
+body{height:100vh;min-height:720px;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:28px 36px minmax(0,1fr);overflow:hidden;font-feature-settings:"tnum"}
+.id,code,.mono{font-family:var(--mono)}
+.menu{display:flex;gap:18px;align-items:center;padding:0 12px;background:#14212a;color:#d4e0e7;font-size:12px}
+.menu b{font:700 13px var(--mono);color:#fff;margin-right:6px}.menu .tag{margin-left:auto;color:#9db2bf}
+.bar{display:flex;align-items:center;gap:12px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
+.bar .sbx{flex:1;min-width:0;flex-wrap:nowrap;overflow:hidden;white-space:nowrap}
+.bar .sbx code{font-size:12px}
+.themebtn{flex:none;display:inline-flex;gap:6px;align-items:center;padding:3px 10px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);border-radius:var(--r)}
+.themebtn:hover{border-color:var(--accent)}
+.themebtn i{width:10px;height:10px;border-radius:50%;background:linear-gradient(90deg,var(--fg) 50%,var(--panel) 50%);border:1px solid var(--fg)}
+.work{display:flex;min-height:0}
+.pane{background:var(--panel);min-height:0;overflow:auto}
+.pane>h2{font:600 12px var(--ui);color:var(--muted);padding:7px 12px;background:var(--sunk);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1;white-space:nowrap}
+.explorer{flex:none;width:228px;min-width:168px;max-width:400px;resize:horizontal;overflow:auto;border-right:1px solid var(--line)}
+.tree{list-style:none;margin:0;padding:4px 0 6px}.tree ul{list-style:none;margin:0;padding-left:14px}
+.tree summary,.tree li>.it{display:flex;align-items:center;gap:6px;padding:3px 10px;min-width:0}
+.tree summary{list-style:none;color:var(--muted);font-weight:500}.tree summary::-webkit-details-marker{display:none}
+.tree summary::before{content:"▸";width:9px;font-size:10px;flex:none}.tree details[open]>summary::before{content:"▾"}
+.tree .it::before{content:"";width:9px;flex:none}
+.tree .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:12.5px var(--mono)}
+.tree .it:hover{background:var(--sunk)}.tree .sel{background:color-mix(in srgb,var(--accent) 14%,transparent);box-shadow:inset 2px 0 var(--accent)}
+.tree .sel .nm{font-weight:700}
+.tree em{font-style:normal;color:var(--muted);font-size:12px;flex:none}
+.ic{width:9px;height:9px;flex:none;border:1.5px solid var(--muted)}.ic.t{border-radius:1px}.ic.p{border-radius:50%}.ic.f{transform:rotate(45deg) scale(.8)}
+.exhint{padding:6px 12px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
+.center{flex:1;min-width:0;display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel)}
+.tabs{display:flex;background:var(--sunk);border-bottom:1px solid var(--line);align-items:stretch;flex:none;height:34px}
+.tabs button{border:0;border-right:1px solid var(--line);background:transparent;color:var(--muted);padding:0 14px;font:500 13px var(--ui);border-top:2px solid transparent;display:inline-flex;gap:6px;align-items:center}
+.tabs button.on{background:var(--panel);color:var(--fg);border-top-color:var(--accent);font-weight:600}
+.tabs button .mono{font-size:12.5px}
+.tabs .sp{flex:1}.tabs .tool{display:flex;gap:6px;padding:0 8px;align-items:center}
+.btn.sm{padding:2px 9px;font-size:12px}
+.ed{flex:none;height:178px;min-height:68px;max-height:60%;resize:vertical;overflow:hidden;display:flex;flex-direction:column;border-bottom:3px double var(--tick)}
+.ed.col{height:35px!important;min-height:35px;resize:none}
+.edbody{flex:1;min-height:0;overflow:auto}
+.code{display:grid;grid-template-columns:38px 1fr;font:13.5px/22px var(--mono);padding-top:4px}
+.code .g{color:var(--code-cm);text-align:right;padding-right:10px;background:var(--sunk);user-select:none;border-right:1px solid var(--line)}
+.code .l{padding-left:12px;white-space:pre}
+.kw{color:var(--code-kw);font-weight:700}.num{color:var(--code-num)}.cm{color:var(--code-cm)}
+.sq{text-decoration:underline wavy var(--warn);text-underline-offset:4px}.sq.rj{text-decoration-color:var(--err)}
+.g .w,.g .e{display:inline-block;width:9px;margin-right:4px;font-size:9px}.g .w{color:var(--warn)}.g .e{color:var(--err)}
+.diag{margin:6px 0 0;padding:0;border-top:1px solid var(--line);font-size:12.5px}
+.diag li{list-style:none;display:grid;grid-template-columns:38px 46px 1fr;gap:8px;padding:3px 12px;align-items:baseline;border-bottom:1px solid var(--sunk)}
+.diag .t{font-weight:600}.diag .w .t{color:var(--warn)}.diag .e .t{color:var(--err)}.diag .ln{font:12px var(--mono);color:var(--muted)}
+.grip{flex:none;height:10px;display:flex;justify-content:center;align-items:center;color:var(--tick);font-size:9px;letter-spacing:3px;user-select:none;pointer-events:none;margin-top:-10px;position:relative;z-index:1}
+.procwrap{padding:10px 14px;max-width:760px}
+.bottom{flex:1;min-height:0;display:flex;flex-direction:column}
+.bpane{flex:1;min-height:0;overflow:auto}
+.pad{padding:10px 14px}
+.scope{position:relative;padding:30px 14px 10px 26px;min-height:100%;background:
+ linear-gradient(var(--grid2) 1px,transparent 1px) 0 0/100px 100px,linear-gradient(90deg,var(--grid2) 1px,transparent 1px) 0 0/100px 100px,
+ linear-gradient(var(--grid1) 1px,transparent 1px) 0 0/20px 20px,linear-gradient(90deg,var(--grid1) 1px,transparent 1px) 0 0/20px 20px,var(--scope)}
+.scope::before,.scope::after{content:"";position:absolute;background-color:var(--panel);pointer-events:none}
+.scope::before{left:0;right:0;top:0;height:14px;border-bottom:1px solid var(--tick);background-image:repeating-linear-gradient(90deg,var(--tick) 0 1px,transparent 1px 10px)}
+.scope::after{left:0;top:0;bottom:0;width:14px;border-right:1px solid var(--tick);background-image:repeating-linear-gradient(180deg,var(--tick) 0 1px,transparent 1px 10px)}
+.scope .lgd{position:relative;z-index:1;display:inline-block;background:var(--panel);border:1px solid var(--line);padding:4px 10px;margin-bottom:8px;font-size:12.5px;color:var(--muted);border-radius:var(--r)}
+.legend .ord{color:var(--fg);font-weight:600}
+.scope .graph{position:relative;z-index:1;max-width:900px}
+.graph .t1{font:600 12.5px var(--mono)}.graph .t2{font:12px var(--ui)}
+.graph .elab{font:12px var(--ui)}
+.graph .nd{fill:var(--nd);stroke:var(--nd-s);stroke-width:1.2}
+.graph .stripe{fill:var(--k-direct)}.graph .stripe.k-fk{fill:var(--k-fk)}.graph .stripe.k-fires{fill:var(--k-fires)}.graph .stripe.k-call{fill:var(--k-call)}
+.graph .dim .nd{stroke-dasharray:none;stroke-width:1;opacity:1;fill:var(--sunk);stroke:var(--line)}.graph .dim .stripe{opacity:.45}.graph .dim text{opacity:1;fill:var(--muted)}
+.graph .seq circle{fill:var(--panel);stroke:var(--nd-s)}.graph .seq text{font:600 11px var(--mono);fill:var(--fg)}
+.scope .pnote{position:relative;z-index:1;margin:6px 0 0;font-size:12px;color:var(--muted)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.rail{flex:none;width:350px;display:flex;flex-direction:column;overflow:auto}
+.sec{padding:10px 14px 12px;border-bottom:1px solid var(--line)}.sec h3{font:600 13px var(--ui);margin-bottom:8px}
+.read{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;background:var(--sunk)}
+.read div{padding:6px 8px;border-right:1px solid var(--line)}.read div:last-child{border-right:0}
+.read b{display:block;font:500 24px/1.1 var(--mono)}.read span{font-size:12px;color:var(--muted)}
+.read .w b{color:var(--warn)}
+.rsum{width:100%;table-layout:fixed;font-variant-numeric:tabular-nums}
+.rsum th{font:500 12px var(--ui);color:var(--muted);text-align:right;padding:2px 4px 4px;border-bottom:1px solid var(--line)}.rsum th:first-child{text-align:left;padding-left:0}
+.rsum td{padding:5px 4px;border-bottom:1px solid var(--sunk);text-align:right;font:13px var(--mono);vertical-align:top}
+.rsum td.nm{text-align:left;padding-left:0;overflow:hidden;font-family:var(--ui)}
+.rsum td.nm .id{display:block;font:12px var(--mono);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rsum td.nm small{display:block;font:12px var(--ui);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rsum tr.zero td{color:var(--muted);border-style:solid;border-width:0 0 1px;border-color:var(--sunk)}.rsum tr.zero .id{font-weight:400}
+.rsum tfoot td{font-weight:700;border-bottom:0;font-family:var(--ui);border-top:1px solid var(--tick)}.rsum tfoot td:not(:first-child){font-family:var(--mono)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.apply>h3{display:none}.apply .gate{font-size:13px}
+.hint{font-size:12px}
+.grid{font-size:12.5px}.grid td,.grid th{font-family:var(--mono)}.grid td.op,.grid .badge,.grid th .badge,.grid caption{font-family:var(--ui)}
+.grid caption{font-size:13px}.grid td code{font-size:12px}
+.grid tr.zero td{border-style:solid;border-color:var(--line);color:var(--muted)}
+.sum .zero td{border-bottom-style:solid}
+.mock-note{font-size:12px}
+.tree button.it{width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+button{touch-action:manipulation}
+h1,h2,h3{text-wrap:balance}
+.pane,.bpane,.edbody{overscroll-behavior:contain}
+.tabs button:hover{color:var(--fg);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.skip{position:absolute;left:8px;top:-60px;z-index:9;background:var(--accent);color:var(--accent-fg);padding:6px 12px;border-radius:var(--r)}.skip:focus{top:6px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.graph .seq text{font-size:12px!important}
+@media (prefers-reduced-motion:no-preference){.tabs button,.themebtn,.btn{transition:background-color .12s,border-color .12s,color .12s}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a><h1 class="sr">db-ripple 영향 미리보기 워크벤치</h1>
+<div class="menu"><b>db-ripple</b><span>파일</span><span>편집</span><span>보기</span><span>샌드박스</span><span>도움말</span><span class="tag">시안 A v2 · 정적 목업 · 값은 예시값</span></div>
+<div class="bar"><div class="sbx"><span class="dot"></span><b>샌드박스 ready</b><span>기준 시각 <time datetime="2026-11-12T21:40">2026-11-12 21:40</time></span><span>환경 지문 <code>16.0.4175 · Enterprise · compat 160 · 일치</code></span><span>잠금 없음</span><button type="button" class="btn ghost">샌드박스 새로 고침</button></div><button type="button" class="themebtn" id="themebtn" aria-pressed="false"><i aria-hidden="true"></i><span>어두운 테마</span></button></div>
+<div class="work">
+  <aside class="pane explorer" aria-label="개체 탐색기">
+    <h2>개체 탐색기 · AdventureWorks 복제본</h2>
+    <ul class="tree">
+      <li><details open><summary>테이블</summary><ul>
+        <li><details open><summary>Sales</summary><ul>
+          <li><button type="button" class="it sel" title="Sales.SalesOrderHeader"><i class="ic t"></i><span class="nm">SalesOrderHeader</span><em>직접</em></button></li>
+          <li><button type="button" class="it" title="Sales.SalesOrderDetail"><i class="ic t"></i><span class="nm">SalesOrderDetail</span><em>연쇄</em></button></li>
+          <li><button type="button" class="it" title="Sales.SalesOrderHeaderSalesReason"><i class="ic t"></i><span class="nm">SalesOrderHeaderSalesReason</span><em>연쇄</em></button></li>
+          <li><button type="button" class="it" title="Sales.SalesPerson"><i class="ic t"></i><span class="nm">SalesPerson</span></button></li>
+          <li><button type="button" class="it" title="Sales.Customer"><i class="ic t"></i><span class="nm">Customer</span></button></li></ul></details></li>
+        <li><details><summary>HumanResources</summary><ul>
+          <li><button type="button" class="it" title="HumanResources.Employee"><i class="ic t"></i><span class="nm">Employee</span></button></li>
+          <li><button type="button" class="it" title="HumanResources.EmployeePayHistory"><i class="ic t"></i><span class="nm">EmployeePayHistory</span></button></li></ul></details></li>
+        <li><details><summary>Person</summary><ul><li><button type="button" class="it" title="Person.Person"><i class="ic t"></i><span class="nm">Person</span></button></li></ul></details></li></ul></details></li>
+      <li><details open><summary>프로시저</summary><ul><li><details open><summary>HumanResources</summary><ul>
+        <li><button type="button" class="it" title="HumanResources.uspUpdateEmployeeHireInfo (가정 기능)"><i class="ic p"></i><span class="nm">uspUpdateEmployeeHireInfo</span><span class="badge b-assume">가정</span></button></li>
+        <li><button type="button" class="it" title="HumanResources.uspUpdateEmployeePersonalInfo"><i class="ic p"></i><span class="nm">uspUpdateEmployeePersonalInfo</span></button></li></ul></details></li></ul></details></li>
+      <li><details><summary>트리거</summary><ul>
+        <li><button type="button" class="it" title="iduSalesOrderDetail"><i class="ic f"></i><span class="nm">iduSalesOrderDetail</span></button></li>
+        <li><button type="button" class="it" title="uSalesOrderHeader"><i class="ic f"></i><span class="nm">uSalesOrderHeader</span></button></li>
+        <li><button type="button" class="it" title="dEmployee (INSTEAD OF)"><i class="ic f"></i><span class="nm">dEmployee</span><em>INSTEAD OF</em></button></li></ul></details></li>
+    </ul>
+    <p class="exhint">오른쪽 아래 모서리를 끌면 폭을 바꿀 수 있습니다. 긴 이름은 …로 줄고 마우스를 올리면 전체가 보입니다.</p>
+  </aside>
+
+  <main class="center" id="main">
+    <section class="ed" id="ed" aria-label="SQL 편집기">
+      <div class="tabs" data-tabs="ed" role="tablist" aria-label="편집기 탭">
+        <button type="button" class="on" data-t="sql" role="tab" aria-selected="true"><span class="mono">쿼리 1.sql</span></button>
+        <button type="button" data-t="proc" role="tab" aria-selected="false">프로시저 호출 <span class="badge b-assume">가정 기능</span></button>
+        <span class="sp"></span>
+        <div class="tool"><button type="button" class="btn sm" id="edcollapse" aria-expanded="true">편집기 접기</button><button type="button" class="btn primary sm">미리보기 (Ctrl&nbsp;+&nbsp;Enter)</button></div>
+      </div>
+      <div class="edbody">
+        <div data-p="ed" data-pv="sql">
+          <div class="code"><div class="g"><span class="w" aria-hidden="true">▲</span>1<br><br><span class="e" aria-hidden="true">■</span>3</div><div class="l" translate="no"><span class="kw">DELETE FROM</span> <span class="sq">Sales.SalesOrderHeader</span> <span class="kw">WHERE</span> SalesOrderID = <span class="num">43697</span>;
+<span class="cm">-- 아래 줄은 거부 표시 예시입니다. 입력하면 분석 단계에서 막힙니다.</span>
+<span class="kw sq rj">DROP TABLE</span> Sales.Store;</div></div>
+          <ul class="diag" aria-label="분석 결과">
+            <li class="w"><span class="t">경고</span><span class="ln">줄 1</span><span>삭제 대상에 연쇄 FK 2개와 트리거 1개가 있습니다. 미리보기로 범위를 확인하세요.</span></li>
+            <li class="e"><span class="t">거부</span><span class="ln">줄 3</span><span>DDL은 실행하지 않습니다(거부 규칙 ID 자리). 이 문장이 있으면 미리보기가 시작되지 않습니다.</span></li></ul>
+        </div>
+        <div data-p="ed" data-pv="proc" hidden class="procwrap"><div class="proc"><p class="assume"><span class="badge b-assume">가정 기능</span> 아직 구현되지 않았습니다. 매개변수는 <code>sys.parameters</code>에서 자동으로 만든 입력란입니다.</p>
+<table class="params"><thead><tr><th>이름</th><th>형식</th><th>값</th><th></th></tr></thead><tbody><tr><td><code>@BusinessEntityID</code></td><td>int</td><td><input type="text" autocomplete="off" spellcheck="false" value="274" aria-label="@BusinessEntityID 값"></td><td class="req">필수</td></tr><tr><td><code>@JobTitle</code></td><td>nvarchar(50)</td><td><input type="text" autocomplete="off" spellcheck="false" value="Senior Sales Representative" aria-label="@JobTitle 값"></td><td class="req">필수</td></tr><tr><td><code>@HireDate</code></td><td>datetime</td><td><input type="text" autocomplete="off" spellcheck="false" value="2008-12-12" aria-label="@HireDate 값"></td><td class="req">필수</td></tr><tr><td><code>@RateChangeDate</code></td><td>datetime</td><td><input type="text" autocomplete="off" spellcheck="false" value="2026-11-01" aria-label="@RateChangeDate 값"></td><td class="req">필수</td></tr><tr><td><code>@Rate</code></td><td>money</td><td><input type="text" autocomplete="off" spellcheck="false" value="32.50" aria-label="@Rate 값"></td><td class="req">필수</td></tr><tr><td><code>@PayFrequency</code></td><td>tinyint</td><td><input type="text" autocomplete="off" spellcheck="false" value="2" aria-label="@PayFrequency 값"></td><td class="req">필수</td></tr><tr><td><code>@CurrentFlag</code></td><td>dbo.Flag (bit)</td><td><input type="text" autocomplete="off" spellcheck="false" value="1" aria-label="@CurrentFlag 값"></td><td class="req">기본값 1</td></tr></tbody></table>
+<pre class="sqlbox">EXEC HumanResources.uspUpdateEmployeeHireInfo
+     @BusinessEntityID = 274, @JobTitle = N'Senior Sales Representative',
+     @HireDate = '2008-12-12', @RateChangeDate = '2026-11-01',
+     @Rate = 32.50, @PayFrequency = 2, @CurrentFlag = 1;</pre><div class="row"><button type="button" class="btn primary">프로시저 미리보기</button><span class="hint">프로시저 본문은 복제 DB에서 실제로 실행되며 원본은 바뀌지 않습니다.</span></div></div></div>
+      </div>
+    </section>
+    <div class="grip" aria-hidden="true">⋯⋯⋯</div>
+
+    <section class="bottom" aria-label="결과">
+      <div class="tabs" data-tabs="res" role="tablist" aria-label="결과 탭">
+        <button type="button" class="on" data-t="graph" role="tab" aria-selected="true">전파 그래프</button>
+        <button type="button" data-t="grid" role="tab" aria-selected="false">before · after 표</button>
+        <button type="button" data-t="pg" role="tab" aria-selected="false">프로시저 그래프 <span class="badge b-assume">가정 기능</span></button>
+        <span class="sp"></span><div class="tool"><span class="mock-note">실행 11:02 · 1.4초 · status ok</span></div>
+      </div>
+      <div class="bpane" data-p="res" data-pv="graph">
+        <div class="scope"><div class="lgd"><ul class="legend"><li><svg class="lg" viewBox="0 0 36 8" aria-hidden="true"><path class="edge certain k-direct" d="M1 4H35"/></svg>확실(실선)</li><li><svg class="lg" viewBox="0 0 36 8" aria-hidden="true"><path class="edge inferred k-direct" d="M1 4H35"/></svg>추론(파선)</li><li><svg class="lg" viewBox="0 0 36 8" aria-hidden="true"><path class="edge ambiguous k-direct" d="M1 4H35"/></svg>모호(점선)</li><li><svg class="lg" viewBox="0 0 36 8" aria-hidden="true"><path class="edge certain k-fk" d="M1 4H35"/></svg>FK 연쇄</li><li><svg class="lg" viewBox="0 0 36 8" aria-hidden="true"><path class="edge certain k-fires" d="M1 4H35"/></svg>트리거 발동</li><li><svg class="lg" viewBox="0 0 36 8" aria-hidden="true"><path class="edge certain k-repl" d="M1 4H35"/></svg>INSTEAD OF 대체</li><li class="ord">관측 순서, 보장 안 됨</li></ul></div><svg class="graph" viewBox="0 0 860 500" role="img" aria-label="전파 그래프. 문장에서 SalesOrderHeader 삭제, FK 연쇄로 SalesOrderDetail과 SalesOrderHeaderSalesReason 삭제, 트리거 iduSalesOrderDetail 발동, 0행 쓰기 2건"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1 L10 5 L0 9 z" fill="context-stroke"/></marker></defs>
+<path class="edge certain k-direct" d="M370 74 C370 94 370 94 370 114" marker-end="url(#ar)"/><text class="elab" x="384" y="98">직접</text><g class="seq"><circle cx="370" cy="94" r="9"/><text x="370" y="97.6" text-anchor="middle">1</text></g>
+<path class="edge certain k-fk" d="M370 176 C370 196 565 196 565 216" marker-end="url(#ar)"/><text class="elab" x="481.5" y="200">FK 연쇄</text><g class="seq"><circle cx="467.5" cy="196" r="9"/><text x="467.5" y="199.6" text-anchor="middle">2</text></g>
+<path class="edge certain k-fk" d="M370 176 C370 196 135 196 135 216" marker-end="url(#ar)"/><text class="elab" x="266.5" y="200">FK 연쇄</text><g class="seq"><circle cx="252.5" cy="196" r="9"/><text x="252.5" y="199.6" text-anchor="middle">3</text></g>
+<path class="edge inferred k-fires" d="M565 278 C565 298 565 298 565 318" marker-end="url(#ar)"/><text class="elab" x="579" y="302">트리거 발동</text><g class="seq"><circle cx="565" cy="298" r="9"/><text x="565" y="301.6" text-anchor="middle">4</text></g>
+<path class="edge inferred k-writes" d="M565 380 C565 400 415 400 415 420" marker-end="url(#ar)"/><text class="elab" x="504" y="404">쓰기</text><g class="seq"><circle cx="490" cy="400" r="9"/><text x="490" y="403.6" text-anchor="middle">5</text></g>
+<path class="edge ambiguous k-writes" d="M565 380 C565 400 735 400 735 420" marker-end="url(#ar)"/><text class="elab" x="664" y="404">쓰기</text><g class="seq"><circle cx="650" cy="400" r="9"/><text x="650" y="403.6" text-anchor="middle">6</text></g>
+<g class="node nd-stmt" data-d="stmt"><title>DELETE · 문장 1 · WHERE SalesOrderID = 43697</title><rect class="nd" x="245" y="12" width="250" height="62" rx="5"/><rect class="stripe k-direct" x="245" y="12" width="5" height="62" rx="2"/><text class="t1" x="261" y="38">DELETE · 문장 1</text><text class="t2" x="261" y="59">WHERE SalesOrderID = 43697</text></g>
+<g class="node nd-tbl" ><title>SalesOrderHeader · Sales · 삭제 1행 · 직접</title><rect class="nd" x="245" y="114" width="250" height="62" rx="5"/><rect class="stripe k-direct" x="245" y="114" width="5" height="62" rx="2"/><text class="t1" x="261" y="140">SalesOrderHeader</text><text class="t2" x="261" y="161">Sales · 삭제 1행 · 직접</text></g>
+<g class="node nd-tbl" ><title>SalesOrderDetail · Sales · 삭제 1행 · FK 연쇄</title><rect class="nd" x="440" y="216" width="250" height="62" rx="5"/><rect class="stripe k-fk" x="440" y="216" width="5" height="62" rx="2"/><text class="t1" x="456" y="242">SalesOrderDetail</text><text class="t2" x="456" y="263">Sales · 삭제 1행 · FK 연쇄</text></g>
+<g class="node nd-tbl" ><title>SalesOrderHeaderSalesReason · Sales · 삭제 2행 · FK 연쇄</title><rect class="nd" x="10" y="216" width="250" height="62" rx="5"/><rect class="stripe k-fk" x="10" y="216" width="5" height="62" rx="2"/><text class="t1" x="26" y="242">SalesOrderHeaderSalesReason</text><text class="t2" x="26" y="263">Sales · 삭제 2행 · FK 연쇄</text></g>
+<g class="node nd-trig" ><title>iduSalesOrderDetail · 트리거 · 추론 귀속</title><rect class="nd" x="440" y="318" width="250" height="62" rx="5"/><rect class="stripe k-fires" x="440" y="318" width="5" height="62" rx="2"/><text class="t1" x="456" y="344">iduSalesOrderDetail</text><text class="t2" x="456" y="365">트리거 · 추론 귀속</text></g>
+<g class="node nd-tbl dim" ><title>SalesOrderHeader · Sales · 수정 0행 · 관측 안 됨</title><rect class="nd" x="290" y="420" width="250" height="62" rx="5"/><rect class="stripe k-fires" x="290" y="420" width="5" height="62" rx="2"/><text class="t1" x="306" y="446">SalesOrderHeader</text><text class="t2" x="306" y="467">Sales · 수정 0행 · 관측 안 됨</text></g>
+<g class="node nd-tbl dim" ><title>Person · Person · 수정 0행 · 모호</title><rect class="nd" x="610" y="420" width="250" height="62" rx="5"/><rect class="stripe k-fires" x="610" y="420" width="5" height="62" rx="2"/><text class="t1" x="626" y="446">Person</text><text class="t2" x="626" y="467">Person · 수정 0행 · 모호</text></g>
+</svg></div>
+      </div>
+      <div class="bpane pad" data-p="res" data-pv="grid" hidden><div class="seg" data-tabs="view" role="tablist"><button type="button" class="on" data-t="event" role="tab">발동 보기</button><button type="button" data-t="net" role="tab">최종 차이 보기</button></div>
+<div data-p="view" data-pv="event"><table class="grid ev"><thead><tr><th>순서</th><th>묶음</th><th>연산</th><th>행</th><th>원인</th><th>확신도</th></tr></thead><tbody>
+<tr><td>#1</td><td>Sales.SalesOrderHeader</td><td>DELETE</td><td>1</td><td><span class="badge b-dir">직접</span></td><td><span class="badge b-certain">확실</span></td></tr>
+<tr><td>#2</td><td>Sales.SalesOrderDetail</td><td>DELETE</td><td>1</td><td><span class="badge b-fk">FK 연쇄</span> <code>FK_SalesOrderDetail_SalesOrderHeader_SalesOrderID</code></td><td><span class="badge b-certain">확실</span></td></tr>
+<tr><td>#3</td><td>Sales.SalesOrderHeaderSalesReason</td><td>DELETE</td><td>2</td><td><span class="badge b-fk">FK 연쇄</span> <code>FK_SalesOrderHeaderSalesReason_…_SalesOrderID</code></td><td><span class="badge b-certain">확실</span></td></tr>
+<tr><td>#4</td><td>Sales.SalesOrderHeader</td><td>UPDATE</td><td>0</td><td><span class="badge b-trg">트리거</span> <code>iduSalesOrderDetail</code></td><td><span class="badge b-inferred">추론</span></td></tr>
+<tr class="zero"><td>#5</td><td>Person.Person</td><td>UPDATE</td><td>0</td><td><span class="badge b-trg">트리거</span> <code>iduSalesOrderDetail</code></td><td><span class="badge b-ambig">모호</span></td></tr>
+</tbody></table><p class="hint">순서는 관측한 발동 순서이며 보장되지 않습니다. 0행 묶음은 점선으로 표시합니다.</p></div><div data-p="view" data-pv="net" hidden><table class="grid"><caption>Sales.SalesOrderHeader · 삭제 1행</caption><thead><tr><th>변경</th><th>SalesOrderID</th><th>OrderDate</th><th>CustomerID</th><th>SubTotal</th><th>TotalDue <span class="badge b-der">파생</span></th></tr></thead><tbody><tr class="rdel"><td class="op">삭제</td><td><del>43697</del></td><td><del>2011-06-21</del></td><td><del>21768</del></td><td><del>3578.27</del></td><td><del>3953.99</del></td></tr></tbody></table><table class="grid"><caption>Sales.SalesOrderDetail · 삭제 1행 (FK 연쇄)</caption><thead><tr><th>변경</th><th>SalesOrderDetailID</th><th>ProductID</th><th>OrderQty</th><th>UnitPrice</th><th>LineTotal <span class="badge b-der">파생</span></th></tr></thead><tbody><tr class="rdel"><td class="op">삭제</td><td><del>353</del></td><td><del>753</del></td><td><del>1</del></td><td><del>3578.27</del></td><td><del>3578.27</del></td></tr></tbody></table><table class="grid"><caption>Sales.SalesOrderHeaderSalesReason · 삭제 2행 (FK 연쇄)</caption><thead><tr><th>변경</th><th>SalesOrderID</th><th>SalesReasonID</th></tr></thead><tbody><tr class="rdel"><td class="op">삭제</td><td><del>43697</del></td><td><del>5</del></td></tr><tr class="rdel"><td class="op">삭제</td><td><del>43697</del></td><td><del>9</del></td></tr></tbody></table><p class="hint">값은 예시값입니다. 파생 = 계산 열이라 직접 바뀐 값이 아님.</p></div></div>
+      <div class="bpane" data-p="res" data-pv="pg" hidden>
+        <div class="scope"><div class="lgd"><ul class="legend"><li><svg class="lg" viewBox="0 0 36 8" aria-hidden="true"><path class="edge certain k-direct" d="M1 4H35"/></svg>확실(실선)</li><li><svg class="lg" viewBox="0 0 36 8" aria-hidden="true"><path class="edge inferred k-direct" d="M1 4H35"/></svg>추론(파선)</li><li><svg class="lg" viewBox="0 0 36 8" aria-hidden="true"><path class="edge ambiguous k-direct" d="M1 4H35"/></svg>모호(점선)</li><li><svg class="lg" viewBox="0 0 36 8" aria-hidden="true"><path class="edge certain k-fk" d="M1 4H35"/></svg>FK 연쇄</li><li><svg class="lg" viewBox="0 0 36 8" aria-hidden="true"><path class="edge certain k-fires" d="M1 4H35"/></svg>트리거 발동</li><li><svg class="lg" viewBox="0 0 36 8" aria-hidden="true"><path class="edge certain k-repl" d="M1 4H35"/></svg>INSTEAD OF 대체</li><li class="ord">관측 순서, 보장 안 됨</li></ul></div><svg class="graph" viewBox="0 0 860 330" role="img" aria-label="프로시저 호출 그래프(가정 기능). 호출, 내부 문장 2개, 테이블 2개"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1 L10 5 L0 9 z" fill="context-stroke"/></marker></defs>
+<path class="edge certain k-call" d="M430 74 C430 100 215 100 215 126" marker-end="url(#ar)"/><text class="elab" x="336.5" y="104">호출</text><g class="seq"><circle cx="322.5" cy="100" r="9"/><text x="322.5" y="103.6" text-anchor="middle">1</text></g>
+<path class="edge certain k-call" d="M430 74 C430 100 645 100 645 126" marker-end="url(#ar)"/><text class="elab" x="551.5" y="104">호출</text><g class="seq"><circle cx="537.5" cy="100" r="9"/><text x="537.5" y="103.6" text-anchor="middle">2</text></g>
+<path class="edge certain k-direct" d="M215 188 C215 214 215 214 215 240" marker-end="url(#ar)"/><text class="elab" x="229" y="218">직접</text><g class="seq"><circle cx="215" cy="214" r="9"/><text x="215" y="217.6" text-anchor="middle">3</text></g>
+<path class="edge certain k-direct" d="M645 188 C645 214 645 214 645 240" marker-end="url(#ar)"/><text class="elab" x="659" y="218">직접</text><g class="seq"><circle cx="645" cy="214" r="9"/><text x="645" y="217.6" text-anchor="middle">4</text></g>
+<g class="node nd-proc" ><title>uspUpdateEmployeeHireInfo · HumanResources · 호출(가정)</title><rect class="nd" x="305" y="12" width="250" height="62" rx="5"/><rect class="stripe k-call" x="305" y="12" width="5" height="62" rx="2"/><text class="t1" x="321" y="38">uspUpdateEmployeeHireInfo</text><text class="t2" x="321" y="59">HumanResources · 호출(가정)</text></g>
+<g class="node nd-stmt" ><title>UPDATE · 내부 문장 1 · HumanResources.Employee</title><rect class="nd" x="90" y="126" width="250" height="62" rx="5"/><rect class="stripe k-direct" x="90" y="126" width="5" height="62" rx="2"/><text class="t1" x="106" y="152">UPDATE · 내부 문장 1</text><text class="t2" x="106" y="173">HumanResources.Employee</text></g>
+<g class="node nd-stmt" ><title>INSERT · 내부 문장 2 · HumanResources.EmployeePayHistory</title><rect class="nd" x="520" y="126" width="250" height="62" rx="5"/><rect class="stripe k-direct" x="520" y="126" width="5" height="62" rx="2"/><text class="t1" x="536" y="152">INSERT · 내부 문장 2</text><text class="t2" x="536" y="173">HumanResources.EmployeePayHistory</text></g>
+<g class="node nd-tbl" ><title>Employee · HumanResources · 수정 1행</title><rect class="nd" x="90" y="240" width="250" height="62" rx="5"/><rect class="stripe k-direct" x="90" y="240" width="5" height="62" rx="2"/><text class="t1" x="106" y="266">Employee</text><text class="t2" x="106" y="287">HumanResources · 수정 1행</text></g>
+<g class="node nd-tbl" ><title>EmployeePayHistory · HumanResources · 추가 1행</title><rect class="nd" x="520" y="240" width="250" height="62" rx="5"/><rect class="stripe k-direct" x="520" y="240" width="5" height="62" rx="2"/><text class="t1" x="536" y="266">EmployeePayHistory</text><text class="t2" x="536" y="287">HumanResources · 추가 1행</text></g>
+</svg><p class="pnote"><span class="badge b-assume">가정 기능</span> 아직 구현되지 않았습니다. 호출 노드에서 내부 문장, 테이블로 이어집니다.</p></div>
+        <div class="pad"><table class="grid"><caption>HumanResources.Employee · 수정 1행 <span class="badge b-assume">가정</span></caption><thead><tr><th>변경</th><th>BusinessEntityID</th><th>JobTitle</th><th>HireDate</th><th>CurrentFlag</th></tr></thead><tbody><tr><td class="op">수정</td><td>274</td><td class="chg"><del>Sales Representative</del> → <ins>Senior Sales Representative</ins></td><td class="chg"><del>2012-05-30</del> → <ins>2008-12-12</ins></td><td>1</td></tr></tbody></table>
+<table class="grid"><caption>HumanResources.EmployeePayHistory · 추가 1행 <span class="badge b-assume">가정</span></caption><thead><tr><th>변경</th><th>BusinessEntityID</th><th>RateChangeDate</th><th>Rate</th><th>PayFrequency</th><th>ModifiedDate</th></tr></thead><tbody><tr class="radd"><td class="op">추가</td><td><ins>274</ins></td><td><ins>2026-11-01</ins></td><td><ins>32.5000</ins></td><td><ins>2</ins></td><td><ins>2026-11-13</ins> <span class="badge b-exp">예상값</span></td></tr></tbody></table><p class="hint">예상값 = 실행 시각에 따라 달라지는 값(GETDATE 등). 값은 예시값입니다.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="pane rail" aria-label="요약과 적용">
+    <h2>요약</h2>
+    <div class="sec">
+      <div class="read" role="group" aria-label="변경 요약"><div><b>4</b><span>변경 행</span></div><div><b>3</b><span>테이블</span></div><div><b>1</b><span>트리거</span></div><div class="w"><b>1</b><span>경고</span></div></div>
+      <table class="rsum"><caption class="sr">테이블별 변경 행 수</caption><colgroup><col><col style="width:40px"><col style="width:40px"><col style="width:36px"></colgroup><thead><tr><th scope="col">테이블</th><th scope="col">직접</th><th scope="col">연쇄</th><th scope="col">합</th></tr></thead><tbody>
+<tr><td class="nm" title="Sales.SalesOrderHeader"><span class="id">SalesOrderHeader</span><small>Sales · 삭제</small></td><td>1</td><td>·</td><td>1</td></tr><tr><td class="nm" title="Sales.SalesOrderDetail"><span class="id">SalesOrderDetail</span><small>Sales · 삭제</small></td><td>·</td><td>1</td><td>1</td></tr><tr><td class="nm" title="Sales.SalesOrderHeaderSalesReason"><span class="id">SalesOrderHeaderSalesReason</span><small>Sales · 삭제</small></td><td>·</td><td>2</td><td>2</td></tr>
+<tr class="zero"><td class="nm" title="Sales.SalesOrderHeader"><span class="id">SalesOrderHeader</span><small>Sales · 트리거 발동, 변경 없음</small></td><td>·</td><td>0</td><td>0</td></tr><tr class="zero"><td class="nm" title="Person.Person"><span class="id">Person</span><small>Person · 트리거 발동, 변경 없음</small></td><td>·</td><td>0</td><td>0</td></tr>
+</tbody><tfoot><tr><td>총 변경</td><td>1</td><td>3</td><td>4</td></tr></tfoot></table>
+      <p class="hint">롤백 뒤 남은 변경 없음 · 수집 범위 전체</p>
+    </div>
+    <div class="sec"><ul class="warns"><li class="w"><b>경고 1</b> 트리거 iduSalesOrderDetail 의 귀속은 추론(inferred)입니다. 같은 문장에서 트리거가 여러 개 발동하면 짝짓기를 보장하지 않습니다.</li><li class="i"><b>참고</b> 트리거는 발동했지만 변경이 없습니다. 헤더가 먼저 삭제돼 조인이 0행이었습니다(0행 묶음, 점선).</li></ul></div>
+    <div class="sec"><div class="apply"><h3>적용</h3><ul class="gate"><li class="ok">미리보기 상태 ok</li><li class="ok">환경 지문 일치</li><li class="ok">30분 안(남은 시간 24분)</li><li class="ok">SQL이 미리보기 뒤 바뀌지 않음</li></ul>
+<div class="row"><button type="button" class="btn danger" data-confirm>적용</button><button type="button" class="btn">취소</button></div>
+<div class="confirm" hidden><p><b>원본 DB에 적용합니다.</b> 4행이 실제로 삭제되며 되돌릴 수 없습니다. 적용 직전에 원본이 미리보기 때와 같은지 한 번 더 확인합니다.</p><div class="row"><button type="button" class="btn danger">확인하고 적용</button><button type="button" class="btn" data-confirm>돌아가기</button></div></div>
+<details class="offex"><summary>꺼진 상태 예시</summary><button type="button" class="btn danger" disabled>적용</button><ul class="gate"><li class="no">30분이 지났습니다(PREVIEW_EXPIRED). 미리보기를 다시 실행하세요.</li><li class="no">환경 지문이 다릅니다(FINGERPRINT_MISMATCH). 샌드박스를 새로 고치세요.</li><li class="ok">SQL 불변</li></ul></details></div></div>
+  </aside>
+</div>
+<script>
+document.querySelectorAll('[data-tabs]').forEach(g=>{const bs=g.querySelectorAll('[data-t]');bs.forEach(b=>b.addEventListener('click',()=>{bs.forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-selected',x===b)});document.querySelectorAll('[data-p="'+g.dataset.tabs+'"]').forEach(p=>{p.hidden=p.dataset.pv!==b.dataset.t})}))});
+document.querySelectorAll('[data-confirm]').forEach(b=>b.addEventListener('click',()=>{const a=b.closest('.apply');const c=a.querySelector('.confirm');c.hidden=!c.hidden}));
+document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{document.querySelector('[data-t="'+b.dataset.go+'"]').click();scrollTo(0,0)}));
+</script>
+<script>
+(function(){
+document.querySelectorAll('[data-p]').forEach(function(p){p.setAttribute('role','tabpanel')});
+var tc=document.querySelector('meta[name=theme-color]'),R=document.documentElement,b=document.getElementById('themebtn');
+function setT(t,save){R.dataset.theme=t;b.setAttribute('aria-pressed',t==='dark');tc.setAttribute('content',t==='dark'?'#091116':'#e6ebee');b.querySelector('span').textContent=t==='dark'?'밝은 테마':'어두운 테마';if(save){try{localStorage.setItem('dbr-theme',t)}catch(e){}}}
+var s=null;try{s=localStorage.getItem('dbr-theme')}catch(e){}
+setT(s==='dark'?'dark':'light',false);
+b.addEventListener('click',function(){setT(R.dataset.theme==='dark'?'light':'dark',true)});
+var ed=document.getElementById('ed'),c=document.getElementById('edcollapse');
+c.addEventListener('click',function(){var o=ed.classList.toggle('col');c.textContent=o?'편집기 펼치기':'편집기 접기';c.setAttribute('aria-expanded',!o)});
+})();
+</script>
+</body>
+</html>

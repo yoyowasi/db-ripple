@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>db-ripple GUI 시안 4종</title>
+<style>
+:root{--ui:"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif;--mono:Consolas,"Cascadia Mono",monospace;--fs:15px;
+--bg:#f7f7f5;--panel:#fff;--sunk:#efefeb;--fg:#222;--muted:#666;--line:#d9d9d2;--accent:#222;--accent-fg:#fff}
+body{margin:0;font:15px/1.6 var(--ui);color:var(--fg);background:var(--bg)}
+.w{max-width:1180px;margin:0 auto;padding:36px 32px 60px}
+h1{font-size:28px;margin:0 0 6px}h2{font-size:19px;margin:34px 0 12px}
+.lead{color:var(--muted);max-width:46em;margin:0 0 4px}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.c{background:var(--panel);border:1px solid var(--line);border-top:6px solid var(--k);border-radius:8px;padding:16px 20px}
+.c h3{margin:0 0 2px;font-size:18px}.c h3 a{color:inherit}
+.c .one{color:var(--muted);margin:0 0 10px}
+.c dl{margin:0;display:grid;grid-template-columns:5.5em 1fr;gap:4px 10px;font-size:14px}
+.c dt{font-weight:700;color:var(--muted)}.c dd{margin:0}.c dd ul{margin:0;padding-left:1.1em}
+.c .go{display:inline-block;margin-top:12px;padding:6px 16px;background:var(--k);color:#fff;border-radius:6px;text-decoration:none;font-weight:600}
+table{border-collapse:collapse;width:100%;background:var(--panel);font-size:14px}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}th{background:var(--sunk)}
+tbody th{width:13em;background:var(--panel)}
+.note{color:var(--muted);font-size:13px;margin-top:10px}
+:focus-visible{outline:2px solid #1f6feb;outline-offset:2px}
+</style>
+</head>
+<body><div class="w">
+<h1>db-ripple GUI 시안 4종</h1>
+<p class="lead">같은 예시로 그렸습니다. DML 예시 <code>DELETE FROM Sales.SalesOrderHeader WHERE SalesOrderID = 43697;</code>, 가정 기능 예시 <code>EXEC HumanResources.uspUpdateEmployeeHireInfo</code>(프로시저 호출 미리보기). 모두 정적 목업이며 사용자 평가가 아니라 설계 가정에 근거한 비교입니다.</p>
+<p class="lead">숫자(직접 1행, FK 연쇄 3행, 합계 4행)는 scripts/demo/demo.http 의 실측 설명(주문 43697)을 따랐고, 열 값은 모두 예시값입니다.</p>
+
+<h2>시안 한눈에 보기</h2>
+<div class="cards">
+<article class="c" style="--k:#0e6b8c"><h3><a href="a-workbench.html">A 워크벤치</a></h3><p class="one">SSMS·DataGrip처럼 탐색기, 편집기, 결과 탭, 요약 레일을 한 화면에 놓는 IDE형.</p><dl>
+<dt>장점</dt><dd><ul><li>한 화면에서 입력부터 적용까지 끝나 오가는 동작이 적다.</li><li>현재 web/ 화면 구성과 가장 가까워 구현이 빠르다.</li></ul></dd>
+<dt>단점</dt><dd><ul><li>정보가 빽빽해 처음 보는 사람은 어디부터 읽을지 막막하다.</li><li>그래프와 표가 탭으로 나뉘어 둘을 동시에 볼 수 없다.</li></ul></dd>
+<dt>어울리는 사용자</dt><dd>SSMS를 매일 쓰는 DBA, 개발자.</dd>
+<dt>프로시저</dt><dd>편집기 두 번째 탭(입력), 결과 세 번째 탭(그래프·표).</dd></dl><a class="go" href="a-workbench.html">시안 A 열기</a></article>
+
+<article class="c" style="--k:#1a7f37"><h3><a href="b-impact-report.html">B 영향 리포트 우선</a></h3><p class="one">결과를 문장 하나로 먼저 말하고, PR의 Files changed처럼 테이블별 diff 카드로 읽는 보고서형.</p><dl>
+<dt>장점</dt><dd><ul><li>결론이 맨 위에 있어 바로 판단하고 공유하기 쉽다.</li><li>카드마다 원인 칩과 확신도가 붙어 값 단위로 검토하기 좋다.</li></ul></dd>
+<dt>단점</dt><dd><ul><li>그래프가 접힌 보조라 전파 경로의 깊이가 덜 드러난다.</li><li>테이블이 많으면 카드가 길어져 스크롤이 늘어난다.</li></ul></dd>
+<dt>어울리는 사용자</dt><dd>변경을 검토하고 승인하는 리뷰어, 팀 리드.</dd>
+<dt>프로시저</dt><dd>입력 카드의 두 번째 탭(폼), 하단 접이식 가정 패널(그래프·diff).</dd></dl><a class="go" href="b-impact-report.html">시안 B 열기</a></article>
+
+<article class="c" style="--k:#2a8f86"><h3><a href="c-graph-canvas.html">C 그래프 캔버스</a></h3><p class="one">전파 그래프가 화면 대부분을 차지하고, 노드를 누르면 서랍에서 before/after 표가 열리는 어두운 캔버스형.</p><dl>
+<dt>장점</dt><dd><ul><li>연쇄가 깊고 갈래가 많을수록 구조가 한눈에 보인다.</li><li>선 모양, 색, 순서 번호를 크게 보여 도구의 차별점이 가장 잘 드러난다.</li></ul></dd>
+<dt>단점</dt><dd><ul><li>노드가 수백 개가 되면 확대, 이동, 접기 같은 조작이 꼭 필요하다.</li><li>표를 보려면 노드를 하나씩 눌러야 해 전체 값 훑기가 느리다.</li></ul></dd>
+<dt>어울리는 사용자</dt><dd>연쇄 구조를 파악하려는 설계자, 발표와 시연.</dd>
+<dt>프로시저</dt><dd>상단 모드 전환(SQL / 프로시저), 왼쪽 떠 있는 폼, 캔버스에 호출 그래프.</dd></dl><a class="go" href="c-graph-canvas.html">시안 C 열기</a></article>
+
+<article class="c" style="--k:#5a3fd0"><h3><a href="d-wizard.html">D 단계 안내</a></h3><p class="one">작성, 영향 확인, 적용의 3단계 표시줄. 요약, 그래프, 표 순으로 아래로 읽는 안내형.</p><dl>
+<dt>장점</dt><dd><ul><li>순서가 정해져 있어 처음 쓰는 사람도 길을 잃지 않는다.</li><li>적용 전에 반드시 영향 확인을 거치게 해 안전 규칙과 잘 맞는다.</li></ul></dd>
+<dt>단점</dt><dd><ul><li>능숙한 사용자는 단계 이동이 답답하고 반복 작업이 느리다.</li><li>세로가 길어 요약, 그래프, 표를 한 화면에 함께 두기 어렵다.</li></ul></dd>
+<dt>어울리는 사용자</dt><dd>처음 쓰는 사람, 졸업작품 시연 관객.</dd>
+<dt>프로시저</dt><dd>1단계 두 번째 탭(폼), 2단계 하단 접이식 가정 패널.</dd></dl><a class="go" href="d-wizard.html">시안 D 열기</a></article>
+</div>
+
+<h2>비교</h2>
+<table><thead><tr><th></th><th>A 워크벤치</th><th>B 영향 리포트</th><th>C 그래프 캔버스</th><th>D 단계 안내</th></tr></thead><tbody>
+<tr><th>정보 밀도</th><td>높음</td><td>중간</td><td>중간(그래프는 크고 표는 서랍)</td><td>낮음</td></tr>
+<tr><th>초보 친화</th><td>낮음</td><td>중간</td><td>낮음~중간</td><td>높음</td></tr>
+<tr><th>그래프 비중</th><td>중간(탭 하나)</td><td>낮음(접힌 보조)</td><td>매우 높음(화면 대부분)</td><td>중간(2단계 가운데)</td></tr>
+<tr><th>구현 난이도<br>(현재 web/ 코드 재사용)</th><td>쉬움. 기존 컴포넌트를 재배치하고 탐색기 트리만 새로 만든다.</td><td>보통. DiffGrid를 테이블별 카드로 쪼개고 요약을 크게 키운다.</td><td>어려움. 그래프 확대·이동, 서랍, 떠 있는 패널이 새로 필요하다.</td><td>쉬움~보통. 컴포넌트는 그대로 두고 단계 상태와 순서 배치를 더한다.</td></tr>
+<tr><th>[적용] 안전 규칙</th><td>오른쪽 레일에 늘 보임</td><td>맨 아래 병합 영역</td><td>캔버스 위 떠 있는 카드</td><td>3단계 전용 화면</td></tr>
+</tbody></table>
+<p class="note">이 비교는 평가 결과가 아니라 목업을 만든 쪽의 가정입니다. 실제 사용자 테스트는 하지 않았습니다. 화면은 1440×900 기준으로 그렸습니다.</p>
+</div></body></html>
