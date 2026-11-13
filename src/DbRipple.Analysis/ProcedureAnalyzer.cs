@@ -216,25 +216,32 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
         .GroupBy(v => (Schema: v.Schema.ToUpperInvariant(), Name: v.Name.ToUpperInvariant()))
         .ToDictionary(g => g.Key, g => g.ToList());
 
-    /// <summary>
-    /// 읽는 이름이 뷰면 뷰 본문(안쪽 뷰·함수 포함)을 함수와 같은 기준으로 판정한다(2026-11-13). 뷰가 아니거나 뷰 목록이 없는 예전 기준선이면 null(판정 안 함).
-    /// </summary>
-    public string? CheckViewReference(SchemaObjectName so, string callerSchema)
-    {
-        if (!catalog.ViewsKnown || so.DatabaseIdentifier != null || so.ServerIdentifier != null) return null;
-        var baseName = so.BaseIdentifier.Value;
-        if (baseName.StartsWith('#') || baseName.StartsWith('@')) return null;
-        var (v, ambiguous) = FindView(so.SchemaIdentifier?.Value, baseName, callerSchema);
-        if (ambiguous) return "같은 이름의 뷰가 부르는 모듈 스키마와 dbo에 모두 있어 모호함";
-        return v is null ? null : CheckView(v, 1, []);
-    }
+    /// <summary>프로시저 본문이 읽거나 쓰는 이름 하나를 판정한다(<see cref="CheckName"/>). ctes는 그 모듈의 CTE 이름.</summary>
+    public string? CheckNameReference(SchemaObjectName so, string moduleSchema, IReadOnlyDictionary<string, List<QueryExpression>> ctes) =>
+        CheckName(so, moduleSchema, ctes, 1, []);
 
     /// <summary>
-    /// 읽거나 쓰는 테이블의 계산 열·DEFAULT·CHECK가 부르는 함수를 판정한다(2026-11-13). 거부 이유, 없거나 판정할 것이 없으면 null.
-    /// 테이블 이름은 카탈로그 철자와 대소문자 무시로 맞춘다(TableResolver와 같은 기준: 스키마가 없으면 부르는 모듈 스키마, 없으면 dbo).
+    /// 읽거나 쓰는 이름 하나(2026-11-13): 동의어(가리키는 개체를 판정하지 않으므로 거부, 보안 검토 review-fn-2), tempdb 영구 개체(외부로 보지 않으므로 거부),
+    /// 테이블의 계산 열·DEFAULT·CHECK가 부르는 함수, 뷰 본문(안쪽 뷰·함수 포함). 거부 이유, 판정할 것이 없으면 null.
+    /// #임시·@변수·CTE 이름은 건너뛴다. 다른 DB·서버 이름은 BodyVisitor가 외부 부작용으로 표시한다.
+    /// 스키마 없는 이름은 부르는 모듈 스키마와 dbo를 모두 본다(실제 해석 순서는 DB로 확인하지 않아 닫힌 쪽).
     /// </summary>
-    public string? CheckTableReference(SchemaObjectName so, string callerSchema) =>
-        so.DatabaseIdentifier != null || so.ServerIdentifier != null ? null : CheckTable(so.SchemaIdentifier?.Value, so.BaseIdentifier.Value, callerSchema, 1, []);
+    string? CheckName(SchemaObjectName so, string moduleSchema, IReadOnlyDictionary<string, List<QueryExpression>> ctes, int depth, HashSet<int> stack)
+    {
+        var name = so.BaseIdentifier.Value;
+        if (name.StartsWith('#') || name.StartsWith('@') || so.ServerIdentifier != null) return null;
+        if (so.DatabaseIdentifier != null)
+            return so.DatabaseIdentifier.Value.Equals("tempdb", StringComparison.OrdinalIgnoreCase) ? $"tempdb 영구 개체 {SqlSyntax.Name(so)}(판정할 수 없음)" : null;
+        if (so.SchemaIdentifier == null && ctes.ContainsKey(name)) return null;
+        if (SynonymClash(so.SchemaIdentifier?.Value, name, moduleSchema)) return $"동의어 {SqlSyntax.Name(so)}(가리키는 개체를 판정하지 않음)";
+        if (CheckTable(so.SchemaIdentifier?.Value, name, moduleSchema, depth, stack) is { } tableWhy) return tableWhy;
+        if (!catalog.ViewsKnown) return null;
+        var (v, ambiguous) = FindView(so.SchemaIdentifier?.Value, name, moduleSchema);
+        if (ambiguous) return $"뷰 {SqlSyntax.Name(so)}: 같은 이름이 부르는 모듈 스키마와 dbo에 모두 있어 모호함";
+        if (v is null) return null;
+        if (stack.Contains(v.ObjectId)) return $"뷰 {SqlSyntax.Name(so)}: 순환 참조";
+        return CheckView(v, depth, stack) is { } why ? $"뷰 {SqlSyntax.Name(so)}: {why}" : null;
+    }
 
     string? CheckTable(string? schema, string name, string callerSchema, int depth, HashSet<int> stack)
     {
@@ -250,7 +257,7 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
             if (SynonymClash(d.FunctionSchema ?? "dbo", d.FunctionName, d.TableSchema)) return $"테이블 {d.TableSchema}.{d.TableName}의 계산 열·제약 함수 {display}: 동의어와 이름이 겹침";
             var f = One(d.FunctionSchema ?? "dbo", d.FunctionName);
             if (f is null) return $"테이블 {d.TableSchema}.{d.TableName}의 계산 열·제약 함수 {display}: 카탈로그에 없거나 이름이 모호함";
-            if (stack.Contains(f.ObjectId)) continue; // 판정 중인 함수 자신(순환은 함수 판정이 따로 잡는다)
+            if (stack.Contains(f.ObjectId)) return $"테이블 {d.TableSchema}.{d.TableName}의 계산 열·제약 함수 {display}: 순환(판정 중인 함수를 다시 부름)";
             if (CheckFunction(f, depth, stack) is { } why) return $"테이블 {d.TableSchema}.{d.TableName}의 계산 열·제약 함수 {display}: {why}";
         }
         return null;
@@ -342,6 +349,8 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
         if (inner.Unjudgeable.Count > 0) return inner.Unjudgeable[0];
         var refs = new NamedReferenceCollector();
         fragment.Accept(refs);
+        var ctes = new Dictionary<string, List<QueryExpression>>(StringComparer.OrdinalIgnoreCase);
+        fragment.Accept(new CtePrepass(ctes));
         stack.Add(objectId);
         try
         {
@@ -355,17 +364,7 @@ internal sealed class FunctionGate(DbCatalog catalog, TableResolver resolver, Pr
                 if (CheckFunction(g, depth + 1, stack) is { } why) return $"안쪽 함수 {call.Display}: {why}";
             }
             foreach (var r in refs.Refs)
-                {
-                    var so = r.SchemaObject;
-                    if (so.DatabaseIdentifier != null || so.ServerIdentifier != null) continue; // 다른 DB 이름은 BodyVisitor가 이미 외부로 표시했다
-                    if (CheckTable(so.SchemaIdentifier?.Value, so.BaseIdentifier.Value, moduleSchema, depth + 1, stack) is { } tableWhy) return $"읽는 {tableWhy}";
-                    if (!catalog.ViewsKnown) continue;
-                    var (v, ambiguous) = FindView(so.SchemaIdentifier?.Value, so.BaseIdentifier.Value, moduleSchema);
-                    if (ambiguous) return $"읽는 뷰 {SqlSyntax.Name(so)}: 이름이 모호함";
-                    if (v is null) continue;
-                    if (stack.Contains(v.ObjectId)) return $"읽는 뷰 {SqlSyntax.Name(so)}: 순환 참조";
-                    if (CheckView(v, depth + 1, stack) is { } why) return $"읽는 뷰 {SqlSyntax.Name(so)}: {why}";
-                }
+                if (CheckName(r.SchemaObject, moduleSchema, ctes, depth + 1, stack) is { } why) return $"읽는 {why}";
         }
         finally { stack.Remove(objectId); }
         return null;
@@ -810,11 +809,9 @@ internal sealed class ExecRulesVisitor(Accumulator a, string module, FunctionGat
     // 프로시저 본문이 읽는 뷰 안의 함수·외부 참조도 판정한다(2026-11-13). 뷰에 쓰는 것은 따로 REJECT_PROC_WRITE_TARGET이다.
     public override void Visit(NamedTableReference node)
     {
-        if (functions.CheckViewReference(node.SchemaObject, a.TriggerSchema) is { } why)
-            Reject(AnalysisRules.RejectProcUnresolvedCall, $"뷰 {SqlSyntax.Name(node.SchemaObject)}({why})");
-        // 읽거나 쓰는 테이블의 계산 열·DEFAULT·CHECK 안 함수(2026-11-13)
-        if (functions.CheckTableReference(node.SchemaObject, a.TriggerSchema) is { } tableWhy)
-            Reject(AnalysisRules.RejectProcUnresolvedCall, tableWhy);
+        // 동의어·tempdb 영구 개체·테이블 계산 열/제약 함수·뷰 본문(2026-11-13). CTE 이름은 건너뛴다.
+        if (functions.CheckNameReference(node.SchemaObject, a.TriggerSchema, a.CteDefinitions) is { } why)
+            Reject(AnalysisRules.RejectProcUnresolvedCall, why);
     }
 
     internal const string UdtPropertyReason = "사용자 정의 형식 속성 접근(CLR 형식이면 코드가 실행됨, 판정할 수 없음)";

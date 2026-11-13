@@ -248,6 +248,39 @@ public class FunctionGateTests
         Assert.True(Run(ctx with { Catalog = ctx.Catalog with { TableFunctions = null } }).IsAccepted);
     }
 
+    // ---- 보안 검토(review-fn-2, 2026-11-13) 재현: 동의어를 거친 읽기, tempdb 영구 개체, CTE 오탐 ----
+
+    [Theory]
+    [InlineData("UPDATE dbo.U SET y = 1 WHERE y IN (SELECT y FROM dbo.sV);")] // 동의어 → 위험한 뷰
+    [InlineData("UPDATE dbo.U SET y = 1 WHERE y IN (SELECT y FROM dbo.sRemote);")] // 동의어 → 링크드 서버
+    [InlineData("UPDATE dbo.U SET y = 1 WHERE y IN (SELECT y FROM dbo.vS);")] // 뷰 안의 동의어
+    [InlineData("UPDATE dbo.U SET y = 1 WHERE y IN (SELECT y FROM tempdb.dbo.v);")] // tempdb 영구 개체
+    public void Reads_through_synonyms_or_tempdb_objects_are_rejected(string body)
+    {
+        var r = Run(Ctx(body, b => b
+            .View("dbo", "vClr", ClrView).Function("dbo", "clr", null, "FS")
+            .Synonym("dbo", "sV", "[dbo].[vClr]").Synonym("dbo", "sRemote", "[Srv].[db].[dbo].[t]")
+            .View("dbo", "vS", "CREATE VIEW dbo.vS AS SELECT y FROM dbo.sV;")));
+        Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && (d.Message.Contains("동의어") || d.Message.Contains("tempdb")));
+    }
+
+    [Fact]
+    public void Cte_named_like_a_view_is_not_checked_as_the_view()
+    {
+        var r = Run(Ctx("WITH vClr AS (SELECT y FROM dbo.U) UPDATE dbo.U SET y = 1 WHERE y IN (SELECT y FROM vClr);",
+            b => b.View("dbo", "vClr", ClrView).Function("dbo", "clr", null, "FS")));
+        Assert.True(r.IsAccepted, Show(r));
+    }
+
+    [Fact]
+    public void Constraint_function_cycle_is_rejected_instead_of_skipped()
+    {
+        // F가 T를 읽고 T의 계산 열이 F를 부른다: 건너뛰어 허용으로 메모하지 않고 순환으로 거부한다
+        const string f = "CREATE FUNCTION dbo.f(@a int) RETURNS int AS BEGIN RETURN (SELECT COUNT(*) FROM dbo.U); END;";
+        var r = Run(Ctx("SELECT dbo.f(1);", b => b.Function("dbo", "f", f).TableFunction("dbo.U", "dbo.f")));
+        Assert.Contains(r.Rejects, d => d.RuleId == AnalysisRules.RejectProcUnresolvedCall && d.Message.Contains("순환"));
+    }
+
     [Fact]
     public void Ambiguous_function_names_are_rejected()
     {
