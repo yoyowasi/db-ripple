@@ -1,22 +1,19 @@
 <script setup lang="ts">
-// C3 diff 그리드. 발동 보기(event, 묶음별 행 변경)와 최종 차이 보기(net, 순 변경)를 전환하고 서버 페이지로 읽는다.
-import { AgGridVue } from 'ag-grid-vue3'
-import type { GetRowIdParams, GridApi, GridReadyEvent, RowClassParams } from 'ag-grid-community'
-import { computed, ref, watch } from 'vue'
+// "행 변경" 탭(C3). 발동 보기 = 묶음 목록 → 고른 묶음의 행, 최종 차이 보기 = 테이블 선택 → 그 테이블의 행.
+// 행은 서버 페이지로 읽는다(useRowPage). 서버 rows API에는 테이블 필터가 없어 최종 차이의 테이블 거르기는 읽은 페이지 안에서만 한다.
+import { computed, ref } from 'vue'
 import type { NetChange, PreviewResult, RowChange, RowView } from '../api/types'
 import { useRowPage } from '../composables/useRowPage'
-import { formatCount } from '../lib/format'
+import { OP_LABEL, formatCount } from '../lib/format'
 import type { GridRow } from '../lib/gridRows'
-import {
-  buildColumnDefs,
-  columnMeta,
-  dataColumns,
-  eventRowToGrid,
-  netRowToGrid,
-} from '../lib/gridRows'
-import { gridTheme } from '../lib/theme'
+import { columnMeta, eventRowToGrid, netRowToGrid } from '../lib/gridRows'
+import { CAUSE_LABEL, tableBadges } from '../lib/summary'
+import { usePreviewStore } from '../stores/preview'
 import { useSandboxStore } from '../stores/sandbox'
+import FiringTable from './FiringTable.vue'
 import ProblemBanner from './ProblemBanner.vue'
+import RowGrid from './rows/RowGrid.vue'
+import RowPager from './rows/RowPager.vue'
 
 const props = defineProps<{
   preview: PreviewResult | null
@@ -33,88 +30,64 @@ const emit = defineEmits<{
 }>()
 
 const sandbox = useSandboxStore()
+const store = usePreviewStore()
+
+// ---- 보기 전환(탭과 같은 밑줄 방식, roving tabindex) ----
+const VIEWS: { id: RowView; label: string }[] = [
+  { id: 'event', label: '발동 보기' },
+  { id: 'net', label: '최종 차이 보기' },
+]
+const tabId = (v: RowView) => `rv-tab-${v}`
+
+function onViewKey(e: KeyboardEvent): void {
+  const i = VIEWS.findIndex((v) => v.id === props.view)
+  let next: number | null = null
+  if (e.key === 'ArrowRight') next = (i + 1) % VIEWS.length
+  else if (e.key === 'ArrowLeft') next = (i + VIEWS.length - 1) % VIEWS.length
+  else if (e.key === 'Home') next = 0
+  else if (e.key === 'End') next = VIEWS.length - 1
+  if (next === null) return
+  e.preventDefault()
+  setView(VIEWS[next].id)
+  document.getElementById(tabId(VIEWS[next].id))?.focus()
+}
+function setView(v: RowView): void {
+  if (!props.consumed && v !== props.view) emit('update:view', v)
+}
+
+// ---- 읽기 ----
+const firings = computed(() => props.preview?.firings ?? [])
+const selFiring = computed(() => firings.value.find((f) => f.id === props.selectedFiringId) ?? null)
 
 const previewId = computed(() => props.preview?.previewId ?? null)
 const viewRef = computed(() => props.view)
-const firingRef = computed(() => props.selectedFiringId)
-const enabled = computed(() => !!props.preview && !props.consumed)
+// 최종 차이 보기는 묶음으로 거르지 않고 전체를 읽는다(테이블은 아래에서 거른다).
+const firingRef = computed(() => (props.view === 'event' ? props.selectedFiringId : null))
+// 발동 보기는 묶음을 골라야 읽고, 0행 묶음은 읽을 것이 없다.
+const enabled = computed(
+  () => !!props.preview && !props.consumed && (props.view === 'net' || (!!selFiring.value && selFiring.value.rowCount > 0)),
+)
 
 const { page, loading, error, offset, limit, next, prev } = useRowPage(previewId, viewRef, firingRef, enabled)
 
-const firingTable = computed(() => new Map((props.preview?.firings ?? []).map((f) => [f.id, f.table])))
+const tableOf = computed(() => new Map(firings.value.map((f) => [f.id, f.table])))
 
-const gridRows = computed<GridRow[]>(() => {
+/** 읽은 행. 다른 보기·다른 묶음에서 읽다 만 페이지가 남아 있으면 보이지 않게 한다. */
+const pageRows = computed<GridRow[]>(() => {
   const p = page.value
-  if (!p) return []
+  if (!p || p.view !== props.view) return []
   if (p.view === 'net') {
     return (p.rows as NetChange[]).map((r, i) => netRowToGrid(r, p.offset + i, columnMeta(sandbox.findTable(r.table))))
   }
-  return (p.rows as RowChange[]).map((r) => {
-    const table = firingTable.value.get(r.firingId) ?? ''
-    return eventRowToGrid(r, table, columnMeta(sandbox.findTable(table)))
+  const rows = p.rows as RowChange[]
+  if (rows.some((r) => r.firingId !== props.selectedFiringId)) return []
+  return rows.map((r) => {
+    const t = tableOf.value.get(r.firingId) ?? ''
+    return eventRowToGrid(r, t, columnMeta(sandbox.findTable(t)))
   })
 })
 
-const columnDefs = computed(() => {
-  const rows = gridRows.value
-  const tables = sandbox.schema?.tables ?? []
-  const first = rows[0] ? sandbox.findTable(rows[0].table) : undefined
-  const schemaColumns = new Map((first?.columns ?? []).map((c) => [c.name, c]))
-  const mixed = new Set(rows.map((r) => r.table)).size > 1
-  return buildColumnDefs({
-    showTable: props.view === 'net' || mixed,
-    columns: dataColumns(rows, tables),
-    schemaColumns,
-  })
-})
-
-const defaultColDef = { resizable: true, sortable: false, suppressMovable: true }
-const getRowId = (p: GetRowIdParams<GridRow>): string => p.data.rowId
-const getRowClass = (p: RowClassParams<GridRow>): string | undefined => {
-  const id = props.selectedFiringId
-  return props.view === 'net' && id && p.data?.firingIds.includes(id) ? 'row-linked' : undefined
-}
-
-let api: GridApi<GridRow> | null = null
-function onGridReady(e: GridReadyEvent<GridRow>): void {
-  api = e.api
-}
-// 최종 차이 보기에서 선택한 묶음이 바뀌면 강조 줄만 다시 그린다.
-watch(
-  () => props.selectedFiringId,
-  () => api?.redrawRows(),
-)
-
-// 묶음 선택 목록: 0행 묶음은 기본 숨김(E23). 선택돼 있으면 항상 보인다.
-const firingOptions = computed(() => {
-  const list = (props.preview?.firings ?? [])
-    .filter((f) => props.showZeroRows || f.rowCount > 0 || f.id === props.selectedFiringId)
-    .sort((a, b) => a.captureSeq - b.captureSeq)
-  return list.map((f) => ({
-    id: f.id,
-    label: `#${f.captureSeq} ${f.table} ${f.operation} ${formatCount(f.rowCount)}행 (깊이 ${f.depth})`,
-  }))
-})
-
-function onFiringChange(e: Event): void {
-  const v = (e.target as HTMLSelectElement).value
-  emit('update:selectedFiringId', v === '' ? null : v)
-}
-
-// E6: 키 없는 테이블의 다중집합 문구. 최종 차이 보기는 모든 테이블, 발동 보기는 선택한 묶음의 테이블만.
-const multisetNotes = computed(() => {
-  const p = props.preview
-  if (!p) return []
-  const selTable = p.firings.find((f) => f.id === props.selectedFiringId)?.table
-  return p.netSummary
-    .filter((s) => (s.multisetRemoved > 0 || s.multisetAdded > 0) && (props.view === 'net' || s.table === selTable))
-    .map((s) => ({
-      table: s.table,
-      text: `제거된 행 ${formatCount(s.multisetRemoved)}개, 추가된 행 ${formatCount(s.multisetAdded)}개`,
-    }))
-})
-
-const range = computed(() => {
+const pageLabel = computed(() => {
   const p = page.value
   if (!p || p.total === 0) return '0행'
   const to = Math.min(p.offset + p.rows.length, p.total)
@@ -122,177 +95,292 @@ const range = computed(() => {
 })
 const canPrev = computed(() => !props.consumed && offset.value > 0)
 const canNext = computed(() => !props.consumed && !!page.value && offset.value + limit.value < page.value.total)
+
+// ---- 발동 보기 ----
+const zeroCount = computed(() => firings.value.filter((f) => f.rowCount === 0).length)
+const visibleFirings = computed(() =>
+  firings.value.filter((f) => props.showZeroRows || f.rowCount > 0 || f.id === props.selectedFiringId),
+)
+function toggleZero(): void {
+  store.showZeroRows = !props.showZeroRows
+}
+
+const selOrder = computed(() => (selFiring.value ? store.firingOrder.get(selFiring.value.id) : undefined))
+const selCause = computed(() => {
+  const c = selFiring.value?.cause
+  if (!c) return null
+  return {
+    kind: CAUSE_LABEL[c.kind],
+    name: c.foreignKey?.name ?? c.triggerCandidates.join(', '),
+  }
+})
+const selKeysOnly = computed(() => selFiring.value?.imageMode === 'KEYS')
+const hasUnpaired = computed(() => pageRows.value.some((r) => r.unpaired))
+
+// ---- 최종 차이 보기 ----
+const netOptions = computed(() => {
+  const p = props.preview
+  if (!p) return []
+  const badges = tableBadges(p)
+  return p.netSummary
+    .filter((s) => s.inserted + s.updated + s.deleted + s.multisetAdded + s.multisetRemoved > 0)
+    .map((s) => ({ table: s.table, label: `${s.table} · ${badges.get(s.table)?.text ?? '변경'}` }))
+})
+const pickedTable = ref<string | null>(null)
+/** 고른 테이블. 안 골랐거나 목록에 없으면 고른 묶음의 테이블, 그것도 없으면 첫 테이블. */
+const netTable = computed(() => {
+  const names = netOptions.value.map((o) => o.table)
+  if (pickedTable.value && names.includes(pickedTable.value)) return pickedTable.value
+  const fromFiring = selFiring.value?.table
+  if (fromFiring && names.includes(fromFiring)) return fromFiring
+  return names[0] ?? null
+})
+const netRows = computed(() => pageRows.value.filter((r) => r.table === netTable.value))
+// 읽은 페이지가 전체가 아니면 거른 결과도 일부다.
+const netPartial = computed(() => !!page.value && (page.value.offset > 0 || page.value.total > page.value.rows.length))
+const netLabel = computed(() => {
+  if (netPartial.value) return pageLabel.value
+  return `${formatCount(netRows.value.length)}행`
+})
+const netKeysOnly = computed(() => firings.value.some((f) => f.table === netTable.value && f.imageMode === 'KEYS'))
+
+// E6: 키 없는 테이블의 다중집합 문구. 최종 차이 보기는 고른 테이블, 발동 보기는 고른 묶음의 테이블만.
+const multisetNotes = computed(() => {
+  const p = props.preview
+  if (!p) return []
+  const t = props.view === 'net' ? netTable.value : selFiring.value?.table
+  return p.netSummary
+    .filter((s) => (s.multisetRemoved > 0 || s.multisetAdded > 0) && s.table === t)
+    .map((s) => ({
+      table: s.table,
+      text: `제거된 행 ${formatCount(s.multisetRemoved)}개, 추가된 행 ${formatCount(s.multisetAdded)}개`,
+    }))
+})
 </script>
 
 <template>
-  <section class="card" aria-label="변경 행">
-    <header>
-      <h2>변경 행</h2>
-      <fieldset class="seg">
-        <legend class="sr-only">보기 방식</legend>
-        <label :class="{ on: view === 'event' }">
-          <input type="radio" name="rowview" value="event" :checked="view === 'event'" :disabled="consumed" @change="emit('update:view', 'event')" />
-          발동 보기
-        </label>
-        <label :class="{ on: view === 'net' }">
-          <input type="radio" name="rowview" value="net" :checked="view === 'net'" :disabled="consumed" @change="emit('update:view', 'net')" />
-          최종 차이 보기
-        </label>
-      </fieldset>
-    </header>
-
-    <div class="tools">
-      <label v-if="view === 'event'" class="field">
-        <span>묶음</span>
-        <select :value="selectedFiringId ?? ''" :disabled="!preview || consumed" @change="onFiringChange">
-          <option value="">전체(모든 묶음)</option>
-          <option v-for="o in firingOptions" :key="o.id" :value="o.id">{{ o.label }}</option>
-        </select>
-      </label>
-      <span v-else class="muted">테이블 전체의 순 변경을 보입니다. 그래프에서 고른 묶음과 관련된 행은 왼쪽 띠로 표시됩니다.</span>
-
-      <span class="spacer"></span>
-      <span class="muted" role="status">{{ loading ? '읽는 중…' : range }}</span>
-      <label class="field">
-        <span>페이지 크기</span>
-        <select v-model.number="limit" :disabled="consumed">
-          <option :value="50">50</option>
-          <option :value="100">100</option>
-          <option :value="500">500</option>
-          <option :value="1000">1000</option>
-        </select>
-      </label>
-      <button type="button" class="btn btn-sm" :disabled="!canPrev" @click="prev()">이전</button>
-      <button type="button" class="btn btn-sm" :disabled="!canNext" @click="next()">다음</button>
+  <section class="rv" aria-label="행 변경">
+    <div class="top">
+      <div class="seg" role="tablist" aria-label="행 변경 보기 방식" @keydown="onViewKey">
+        <button
+          v-for="v in VIEWS"
+          :id="tabId(v.id)"
+          :key="v.id"
+          type="button"
+          role="tab"
+          :aria-selected="view === v.id"
+          :aria-disabled="consumed || undefined"
+          aria-controls="rv-panel"
+          :tabindex="view === v.id ? 0 : -1"
+          @click="setView(v.id)"
+        >
+          {{ v.label }}
+        </button>
+      </div>
+      <p class="hint desc">발동 보기는 묶음마다 일어난 그대로, 최종 차이 보기는 끝난 뒤 달라진 것만.</p>
     </div>
 
-    <div class="notes">
-      <p class="muted hint">
-        <span class="legend-chip changed">바뀐 셀</span>은 "이전 → 이후"로 보입니다.
-        <span class="legend-chip volatile">예상값</span>은 원본에 적용하면 달라질 수 있는 값(IDENTITY·SEQUENCE·GETDATE·NEWID·rowversion),
-        <span class="legend-chip derived">파생</span>은 계산 열입니다.
-        같은 행을 여러 문장이 바꾸면 발동 보기는 문장별 중간 값을, 최종 차이 보기는 순 변경을 보입니다.
-      </p>
-      <div v-for="n in multisetNotes" :key="n.table" class="banner banner-info">
-        <div>
-          <strong>{{ n.table }}: {{ n.text }}</strong>
-          키가 없는 테이블이라 행 개수 차이로만 비교합니다. UPDATE의 전후 짝은 확정하지 않습니다.
-        </div>
-      </div>
-      <div v-if="consumed" class="banner banner-warn" role="status">
-        <div>이 미리보기는 서버에서 지워져 마지막으로 읽은 페이지만 보입니다.</div>
-      </div>
-      <ProblemBanner v-if="error" :error="error" title="행을 읽지 못했습니다." />
+    <div v-if="consumed" class="banner banner-warn" role="status">
+      <div>이 미리보기는 서버에서 지워져 마지막으로 읽은 페이지만 보입니다.</div>
     </div>
+    <ProblemBanner v-if="error" :error="error" title="행을 읽지 못했습니다." />
 
     <div v-if="!preview" class="empty">미리보기를 실행하면 변경 행이 여기에 나옵니다.</div>
-    <div v-else class="grid-host" role="region" aria-label="변경 행 표">
-      <AgGridVue
-        class="grid"
-        :theme="gridTheme"
-        :row-data="gridRows"
-        :column-defs="columnDefs"
-        :default-col-def="defaultColDef"
-        :get-row-id="getRowId"
-        :get-row-class="getRowClass"
-        :tooltip-show-delay="400"
-        :loading="loading"
-        overlay-no-rows-template="<span>표시할 행이 없습니다</span>"
-        @grid-ready="onGridReady"
-      />
+
+    <div v-else id="rv-panel" role="tabpanel" :aria-labelledby="tabId(view)">
+      <!-- 발동 보기 -->
+      <template v-if="view === 'event'">
+        <div v-if="!firings.length" class="empty">발동한 묶음이 없습니다.</div>
+        <template v-else>
+          <FiringTable
+            :firings="visibleFirings"
+            :order="store.firingOrder"
+            :selected-id="selectedFiringId"
+            :disabled="consumed"
+            @select="(id) => emit('update:selectedFiringId', id)"
+          />
+          <p v-if="zeroCount" class="zsum">
+            0행 묶음 {{ zeroCount }}개 {{ showZeroRows ? '표시 중' : '숨김' }} ·
+            <button type="button" class="lnk" @click="toggleZero">{{ showZeroRows ? '접기' : '보기' }}</button>
+          </p>
+          <p class="hint">번호 = 화면 표시 순번(그래프 노드와 같습니다). 관측 순서이며 실행 순서를 보장하지 않습니다.</p>
+
+          <div class="detail">
+            <template v-if="selFiring">
+              <h3 :id="`rv-h-${selFiring.id}`" aria-live="polite">
+                #{{ selOrder }} · {{ selFiring.table }} {{ OP_LABEL[selFiring.operation] }} {{ formatCount(selFiring.rowCount) }}행
+              </h3>
+              <p v-if="selCause" class="hint cause">
+                <span class="chip">{{ selCause.kind }}</span>
+                <code v-if="selCause.name">{{ selCause.name }}</code>
+              </p>
+              <p v-if="selFiring.rowCount === 0" class="hint">
+                {{ OP_LABEL[selFiring.operation] }} 0행. 발동했지만 바뀐 행이 없어 표시할 행이 없습니다.
+              </p>
+              <template v-else>
+                <p v-if="selKeysOnly" class="hint">행 이미지 상한을 넘어 키 열만 수집했습니다. 키 열의 값만 보입니다.</p>
+                <p v-if="hasUnpaired" class="hint">키가 없는 테이블이라 UPDATE의 전후 짝을 확정하지 못한 행이 있습니다(삭제와 추가의 쌍으로 봅니다).</p>
+                <RowGrid :rows="pageRows" :loading="loading" :label="`${selFiring.table} ${OP_LABEL[selFiring.operation]}`" />
+                <RowPager :text="pageLabel" :loading="loading" :can-prev="canPrev" :can-next="canNext" @prev="prev()" @next="next()" />
+              </template>
+            </template>
+            <p v-else class="hint">목록에서 묶음을 고르면 그 묶음의 행이 보입니다.</p>
+          </div>
+        </template>
+      </template>
+
+      <!-- 최종 차이 보기 -->
+      <template v-else>
+        <div v-if="!netOptions.length" class="empty">끝난 뒤 달라진 행이 없습니다.</div>
+        <template v-else>
+          <div class="selrow">
+            <label for="rv-net-table">테이블</label>
+            <select id="rv-net-table" :value="netTable ?? ''" :disabled="consumed" @change="pickedTable = ($event.target as HTMLSelectElement).value">
+              <option v-for="o in netOptions" :key="o.table" :value="o.table">{{ o.label }}</option>
+            </select>
+          </div>
+          <div class="detail">
+            <h3>{{ netTable }}</h3>
+            <p v-if="netKeysOnly" class="hint">행 이미지 상한을 넘어 키 열만 보입니다.</p>
+            <div v-for="n in multisetNotes" :key="n.table" class="banner banner-info">
+              <div>
+                <strong>{{ n.text }}</strong>
+                키가 없는 테이블이라 행 개수 차이로만 비교합니다. UPDATE의 전후 짝은 확정하지 않습니다.
+              </div>
+            </div>
+            <p v-if="netPartial" class="hint partial" role="status">
+              이 페이지 안에서만 걸렀습니다(전체 {{ formatCount(page?.total ?? 0) }}행). 다른 행은 [이전]/[다음]으로 넘겨 보세요.
+            </p>
+            <RowGrid :rows="netRows" :loading="loading" :label="netTable ?? ''" :linked-firing-id="selectedFiringId" />
+            <RowPager :text="netLabel" :loading="loading" :can-prev="canPrev" :can-next="canNext" @prev="prev()" @next="next()" />
+            <p v-if="selectedFiringId" class="hint">그래프·목록에서 고른 묶음이 바꾼 행은 왼쪽 띠로 표시됩니다.</p>
+          </div>
+        </template>
+      </template>
+
+      <p class="hint legend">파생 = 계산 열이라 직접 바뀐 값이 아닙니다. 예상값 = 실행 시각·IDENTITY처럼 적용 때 달라질 수 있는 값입니다.</p>
     </div>
   </section>
 </template>
 
 <style scoped>
-.seg {
-  display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0;
-  margin: 0;
-  overflow: hidden;
+.rv {
+  display: grid;
+  gap: 8px;
+  align-content: start;
 }
-.seg label {
+.top {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.desc {
+  margin: 0 0 6px auto;
+}
+.seg {
+  display: flex;
+  gap: 16px;
+}
+.seg button {
   position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  font-size: 13px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: 500 13px var(--ui);
   cursor: pointer;
 }
-.seg label.on {
-  background: var(--accent);
-  color: var(--accent-fg);
+.seg button::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: color-mix(in srgb, var(--accent) 50%, transparent);
+  transform: scaleX(0);
+  transform-origin: right;
+}
+.seg button:hover {
+  color: var(--fg);
+}
+.seg button:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+.seg button[aria-selected='true'] {
+  color: var(--fg);
   font-weight: 600;
 }
-.seg label:focus-within {
-  outline: 2px solid var(--accent);
+.seg button[aria-selected='true']::after {
+  transform: scaleX(1);
+  background: var(--accent);
+}
+.seg button[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.seg button:focus-visible {
   outline-offset: -2px;
 }
-.seg input {
-  /* 라디오는 시각적으로 숨기고 라벨 전체를 버튼처럼 쓴다. 키보드(방향키·스페이스)는 그대로 된다. */
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
+.empty {
+  padding: 28px 0;
+  text-align: center;
+  color: var(--muted);
 }
-.tools {
+#rv-panel {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+#rv-panel > p {
+  margin: 0;
+}
+.zsum {
+  font-size: 12px;
+  color: var(--muted);
+}
+.lnk {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.detail {
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+  display: grid;
+  gap: 6px;
+}
+.detail > p {
+  margin: 0;
+}
+.detail h3 {
+  margin: 4px 0 0;
+  font: 700 13px var(--ui);
+  overflow-wrap: anywhere;
+}
+.cause {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.selrow {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
-  padding: 8px 12px;
 }
-.field {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
+.selrow select {
+  max-width: 100%;
 }
-.field select {
-  max-width: 360px;
-}
-.spacer {
-  flex: 1;
-}
-.notes {
-  display: grid;
-  gap: 6px;
-  padding: 0 12px 8px;
-}
-.hint {
-  margin: 0;
-  font-size: 12px;
-}
-.legend-chip {
-  padding: 0 5px;
-  border-radius: 8px;
-  font-weight: 600;
-}
-.legend-chip.changed {
-  background: var(--changed-bg);
-  color: var(--fg);
-}
-.legend-chip.volatile {
-  background: var(--volatile-bg);
-  color: var(--volatile);
-}
-.legend-chip.derived {
-  background: var(--derived-bg);
-  color: var(--derived);
-}
-.empty {
-  padding: 32px 12px;
-  text-align: center;
-  color: var(--fg-muted);
-}
-.grid-host {
-  height: 380px;
-  padding: 0 12px 12px;
-}
-.grid {
-  width: 100%;
-  height: 100%;
+.legend {
+  margin-top: 2px;
 }
 </style>

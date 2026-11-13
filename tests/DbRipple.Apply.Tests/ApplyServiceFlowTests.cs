@@ -44,6 +44,7 @@ public sealed class ApplyServiceFlowTests
         public Task RefreshAsync(CancellationToken ct) => throw new NotSupportedException();
         public void StartRefresh() => log.Add("refresh");
         public void MarkDirty(string reason) => log.Add("dirty");
+        public void MarkStale(string reason) => log.Add("stale");
         public Task<IAsyncDisposable> AcquirePreviewLockAsync(CancellationToken ct)
         {
             log.Add("lock");
@@ -126,8 +127,12 @@ public sealed class ApplyServiceFlowTests
         public Fingerprint Fingerprint = TestData.Fingerprint();
         public bool UserExists = true;
         public (SnapshotOutcome, string?) Snapshot = (SnapshotOutcome.Created, null);
+        public SnapshotCapability Capability = new(true, null);
         public readonly FakeConnection Connection = new(log);
-        public Task<Fingerprint> ReadFingerprintAsync(string originDb, CancellationToken ct) => Task.FromResult(Fingerprint);
+        public Task<SnapshotCapability> CheckSnapshotCapabilityAsync(string originDb, CancellationToken ct) => Task.FromResult(Capability);
+        public Exception? Unreachable;
+        public Task<Fingerprint> ReadFingerprintAsync(string originDb, CancellationToken ct) =>
+            Unreachable is { } ex ? Task.FromException<Fingerprint>(ex) : Task.FromResult(Fingerprint);
         public Task<bool> UserExistsAsync(string originDb, string user, CancellationToken ct) => Task.FromResult(UserExists);
         public Task<(SnapshotOutcome Outcome, string? Reason)> CreateSnapshotAsync(string originDb, string snapshotDb, CancellationToken ct) { log.Add($"snapshot {snapshotDb}"); return Task.FromResult(Snapshot); }
         public Task DropSnapshotAsync(string originDb, string snapshotDb, CancellationToken ct) { log.Add($"drop {snapshotDb}"); return Task.CompletedTask; }
@@ -396,12 +401,61 @@ public sealed class ApplyServiceFlowTests
     }
 
     [Fact]
-    public async Task Snapshot_failure_falls_back_to_keyset()
+    public async Task No_snapshot_capability_without_consent_is_precondition_failed()
     {
         var rig = NewRig();
-        rig.Origin.Snapshot = (SnapshotOutcome.Unsupported, "FILESTREAM");
+        rig.Origin.Capability = OriginSnapshot.Decide(canCreateDatabase: false, filestreamGroups: 0, memoryOptimizedGroups: 0);
 
         var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.PreconditionFailed, result!.Status);
+        Assert.Equal([ApplyPrecondition.WeakVerificationNotAccepted], result.PreconditionFailures);
+        Assert.Equal(VerificationMode.Keyset, result.Verification.Mode);
+        Assert.Contains("allowKeysetVerification", result.Message);
+        AssertNothingRanOnOrigin();
+    }
+
+    [Fact]
+    public void Snapshot_outcome_has_no_silent_downgrade_value()
+    {
+        // 2026-11-13: 생성 실패는 Failed(error) 하나뿐. KEYSET은 실행 전 결정(CheckSnapshotCapability)으로만 간다.
+        Assert.Equal(["Created", "Failed"], Enum.GetNames<SnapshotOutcome>());
+    }
+
+    [Theory]
+    [InlineData(true, 0, 0, true, null)]
+    [InlineData(false, 0, 0, false, "CREATE DATABASE")]
+    [InlineData(true, 1, 0, false, "FILESTREAM")]
+    [InlineData(true, 0, 2, false, "메모리 최적화")]
+    public void Snapshot_capability_is_decided_from_permission_and_filegroups(bool perm, int fd, int fx, bool can, string? reason)
+    {
+        var c = OriginSnapshot.Decide(perm, fd, fx);
+        Assert.Equal(can, c.CanSnapshot);
+        if (reason is null) Assert.Null(c.Reason);
+        else Assert.Contains(reason, c.Reason);
+    }
+
+    [Fact]
+    public async Task Unexpected_snapshot_failure_is_error_not_keyset()
+    {
+        var rig = NewRig();
+        rig.Origin.Snapshot = (SnapshotOutcome.Failed, "원본 스냅샷 생성 실패(오류 5119)");
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.Error, result!.Status);
+        Assert.Equal(VerificationMode.SnapshotNetdiff, result.Verification.Mode);
+        Assert.DoesNotContain("open", log);
+        Assert.DoesNotContain("count", log);
+    }
+
+    [Fact]
+    public async Task No_snapshot_capability_with_consent_uses_keyset()
+    {
+        var rig = NewRig();
+        rig.Origin.Capability = OriginSnapshot.Decide(canCreateDatabase: true, filestreamGroups: 1, memoryOptimizedGroups: 0);
+
+        var result = await rig.ApplyAsync(new ApplyRequest { AllowKeysetVerification = true });
 
         Assert.Equal(ApplyStatus.Committed, result!.Status);
         Assert.Equal(VerificationMode.Keyset, result.Verification.Mode);
@@ -411,7 +465,73 @@ public sealed class ApplyServiceFlowTests
         Assert.Contains("count", log);
         Assert.Contains("keyset", log);
         Assert.DoesNotContain(log, e => e.StartsWith("diff", StringComparison.Ordinal));
-        Assert.DoesNotContain(log, e => e.StartsWith("drop", StringComparison.Ordinal)); // 만들지 못한 스냅샷은 지우지 않는다
+        Assert.DoesNotContain(log, e => e.StartsWith("drop", StringComparison.Ordinal)); // 만들지 않은 스냅샷은 지우지 않는다
+        Assert.DoesNotContain(log, e => e.StartsWith("snapshot", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Split_commit_marks_baseline_stale_without_rebuild_and_runs_as_own_login()
+    {
+        var rig = NewRig(settings: new ApplySettings { Mode = ServerMode.Split, MachineTag = "devpc", ExecuteAsUser = PreviewUserSql.UserName });
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.Committed, result!.Status);
+        Assert.False(result.SandboxRefreshStarted);
+        Assert.DoesNotContain("refresh", log);
+        Assert.Equal("stale", log[^1]);
+        Assert.Contains("기준선이 오래됨", result.Message);
+        Assert.Null(rig.Runner.Context!.ExecuteAsUser);                 // 원본에서 가장하지 않는다
+        Assert.Contains(ApplyService.PrincipalLimitation, result.Verification.Limitations);
+        var snapshot = Assert.Single(log, e => e.StartsWith("snapshot ", StringComparison.Ordinal))["snapshot ".Length..];
+        Assert.Matches("^Origin_pre_devpc_[0-9a-f]{8}$", snapshot);       // PC·적용 id 접미사
+        Assert.Contains($"drop {snapshot}", log);                       // 자기가 만든 이름만 지운다
+    }
+
+    [Fact]
+    public async Task Split_skips_execute_as_user_precondition_and_compares_blocking_fingerprint_fields_only()
+    {
+        var rig = NewRig(settings: new ApplySettings { Mode = ServerMode.Split });
+        rig.Origin.UserExists = false;                                  // Split에서는 원본에 dbr_preview_user가 없어도 된다
+        rig.Origin.Fingerprint = Fingerprint("16.0.4000.1");            // 버전 차이는 경고 항목
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.Committed, result!.Status);
+
+        var blocked = NewRig(settings: new ApplySettings { Mode = ServerMode.Split });
+        blocked.Origin.Fingerprint = Fingerprint() with { CompatibilityLevel = 150 };
+        var r2 = await blocked.ApplyAsync();
+        Assert.Equal([ApplyPrecondition.FingerprintMismatch], r2!.PreconditionFailures);
+        Assert.Contains("호환성 수준", r2.Message);
+    }
+
+    [Fact]
+    public async Task Origin_unreachable_is_precondition_failed_without_touching_origin()
+    {
+        // N4: 원본에 연결할 수 없으면 ORIGIN_UNREACHABLE로 막는다(검증 모드 판단·사용자 확인도 하지 않는다).
+        var rig = NewRig(settings: new ApplySettings { Mode = ServerMode.Split });
+        rig.Origin.Unreachable = new SandboxUnavailableException("원본 서버에 연결할 수 없음(DB master, 오류 53)");
+        rig.Origin.Capability = OriginSnapshot.Decide(canCreateDatabase: false, filestreamGroups: 0, memoryOptimizedGroups: 0);
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.PreconditionFailed, result!.Status);
+        Assert.Equal([ApplyPrecondition.OriginUnreachable], result.PreconditionFailures);
+        Assert.Contains("오류 53", result.Message);
+        AssertNothingRanOnOrigin();
+        Assert.Contains("\"ORIGIN_UNREACHABLE\"", System.Text.Json.JsonSerializer.Serialize(result.PreconditionFailures, ContractJson.Options));
+    }
+
+    [Fact]
+    public async Task Split_sysadmin_origin_login_adds_limitation_but_does_not_block()
+    {
+        var rig = NewRig(settings: new ApplySettings { Mode = ServerMode.Split }, context: Context() with { OriginIsSysadmin = true });
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.Committed, result!.Status);
+        Assert.Contains(ApplyService.SysadminLimitation, result.Verification.Limitations);
     }
 
     [Fact]

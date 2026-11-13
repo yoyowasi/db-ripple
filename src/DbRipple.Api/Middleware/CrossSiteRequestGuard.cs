@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace DbRipple.Api.Middleware;
@@ -13,11 +14,11 @@ namespace DbRipple.Api.Middleware;
 /// </summary>
 public sealed class CrossSiteRequestGuardOptions
 {
-    /// <summary>기본 허용 출처: Vite 개발 서버(5273)와 Host(5080)의 127.0.0.1·localhost.</summary>
-    public static readonly string[] DefaultOrigins =
-    [
-        "http://127.0.0.1:5273", "http://localhost:5273", "http://127.0.0.1:5080", "http://localhost:5080",
-    ];
+    /// <summary>기본 허용 출처: Host(5080)의 127.0.0.1·localhost. 실행 파일 모드에서는 Host가 실제 바인딩 주소로 바꾼다.</summary>
+    public static readonly string[] DefaultOrigins = ["http://127.0.0.1:5080", "http://localhost:5080"];
+
+    /// <summary>Vite 개발 서버(5273) 출처. Development에서만 허용한다(N4).</summary>
+    public static readonly string[] DevelopmentOrigins = ["http://127.0.0.1:5273", "http://localhost:5273"];
 
     /// <summary>Origin 헤더가 있을 때 허용하는 출처(스킴://호스트:포트, 끝 슬래시 없음, 대소문자 무시).</summary>
     public IReadOnlyCollection<string> AllowedOrigins { get; set; } = DefaultOrigins;
@@ -46,10 +47,12 @@ public static class CrossSiteRequestGuard
 
     internal static IServiceCollection AddCrossSiteRequestGuard(this IServiceCollection services)
     {
-        services.AddOptions<CrossSiteRequestGuardOptions>().Configure<IConfiguration>((options, configuration) =>
+        services.AddOptions<CrossSiteRequestGuardOptions>().Configure<IConfiguration, IHostEnvironment>((options, configuration, environment) =>
         {
             var configured = configuration.GetSection(AllowedOriginsConfigKey).Get<string[]>();
-            options.AllowedOrigins = configured is { Length: > 0 } ? configured : CrossSiteRequestGuardOptions.DefaultOrigins;
+            options.AllowedOrigins = configured is { Length: > 0 } ? configured
+                : environment.IsDevelopment() ? [.. CrossSiteRequestGuardOptions.DefaultOrigins, .. CrossSiteRequestGuardOptions.DevelopmentOrigins]
+                : CrossSiteRequestGuardOptions.DefaultOrigins;
         });
         services.AddTransient<IStartupFilter, GuardStartupFilter>();
         return services;
@@ -76,14 +79,17 @@ public static class CrossSiteRequestGuard
         return null;
     }
 
+    // 파이프라인 맨 앞: 보안 헤더(모든 응답) → 실행 토큰(켜졌을 때) → 교차 사이트 방어. 허용 출처는 요청마다 읽는다(Host가 시작 뒤 실제 주소로 바꾼다).
     sealed class GuardStartupFilter(IOptions<CrossSiteRequestGuardOptions> options) : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
         {
-            var allowed = options.Value.AllowedOrigins.Select(o => o.Trim().TrimEnd('/')).Where(o => o.Length > 0).ToArray();
+            var session = app.ApplicationServices.GetService<LaunchSession>();
             app.Use(async (context, nextMiddleware) =>
             {
-                if (IsGuarded(context.Request) && Check(context.Request, allowed) is { } reason)
+                SecurityHeaders.Register(context.Response);
+                if (session is not null && !await session.GateAsync(context)) return;
+                if (IsGuarded(context.Request) && Check(context.Request, Normalize(options.Value.AllowedOrigins)) is { } reason)
                 {
                     var problem = new ProblemDetails
                     {
@@ -99,5 +105,26 @@ public static class CrossSiteRequestGuard
             });
             next(app);
         };
+
+        static string[] Normalize(IReadOnlyCollection<string> origins) =>
+            origins.Select(o => o.Trim().TrimEnd('/')).Where(o => o.Length > 0).ToArray();
     }
+}
+
+/// <summary>보안 헤더(N4 계약 3절). 응답 직전에 붙여 예외 처리기가 헤더를 지운 오류 응답에도 남는다.</summary>
+public static class SecurityHeaders
+{
+    /// <summary>Content-Security-Policy 값.</summary>
+    public const string ContentSecurityPolicy =
+        "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+
+    internal static void Register(HttpResponse response) => response.OnStarting(static state =>
+    {
+        var headers = ((HttpResponse)state).Headers;
+        headers.ContentSecurityPolicy = ContentSecurityPolicy;
+        headers.XFrameOptions = "DENY";
+        headers.XContentTypeOptions = "nosniff";
+        headers["Referrer-Policy"] = "no-referrer";
+        return Task.CompletedTask;
+    }, response);
 }

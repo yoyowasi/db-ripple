@@ -71,7 +71,7 @@ static class Cli
             Console.WriteLine("-- 이후: RESTORE … WITH MOVE, REPLACE(실패 시 MULTI_USER 복구) → 카탈로그 → 행 수 → 설치 → 행 수 → 환경 지문 → CREATE DATABASE … AS SNAPSHOT OF");
             return 0;
         }
-        await using var steps = new SqlBaselineSteps(ConnectionString(), m => Console.WriteLine($"{DateTimeOffset.Now:HH:mm:ss.fff} {m}")) { CommandTimeoutSeconds = timeout };
+        await using var steps = new SqlBaselineSteps(new SandboxConnection(ConnectionString()), m => Console.WriteLine($"{DateTimeOffset.Now:HH:mm:ss.fff} {m}")) { CommandTimeoutSeconds = timeout };
         var started = DateTimeOffset.Now;
         var result = await BaselineBuilder.BuildAsync(o, steps, () => DateTimeOffset.Now);
         var m = result.Install.Manifest;
@@ -91,7 +91,7 @@ static class Cli
     static async Task<int> RestoreAsync(string backup, string database, int timeout)
     {
         BaselineSql.ValidateName(database, "복원 대상"); // 연결하기 전에 이름 규칙부터
-        await using var steps = new SqlBaselineSteps(ConnectionString(), m => Console.WriteLine($"{DateTimeOffset.Now:HH:mm:ss.fff} {m}")) { CommandTimeoutSeconds = timeout };
+        await using var steps = new SqlBaselineSteps(new SandboxConnection(ConnectionString()), m => Console.WriteLine($"{DateTimeOffset.Now:HH:mm:ss.fff} {m}")) { CommandTimeoutSeconds = timeout };
         await BaselineBuilder.RestoreAsync(steps, database, backup);
         Console.WriteLine($"{database} 복원 완료");
         return 0;

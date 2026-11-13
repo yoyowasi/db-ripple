@@ -66,3 +66,25 @@ GET {{baseUrl}}/api/previews/pv_00000000_0001/export
 
 ### OpenAPI(개발 환경)
 GET {{baseUrl}}/openapi/v1.json
+
+### 연결 설정(N4, 비밀값 없음). 실행 파일 모드에서는 실행 URL로 받은 쿠키 dbr_session이 있어야 한다(없으면 401 NO_SESSION)
+GET {{baseUrl}}/api/settings
+
+### 연결 설정 저장(204, 400 필드별 errors, 409 ENV_OVERRIDE). password는 바꿀 때만
+PUT {{baseUrl}}/api/settings
+X-DbRipple-Request: {{guard}}
+Content-Type: application/json
+
+{ "mode": "split",
+  "origin": { "server": "devsql01", "database": "AW_Origin", "auth": "windows", "rememberPassword": false, "trustServerCertificate": false },
+  "sandbox": { "server": "127.0.0.1,14333", "database": "AW_Sandbox", "auth": "sql", "user": "sa", "password": "<샌드박스 비밀번호>", "rememberPassword": true },
+  "backup": { "serverPath": null, "sharePath": null, "importFile": null } }
+
+### 연결 시험(저장 안 함, 읽기만)
+POST {{baseUrl}}/api/settings/test
+X-DbRipple-Request: {{guard}}
+Content-Type: application/json
+
+{ "mode": "split",
+  "origin": { "server": "devsql01", "database": "AW_Origin", "auth": "windows" },
+  "sandbox": { "server": "127.0.0.1,14333", "database": "AW_Sandbox", "auth": "sql", "user": "sa" } }

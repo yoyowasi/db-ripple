@@ -195,7 +195,10 @@ public sealed class BatchAnalyzer : IBatchAnalyzer
                     else if (table.Schema.Equals("audit", StringComparison.OrdinalIgnoreCase))
                         Reject(AnalysisRules.RejectCaptureStore, $"'{target}'은(는) 변경 수집 장치의 저장소입니다. 사용자 문장의 대상이 될 수 없습니다.", "D5", index, targetSpan);
                     else
+                    {
                         CheckTargetTriggers(target, table, kind, index, lines.Span(targetNode));
+                        CheckReachedTriggers(target, kind, index, lines.Span(targetNode));
+                    }
                     if (isCte) target = null; // CTE 이름은 테이블 이름이 아니다
                 }
             }
@@ -311,6 +314,97 @@ public sealed class BatchAnalyzer : IBatchAnalyzer
                         $"{target}의 {Verb(kind)}에는 사용자 Last 트리거가 있어 감사 트리거를 Last로 둘 수 없습니다. 이 테이블에서 발동한 트리거의 원인 귀속은 ambiguous 이하가 됩니다.",
                         "E15", index, span);
             }
+        }
+
+        // ---- 도달 폐포(2026-11-13): FK 참조 동작과 트리거 쓰기 대상으로 닿는 테이블의 트리거도 D5 거부 규칙으로 본다 ----
+
+        static readonly ChangeOperation[] AllOps = [ChangeOperation.Insert, ChangeOperation.Update, ChangeOperation.Delete];
+
+        IEnumerable<TriggerStaticInfo> Firing(string table, ChangeOperation op) => baseline.Triggers
+            .Where(t => t.Table.Equals(table, StringComparison.OrdinalIgnoreCase) && !t.IsDisabled && !t.IsAuditTrigger && t.Events.Contains(op));
+
+        /// <summary>
+        /// 직접 대상 밖에서 발동할 수 있는 트리거를 (테이블, 연산) 고정점까지 모아 외부 부작용·불투명·트랜잭션 제어를 거부한다.
+        /// 넓히는 길은 둘이다: FK 참조 동작(CASCADE는 같은 연산, SET NULL·SET DEFAULT는 자식 UPDATE)과 트리거의 정적 쓰기 대상(연산은 모르므로 셋 다).
+        /// 쓰기 대상을 모르는 트리거(암호화, 파싱 실패, 동적 SQL, 못 펼친 프로시저)는 모든 사용자 테이블에 닿는다고 보고 닫힌 쪽으로 넓힌다.
+        /// ROLLBACK만 하는 트리거는 거부하지 않는다(직접 대상 규칙과 같이 trigger_blocked로 보인다).
+        /// </summary>
+        void CheckReachedTriggers(string target, ChangeOperation kind, int index, SourceSpan span)
+        {
+            var catalog = baseline.Catalog;
+            var nameById = catalog.Tables.ToDictionary(t => t.ObjectId, t => $"{t.Schema}.{t.Name}");
+            var idByName = catalog.Tables.ToDictionary(t => $"{t.Schema}.{t.Name}", t => t.ObjectId, StringComparer.OrdinalIgnoreCase);
+            var childFks = catalog.ForeignKeys.Where(f => !f.IsDisabled)
+                .GroupBy(f => f.ObjectId).Select(g => g.First())
+                .ToLookup(f => f.ReferencedObjectId);
+
+            var seen = new HashSet<(string, ChangeOperation)>();
+            var queue = new Queue<(string Table, ChangeOperation Op, string Via)>();
+            void Add(string table, ChangeOperation op, string via)
+            {
+                if (seen.Add((table.ToUpperInvariant(), op))) queue.Enqueue((table, op, via));
+            }
+
+            // 직접 대상의 트리거는 CheckTargetTriggers가 이미 판정했다. 쓰기 대상만 넓힌다.
+            var judged = new HashSet<string>(Firing(target, kind).Select(t => t.Trigger), StringComparer.OrdinalIgnoreCase);
+            var allTablesReached = false;
+            Add(target, kind, $"{target} {Verb(kind)}");
+
+            while (queue.Count > 0)
+            {
+                var (table, op, via) = queue.Dequeue();
+
+                if (op != ChangeOperation.Insert && idByName.TryGetValue(table, out var id))
+                    foreach (var fk in childFks[id])
+                    {
+                        var action = op == ChangeOperation.Delete ? fk.DeleteAction : fk.UpdateAction;
+                        ChangeOperation? childOp = action.ToUpperInvariant() switch
+                        {
+                            "CASCADE" => op,
+                            "SET_NULL" or "SET_DEFAULT" => ChangeOperation.Update,
+                            _ => null,
+                        };
+                        if (childOp is { } co && nameById.TryGetValue(fk.ParentObjectId, out var child))
+                            Add(child, co, $"{via} → FK {fk.Name} → {child} {Verb(co)}");
+                    }
+
+                foreach (var t in Firing(table, op))
+                {
+                    if (judged.Add(t.Trigger)) RejectReached(t, via, index, span);
+
+                    foreach (var w in t.WriteTargets)
+                        foreach (var wo in AllOps)
+                            Add(w, wo, $"{via} → 트리거 {t.Trigger} → {w}");
+
+                    var unknownWrites = t.IsEncrypted || t.WriteTargetsUnknown || t.HasDynamicSql || t.UnresolvedProcedureCalls.Count > 0
+                        || (t.ProcedureCalls.Count > 0 && t.ExpandedProcedureCalls.Count == 0); // 펼치기 전 분석기 호환 규칙(TriggerStaticInfo 주석)
+                    if (unknownWrites && !allTablesReached)
+                    {
+                        allTablesReached = true;
+                        foreach (var name in nameById.Values.Where(n => !n.StartsWith("audit.", StringComparison.OrdinalIgnoreCase)))
+                            foreach (var wo in AllOps)
+                                Add(name, wo, $"{via} → 트리거 {t.Trigger}(쓰기 대상 미상) → {name}");
+                    }
+                }
+            }
+        }
+
+        void RejectReached(TriggerStaticInfo t, string via, int index, SourceSpan span)
+        {
+            var path = $" 닿는 경로: {via} → 트리거 {t.Trigger}.";
+            if (t.IsEncrypted)
+                Reject(AnalysisRules.RejectTriggerOpaque,
+                    $"FK 연쇄·트리거로 닿는 {t.Table}에 본문을 읽을 수 없는(암호화·CLR) 트리거 {t.Trigger}가 있어 외부 부작용을 배제할 수 없습니다.{path}", "E18", index, span);
+            else if (t.ExternalSideEffects.Count > 0)
+                Reject(AnalysisRules.RejectTriggerExternalEffect,
+                    t.ExternalSideEffects.Contains(TriggerAnalyzer.UnparsedMarker)
+                        ? $"FK 연쇄·트리거로 닿는 {t.Table}의 트리거 {t.Trigger}의 본문을 분석하지 못해 외부 부작용을 배제할 수 없습니다.{path}"
+                        : $"FK 연쇄·트리거로 닿는 {t.Table}의 트리거 {t.Trigger}에 외부 부작용({string.Join(", ", t.ExternalSideEffects)})이 있어 샌드박스에서 재현하면 실제 부작용이 생길 수 있습니다.{path}",
+                    "E18", index, span);
+            if (t.HasTransactionControl)
+                Reject(AnalysisRules.RejectTriggerTransactionControl,
+                    $"FK 연쇄·트리거로 닿는 {t.Table}의 트리거 {t.Trigger}가 COMMIT·BEGIN TRAN·SAVE TRAN을 해서 미리보기 트랜잭션이 확정될 수 있습니다(롤백으로 되돌릴 수 없음).{path}",
+                    "E13", index, span);
         }
 
         // ---- 허용 목록 밖 문장 분류 ----

@@ -44,7 +44,10 @@ export interface RejectItem {
   span: SourceSpan
 }
 
-/** 400·404·409·422·500·501·503 */
+/** 401 NO_SESSION · 409 ENV_OVERRIDE(설정 API, 환경 변수가 우선일 때) */
+export type ProblemReason = ConflictReason | 'ENV_OVERRIDE' | 'NO_SESSION'
+
+/** 400·401·404·409·422·500·501·503 */
 export interface ProblemDetails {
   type?: string
   title?: string
@@ -56,18 +59,38 @@ export interface ProblemDetails {
   errors?: Record<string, string[]>
   /** 422, type = "https://example.local/problems/rejected" */
   rejects?: RejectItem[]
-  /** 409 (3주차 추가) */
-  reason?: ConflictReason
+  /** 409 (3주차 추가) · 401 NO_SESSION · 409 ENV_OVERRIDE(N4 계약) */
+  reason?: ProblemReason
 }
 
 // GET /api/sandbox → 200
 export type SandboxState = 'building' | 'ready' | 'dirty' | 'error'
+export type ConnectionMode = 'split' | 'single_server'
+/** N4 계약 §5. 아래 새 필드는 모두 선택이다(옛 서버 응답에도 화면이 동작한다). */
+export interface SandboxOrigin {
+  server: string
+  database: string
+  /** SQL 인증이면 사용자 이름, Windows 인증이면 "Windows 인증". 비밀값 없음. */
+  login?: string
+  /** 원본 로그인이 sysadmin인가(모르면 null) */
+  isSysadmin?: boolean | null
+}
 export interface SandboxStatus {
   state: SandboxState
   baselineAt: Iso | null
   fingerprintMatch: boolean
   locked: boolean
   manifest: { coveredTables: number; excludedTables: number; auditNotLast: number } | null
+  mode?: ConnectionMode
+  origin?: SandboxOrigin | null
+  /** 경고(적용은 막지 않는다) */
+  fingerprintWarnings?: string[]
+  /** 차단(원본과 샌드박스의 환경이 달라 미리보기·적용이 막히는 항목) */
+  fingerprintMismatches?: string[]
+  /** 원본이 샌드박스 기준선 뒤에 바뀌어 기준선이 오래됐다 */
+  baselineStale?: boolean
+  /** false면 원본에 연결할 수 없다(미리보기는 기존 기준선으로 가능, 적용은 ORIGIN_UNREACHABLE) */
+  originReachable?: boolean
 }
 // POST /api/sandbox/refresh → 202, 본문 없음(Location: /api/sandbox)
 
@@ -142,6 +165,14 @@ export interface Fingerprint {
   disallowResultsFromTriggers: number
   sessionOptions: number
   collation: string
+  /** N4 계약 §5(없으면 null 또는 필드 없음) */
+  serverCollation?: string | null
+  hostPlatform?: string | null
+  majorVersion?: number | null
+  language?: string | null
+  dateFormat?: string | null
+  dateFirst?: number | null
+  hasUserClrAssemblies?: boolean | null
 }
 export interface StatementError {
   errorNumber: number
@@ -283,6 +314,8 @@ export interface PreviewResult {
     snapshotDb: string
     backupFinishedAt: Iso
     fingerprint: Fingerprint
+    /** N4 계약 §5 */
+    fingerprintWarnings?: string[]
   }
   statements: StatementResult[]
   firings: Firing[]
@@ -339,9 +372,13 @@ export type ApplyPrecondition =
   | 'PREVIEW_EXPIRED'
   | 'FINGERPRINT_MISMATCH'
   | 'EXECUTE_AS_USER_MISSING'
+  | 'WEAK_VERIFICATION_NOT_ACCEPTED'
+  | 'ORIGIN_UNREACHABLE'
 export type ApplyStatus = 'committed' | 'rolled_back_mismatch' | 'drift_detected' | 'precondition_failed' | 'error'
 export interface ApplyRequest {
   sqlHash: string | null
+  /** 원본에 스냅샷 권한이 없어 KEYSET(약한 검증)이 필요할 때 사용자가 동의했다(기본 false) */
+  allowKeysetVerification?: boolean
 }
 export interface DriftRow {
   table: string
@@ -407,4 +444,72 @@ export interface PreviewExport {
   rowChanges: RowChange[]
   netChanges: NetChange[]
   sql: string
+}
+
+// ---- 설정(프로필) API, N4 계약 §4. 비밀번호·연결 문자열은 응답에 없다. ----
+
+export type SettingsSource = 'profile' | 'env' | 'none'
+export type AuthKind = 'windows' | 'sql'
+
+/** GET /api/settings → 200 */
+export interface SettingsEndpointView {
+  server: string
+  database: string
+  auth: AuthKind
+  user: string | null
+  hasStoredPassword: boolean
+}
+export interface SettingsOriginView extends SettingsEndpointView {
+  trustServerCertificate: boolean
+}
+export interface SettingsBackup {
+  serverPath: string | null
+  sharePath: string | null
+  importFile: string | null
+}
+export interface SettingsView {
+  source: SettingsSource
+  configured: boolean
+  mode?: ConnectionMode
+  origin?: SettingsOriginView | null
+  sandbox?: SettingsEndpointView | null
+  backup?: SettingsBackup | null
+}
+
+/** PUT /api/settings · POST /api/settings/test 본문. 비밀번호는 바꿀 때만 넣는다. */
+export interface SettingsEndpointInput {
+  server: string
+  database: string
+  auth: AuthKind
+  user: string | null
+  password?: string
+  rememberPassword: boolean
+}
+export interface SettingsRequest {
+  mode: ConnectionMode
+  origin: SettingsEndpointInput & { trustServerCertificate: boolean }
+  sandbox: SettingsEndpointInput
+  backup: SettingsBackup
+}
+
+/** POST /api/settings/test → 200 */
+export interface SettingsTestResult {
+  origin: {
+    ok: boolean
+    serverName?: string | null
+    productVersion?: string | null
+    edition?: string | null
+    isSysadmin?: boolean | null
+    canBackup?: boolean | null
+    canCreateDatabase?: boolean | null
+    error: string | null
+  } | null
+  sandbox: {
+    ok: boolean
+    serverName?: string | null
+    productVersion?: string | null
+    isLoopback?: boolean | null
+    error: string | null
+  } | null
+  warnings?: string[]
 }

@@ -15,6 +15,8 @@ public sealed record BaselineInfo
     public required DateTimeOffset BackupFinishedAt { get; init; }
     /// <summary>환경 지문(Core Fingerprint, 필드 이름이 §6.2 예시와 같다).</summary>
     public required Fingerprint Fingerprint { get; init; }
+    /// <summary>지문 경고(원본·샌드박스 버전·판 등, 막지 않음). 2026-11-13 추가.</summary>
+    public IReadOnlyList<string> FingerprintWarnings { get; init; } = [];
 }
 
 /// <summary>단계별 시간(ms, §6.2 timingsMs, §10.4 M5).</summary>

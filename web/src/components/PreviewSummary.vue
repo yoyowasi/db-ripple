@@ -1,267 +1,175 @@
 <script setup lang="ts">
-// C4(요약 부분): 문장별 결과, 테이블별 건수, 경고, 롤백 뒤 남은 변경, 환경 지문, 수집 범위.
+// 오른쪽 레일 본문: (적용 결과) → 테이블별 변경 행 수(순변경) → 경고와 참고 → 문장별 결과 → 잔여 변경 → 자세히.
+// 헤드라인·적용 가능 줄은 HomeView 의 rail-top 이 그린다.
 import { computed } from 'vue'
-import { exportUrl } from '../api/client'
-import type { PreviewResult, PreviewStatus } from '../api/types'
-import {
-  PREVIEW_STATUS_LABEL,
-  STATEMENT_STATUS_LABEL,
-  formatCount,
-  formatMs,
-  formatTime,
-  shortHash,
-} from '../lib/format'
-import { useSandboxStore } from '../stores/sandbox'
+import type { PreviewResult } from '../api/types'
+import { OP_LABEL } from '../lib/format'
+import { causeBreakdown, netTotals } from '../lib/summary'
+import { usePreviewStore } from '../stores/preview'
+import ApplyResultView from './ApplyResultView.vue'
 import DiagnosticList from './DiagnosticList.vue'
 import NetChangeList from './NetChangeList.vue'
+import NetSummaryTable from './rail/NetSummaryTable.vue'
+import PreviewDetails from './rail/PreviewDetails.vue'
+import StatementTable from './rail/StatementTable.vue'
 
 const props = defineProps<{ preview: PreviewResult; consumed: boolean }>()
 
-const sandbox = useSandboxStore()
+const store = usePreviewStore()
 
-const STATUS_CHIP: Record<PreviewStatus, string> = {
-  ok: 'chip-ok',
-  failed: 'chip-err',
-  trigger_blocked: 'chip-err',
-  truncated: 'chip-warn',
-}
-const STATUS_NOTE: Partial<Record<PreviewStatus, string>> = {
-  failed: '문장이 실패했습니다. 트랜잭션은 롤백됐고 원본은 바뀌지 않았습니다. 오류는 아래 문장별 결과에 있습니다.',
-  trigger_blocked:
-    '트리거가 ROLLBACK 하거나 거부했습니다(E13). 트랜잭션 안 변경은 0건이고, 원본에 적용해도 같은 결과가 납니다. 거부한 트리거는 그래프의 오류·트리거 노드에서 확인하세요.',
-  truncated:
-    '변경 행이 수집 상한을 넘어 행 이미지를 일부만 모았습니다. 건수는 정확하지만 행 값을 다 볼 수 없어 [적용]을 막습니다(D8).',
+const breakdown = computed(() => causeBreakdown(props.preview.firings))
+const hasRows = computed(() => netTotals(props.preview.netSummary).total > 0)
+
+const STATUS_NOTE: Partial<Record<PreviewResult['status'], string>> = {
+  failed: '문장이 실패해 트랜잭션을 롤백했습니다. 원본은 바뀌지 않았습니다. 오류는 아래 문장별 결과에 있습니다.',
+  trigger_blocked: '트리거가 ROLLBACK 하거나 거부했습니다(E13). 원본에서도 같은 결과가 납니다.',
 }
 
-const totals = computed(() => {
-  const t = { inserted: 0, updated: 0, deleted: 0, removed: 0, added: 0 }
-  for (const r of props.preview.netSummary) {
-    t.inserted += r.inserted
-    t.updated += r.updated
-    t.deleted += r.deleted
-    t.removed += r.multisetRemoved
-    t.added += r.multisetAdded
-  }
-  return t
+// 0행 묶음: 트리거·INSTEAD OF 뿐이면 "트리거 쓰기", 아니면 일반 "쓰기"로 부른다.
+const zeroLabel = computed(() => {
+  const z = breakdown.value.zeroRow
+  const trig = z.every((f) => f.cause.kind === 'TRIGGER' || f.cause.kind === 'INSTEAD_OF')
+  return `변경 없는 ${trig ? '트리거 ' : ''}쓰기 ${z.length}건`
 })
-const hasMultiset = computed(() => totals.value.removed > 0 || totals.value.added > 0)
-const fp = computed(() => props.preview.baseline.fingerprint)
-const manifest = computed(() => sandbox.status?.manifest ?? null)
-const timings = computed(() => Object.entries(props.preview.timingsMs))
+function zeroText(id: string, table: string, op: keyof typeof OP_LABEL, cands: string[]): string {
+  const n = store.firingOrder.get(id)
+  return `${n ? `#${n} ` : ''}${table} ${OP_LABEL[op]} 0행${cands.length ? ` · ${cands.join(', ')}` : ''}`
+}
+
+// 롤백 뒤 남은 변경·수집 범위 한 줄
+const footLine = computed(() => {
+  const p = props.preview
+  const parts: string[] = []
+  if (p.residualCheckFailed) parts.push('롤백 뒤 남은 변경을 확인하지 못했습니다')
+  else if (p.residualCommitted.length === 0) parts.push('롤백 뒤 남은 변경 없음')
+  const keysOnly = p.capture.truncated || p.firings.some((f) => f.imageMode === 'KEYS')
+  parts.push(keysOnly ? '수집 범위: 키만(행 이미지 상한 초과)' : '수집 범위 전체')
+  return parts.join(' · ')
+})
+
+const inferredTrigger = computed(() =>
+  props.preview.firings.some((f) => f.cause.kind === 'TRIGGER' && f.cause.confidence === 'inferred'),
+)
+const showStatements = computed(
+  () => props.preview.statements.length > 1 || props.preview.statements.some((s) => s.status !== 'ok'),
+)
 </script>
 
 <template>
-  <section class="card" aria-label="미리보기 요약">
-    <header>
-      <h2>요약</h2>
-      <span class="chip" :class="STATUS_CHIP[preview.status]">{{ PREVIEW_STATUS_LABEL[preview.status] }}</span>
-      <a v-if="!consumed" class="btn btn-sm" :href="exportUrl(preview.previewId)" download>결과 JSON 내보내기</a>
-    </header>
+  <div class="summary">
+    <ApplyResultView v-if="store.applyResult" :result="store.applyResult" :preview="preview" />
 
-    <div class="card-body stack">
-      <!-- 잔여 확인 실패: 롤백 뒤 남은 변경을 검사하다 실패했다(Q31) -->
-      <div v-if="preview.residualCheckFailed" class="banner banner-err" role="alert">
+    <div v-if="preview.residualCheckFailed" class="sec">
+      <div class="banner banner-err" role="alert">
+        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.8" /><path d="M4 12L12 4" /></svg>
         <div>
           <strong>잔여 확인 실패</strong>
-          롤백 뒤 원본 기준 스냅샷과 비교해 남은 변경을 확인하려 했지만 끝내지 못했습니다. 남은 변경이 없다고 말할 수 없고, 샌드박스는 오염 상태로 표시됩니다.
-          [적용]은 막히며 샌드박스를 새로 고쳐야 합니다.
-          <span v-if="preview.residualCheckMessage" class="detail">사유: {{ preview.residualCheckMessage }}</span>
+          롤백 뒤 남은 변경을 확인하지 못했습니다. 남은 변경이 없다고 말할 수 없고 샌드박스는 오염 상태가 됩니다.
+          <span v-if="preview.residualCheckMessage" class="why">사유: {{ preview.residualCheckMessage }}</span>
         </div>
       </div>
-
-      <div v-if="STATUS_NOTE[preview.status]" class="banner" :class="preview.status === 'truncated' ? 'banner-warn' : 'banner-err'">
-        <div>{{ STATUS_NOTE[preview.status] }}</div>
-      </div>
-
-      <dl class="kv">
-        <dt>미리보기</dt>
-        <dd class="mono">{{ preview.previewId }}</dd>
-        <dt>SQL 지문</dt>
-        <dd class="mono" :title="preview.sqlHash">{{ shortHash(preview.sqlHash) }}</dd>
-        <dt>만든 시각</dt>
-        <dd>{{ formatTime(preview.createdAt) }}</dd>
-      </dl>
-
-      <div>
-        <h3>문장별 결과</h3>
-        <table class="data">
-          <thead>
-            <tr>
-              <th class="num">#</th>
-              <th>문장</th>
-              <th>상태</th>
-              <th class="num">영향 행</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-for="s in preview.statements" :key="s.index">
-              <tr>
-                <td class="num">{{ s.index }}</td>
-                <td>{{ s.kind }} <span class="muted">{{ s.target }}</span></td>
-                <td>
-                  <span class="chip" :class="s.status === 'ok' ? 'chip-ok' : s.status === 'not_run' ? '' : 'chip-err'">
-                    {{ STATEMENT_STATUS_LABEL[s.status] }}
-                  </span>
-                </td>
-                <td class="num">{{ s.rowsAffected === null ? '-' : formatCount(s.rowsAffected) }}</td>
-              </tr>
-              <tr v-if="s.error">
-                <td></td>
-                <td colspan="3" class="err-row">
-                  오류 {{ s.error.errorNumber }}<template v-if="s.error.procedure"> ({{ s.error.procedure }})</template>:
-                  {{ s.error.message }}
-                  <span v-if="s.error.isToolFault" class="chip chip-err">도구 오류</span>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-
-      <div>
-        <h3>테이블별 건수(최종 차이)</h3>
-        <p v-if="preview.netSummary.length === 0" class="muted none">바뀐 테이블이 없습니다.</p>
-        <table v-else class="data">
-          <thead>
-            <tr>
-              <th>테이블</th>
-              <th class="num">추가</th>
-              <th class="num">수정</th>
-              <th class="num">삭제</th>
-              <th v-if="hasMultiset" class="num">제거·추가(다중집합)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="r in preview.netSummary" :key="r.table">
-              <td>{{ r.table }}</td>
-              <td class="num">{{ formatCount(r.inserted) }}</td>
-              <td class="num">{{ formatCount(r.updated) }}</td>
-              <td class="num">{{ formatCount(r.deleted) }}</td>
-              <td v-if="hasMultiset" class="num">
-                <template v-if="r.multisetRemoved > 0 || r.multisetAdded > 0">
-                  제거 {{ formatCount(r.multisetRemoved) }} · 추가 {{ formatCount(r.multisetAdded) }}
-                </template>
-                <template v-else>-</template>
-              </td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr>
-              <th>합계</th>
-              <th class="num">{{ formatCount(totals.inserted) }}</th>
-              <th class="num">{{ formatCount(totals.updated) }}</th>
-              <th class="num">{{ formatCount(totals.deleted) }}</th>
-              <th v-if="hasMultiset" class="num">제거 {{ formatCount(totals.removed) }} · 추가 {{ formatCount(totals.added) }}</th>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <div>
-        <h3>경고</h3>
-        <DiagnosticList :items="preview.warnings" empty-text="경고 없음" />
-      </div>
-
-      <div>
-        <h3>롤백 뒤 남은 변경</h3>
-        <NetChangeList
-          :items="preview.residualCommitted"
-          :empty-text="preview.residualCheckFailed ? '확인하지 못했습니다(위 배너)' : '없음 — 트랜잭션 밖에서 확정된 변경이 없습니다'"
-        />
-        <p v-if="preview.residualCommitted.length > 0" class="muted none">
-          트리거가 롤백 뒤에 남긴 변경입니다(예: CATCH 블록의 오류 로그 INSERT). 샌드박스는 오염으로 표시되고 다시 만들어집니다.
-        </p>
-      </div>
-
-      <div>
-        <h3>환경 지문</h3>
-        <dl class="kv">
-          <dt>SQL Server</dt>
-          <dd>{{ fp.productVersion }} · {{ fp.edition }}</dd>
-          <dt>호환 수준</dt>
-          <dd>{{ fp.compatibilityLevel }}</dd>
-          <dt>정렬 규칙</dt>
-          <dd>{{ fp.collation }}</dd>
-          <dt>트리거 설정</dt>
-          <dd>
-            중첩 {{ fp.nestedTriggers }} · 재귀 {{ fp.isRecursiveTriggersOn ? 'ON' : 'OFF' }} · 트리거 결과 반환 금지
-            {{ fp.disallowResultsFromTriggers }}
-          </dd>
-          <dt>세션 옵션</dt>
-          <dd>{{ fp.sessionOptions }}</dd>
-          <dt>일치 여부</dt>
-          <dd>
-            <span
-              v-if="sandbox.status"
-              class="chip"
-              :class="sandbox.status.fingerprintMatch ? 'chip-ok' : 'chip-err'"
-            >
-              원본과 {{ sandbox.status.fingerprintMatch ? '일치' : '불일치' }}
-            </span>
-            <span v-else class="muted">알 수 없음</span>
-          </dd>
-        </dl>
-      </div>
-
-      <div>
-        <h3>수집 범위</h3>
-        <dl class="kv">
-          <dt>원본 → 샌드박스</dt>
-          <dd>{{ preview.baseline.originDb }} → {{ preview.baseline.sandboxDb }}</dd>
-          <dt>기준선 시각</dt>
-          <dd>{{ formatTime(preview.baseline.backupFinishedAt) }}</dd>
-          <dt>행 이미지</dt>
-          <dd>
-            {{ formatCount(preview.capture.imageCount) }} / 상한 {{ formatCount(preview.capture.cap) }}
-            <span v-if="preview.capture.truncated" class="chip chip-warn">상한 초과</span>
-          </dd>
-          <dt>수집 매니페스트</dt>
-          <dd>{{ preview.capture.manifestVersion }}</dd>
-          <template v-if="manifest">
-            <dt>대상 테이블</dt>
-            <dd>
-              수집 {{ manifest.coveredTables }}개 · 제외 {{ manifest.excludedTables }}개
-              <template v-if="manifest.auditNotLast > 0"> · 감사 순서 불확실 {{ manifest.auditNotLast }}개</template>
-            </dd>
-          </template>
-        </dl>
-      </div>
-
-      <details>
-        <summary>단계별 소요 시간</summary>
-        <dl class="kv">
-          <template v-for="[k, v] in timings" :key="k">
-            <dt>{{ k }}</dt>
-            <dd>{{ formatMs(v) }}</dd>
-          </template>
-        </dl>
-      </details>
     </div>
-  </section>
+
+    <section class="sec" aria-labelledby="h-sum">
+      <h3 id="h-sum">테이블별 변경 행 수(순변경)</h3>
+      <template v-if="hasRows">
+        <NetSummaryTable :preview="preview" :basis="breakdown.basisByTable" />
+        <p class="hint">합계와 위 문구는 순변경 기준입니다. 발동 기준은 보조 정보라 합과 다를 수 있습니다.</p>
+      </template>
+      <template v-else>
+        <p class="none">
+          <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.8" /><path d="M8 7.4v3.6M8 5v.1" /></svg>
+          <span>변경 행 없음</span>
+        </p>
+        <p v-if="STATUS_NOTE[preview.status]" class="hint">{{ STATUS_NOTE[preview.status] }}</p>
+      </template>
+
+      <details v-if="breakdown.zeroRow.length" class="zero">
+        <summary>{{ zeroLabel }}</summary>
+        <ul>
+          <li v-for="f in breakdown.zeroRow" :key="f.id">
+            {{ zeroText(f.id, f.table, f.operation, f.cause.triggerCandidates) }}
+          </li>
+        </ul>
+      </details>
+
+      <p class="hint">{{ footLine }}</p>
+    </section>
+
+    <section class="sec" aria-labelledby="h-warn">
+      <h3 id="h-warn">경고와 참고</h3>
+      <p v-if="preview.warnings.length === 0" class="none ok">
+        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 4.8" /></svg>
+        <span>경고 없음</span>
+      </p>
+      <DiagnosticList v-else :items="preview.warnings" />
+      <p v-if="inferredTrigger" class="hint">트리거로 인한 변경의 귀속은 추론입니다(그래프의 파선).</p>
+    </section>
+
+    <section v-if="showStatements" class="sec" aria-labelledby="h-st">
+      <h3 id="h-st">문장별 결과</h3>
+      <StatementTable :statements="preview.statements" />
+    </section>
+
+    <section v-if="preview.residualCommitted.length" class="sec" aria-labelledby="h-residual">
+      <h3 id="h-residual">롤백 뒤 남은 변경 {{ preview.residualCommitted.length }}건</h3>
+      <NetChangeList :items="preview.residualCommitted" />
+      <p class="hint">트리거가 롤백 뒤에 남긴 변경입니다. 샌드박스는 오염으로 표시되고 다시 만들어집니다.</p>
+    </section>
+
+    <div class="sec">
+      <PreviewDetails :preview="preview" :consumed="consumed" />
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.stack {
-  display: grid;
-  gap: 12px;
+.summary {
+  min-width: 0;
 }
-.detail {
-  display: block;
-  margin-top: 2px;
+.sec {
+  padding: 8px var(--gx) 12px;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
 }
-.err-row {
-  color: var(--err);
+.sec:last-child {
+  border-bottom: 0;
+}
+.sec > h3 {
+  margin-bottom: 6px;
+}
+.sec .hint {
+  margin-top: 6px;
 }
 .none {
-  margin: 4px 0 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--muted);
+}
+.none.ok .ic {
+  color: var(--ok);
+}
+.why {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.zero {
+  margin-top: 8px;
+  color: var(--muted);
   font-size: 12px;
 }
-summary {
+.zero > summary {
   cursor: pointer;
-  font-size: 12.5px;
-  color: var(--fg-muted);
 }
-tfoot th {
-  border-bottom: none;
+.zero > summary:hover {
+  color: var(--fg);
+}
+.zero ul {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  overflow-wrap: anywhere;
 }
 </style>

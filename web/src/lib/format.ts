@@ -112,6 +112,8 @@ export const PRECONDITION_LABEL: Record<ApplyPrecondition, string> = {
   PREVIEW_EXPIRED: '미리보기가 만료됐습니다(30분).',
   FINGERPRINT_MISMATCH: '원본과 환경 지문이 다릅니다.',
   EXECUTE_AS_USER_MISSING: '원본 DB에 실행 사용자(dbr_preview_user)가 없습니다. 준비 단계가 필요합니다.',
+  WEAK_VERIFICATION_NOT_ACCEPTED: '원본에 스냅샷 권한이 없어 약한 검증(KEYSET)이 필요한데 동의하지 않았습니다.',
+  ORIGIN_UNREACHABLE: '원본에 연결할 수 없습니다. 연결을 복구한 뒤 샌드박스를 새로 고치고 다시 시도하세요.',
 }
 
 export function plural(n: number, unit: string): string {

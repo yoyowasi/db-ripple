@@ -1,6 +1,7 @@
 using DbRipple.Api.Middleware;
 using DbRipple.Contracts;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.HostFiltering;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +21,9 @@ public static class DbRippleApi
     /// <summary>요청 SQL 최대 길이(문자 수, 열린 질문 Q20). 넘으면 400.</summary>
     public const int MaxSqlLength = 1_000_000;
 
+    /// <summary>허용하는 Host 헤더(포트 제외). 설정으로 바꿀 수 없다.</summary>
+    public static readonly IReadOnlyList<string> LocalHosts = ["127.0.0.1", "localhost", "[::1]"];
+
     /// <summary>ProblemDetails, 예외 처리기, OpenAPI, JSON 설정, 교차 사이트 요청 방어(<see cref="CrossSiteRequestGuard"/>)를 등록한다.</summary>
     public static IServiceCollection AddDbRippleApi(this IServiceCollection services)
     {
@@ -28,6 +32,12 @@ public static class DbRippleApi
         services.AddOpenApi();
         services.AddCrossSiteRequestGuard();
         services.ConfigureHttpJsonOptions(o => ContractJson.Apply(o.SerializerOptions));
+        // 호스트 고정(N4): 설정 파일의 AllowedHosts(* 포함)보다 뒤에 적용돼 덮어쓴다. DNS 리바인딩 방어.
+        services.PostConfigure<HostFilteringOptions>(o =>
+        {
+            o.AllowedHosts = [.. LocalHosts];
+            o.AllowEmptyHosts = false;
+        });
         return services;
     }
 
@@ -127,8 +137,50 @@ public static class DbRippleApi
             })
             .WithName("ExportPreview").WithSummary("결과 JSON 파일(PreviewRecord)");
 
+        MapSettings(api);
         return app;
     }
+
+    // 설정(프로필) API(N4 계약 4절). 비밀번호·연결 문자열은 응답에 넣지 않는다.
+    static void MapSettings(RouteGroupBuilder api)
+    {
+        api.MapGet("/settings", async Task<Ok<SettingsView>> ([FromServices] ISettingsService settings, CancellationToken ct) =>
+                TypedResults.Ok(await settings.GetAsync(ct)))
+            .WithName("GetSettings").WithSummary("연결 설정(비밀값 없음). source profile·env·none");
+
+        api.MapPut("/settings", async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> (
+                [FromBody] SettingsRequest? request, [FromServices] ISettingsService settings, CancellationToken ct) =>
+            {
+                var outcome = await settings.SaveAsync(request ?? new SettingsRequest(), ct);
+                if (outcome.EnvOverride)
+                {
+                    var problem = new ProblemDetails
+                    {
+                        Status = StatusCodes.Status409Conflict,
+                        Title = "환경 변수 설정이 우선이라 저장할 수 없습니다",
+                    };
+                    problem.Extensions["reason"] = EnvOverrideReason;
+                    problem.Extensions["source"] = "env";
+                    return TypedResults.Problem(problem);
+                }
+                return outcome.Errors is { } errors ? TypedResults.ValidationProblem(errors) : TypedResults.NoContent();
+            })
+            .WithName("SaveSettings").WithSummary("설정 저장 후 연결을 다시 만든다(샌드박스는 재구축 필요). 400 필드별 errors, 409 ENV_OVERRIDE·LOCKED·BUILDING")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        api.MapPost("/settings/test", async Task<Results<Ok<SettingsTestResult>, ValidationProblem>> (
+                [FromBody] SettingsRequest? request, [FromServices] ISettingsService settings, CancellationToken ct) =>
+            {
+                var outcome = await settings.TestAsync(request ?? new SettingsRequest(), ct);
+                return outcome.Errors is { } errors ? TypedResults.ValidationProblem(errors) : TypedResults.Ok(outcome.Result!);
+            })
+            .WithName("TestSettings").WithSummary("저장하지 않고 원본·샌드박스에 연결해 권한을 읽기만 한다")
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+    }
+
+    /// <summary>PUT /api/settings 409 reason(환경 변수 우선).</summary>
+    public const string EnvOverrideReason = "ENV_OVERRIDE";
 
     /// <summary>SQL 입력 검사(비어 있음, 최대 길이 Q20). 문제가 없으면 null.</summary>
     static ValidationProblem? SqlProblem(string? sql)

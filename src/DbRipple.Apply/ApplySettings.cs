@@ -1,4 +1,5 @@
 using DbRipple.Contracts;
+using DbRipple.Core.Baseline;
 
 namespace DbRipple.Apply;
 
@@ -18,6 +19,12 @@ public sealed record ApplySettings
     public string OriginSnapshotSuffix { get; init; } = DefaultOriginSnapshotSuffix;
     /// <summary>미리보기 유효 시간(§5.3 선행 조건 "30분(설정값)").</summary>
     public TimeSpan PreviewExpiry { get; init; } = IPreviewStore.DefaultExpiry;
-    /// <summary>스냅샷을 만들 수 있어도 KEYSET으로 검증한다(테스트·데모 전용, §5.3 대체 경로 확인용).</summary>
+    /// <summary>스냅샷을 만들 수 있어도 KEYSET으로 검증한다(테스트·데모 전용, §5.3 대체 경로 확인용). 설정이 곧 동의라 요청 동의를 묻지 않는다.</summary>
     public bool ForceKeyset { get; init; }
+    /// <summary>서버 배치(2026-11-13). 기본 SingleServer(기존 동작·테스트). Split이면 커밋 뒤 자동 재구축 대신 "기준선 오래됨" 표시, 원본 스냅샷 이름에 PC·적용 id.</summary>
+    public ServerMode Mode { get; init; } = ServerMode.SingleServer;
+    /// <summary>PC 이름 조각(Split 원본 스냅샷 이름).</summary>
+    public string MachineTag { get; init; } = RunNames.MachineTag(Environment.MachineName);
+    /// <summary>Split 원본 연결의 SET LOCK_TIMEOUT(ms). 0 이하면 설정하지 않는다.</summary>
+    public int OriginLockTimeoutMs { get; init; } = 10000;
 }

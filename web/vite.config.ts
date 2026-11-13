@@ -22,7 +22,8 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
-    sourcemap: true,
+    // 실행 파일 배포본에는 소스맵을 넣지 않는다(개발 서버는 빌드와 무관하게 자체 맵을 쓴다).
+    sourcemap: false,
     rollupOptions: {
       output: {
         // 큰 라이브러리를 따로 나눠 앱 청크를 작게 하고 캐시를 살린다.

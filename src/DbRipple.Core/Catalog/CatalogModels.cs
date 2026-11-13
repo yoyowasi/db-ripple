@@ -7,9 +7,11 @@ public sealed record CatalogColumn(
     int ObjectId, int ColumnId, string Name, string SystemTypeName, bool IsUserClrType,
     bool IsNullable, bool IsComputed, bool IsIdentity, bool IsRowVersion, string? DefaultDefinition)
 {
-    // SEQUENCE/GETDATE/NEWID 류 기본값
+    // SEQUENCE/GETDATE/NEWID 류 기본값, 그리고 실행 환경(로그인·서버·DB)에 따라 달라지는 기본값(2026-11-13 Split: 샌드박스와 원본에서 값이 다름)
     static readonly Regex Nondeterministic = new(
-        @"NEXT\s+VALUE\s+FOR|GETDATE|GETUTCDATE|SYSDATETIME|SYSUTCDATETIME|SYSDATETIMEOFFSET|CURRENT_TIMESTAMP|NEWID|NEWSEQUENTIALID|RAND\s*\(",
+        @"NEXT\s+VALUE\s+FOR|GETDATE|GETUTCDATE|SYSDATETIME|SYSUTCDATETIME|SYSDATETIMEOFFSET|CURRENT_TIMESTAMP|NEWID|NEWSEQUENTIALID|RAND\s*\(" +
+        @"|\b(SUSER_SNAME|SUSER_NAME|SUSER_ID|SUSER_SID|ORIGINAL_LOGIN|HOST_NAME|HOST_ID|APP_NAME|DB_NAME|DB_ID|USER_NAME|USER_ID|SESSION_CONTEXT|CONTEXT_INFO)\s*\(" +
+        @"|\b(CURRENT_USER|SESSION_USER|SYSTEM_USER)\b|@@(SERVERNAME|SERVICENAME|SPID)\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     public bool HasNondeterministicDefault => DefaultDefinition is not null && Nondeterministic.IsMatch(DefaultDefinition);

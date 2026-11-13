@@ -21,6 +21,20 @@
 - **요약:** 문장별 결과, 테이블별 건수, 거부·경고, 트리거가 트랜잭션 밖에 남긴 변경을 보여 준다.
 - **[적용]·[취소]:** [적용]은 원본에서 같은 SQL을 다시 실행하고, 결과가 미리보기와 같을 때만 커밋한다(아래 "[적용]은 어떻게 안전한가").
 
+## 화면
+
+화면은 확정 목업 v6(IDE형 워크벤치)를 따른다. 왼쪽 탐색기, 가운데 SQL 편집기와 결과 탭(전파 그래프 | 행 변경), 오른쪽 요약·[적용] 레일로 이뤄진다. `web/`은 이 목업대로 구현돼 있다.
+
+![v6 워크벤치: DM1 주문 삭제 미리보기](docs/mockups/png/a-workbench-v6-dm1-light.png)
+
+상태별 화면(정상, 트리거 거부, 트리거 사슬, 드리프트):
+
+![v6 상태 4종](docs/mockups/png/a-v6-states.png)
+
+- **직접 열어 보기:** [docs/mockups/a-workbench-v6.html](docs/mockups/a-workbench-v6.html)을 내려받아 브라우저로 연다. 오른쪽 위 "목업 상태"로 8개 상태를 바꿔 볼 수 있다. 정적 목업이고, 숫자는 e2e 실측 로그 기준이며 로그에 없는 값은 화면에 "예시값"으로 표시했다.
+- **처음 비교한 방향 4종**(워크벤치, 영향 리포트, 그래프 캔버스, 단계 안내): [docs/mockups/index.html](docs/mockups/index.html), [비교 그림](docs/mockups/png/all-4-compare.png)
+- **다듬은 과정:** [v1→v2](docs/mockups/png/a-v1-vs-v2.png) · [v2→v3 AI 티 제거](docs/mockups/png/a-v2-vs-v3.png) · [v3→v4 시스템 통일](docs/mockups/png/a-v3-vs-v4.png) · [v4→v5 독립 검토 반영](docs/mockups/png/a-v4-vs-v5.png) · [v5→v6 그래프](docs/mockups/png/a-v5-vs-v6-graph.png)
+
 ## 다른 방법과 무엇이 다른가
 
 "트랜잭션 안에서 실행하고 롤백해 결과를 보여 주는" dry-run 기능은 다른 도구에도 있다. db-ripple은 거기서 한 걸음 더 나가, 바뀐 행마다 **왜 바뀌었는지(어떤 FK·트리거 때문인지)와 어떤 순서로 퍼졌는지**를 귀속한다. 확신할 수 없는 귀속은 확신도를 낮추고 후보를 함께 보여 준다.
@@ -121,6 +135,8 @@ flowchart LR
    ```
 
    브라우저로 `http://localhost:5273`을 연다. 처음 한 번은 위쪽 띠의 [샌드박스 새로 고침]으로 기준선을 만든다. 그다음 편집기에 SQL을 쓰고 Ctrl+Enter를 누르면 전파 그래프, before/after 표, 요약이 나온다. 화면 구성은 [web/README.md](web/README.md)에 있다.
+
+**실행 파일로 쓰기(2026-11-13):** Node·.NET 설치 없이 쓰는 배포본은 `.\scripts\publish.ps1`로 만든다(web 의존성은 미리 설치돼 있어야 한다). 결과는 `artifacts\db-ripple\`(실행 파일 폴더)와 `artifacts\db-ripple-win-x64.zip`이다. 받는 사람은 Docker Desktop만 설치하고, 폴더 안 `README-실행.txt`대로 `docker compose up -d`로 샌드박스를 띄운 뒤 `DbRipple.Host.exe`를 실행한다. 기본 브라우저가 일회용 실행 주소로 열리고(그 창에서만 API를 쓸 수 있다), 처음에는 화면의 설정에서 원본·샌드박스 연결을 저장한다(`%LOCALAPPDATA%\db-ripple\profile.json`, 비밀번호는 이 Windows 계정에서만 풀리게 따로 암호화). 브라우저를 열지 않으려면 `DbRipple.Host.exe --no-browser`로 실행하고 콘솔에 찍힌 주소를 연다. 위 4번의 `dotnet run`은 개발 모드(`Properties/launchSettings.json`, Vite 프록시)로 돌고 실행 토큰을 요구하지 않는다.
 
 **HTTP로 써 보기:** `/api` 아래의 POST에는 헤더 `X-DbRipple-Request: 1`이 필요하다(아래 "보안").
 

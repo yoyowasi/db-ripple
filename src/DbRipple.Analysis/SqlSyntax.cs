@@ -51,13 +51,25 @@ internal static class SqlSyntax
 
     // ---- 비결정 함수 ----
 
-    static readonly HashSet<string> NondeterministicFunctions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "GETDATE", "GETUTCDATE", "SYSDATETIME", "SYSUTCDATETIME", "SYSDATETIMEOFFSET",
-        "NEWID", "NEWSEQUENTIALID", "RAND", "CRYPT_GEN_RANDOM",
-    };
+    /// <summary>
+    /// 실행 환경(로그인·세션·서버·DB)에 따라 값이 달라지는 함수(2026-11-13 Split). 샌드박스(dbr_preview_user, 로컬 서버)와 원본(본인 로그인, 원본 서버)에서
+    /// 값이 달라지므로 E1 비결정으로 보고 [적용] 값 대조에서 뺀다(존재·형식만 비교). 아래 NondeterministicFunctions보다 먼저 선언해야 한다(정적 초기화 순서).
+    /// </summary>
+    public static readonly IReadOnlyList<string> EnvironmentFunctions =
+    [
+        "SUSER_SNAME", "SUSER_NAME", "SUSER_ID", "SUSER_SID", "ORIGINAL_LOGIN", "HOST_NAME", "HOST_ID", "APP_NAME",
+        "DB_NAME", "DB_ID", "USER_NAME", "USER_ID", "SESSION_CONTEXT", "CONTEXT_INFO",
+    ];
 
-    /// <summary>조각 안의 비결정 함수 호출(GETDATE 등, CURRENT_TIMESTAMP, NEXT VALUE FOR)을 찾는다.</summary>
+    static readonly HashSet<string> NondeterministicFunctions = new(
+        ["GETDATE", "GETUTCDATE", "SYSDATETIME", "SYSUTCDATETIME", "SYSDATETIMEOFFSET", "NEWID", "NEWSEQUENTIALID", "RAND", "CRYPT_GEN_RANDOM", .. EnvironmentFunctions],
+        StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>인자 없는 호출(CURRENT_USER 등)과 전역 변수 중 환경 의존 값.</summary>
+    public static readonly IReadOnlyList<string> EnvironmentValues =
+        ["CURRENT_USER", "SESSION_USER", "SYSTEM_USER", "USER", "@@SERVERNAME", "@@SERVICENAME", "@@SPID"];
+
+    /// <summary>조각 안의 비결정 함수 호출(GETDATE 등, CURRENT_TIMESTAMP, NEXT VALUE FOR, 환경 의존 함수·값)을 찾는다.</summary>
     public static List<(string Name, TSqlFragment Node)> FindNondeterminism(TSqlFragment fragment)
     {
         var v = new NondeterminismFinder();
@@ -74,7 +86,18 @@ internal static class SqlSyntax
         }
         public override void Visit(ParameterlessCall n)
         {
-            if (n.ParameterlessCallType == ParameterlessCallType.CurrentTimestamp) Hits.Add(("CURRENT_TIMESTAMP", n));
+            switch (n.ParameterlessCallType)
+            {
+                case ParameterlessCallType.CurrentTimestamp: Hits.Add(("CURRENT_TIMESTAMP", n)); break;
+                case ParameterlessCallType.CurrentUser: Hits.Add(("CURRENT_USER", n)); break;
+                case ParameterlessCallType.SessionUser: Hits.Add(("SESSION_USER", n)); break;
+                case ParameterlessCallType.SystemUser: Hits.Add(("SYSTEM_USER", n)); break;
+                case ParameterlessCallType.User: Hits.Add(("USER", n)); break;
+            }
+        }
+        public override void Visit(GlobalVariableExpression n)
+        {
+            if (EnvironmentValues.Contains(n.Name, StringComparer.OrdinalIgnoreCase)) Hits.Add((n.Name.ToUpperInvariant(), n));
         }
         public override void Visit(NextValueForExpression n) => Hits.Add(("NEXT VALUE FOR", n));
     }

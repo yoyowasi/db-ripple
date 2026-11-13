@@ -7,6 +7,8 @@ import type { CatalogSchema, SandboxStatus, SchemaTable } from '../api/types'
 export const useSandboxStore = defineStore('sandbox', () => {
   const status = shallowRef<SandboxStatus | null>(null)
   const statusError = ref<string | null>(null)
+  /** 상태 조회가 401 NO_SESSION이다(실행 파일이 연 창이 아님). 화면이 안내 배너를 띄운다. */
+  const noSession = ref<ApiError | null>(null)
   const schema = shallowRef<CatalogSchema | null>(null)
   const schemaError = ref<string | null>(null)
   const refreshing = ref(false)
@@ -55,11 +57,13 @@ export const useSandboxStore = defineStore('sandbox', () => {
       const s = await getSandbox()
       status.value = s
       statusError.value = null
+      noSession.value = null
       if (s.baselineAt && s.state !== 'building' && schema.value?.baselineAt !== s.baselineAt) {
         void loadSchema(s.baselineAt)
       }
     } catch (e) {
       statusError.value = e instanceof ApiError ? describeApiError(e) : String(e)
+      noSession.value = e instanceof ApiError && e.isNoSession ? e : null
     } finally {
       polling = false
     }
@@ -98,5 +102,5 @@ export const useSandboxStore = defineStore('sandbox', () => {
     }
   }
 
-  return { status, statusError, schema, schemaError, refreshing, tableIndex, findTable, start, stop, poll, refresh }
+  return { status, statusError, noSession, schema, schemaError, refreshing, tableIndex, findTable, start, stop, poll, refresh }
 })

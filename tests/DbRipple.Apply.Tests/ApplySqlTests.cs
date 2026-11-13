@@ -55,7 +55,7 @@ sealed class ApplyLab : IAsyncDisposable
             await TestDb.ExecAsync(origin, PreviewUserSql.EnsureBatch(await SchemasAsync(origin)));
             var manager = new SandboxManager(new SandboxManagerOptions
             {
-                ConnectionString = TestDb.ConnectionString(),
+                Connections = ServerConnections.SingleServer(TestDb.ConnectionString()),
                 OriginDb = origin,
                 SandboxDb = origin + "_sbx",
                 SnapshotDb = origin + "_base",
@@ -66,7 +66,7 @@ sealed class ApplyLab : IAsyncDisposable
             var executor = new PreviewExecutor(TestDb.ConnectionString(), new ExecutionSettings { ExecuteAsUser = PreviewUserSql.UserName }, new NetDiffer());
             var store = new PreviewStore(Path.Combine(dir, "previews"), TimeProvider.System);
             var pipeline = new PreviewPipeline(manager, new BatchAnalyzer(), executor, new ChangeCollector(), new CausalResolver(), store, TimeProvider.System);
-            var service = new ApplyService(TestDb.ConnectionString(), settings, store, manager, new BatchAnalyzer(), new StatementRunner(), new NetDiffer(), TimeProvider.System);
+            var service = new ApplyService(new OriginConnection(TestDb.ConnectionString()), settings, store, manager, new BatchAnalyzer(), new StatementRunner(), new NetDiffer(), TimeProvider.System);
             return new ApplyLab(origin, cleanup, dir, manager, pipeline, service);
         }
         catch

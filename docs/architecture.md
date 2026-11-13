@@ -230,6 +230,15 @@ flowchart LR
 
 **이후 범위:** 원본 서버와 분리한 샌드박스 인스턴스를 둔다. 주버전·CU·서버 옵션이 같아야 하고, 환경 지문(§6.2)이 일치해야 미리보기를 허용한다.
 
+**2026-11-13 결정(배포 구성 Split):** 위 "이후 범위"를 기본으로 당겼다(D2). 원본은 원격 서버(본인 로그인, `DBRIPPLE_ORIGIN_CONNECTION`), 샌드박스는 내 PC의 이 컨테이너(`DBRIPPLE_SANDBOX_CONNECTION`)다. `scripts/env.ps1 -Split`이 두 연결 문자열을 만든다(원본 값은 .env, 비밀값 출력 없음). compose는 가져오기 폴더 `./.data/import`를 `/var/opt/mssql/import`에 바인드 마운트하고, 서버 정렬 `MSSQL_COLLATION`을 받는다. `SingleServer`(`DBRIPPLE_SQL_CONNECTION` 하나)는 평가·DB 테스트용으로 그대로 둔다. 한계: 원본과 샌드박스의 주버전·CU·플랫폼 차이는 경고만 하며, 인스턴스마다 RAM 2GB 이상이 든다.
+
+**2026-11-13 결정(실행 파일·보안, N4):** 백엔드·프런트는 "각자 PC에서 실행하는 실행 파일 하나"로 묶는다(Node·npm·.NET 설치 불필요, 샌드박스용 Docker Desktop만 필요).
+- **게시:** `scripts/publish.ps1`이 `npm run build`(SP9 끔, 소스맵·개발 전용 문자열이 있으면 실패) → `dotnet publish -r win-x64 --self-contained`(폴더 게시, 단일 파일 아님) → `wwwroot` 복사 → `README-실행.txt`·compose·`.env.example` → zip(`artifacts/`, 커밋 안 함).
+- **실행:** Host가 `wwwroot`를 같은 출처로 서빙하고(`/api` 밖 GET은 index.html), 시작 뒤 기본 브라우저로 실행 URL을 연다(`--no-browser`로 끔). 포트는 `DbRipple:Urls`(루프백만, 기본 5080)이고, 이미 쓰이면 127.0.0.1의 빈 포트로 열어 실제 주소를 로그·URL·허용 출처에 쓴다.
+- **연결 설정:** 환경 변수(`DBRIPPLE_*_CONNECTION`)가 있으면 그것(개발·평가, 설정 API 읽기 전용), 없으면 화면의 설정이 `%LOCALAPPDATA%\db-ripple\profile.json`(스키마 버전)에 저장한다. 비밀번호는 `profile.secret`에 따로 두고 DPAPI(CurrentUser)로 보호한 Data Protection 키로 암호화한다(기억 안 함이면 메모리만).
+- **데이터 폴더:** 실행 파일 모드는 미리보기 저장소·매니페스트·가져오기 폴더가 `%LOCALAPPDATA%\db-ripple\{previews,baseline,import}`이고, 게시본 compose도 그 import 폴더를 마운트한다. 개발 모드(`ASPNETCORE_ENVIRONMENT=Development`, `Properties/launchSettings.json`)는 지금의 `.data/` 경로를 쓴다.
+- **한계:** 서버 쪽 `dbr_*.bak`은 도구가 지우지 못한다(사용자·DBA). 원본 연결 문자열 조립과 [연결 시험]은 실제 원본 서버로 확인하지 않았다.
+
 ## 4. 컴포넌트 책임과 인터페이스
 
 | # | 컴포넌트 | 책임 | 인터페이스(입력 → 출력) |
@@ -679,6 +688,11 @@ INSERT 예시(비결정 열):
 
 **환경 지문:** 위 `fingerprint` 필드들이다. 원본과 샌드박스에서 모두 같아야 한다.
 
+**2026-11-13 결정(지문 v2, 근거 `src/DbRipple.Core/Baseline/Fingerprint.cs`):** Split에서는 지문을 두 연결에서 따로 읽는다(전에는 같은 master 연결에서 읽어 늘 같았다). 필드 추가: `serverCollation`, `hostPlatform`, `majorVersion`, 실행 연결의 `language`·`dateFormat`·`dateFirst`, `hasUserClrAssemblies`. 판정은 필드별이다.
+- **차단(`fingerprintMatch=false`):** 호환성 수준, DB 정렬, 서버 정렬, nested triggers, disallow results from triggers, RECURSIVE_TRIGGERS, 언어·DATEFORMAT·DATEFIRST. 언어 계열은 샌드박스 연결 문자열 `Current Language`로 맞출 수 있다(실행 봉투 SET은 미룸). 서버 정렬은 컨테이너 생성 때 `MSSQL_COLLATION`으로 정한다.
+- **경고(`fingerprintWarnings`, 막지 않음):** ProductVersion, Edition, HostPlatform, 주버전, 읽은 연결의 @@OPTIONS, 사용자 CLR 어셈블리(거부 후보). trace flag는 아직 읽지 않는다.
+- `SandboxStatus`에 `mode`·`origin`·`fingerprintWarnings`·`fingerprintMismatches`·`baselineStale`, `PreviewResult.baseline`에 `fingerprintWarnings`를 비파괴로 더했다. SingleServer는 지금처럼 지문 레코드 전체가 같아야 일치다.
+
 **v1.3 보충(2026-11-10):**
 - `sessionOptions`(@@OPTIONS)는 지문을 읽는 연결의 값이라 원본과 샌드박스 비교에서는 늘 같다. 실행 봉투의 세션 옵션은 실행기(C10)가 따로 고정하고 점검한다. SqlClient 기본값은 QUOTED_IDENTIFIER ON(@@OPTIONS 5432)이고, sqlcmd는 `-I`가 없으면 OFF다.
 - 헤더 `tranCount`는 BEGIN TRAN 안의 문장에서 2가 정상값이다(트리거 안 @@TRANCOUNT, SP10).
@@ -864,6 +878,15 @@ MVP의 미리보기 요청은 끝날 때까지 기다리는 동기 방식이다.
 - **남는 위험:** 같은 PC의 브라우저 밖 프로그램은 헤더를 붙여 보낼 수 있다. API에 인증은 없다(R13). `http://[::1]:5273`으로 열면 Host 필터와 Origin 검사가 막는다(허용 목록에 없음). AllowedHosts는 설정 파일에만 있어 환경 변수로 `*`를 주면 재바인딩 방어가 풀린다.
 - **확인 범위:** Api.Tests(TestServer, 가짜 서비스)로 확인했다. 실제 Host를 브라우저로 띄워 확인하지는 않았다. `AllowedHosts` 제한은 테스트 전이다.
 
+**2026-11-13 결정(실행 파일·보안, N4, 근거 `src/DbRipple.Api/Middleware/LaunchSession.cs`, `CrossSiteRequestGuard.cs`, `DbRippleApi.cs`):** 실행 파일 모드(Development가 아닐 때)의 최소 보안. 개발 모드는 위 v1.5 동작 그대로다.
+- **실행 토큰:** 시작마다 32바이트 난수 토큰(메모리만). 실행 URL `/?launch=<토큰>`을 한 번 받으면 쿠키 `dbr_session`(HttpOnly, SameSite=Strict, Path=/)을 주고 302로 쿼리를 지운다. 토큰은 즉시 새로 바뀌고 새 URL은 콘솔에만 찍는다. 쿠키가 없으면 `/api/**`(GET 포함) 401 ProblemDetails `reason: NO_SESSION`, 문서는 401 HTML. `/assets/**`는 통과.
+- **보안 헤더(모든 응답, 오류 포함):** `Content-Security-Policy`(default-src 'self', script-src 'self', frame-ancestors 'none' 등), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`.
+- **Host·출처:** AllowedHosts는 코드에서 `127.0.0.1;localhost;[::1]`로 고정한다(설정의 `*` 무시). 허용 출처는 실제 바인딩 주소에서 계산하고 Vite 5273은 Development에서만 허용한다(`appsettings.json`의 `AllowedOrigins` 삭제).
+- **설정 API:** `GET /api/settings`(비밀값 없음, `source` profile·env·none), `PUT /api/settings`(204, 400 필드별 `errors`, 409 `ENV_OVERRIDE`·`LOCKED`, Split인데 샌드박스가 루프백이 아니면 400), `POST /api/settings/test`(저장 없이 serverName·버전·에디션·sysadmin·BACKUP·CREATE DATABASE 권한을 읽기만). 연결 문자열은 `SqlConnectionStringBuilder`로만 만들고 원본 `TrustServerCertificate`는 사용자가 켤 때만 true다. 저장하면 서비스 묶음을 다시 만들고 기준선을 "오래됨"으로 표시한다.
+- **원본 연결 불가:** `SandboxStatus.originReachable=false`(지문 경고 "원본 연결 안 됨 · 지문 비교 보류")면 미리보기는 기존 기준선으로 허용하고 [적용]은 선행 조건 `ORIGIN_UNREACHABLE`로 막는다. `SandboxStatus.origin`에 `login`·`isSysadmin`을 더했고, Split 원본 로그인이 sysadmin이면 [적용] 결과 limitations에 적는다(막지 않음).
+- **로그:** 예외 처리기는 모든 예외를 처리하고, 로그에는 `Password=`·`Pwd=` 값을 가린 문장과 SqlException 번호·서버만 남긴다(예외 객체를 로거에 넘기지 않음). `ExecuteAsUser`가 빈 문자열이면 시작하지 않는다.
+- **한계:** 같은 PC의 다른 계정·다른 프로그램은 토큰 없이 API를 쓰지 못하지만, 이 브라우저의 쿠키를 읽을 수 있는 브라우저 확장이나 같은 계정의 악성 프로그램은 막지 못한다. 쿠키는 포트를 가리지 않으므로 127.0.0.1의 다른 로컬 웹 서버에도 보내진다(HttpOnly라 스크립트로는 못 읽음). HTTPS는 쓰지 않는다(루프백).
+
 ## 7. 원인 귀속과 순서 규칙
 
 ### 7.1 전제 (모두 §13 스파이크로 확인)
@@ -978,6 +1001,13 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 - **복구:** 실행 중 연결이 끊기거나 이상 상태가 되면 §5.1로 기준선을 다시 만든다. RESTORE 전에는 기준 스냅샷부터 지운다. 스냅샷 되돌리기는 평가 회차 초기화에만 쓴다(SP5로 시간을 잰 뒤 결정). **v1.3(SP5):** 되돌리기 411ms, RESTORE 611ms(AW, 1회 측정, 되돌리기 전 변경은 1,000행 하나). 평가 회차 초기화는 스냅샷 되돌리기로 하고, 실패하면 RESTORE로 대신한다.
 - **반대 의견(패널, 충실도 관점):** B가 IDENTITY·SEQUENCE를 원본과 같게 유지해 충실도가 높다. → 새 키는 어느 방식이든 [적용] 때 달라질 수 있어 "예상값"으로 표시해야 한다(A13). 그래서 C를 기본으로 두고, 비교에는 IDENTITY 짝 매핑(§10.4)을 쓴다. 평가는 제품과 같은 정책(C)으로 재고, 사례 사이에만 초기화한다.
 
+**2026-11-13 결정(샌드박스 위치):** 기본 모드를 `Split`(원본 서버 → 내 PC Docker 샌드박스)으로 바꾼다. 각자 자기 PC에서 실행하고, 원본은 팀 개발·테스트 서버일 수 있다(운영 DB는 범위 밖). 같은 인스턴스(`SingleServer`)는 평가 하네스·DB 테스트 전용으로 남긴다(설정 `DbRipple:Mode`). 단, Split 경로를 실제 DB로 확인(SP17)하기 전까지 `appsettings.json`의 기본값은 `SingleServer`로 두고 Split은 설정으로 켠다(확인 안 된 경로를 기본으로 두지 않는다).
+- **원본 최소 권한:** 백업을 원본에서 만들면 `db_backupoperator`, 직접 .bak을 넘기면(`DbRipple:Backup:ImportFile`) 불필요. 그 밖은 본인의 SELECT·DML. 원본에 DDL·RESTORE·DROP·사용자 생성·가장을 하지 않는다.
+- **복제 방법:** 원본 `BACKUP … WITH COPY_ONLY, COMPRESSION, CHECKSUM, INIT`(파일 `dbr_<pc>_<UTC>.bak`) → UNC 공유 또는 지정 파일을 가져오기 폴더로 복사 → 로컬에서 `RESTORE HEADERONLY`(전체 백업, 암호화 거부, 주버전 ≤ 로컬, DB 이름) → `FILELISTONLY`(FILESTREAM·메모리 최적화 거부) → `RESTORE WITH MOVE`(로컬 기본 경로) → 소유자 sa·nested triggers·disallow results를 원본 값에 맞춤(로컬만) → 기존 4b·5·7.
+- **새로 고침:** Split은 [적용] 커밋 뒤 자동 재구축하지 않고 "기준선 오래됨"(`SandboxStatus.baselineStale`)으로 표시한다. 오염 뒤 재구축은 그대로다.
+- **안전장치:** 파괴 단계는 `SandboxConnection` 타입만 받는다(원본 연결 타입에는 임의 SQL 실행 메서드가 없다). 두 연결의 @@SERVERNAME·MachineName이 같거나 로컬 master 표식(`dbripple_instance` 확장 속성)이 원본 연결에서 보이면 기준선을 만들지 않는다. 샌드박스 Data Source가 루프백이 아니면 경고한다.
+- **미룬 것:** KEYSET_HASH(미리보기 밖 테이블 해시), UNC 자동 백업·복사 고급 처리(원본 서버 쪽 백업 파일 정리 포함), SP17~SP21 실측, 실행 파일 묶기·첫 실행 화면, EXEC.
+
 ### D3. 변경 수집 — 감사 트리거(Last) + 최종 차이 대조
 
 | 대안 | 장점 | 단점 |
@@ -1058,7 +1088,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 
 **v1.4 거부 추가(2026-11-10, 2주차 독립 검토):**
 - 직접 대상 테이블·연산에 ROLLBACK이 아닌 트랜잭션 제어(COMMIT, BEGIN TRAN, SAVE TRAN)를 하는 활성 트리거가 있으면 거부한다(`REJECT_TRIGGER_TRANSACTION_CONTROL`, `TriggerStaticInfo.HasTransactionControl`). 트리거의 `COMMIT; BEGIN TRAN;`은 오류 없이 사용자 변경을 샌드박스에 커밋한다(DB 재현).
-- FK·트리거 연쇄로 닿는 테이블의 트리거는 분석기가 보지 않는다. 그 경우는 실행기 방어(§5.2 v1.4)가 잡는다.
+- ~~FK·트리거 연쇄로 닿는 테이블의 트리거는 분석기가 보지 않는다. 그 경우는 실행기 방어(§5.2 v1.4)가 잡는다.~~ **2026-11-13 수정:** 실행기 방어는 트랜잭션 확정(COMMIT)만 감지해서, 연쇄로 닿는 테이블 트리거의 외부 부작용은 샌드박스에서 실제로 실행될 수 있었다. 그래서 분석기가 도달 폐포를 본다. 직접 대상(테이블, 연산)에서 시작해 FK 참조 동작(CASCADE는 같은 연산, SET NULL·SET DEFAULT는 자식 UPDATE)과 트리거의 정적 쓰기 대상(연산은 셋 다)으로 고정점까지 넓히고, 닿는 활성 트리거가 암호화·외부 부작용·파싱 실패·ROLLBACK이 아닌 트랜잭션 제어이면 직접 대상과 같은 규칙 ID로 거부한다(메시지에 닿는 경로를 적는다). 쓰기 대상을 모르는 트리거(암호화, 파싱 실패, 동적 SQL, 못 펼친 프로시저)를 만나면 모든 사용자 테이블에 닿는 것으로 보고 닫힌 쪽으로 넓힌다. ROLLBACK만 하는 트리거는 지금처럼 거부하지 않는다(trigger_blocked). 코드는 `BatchAnalyzer.CheckReachedTriggers`.
 - 암호화·CLR·파싱 실패 트리거가 붙은 테이블의 DML도 거부한다(§4 v1.4 C6).
 
 **경고(실행은 함)**
@@ -1132,6 +1162,14 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 
 - **반대 의견(패널, 1달 MVP 관점):** 원본 스냅샷 대조는 선택 기능으로 두자. → 최종 차이 계산기는 D3에서 이미 만들므로 재사용 비용이 작다. `KEYSET`은 스냅샷을 만들 수 없을 때의 대체 경로일 뿐 일정 절감 수단이 아니다.
 
+**2026-11-13 결정(Split, 근거 `src/DbRipple.Apply/ApplyService.cs`·`ApplySteps.cs`, DB 미확인):**
+- **검증 모드 사전 결정:** 실행 전에 원본 연결에서 `HAS_PERMS_BY_NAME`(CREATE ANY DATABASE 또는 master의 CREATE DATABASE)과 FILESTREAM(FD)·메모리 최적화(FX) 파일 그룹으로 정한다. 스냅샷을 만들 수 있으면 `SNAPSHOT_NETDIFF`, 생성이 실패하면 원인과 상관없이 `error`다(예상 밖 SqlException을 KEYSET으로 조용히 낮추던 경로 삭제, SingleServer 포함).
+- **약한 검증 동의:** 스냅샷을 만들 수 없으면 `KEYSET`이고, 요청에 `allowKeysetVerification=true`가 없으면 `precondition_failed`(`WEAK_VERIFICATION_NOT_ACCEPTED`). `ForceKeyset` 설정은 설정 동의로 본다.
+- **이름:** Split 원본 스냅샷은 `<원본>_pre_<pc>_<적용id>`, 스파스 파일은 원본 DB 문맥 `sys.database_files.physical_name`의 폴더에 둔다. 자기가 만든 이름만 지운다. SingleServer는 `<원본>_pre` 그대로.
+- **실행 주체 불일치(한계):** Split [적용]은 가장 없이 본인 로그인으로 실행한다(원본에 사용자 생성·IMPERSONATE 없음). 미리보기는 샌드박스의 `dbr_preview_user`라 권한·`USER_NAME()` 결과가 다를 수 있어 `verification.limitations`에 적는다. `EXECUTE_AS_USER_MISSING`은 SingleServer에서만 본다. 원본 연결에 `SET LOCK_TIMEOUT`(기본 10000ms)을 건다.
+- **환경 의존 함수:** SUSER_SNAME·ORIGINAL_LOGIN·HOST_NAME·APP_NAME·DB_NAME·USER_NAME·CURRENT_USER·@@SERVERNAME 등은 E1 비결정으로 보고 값 대조에서 뺀다.
+- **동시 [적용]은 범위 밖:** 다른 세션의 쓰기로 생기는 불일치는 롤백 쪽으로 실패한다.
+
 ### D8. 수만 행 변경 — 상한까지 행 이미지, 넘으면 키와 건수만
 
 | 대안 | 장점 | 단점 |
@@ -1182,7 +1220,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 | E15 | 사용자 Last 트리거가 이미 있는 테이블 | 감사 트리거 순서를 `NONE`으로 두고, 그 문맥의 자식 귀속은 `ambiguous` 이하로 한다(§7.2 2단계). 매니페스트에 표시한다. | — | A6 |
 | E16 | CLR(hierarchyid, geography), xml, text/ntext/image 열 | §6.1 규칙을 따른다. text/ntext/image는 최종 차이에서만 비교한다. | — | A12, A19 |
 | E17 | temporal 히스토리, 메모리 최적화 테이블 | 감사 트리거를 설치하지 않는다. 최종 차이로만 수집하고 원인은 `EXCLUDED_TABLE`로 둔다(temporal은 시스템 버전 관리로 표시). | WWI 지원 | A20, A14 |
-| E18 | 외부 부작용이 있는 트리거(Database Mail, 링크드 서버) | 그 테이블 대상 DML을 거부한다. | — | D5 |
+| E18 | 외부 부작용이 있는 트리거(Database Mail, 링크드 서버) | 그 테이블 대상 DML을 거부한다. FK 연쇄·트리거로 그 테이블에 닿는 DML도 거부한다(2026-11-13, D5 도달 폐포). | — | D5 |
 | E19 | 권한(트리거는 CALLER로 실행) | 사용자 문장 구간에만 실행 주체를 원본과 같은 DB 사용자로 맞춘다(`EXECUTE AS USER`). 권한 오류가 나면 운영과 같은 결과이므로 그대로 보인다. 수집 기록 읽기·비교는 REVERT 뒤 도구 계정으로 한다. | — | A18, SP10 |
 | E20 | 타임아웃, 연결 끊김 | CommandTimeout, XACT_ABORT ON, finally에서 ROLLBACK한다. 상태가 이상하면 세션을 정리하고, 기준 스냅샷을 지운 뒤 RESTORE로 기준선을 다시 만든다(§5.1). | — | §5 |
 | E21 | 중첩 32단계 초과 | 엔진 오류를 그대로 `failed`로 보인다. | — | A8 |

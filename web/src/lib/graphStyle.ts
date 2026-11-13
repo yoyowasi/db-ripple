@@ -1,62 +1,86 @@
-// 간선 모양 규칙(§6.3, C2). 선 모양은 확신도, 색은 종류, 흐린 점선은 관측되지 않은 트리거(observed:false).
-// 색만으로 구분하지 않도록 종류는 라벨 글자로도 적는다.
-import type { Confidence, GraphEdge, GraphEdgeKind } from '../api/types'
+// 간선·노드 표시 규칙(§6.3, 목업 v6). 선 모양 = 확신도, 색 = 간선 종류(토큰 --k-*), 종류는 라벨 글자로도 적는다.
+import type { Confidence, FkAction, GraphEdge, GraphEdgeKind } from '../api/types'
+import { CONFIDENCE_LABEL } from './format'
 
-export interface ConfidenceStyle {
-  dash: string | undefined
-  width: number
-  label: string
-  description: string
+/** 간선 종류 → 색 묶음(CSS 클래스 tone-*). FIRES·WRITES·REPLACES는 트리거 색을 같이 쓴다. */
+export type EdgeTone = 'direct' | 'fk' | 'fires' | 'blocked' | 'residual'
+export const EDGE_TONE: Record<GraphEdgeKind, EdgeTone> = {
+  DIRECT: 'direct',
+  FK: 'fk',
+  FIRES: 'fires',
+  REPLACES: 'fires',
+  WRITES: 'fires',
+  RESIDUAL: 'residual',
+  BLOCKED: 'blocked',
 }
 
-export const CONFIDENCE_STYLE: Record<Confidence, ConfidenceStyle> = {
-  certain: { dash: undefined, width: 2.6, label: '실선(굵게)', description: '확실: 메타데이터와 키 일치로 확정' },
-  inferred: { dash: '9 5', width: 2, label: '파선', description: '추론: 정적 분석·위치 규칙으로 추론' },
-  ambiguous: { dash: '12 4 2 4', width: 2, label: '일점쇄선', description: '모호: 후보가 여럿' },
-  unexplained: { dash: '3 4', width: 1.8, label: '짧은 점선(노란색)', description: '설명 안 됨: 원인을 못 찾음' },
+export const FK_ACTION_TEXT: Record<FkAction, string> = {
+  CASCADE: 'CASCADE',
+  SET_NULL: 'SET NULL',
+  SET_DEFAULT: 'SET DEFAULT',
 }
 
-/** 관측되지 않은 트리거로 가는 선: 변경을 남기지 않아 카탈로그로 "발동했을 것"만 추정한 것. */
-export const UNOBSERVED_DASH = '1 6'
-
-export const KIND_COLOR: Record<GraphEdgeKind, string> = {
-  DIRECT: '#4a86e8',
-  FK: '#1aa6a6',
-  FIRES: '#8791a0',
-  REPLACES: '#a463d8',
-  WRITES: '#3fae5f',
-  RESIDUAL: '#d9902b',
-  BLOCKED: '#dc4b44',
-}
-
-export const KIND_LABEL: Record<GraphEdgeKind, string> = {
+/** 축소 표시(배율 80% 미만)에서 쓰는 짧은 라벨 */
+export const KIND_SHORT: Record<GraphEdgeKind, string> = {
   DIRECT: '직접',
   FK: 'FK',
-  FIRES: '발동',
-  REPLACES: '대체(INSTEAD OF)',
+  FIRES: '트리거',
+  REPLACES: 'INSTEAD OF',
   WRITES: '쓰기',
-  RESIDUAL: '잔차 후보',
-  BLOCKED: '차단',
+  RESIDUAL: '설명 안 됨',
+  BLOCKED: '거부',
 }
 
-export const KIND_DESCRIPTION: Record<GraphEdgeKind, string> = {
-  DIRECT: '문장 → 묶음: 문장의 직접 대상 변경',
-  FK: '부모 묶음 → 자식 묶음: FK 참조 동작',
-  FIRES: '묶음 → 트리거: 그 묶음이 트리거를 발동시킴',
-  REPLACES: '문장 → 트리거: INSTEAD OF가 원래 동작을 대체',
-  WRITES: '트리거 → 묶음: 트리거 실행 중 생긴 변경',
-  RESIDUAL: '트리거·묶음 → 잔차: 설명되지 않은 최종 변경의 후보 원인',
-  BLOCKED: '문장 → 오류: 실행 실패·거부',
+const CONF_SUFFIX: Partial<Record<Confidence, string>> = { inferred: ' · 추론', ambiguous: ' · 모호' }
+
+/** 간선 가운데 알약 글자. 예: "직접", "FK · CASCADE · 추론", "거부" */
+export function edgeLabel(e: GraphEdge): string {
+  let text = KIND_SHORT[e.kind]
+  if (e.kind === 'FK' && e.action) text = `FK · ${FK_ACTION_TEXT[e.action]}`
+  if (e.kind !== 'BLOCKED' && e.kind !== 'RESIDUAL') text += CONF_SUFFIX[e.confidence] ?? ''
+  return text
 }
 
 export const OBSERVED_ONLY_TEXT = '관측 순서, 보장 안 됨'
 
-export function edgeLabelText(e: GraphEdge): string {
-  let text = KIND_LABEL[e.kind]
+const KIND_TITLE: Record<GraphEdgeKind, string> = {
+  DIRECT: '문장이 직접 바꾼 테이블',
+  FK: '외래 키 연쇄',
+  FIRES: '이 묶음이 트리거를 발동시켰다고 보는 연결',
+  REPLACES: 'INSTEAD OF 트리거가 원래 동작을 대신함',
+  WRITES: '트리거 실행 중 생긴 변경',
+  RESIDUAL: '설명되지 않은 변경의 후보 원인',
+  BLOCKED: '문장이 실패하거나 트리거가 거부함',
+}
+
+/** 간선 tooltip: FK 전체 이름·action·확신도·일치 행 수 */
+export function edgeTitle(e: GraphEdge): string {
+  const parts: string[] = []
   if (e.kind === 'FK') {
-    const parts = [e.fk, e.action, e.matchedRows !== null ? `${e.matchedRows}행` : null].filter(Boolean)
-    if (parts.length) text += ` ${parts.join(' · ')}`
+    if (e.fk) parts.push(e.fk)
+    parts.push(e.action ? FK_ACTION_TEXT[e.action] : '외래 키')
+  } else {
+    parts.push(KIND_TITLE[e.kind])
   }
-  if (e.orderGuarantee === 'observed_only') text += ` · ${OBSERVED_ONLY_TEXT}`
-  return text
+  parts.push(`확신도 ${CONFIDENCE_LABEL[e.confidence]}`)
+  if (e.matchedRows !== null) parts.push(`일치 ${e.matchedRows.toLocaleString('en-US')}행`)
+  if (e.orderGuarantee === 'observed_only') parts.push(`형제 순서 ${OBSERVED_ONLY_TEXT}`)
+  return parts.join(' · ')
+}
+
+/** 범례 "선 모양" 글자 */
+export const CONFIDENCE_LINE: Record<Confidence, string> = {
+  certain: '실선 확실',
+  inferred: '파선 추론',
+  ambiguous: '점선 모호',
+  unexplained: '점선 설명 안 됨',
+}
+
+/** 범례 "읽는 법"의 간선 줄 */
+export const TONE_LEGEND: Record<EdgeTone, [string, string]> = {
+  direct: ['직접', '문장이 직접 바꾼 테이블'],
+  fk: ['FK · CASCADE', '외래 키 연쇄. 전체 FK 이름은 간선에 마우스를 올리면 보입니다'],
+  fires: ['트리거 · 쓰기', '트리거 발동과 그 쓰기(INSTEAD OF 포함)'],
+  blocked: ['거부', '문장이 실패하거나 트리거가 거부함'],
+  residual: ['설명 안 됨', '설명되지 않은 변경의 후보 원인'],
 }

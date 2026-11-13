@@ -414,16 +414,17 @@ internal static class KeysetVerifier
     }
 }
 
-/// <summary>원본 스냅샷 생성 결과.</summary>
+/// <summary>원본 스냅샷 생성 결과. 2026-11-13: 생성 실패는 모두 Failed(error)다. KEYSET은 실행 전 CheckSnapshotCapability로만 정한다(조용한 강등 없음).</summary>
 internal enum SnapshotOutcome
 {
     /// <summary>만들었다(SNAPSHOT_NETDIFF).</summary>
     Created,
-    /// <summary>이 DB는 스냅샷을 만들 수 없다(A14: FILESTREAM·메모리 최적화·판 제한·디스크 등). 호출자가 KEYSET으로 낮춘다.</summary>
-    Unsupported,
-    /// <summary>설정·권한 문제(이름 충돌 50001·1801, 권한 오류, 원본 파일 없음). KEYSET으로 낮추지 않고 error로 끝낸다.</summary>
+    /// <summary>만들지 못했다(이름 충돌, 권한, 디스크, 그 밖 SQL 오류). KEYSET으로 낮추지 않고 error로 끝낸다.</summary>
     Failed,
 }
+
+/// <summary>실행 전 검증 모드 결정 결과. CanSnapshot이 false면 KEYSET만 가능하고, 요청 동의(allowKeysetVerification)가 있어야 실행한다.</summary>
+internal sealed record SnapshotCapability(bool CanSnapshot, string? Reason);
 
 /// <summary>
 /// 원본 스냅샷(§5.3 AW_Origin_pre). 남은 스냅샷을 지우고 원본 데이터 파일 논리 이름마다 Core BaselineSql.SnapshotPath로 경로를 지정해 만든다.
@@ -440,6 +441,27 @@ internal static class OriginSnapshot
     /// </summary>
     static readonly HashSet<int> PermissionErrors = [262, 229, 230, 297, 300, 916, 15247];
 
+    /// <summary>
+    /// 검증 모드 결정 SQL(master 문맥, 읽기만): CREATE ANY DATABASE 또는 master의 CREATE DATABASE 권한, 원본 FILESTREAM(FD)·메모리 최적화(FX) 파일 그룹 수.
+    /// HAS_PERMS_BY_NAME·sys.filegroups는 공개 권한으로 읽힌다(원본 DB 접근 권한은 필요).
+    /// </summary>
+    public static string CapabilitySql(string originDb) => $"""
+        SELECT CASE WHEN HAS_PERMS_BY_NAME(NULL, NULL, N'CREATE ANY DATABASE') = 1
+                      OR HAS_PERMS_BY_NAME(N'master', N'DATABASE', N'CREATE DATABASE') = 1 THEN 1 ELSE 0 END,
+               (SELECT COUNT(*) FROM {SqlText.Quote(originDb)}.sys.filegroups WHERE type = N'FD'),
+               (SELECT COUNT(*) FROM {SqlText.Quote(originDb)}.sys.filegroups WHERE type = N'FX');
+        """;
+
+    /// <summary>권한·파일 그룹으로 검증 모드를 정한다(스냅샷 불가 이유는 결과·선행 조건 메시지에 싣는다).</summary>
+    public static SnapshotCapability Decide(bool canCreateDatabase, int filestreamGroups, int memoryOptimizedGroups)
+    {
+        var why = new List<string>();
+        if (!canCreateDatabase) why.Add("원본 로그인에 CREATE DATABASE 권한이 없음(데이터베이스 스냅샷 생성 불가)");
+        if (filestreamGroups > 0) why.Add("원본에 FILESTREAM 파일 그룹이 있음(스냅샷에서 오프라인)");
+        if (memoryOptimizedGroups > 0) why.Add("원본에 메모리 최적화 파일 그룹이 있음(스냅샷 미지원)");
+        return new SnapshotCapability(why.Count == 0, why.Count == 0 ? null : string.Join(", ", why));
+    }
+
     /// <summary>스냅샷 생성. 연결을 열 수 없으면 SandboxUnavailableException, 이름이 잘못된 서버 설정이면 InvalidOperationException.</summary>
     public static async Task<(SnapshotOutcome Outcome, string? Reason)> CreateAsync(string connectionString, string originDb, string snapshotDb, int timeoutSeconds, CancellationToken ct)
     {
@@ -454,15 +476,15 @@ internal static class OriginSnapshot
         {
             // 남은 스냅샷 삭제(그 이름이 원본의 스냅샷이 아니면 50001로 멈춘다: 남의 DB를 지우지 않는다).
             await ExecAsync(conn, BaselineSql.DropSnapshot(snapshotDb, originDb), timeoutSeconds, ct);
-            var files = new List<string>();
-            await using (var cmd = new SqlCommand("SELECT name FROM sys.master_files WHERE database_id = DB_ID(@db) AND type = 0 ORDER BY file_id;", conn) { CommandTimeout = timeoutSeconds })
+            // 데이터 파일 논리 이름과 폴더: 원본 DB 문맥의 sys.database_files(공개 읽기). 스파스 파일은 각 데이터 파일과 같은 폴더에 둔다.
+            var files = new Dictionary<string, string>(StringComparer.Ordinal);
+            await using (var cmd = new SqlCommand($"SELECT name, physical_name FROM {SqlText.Quote(originDb)}.sys.database_files WHERE type = 0 ORDER BY file_id;", conn) { CommandTimeout = timeoutSeconds })
             {
-                cmd.Parameters.Add(new SqlParameter("@db", SqlDbType.NVarChar, 128) { Value = originDb });
                 await using var r = await cmd.ExecuteReaderAsync(ct);
-                while (await r.ReadAsync(ct)) files.Add(r.GetString(0));
+                while (await r.ReadAsync(ct)) files[r.GetString(0)] = ServerPaths.Directory(r.GetString(1));
             }
             if (files.Count == 0) return (SnapshotOutcome.Failed, $"원본 {originDb}의 데이터 파일을 찾지 못함(원본 DB가 없거나 접근할 수 없음)");
-            await ExecAsync(conn, BaselineSql.CreateSnapshot(snapshotDb, originDb, files), timeoutSeconds, ct);
+            await ExecAsync(conn, BaselineSql.CreateSnapshot(snapshotDb, originDb, files.Keys, n => BaselineSql.SnapshotPath(snapshotDb, n, files[n])), timeoutSeconds, ct);
             return (SnapshotOutcome.Created, null);
         }
         catch (SqlException ex) when (conn.State != ConnectionState.Open)
@@ -479,7 +501,8 @@ internal static class OriginSnapshot
         }
         catch (SqlException ex)
         {
-            return (SnapshotOutcome.Unsupported, $"원본 스냅샷 생성 실패(오류 {ex.Number}): {ex.Message}");
+            // 예상 밖 오류도 KEYSET으로 낮추지 않는다(2026-11-13): 검증 모드는 실행 전에 정했다.
+            return (SnapshotOutcome.Failed, $"원본 스냅샷 생성 실패(오류 {ex.Number}): {ex.Message}");
         }
     }
 

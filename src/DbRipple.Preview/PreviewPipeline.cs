@@ -51,7 +51,7 @@ public sealed class PreviewPipeline(
         await using var preview = await AcquireReadyAsync(ct);
         var baseline = await sandbox.GetContextAsync(ct);
         if (!baseline.FingerprintMatch)
-            throw new PreviewConflictException(ConflictReason.FingerprintMismatch, "원본과 샌드박스의 환경 지문이 달라 미리보기를 막습니다(§5.1 6).");
+            throw new PreviewConflictException(ConflictReason.FingerprintMismatch, "원본과 샌드박스의 환경 지문이 달라 미리보기를 막습니다(§5.1 6)." + (baseline.FingerprintMismatches.Count > 0 ? " " + string.Join("; ", baseline.FingerprintMismatches) : ""));
 
         var sw = Stopwatch.StartNew();
         var analysis = analyzer.Analyze(sql, baseline);
@@ -99,6 +99,7 @@ public sealed class PreviewPipeline(
                 SnapshotDb = baseline.SnapshotDb,
                 BackupFinishedAt = baseline.BackupFinishedAt,
                 Fingerprint = baseline.Fingerprint,
+                FingerprintWarnings = baseline.FingerprintWarnings,
             },
             Statements = raw.Executions.Select(e => e.Result).ToList(),
             Firings = model.Firings,

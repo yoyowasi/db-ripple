@@ -47,7 +47,7 @@ public class AuditInstallIntegrationTests
         DbCatalog catalog;
         await using (var conn = await TestSql.OpenAsync(db)) catalog = await CatalogReader.ReadAsync(conn);
         var plan = AuditTriggerGenerator.Generate(catalog.ToCaptureInput(), DateTimeOffset.Now);
-        await using (var steps = new SqlBaselineSteps(TestSql.ConnectionString()))
+        await using (var steps = new SqlBaselineSteps(new SandboxConnection(TestSql.ConnectionString())))
             foreach (var b in plan.Batches) await steps.ExecuteAsync(db, b.Sql, default); // 13601 등 생성 시점 오류가 없어야 함
 
         var m = plan.Manifest;

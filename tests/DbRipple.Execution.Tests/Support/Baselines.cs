@@ -41,7 +41,7 @@ public sealed class ExeBaseline : IAsyncDisposable
         {
             await TestDb.ExecAsync("master", $"CREATE DATABASE [{origin}];");
             await TestDb.ExecAsync(origin, batches);
-            await using var steps = new SqlBaselineSteps(TestDb.ConnectionString());
+            await using var steps = new SqlBaselineSteps(new SandboxConnection(TestDb.ConnectionString()));
             var result = await BaselineBuilder.BuildAsync(new BaselineOptions(origin, sandbox, snapshot, backup), steps, () => DateTimeOffset.Now);
             return new ExeBaseline(origin, sandbox, snapshot, result, cleanup);
         }

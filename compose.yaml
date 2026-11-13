@@ -9,12 +9,16 @@ services:
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?.env에 MSSQL_SA_PASSWORD를 설정하세요}
       MSSQL_AGENT_ENABLED: "false"
       MSSQL_MEMORY_LIMIT_MB: "4096"
+      # 서버 정렬은 컨테이너를 처음 만들 때만 정해진다(Split 지문 차단 항목). 원본 서버 정렬과 같게 .env에 둔다.
+      MSSQL_COLLATION: ${MSSQL_COLLATION:-SQL_Latin1_General_CP1_CI_AS}
     mem_limit: 6g
     ports:
       - "127.0.0.1:${MSSQL_HOST_PORT:-14333}:1433"
     volumes:
       # Linux 네이티브 named volume: 데이터·스냅샷 스파스 파일·backup 폴더 모두 여기
       - mssql-data:/var/opt/mssql
+      # Split 기준선 가져오기 폴더(호스트 .data/import → 컨테이너, DbRipple:Backup:ImportDir·ImportContainerDir)
+      - ./.data/import:/var/opt/mssql/import
     healthcheck:
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" -b -o /dev/null"]
       interval: 10s

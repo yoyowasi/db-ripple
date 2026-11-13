@@ -1,11 +1,14 @@
 // GET /api/previews/{id}/rows 를 서버 페이지로 읽는다(offset·limit, limit 1..1000).
 // 입력이 바뀌면 첫 페이지로 돌아가고, 늦게 도착한 응답은 버린다.
-import { ref, shallowRef, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import { ApiError, CLIENT_ERROR_STATUS, getRows, isAbortError } from '../api/client'
 import type { NetChange, RowChange, RowPage, RowView } from '../api/types'
 
 export type AnyRowPage = RowPage<RowChange> | RowPage<NetChange>
+
+export const EVENT_PAGE_SIZE = 100
+export const NET_PAGE_SIZE = 1000
 
 export function useRowPage(
   previewId: Ref<string | null>,
@@ -17,7 +20,8 @@ export function useRowPage(
   const loading = ref(false)
   const error = shallowRef<ApiError | null>(null)
   const offset = ref(0)
-  const limit = ref(100)
+  // 발동 보기는 한 묶음의 행이라 100행, 최종 차이 보기는 테이블을 클라이언트에서 거르므로 한 번에 더 읽는다.
+  const limit = computed(() => (view.value === 'net' ? NET_PAGE_SIZE : EVENT_PAGE_SIZE))
 
   let seq = 0
   let ctrl: AbortController | null = null
@@ -41,7 +45,7 @@ export function useRowPage(
     loading.value = true
     error.value = null
     try {
-      // 두 보기 모두 서버가 묶음으로 거른다(net은 explainedBy.firingIds에 포함된 행).
+      // firingId가 있으면 서버가 묶음으로 거른다(net은 explainedBy.firingIds에 포함된 행).
       const res = await getRows(
         id,
         { view: view.value, firingId: firingId.value, offset: offset.value, limit: limit.value },

@@ -123,7 +123,7 @@ return failures == 0 ? 0 : 1;
 SandboxManager NewSandbox((string Origin, string Sandbox, string Snapshot, string Backup, TestDatabases Cleanup) d) =>
     new(new SandboxManagerOptions
     {
-        ConnectionString = connection,
+        Connections = DbRipple.Core.Baseline.ServerConnections.SingleServer(connection), // 평가는 SingleServer(2026-11-13)
         OriginDb = d.Origin,
         SandboxDb = d.Sandbox,
         SnapshotDb = d.Snapshot,

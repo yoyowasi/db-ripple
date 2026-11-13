@@ -4,8 +4,12 @@ using DbRipple.Core.Sql;
 
 namespace DbRipple.Core.Baseline;
 
-/// <summary>RESTORE FILELISTONLY 한 행(Type: D 데이터, L 로그, S FILESTREAM·메모리 최적화, F 전체 텍스트).</summary>
-public sealed record BackupFile(string LogicalName, char Type, long FileId);
+/// <summary>RESTORE FILELISTONLY 한 행(Type: D 데이터, L 로그, S FILESTREAM·메모리 최적화, F 전체 텍스트). FileGroupName은 로그면 null.</summary>
+public sealed record BackupFile(string LogicalName, char Type, long FileId, string? FileGroupName = null);
+
+/// <summary>Split 복원 경로 정보. 데이터·로그 폴더는 로컬 SERVERPROPERTY('InstanceDefaultDataPath'/'InstanceDefaultLogPath'),
+/// SpecialFileGroups는 원본 sys.filegroups의 FD(FILESTREAM)·FX(메모리 최적화) 이름 → 형식.</summary>
+public sealed record RestoreLayout(string DataDir, string LogDir, IReadOnlyDictionary<string, string>? SpecialFileGroups = null);
 
 /// <summary>C8 기준선 구축 SQL(§5.1). 모두 자동 커밋에서 실행.</summary>
 public static class BaselineSql
@@ -27,11 +31,15 @@ public static class BaselineSql
 
     /// <summary>
     /// 1단계(스냅샷 삭제) 전 서버 사전 검사. 원본: 있고, 이름이 정확히 같고(별칭 거부), ONLINE 사용자 DB. 샌드박스: 복원 대상 가드 + 원본과 다른 DB.
-    /// 스냅샷: 있으면 이름이 정확히 같고 샌드박스의 스냅샷. 어기면 아무것도 바꾸기 전에 THROW.
+    /// 스냅샷: 있으면 이름이 정확히 같고 샌드박스의 스냅샷. 어기면 아무것도 바꾸기 전에 THROW. SingleServer용(= SourcePrecheck + SandboxPrecheck).
     /// </summary>
-    public static string Precheck(string source, string sandbox, string snapshot)
+    public static string Precheck(string source, string sandbox, string snapshot) =>
+        SourcePrecheck(source) + "\n" + SandboxPrecheck(sandbox, snapshot, source);
+
+    /// <summary>원본 사전 검사(읽기만). Split에서는 원본 연결의 master에서 실행한다.</summary>
+    public static string SourcePrecheck(string source)
     {
-        string s = SqlText.NLiteral(source), b = SqlText.NLiteral(sandbox), p = SqlText.NLiteral(snapshot);
+        var s = SqlText.NLiteral(source);
         return $"""
             IF DB_ID({s}) IS NULL
                 THROW 50010, {SqlText.NLiteral($"원본 DB {source}가 없음")}, 1;
@@ -40,6 +48,14 @@ public static class BaselineSql
             IF DB_ID({s}) <= 4
                OR NOT EXISTS (SELECT 1 FROM sys.databases WHERE database_id = DB_ID({s}) AND source_database_id IS NULL AND state_desc = N'ONLINE')
                 THROW 50012, {SqlText.NLiteral($"원본 {source}는 ONLINE 상태의 사용자 DB여야 함(시스템 DB·스냅샷 불가)")}, 1;
+            """;
+    }
+
+    /// <summary>샌드박스 쪽 사전 검사: 복원 대상 가드 + 스냅샷 이름 검사. source는 같은 인스턴스(SingleServer)일 때만 넘긴다.</summary>
+    public static string SandboxPrecheck(string sandbox, string snapshot, string? source = null)
+    {
+        string b = SqlText.NLiteral(sandbox), p = SqlText.NLiteral(snapshot);
+        return $"""
             {RestoreTargetGuard(sandbox, source)}
             IF DB_ID({p}) IS NOT NULL
                AND ({ResolvesToOtherName(p)}
@@ -126,38 +142,130 @@ public static class BaselineSql
     public static string FileListOnly(string backupPath) =>
         $"RESTORE FILELISTONLY FROM DISK = {SqlText.NLiteral(backupPath)};";
 
-    public static string Restore(string sandbox, string backupPath, IEnumerable<BackupFile> files)
+    public static string Restore(string sandbox, string backupPath, IEnumerable<BackupFile> files) =>
+        Restore(sandbox, backupPath, files, new RestoreLayout(DataDir, DataDir));
+
+    /// <summary>Split 복원: 데이터·로그 폴더를 로컬 인스턴스 기본 경로로 지정한다(SingleServer는 DataDir 고정 그대로).</summary>
+    public static string Restore(string sandbox, string backupPath, IEnumerable<BackupFile> files, RestoreLayout layout)
     {
-        var moves = files.Select(f => $"MOVE {SqlText.NLiteral(f.LogicalName)} TO {SqlText.NLiteral(RestorePath(sandbox, f))}");
+        var moves = files.Select(f => $"MOVE {SqlText.NLiteral(f.LogicalName)} TO {SqlText.NLiteral(RestorePath(sandbox, f, layout))}");
         return $"RESTORE DATABASE {SqlText.Quote(sandbox)} FROM DISK = {SqlText.NLiteral(backupPath)} WITH {string.Join(", ", moves)}, REPLACE;";
     }
 
     /// <summary>/var/opt/mssql/data/&lt;db&gt;_&lt;논리명&gt;.&lt;ext&gt;. 데이터(D)·로그(L) 파일만 지원한다.</summary>
-    public static string RestorePath(string db, BackupFile f) => DataDir + FilePart(db) + "_" + FilePart(f.LogicalName) + "." + f.Type switch
-    {
-        'L' => "ldf",
-        'D' => f.FileId == 1 ? "mdf" : "ndf",
-        _ => throw new NotSupportedException(
-            $"백업 파일 {f.LogicalName}의 형식 {f.Type}({FileTypeName(f.Type)})은 지원하지 않음: 기준선은 데이터(D)·로그(L) 파일만 복원한다. " +
-            "이런 파일이 있는 DB는 기준선을 만들 수 없음(대안 없음, 지원하려면 C8에 파일 형식별 복원 경로를 추가해야 함)"),
-    };
+    public static string RestorePath(string db, BackupFile f) => RestorePath(db, f, new RestoreLayout(DataDir, DataDir));
 
-    static string FileTypeName(char type) => type switch
+    public static string RestorePath(string db, BackupFile f, RestoreLayout layout)
     {
+        var name = FilePart(db) + "_" + FilePart(f.LogicalName) + ".";
+        return f.Type switch
+        {
+            'L' => ServerPaths.Join(layout.LogDir, name + "ldf"),
+            'D' => ServerPaths.Join(layout.DataDir, name + (f.FileId == 1 ? "mdf" : "ndf")),
+            _ => throw new NotSupportedException(
+                $"백업 파일 {f.LogicalName}의 형식 {f.Type}({FileTypeName(f, layout)})은 지원하지 않음: 기준선은 데이터(D)·로그(L) 파일만 복원한다. " +
+                "이런 파일이 있는 DB는 기준선을 만들 수 없음(" + Why(f, layout) + ")"),
+        };
+    }
+
+    static string FileTypeName(BackupFile f, RestoreLayout layout) => f.Type switch
+    {
+        'S' when Special(f, layout) == "FD" => "FILESTREAM 파일 그룹 컨테이너",
+        'S' when Special(f, layout) == "FX" => "메모리 최적화 파일 그룹 컨테이너",
         'S' => "FILESTREAM 또는 메모리 최적화 파일 그룹 컨테이너",
         'F' => "전체 텍스트 카탈로그",
         _ => "알 수 없는 형식",
     };
 
+    static string Why(BackupFile f, RestoreLayout layout) => Special(f, layout) switch
+    {
+        "FD" => "FILESTREAM은 미지원: 데이터베이스 스냅샷에서 FILESTREAM 파일 그룹이 오프라인이 되어 기준 스냅샷 비교가 성립하지 않음",
+        "FX" => "메모리 최적화 파일 그룹은 미지원: 데이터베이스 스냅샷을 만들 수 없어 기준 스냅샷 단계가 실패함",
+        _ => "대안 없음, 지원하려면 C8에 파일 형식별 복원 경로를 추가해야 함",
+    };
+
+    static string? Special(BackupFile f, RestoreLayout layout) =>
+        f.FileGroupName is { } g && layout.SpecialFileGroups is { } map && map.TryGetValue(g, out var t) ? t : null;
+
     public static string SnapshotPath(string snapshot, string logicalName) =>
         DataDir + FilePart(snapshot) + "_" + FilePart(logicalName) + ".ss";
 
+    /// <summary>스냅샷 스파스 파일 경로(지정 폴더, 서버 쪽 경로 구분자를 따른다).</summary>
+    public static string SnapshotPath(string snapshot, string logicalName, string dir) =>
+        ServerPaths.Join(dir, FilePart(snapshot) + "_" + FilePart(logicalName) + ".ss");
+
     /// <summary>데이터 파일마다 스파스 파일을 지정한 스냅샷 생성.</summary>
-    public static string CreateSnapshot(string snapshot, string sandbox, IEnumerable<string> dataLogicalNames)
+    public static string CreateSnapshot(string snapshot, string sandbox, IEnumerable<string> dataLogicalNames) =>
+        CreateSnapshot(snapshot, sandbox, dataLogicalNames, n => SnapshotPath(snapshot, n));
+
+    /// <summary>스파스 파일 경로를 논리 이름별로 정하는 스냅샷 생성(Split 기준 스냅샷, [적용] 원본 스냅샷).</summary>
+    public static string CreateSnapshot(string snapshot, string source, IEnumerable<string> dataLogicalNames, Func<string, string> pathOf)
     {
-        var files = dataLogicalNames.Select(n => $"(NAME = {SqlText.Quote(n)}, FILENAME = {SqlText.NLiteral(SnapshotPath(snapshot, n))})").ToList();
+        var files = dataLogicalNames.Select(n => $"(NAME = {SqlText.Quote(n)}, FILENAME = {SqlText.NLiteral(pathOf(n))})").ToList();
         if (files.Count == 0) throw new ArgumentException("데이터 파일이 없음", nameof(dataLogicalNames));
-        return $"CREATE DATABASE {SqlText.Quote(snapshot)} ON {string.Join(", ", files)} AS SNAPSHOT OF {SqlText.Quote(sandbox)};";
+        return $"CREATE DATABASE {SqlText.Quote(snapshot)} ON {string.Join(", ", files)} AS SNAPSHOT OF {SqlText.Quote(source)};";
+    }
+
+    // ---- Split(2026-11-13): 원본 COPY_ONLY 백업, 로컬 HEADERONLY·복원 뒤 정리 ----
+
+    /// <summary>원본 서버에서 하는 유일한 쓰기 성격 명령(백업 파일 생성). 원본 DB 자체는 바꾸지 않는다.</summary>
+    public static string SplitBackup(string source, string serverPath) =>
+        $"BACKUP DATABASE {SqlText.Quote(source)} TO DISK = {SqlText.NLiteral(serverPath)} WITH COPY_ONLY, COMPRESSION, CHECKSUM, INIT;";
+
+    public static string HeaderOnly(string backupPath) =>
+        $"RESTORE HEADERONLY FROM DISK = {SqlText.NLiteral(backupPath)};";
+
+    /// <summary>로컬 인스턴스 정보: 이름·기계 이름·주버전·기본 데이터·로그 경로(SERVERPROPERTY는 모든 사용자가 읽는다).</summary>
+    public const string LocalServerInfo = """
+        SELECT CAST(@@SERVERNAME AS nvarchar(128)), CAST(SERVERPROPERTY('MachineName') AS nvarchar(128)),
+               CAST(SERVERPROPERTY('ProductMajorVersion') AS int),
+               CAST(SERVERPROPERTY('InstanceDefaultDataPath') AS nvarchar(260)), CAST(SERVERPROPERTY('InstanceDefaultLogPath') AS nvarchar(260));
+        """;
+
+    /// <summary>원본 쪽 인스턴스 이름(읽기만).</summary>
+    public const string InstanceIdentity = "SELECT CAST(@@SERVERNAME AS nvarchar(128)), CAST(SERVERPROPERTY('MachineName') AS nvarchar(128));";
+
+    /// <summary>로컬 master의 인스턴스 표식(DB 수준 확장 속성) 이름. 원본에는 쓰지 않는다.</summary>
+    public const string InstanceMarkerName = "dbripple_instance";
+
+    /// <summary>표식 읽기(master 문맥). 없거나 안 보이면 행 없음.</summary>
+    public const string ReadInstanceMarker =
+        "SELECT CAST(value AS nvarchar(128)) FROM sys.extended_properties WHERE class = 0 AND name = N'" + InstanceMarkerName + "';";
+
+    /// <summary>표식이 없으면 만들고 값을 돌려준다(로컬 master 문맥에서만).</summary>
+    public static string EnsureInstanceMarker(Guid value) => $"""
+        IF NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE class = 0 AND name = N'{InstanceMarkerName}')
+            EXEC sys.sp_addextendedproperty @name = N'{InstanceMarkerName}', @value = N'{value:D}';
+        {ReadInstanceMarker}
+        """;
+
+    /// <summary>원본의 FILESTREAM(FD)·메모리 최적화(FX) 파일 그룹(원본 DB 문맥, 읽기만).</summary>
+    public const string SpecialFileGroups = "SELECT name, type FROM sys.filegroups WHERE type IN (N'FD', N'FX');";
+
+    /// <summary>
+    /// 복원 뒤 로컬 정리: DB 소유자를 로컬 sa(SID 0x01)로(원본 로그인 SID는 로컬에 없다), 서버 옵션 nested triggers·disallow results from triggers를 원본 값에 맞춘다(로컬 인스턴스만).
+    /// </summary>
+    public static string AfterRestoreLocal(string sandbox, int nestedTriggers, int disallowResults)
+    {
+        if (nestedTriggers is not (0 or 1) || disallowResults is not (0 or 1))
+            throw new ArgumentException("nested triggers·disallow results from triggers 값은 0 또는 1");
+        return $"""
+            DECLARE @sa sysname = SUSER_SNAME(0x01);
+            DECLARE @sql nvarchar(max) = N'ALTER AUTHORIZATION ON DATABASE::' + QUOTENAME({SqlText.NLiteral(sandbox)}) + N' TO ' + QUOTENAME(@sa) + N';';
+            EXEC sys.sp_executesql @sql;
+            IF (SELECT CAST(value_in_use AS int) FROM sys.configurations WHERE name = N'nested triggers') <> {nestedTriggers}
+            BEGIN
+                EXEC sys.sp_configure N'nested triggers', {nestedTriggers};
+                RECONFIGURE;
+            END;
+            IF (SELECT CAST(value_in_use AS int) FROM sys.configurations WHERE name = N'disallow results from triggers') <> {disallowResults}
+            BEGIN
+                EXEC sys.sp_configure N'show advanced options', 1;
+                RECONFIGURE;
+                EXEC sys.sp_configure N'disallow results from triggers', {disallowResults};
+                RECONFIGURE;
+            END;
+            """;
     }
 
     // 경로 조각에 쓸 수 없는 문자(/, .. 등)는 _로 바꾼다

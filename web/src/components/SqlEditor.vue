@@ -47,20 +47,21 @@ const highlight = HighlightStyle.define([
 ])
 
 const theme = EditorView.theme({
-  '&': { color: 'var(--fg)', backgroundColor: 'var(--bg-elev)', height: '100%', fontSize: '13px' },
+  '&': { color: 'var(--fg)', backgroundColor: 'var(--panel)', height: '100%', fontSize: '13px' },
   '&.cm-focused': { outline: '2px solid var(--accent)', outlineOffset: '-2px' },
-  '.cm-content': { fontFamily: 'var(--mono)', caretColor: 'var(--fg)', padding: '6px 0' },
-  '.cm-scroller': { fontFamily: 'var(--mono)', lineHeight: '1.55' },
-  '.cm-gutters': { backgroundColor: 'var(--bg-sunken)', color: 'var(--fg-muted)', border: 'none' },
+  // 합자를 끈다(JetBrains Mono의 <= != 등이 한 글자로 붙어 보이지 않게).
+  '.cm-content': { fontFamily: 'var(--mono)', fontVariantLigatures: 'none', caretColor: 'var(--fg)', padding: '6px 0' },
+  '.cm-scroller': { fontFamily: 'var(--mono)', fontVariantLigatures: 'none', lineHeight: '1.55' },
+  '.cm-gutters': { backgroundColor: 'var(--sunk)', color: 'var(--code-cm)', borderRight: '1px solid var(--line)' },
   '.cm-activeLine': { backgroundColor: 'color-mix(in srgb, var(--accent) 7%, transparent)' },
   '.cm-activeLineGutter': { backgroundColor: 'color-mix(in srgb, var(--accent) 12%, transparent)' },
   '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
-    backgroundColor: 'color-mix(in srgb, var(--accent) 28%, transparent) !important',
+    backgroundColor: 'var(--sel) !important',
   },
   '.cm-tooltip': {
     backgroundColor: 'var(--bg-elev)',
     color: 'var(--fg)',
-    border: '1px solid var(--border)',
+    border: '1px solid var(--line)',
   },
   '.cm-tooltip-autocomplete ul li[aria-selected]': {
     backgroundColor: 'var(--accent)',
@@ -158,8 +159,7 @@ watch(() => props.diagnostics, applyDiagnostics)
 <style scoped>
 .sql-editor {
   height: 100%;
-  min-height: 140px;
-  border-radius: 0 0 var(--radius) var(--radius);
+  min-height: 0;
   overflow: hidden;
 }
 .sql-editor :deep(.cm-editor) {

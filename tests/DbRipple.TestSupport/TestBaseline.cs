@@ -129,7 +129,7 @@ public sealed class TestBaseline : IAsyncDisposable
         var tb = Create(component, "aw");
         try
         {
-            await using (var steps = new SqlBaselineSteps(TestDb.ConnectionString()))
+            await using (var steps = new SqlBaselineSteps(new SandboxConnection(TestDb.ConnectionString())))
                 await BaselineBuilder.RestoreAsync(steps, tb.Origin, AdventureWorksBackup, null, ct);
             await tb.BuildAsync(ct);
             return tb;
@@ -149,7 +149,7 @@ public sealed class TestBaseline : IAsyncDisposable
 
     async Task BuildAsync(CancellationToken ct)
     {
-        await using var steps = new SqlBaselineSteps(TestDb.ConnectionString());
+        await using var steps = new SqlBaselineSteps(new SandboxConnection(TestDb.ConnectionString()));
         Result = await BaselineBuilder.BuildAsync(new BaselineOptions(Origin, Sandbox, Snapshot, BackupPath), steps, () => DateTimeOffset.Now, ct);
     }
 

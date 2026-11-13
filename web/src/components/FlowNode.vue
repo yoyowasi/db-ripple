@@ -1,224 +1,405 @@
 <script setup lang="ts">
-// 그래프 노드 6종(statement, firing, trigger, residual, error, group)을 한 컴포넌트에서 그린다.
+// 그래프 노드 6종(목업 v6): 문장 = 진한 알약, 묶음 = 결과 카드, 트리거 = 작은 알약, 오류·잔차 = 빨강 카드, 접힌 묶음 = 묶음 수 카드.
+// 색 띠 대신 배경 틴트·기호로 구분한다. 경로 강조·선택·축소 표시는 그래프 맥락(context)을 읽는다.
 import { Handle, Position } from '@vue-flow/core'
 import { computed } from 'vue'
-import { RESIDUAL_CATEGORY_LABEL, STATEMENT_STATUS_LABEL } from '../lib/format'
 import type { RippleNodeData } from '../lib/graphModel'
-import { describeNode } from '../lib/graphModel'
-import { NODE_H, NODE_W } from '../lib/graphLayout'
+import { useGraphContext } from './graph/context'
 
 defineOptions({ inheritAttrs: false })
 
 const props = defineProps<{
   id: string
   data: RippleNodeData
-  selected?: boolean
 }>()
 
-const n = computed(() => props.data.node)
-const flags = computed(() => props.data.flags)
-const title = computed(() => describeNode(n.value))
-const kindLabel = computed(() => {
-  switch (n.value.type) {
-    case 'statement':
-      return '문장'
-    case 'firing':
-      return '변경 묶음'
-    case 'trigger':
-      return '트리거'
-    case 'residual':
-      return '잔차'
-    case 'error':
-      return '오류'
-    case 'group':
-      return '접힌 묶음'
-  }
-  return ''
+const ctx = useGraphContext()
+const v = computed(() => props.data.view)
+const handleStyle = computed(() => ({ top: `${props.data.boxHeight / 2}px` }))
+
+const cls = computed(() => {
+  const d = props.data
+  const view = d.view
+  const active = ctx.active.value
+  return [
+    `t-${view.kind}`,
+    view.kind === 'firing' ? `op-${view.tone}` : '',
+    {
+      unobs: view.kind === 'trigger' && !view.observed,
+      sel: d.node.type === 'firing' && d.node.firingId === ctx.selectedFiringId.value,
+      on: active !== null && active.nodes.has(props.id),
+      dim: active !== null && !active.nodes.has(props.id),
+    },
+  ]
 })
+
+const chipText = computed(() => `0행 쓰기 ${props.data.zeroChip}건 · ${ctx.showZeroRows.value ? '접기' : '보기'}`)
 </script>
 
 <template>
-  <div
-    class="rnode"
-    :class="[
-      `t-${n.type}`,
-      { sel: selected, unobserved: n.type === 'trigger' && !n.observed },
-    ]"
-    :style="{ width: `${NODE_W}px`, minHeight: `${NODE_H - 16}px` }"
-    :title="title"
-    :aria-label="title"
-  >
-    <Handle type="target" :position="Position.Left" :connectable="false" />
-    <div class="kind">{{ kindLabel }}</div>
+  <div class="rn" :class="cls" :title="data.sentence">
+    <div class="box" :style="{ width: `${data.width}px`, height: `${data.boxHeight}px` }">
+      <Handle type="target" :position="Position.Left" :connectable="false" :style="handleStyle" />
 
-    <template v-if="n.type === 'statement'">
-      <div class="main mono">{{ n.label }}</div>
-      <div class="row">
-        <span class="chip" :class="n.status === 'ok' ? 'chip-ok' : 'chip-err'">{{ STATEMENT_STATUS_LABEL[n.status] }}</span>
-        <span class="chip" :class="{ 'is-zero': n.rowsAffected === 0 }">
-          {{ n.rowsAffected === null ? '행 수 모름' : `${n.rowsAffected}행` }}
-        </span>
-        <span class="muted">#{{ n.statementIndex }}</span>
-      </div>
-    </template>
+      <template v-if="v.kind === 'statement'">
+        <svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3L2 8l3.5 5M10.5 3L14 8l-3.5 5" /></svg>
+        <div class="txt">
+          <div class="l1 mono"><span v-if="v.verb" class="vb">{{ v.verb }}</span> {{ ctx.compact.value ? v.targetShort : v.target }}</div>
+          <div class="l2">{{ v.line2 }}</div>
+        </div>
+      </template>
 
-    <template v-else-if="n.type === 'firing'">
-      <div class="main">{{ n.table }}</div>
-      <div class="row">
-        <span class="chip" :class="`op-${n.operation.toLowerCase()}`">{{ n.operation }}</span>
-        <span class="chip" :class="{ 'is-zero': flags.zeroRows }">{{ n.rowCount }}행</span>
-        <span class="muted">깊이 {{ n.depth }} · #{{ n.captureSeq }}</span>
-      </div>
-      <div v-if="flags.zeroRows || flags.partial || flags.auditNotLast" class="row flags">
-        <span v-if="flags.zeroRows" class="chip chip-info" title="영향 받은 행이 0개(헤더만 남음)">0행</span>
-        <span v-if="flags.partial" class="chip chip-warn" title="행 이미지 없이 키만 수집됨(KEYS). 행 값은 보이지 않을 수 있습니다.">
-          일부만 수집
-        </span>
-        <span v-if="flags.auditNotLast" class="chip chip-warn" title="이 테이블에 사용자 Last 트리거가 있어 감사 트리거 순서를 보장하지 못함(NONE). 자식 귀속이 모호할 수 있습니다.">
-          감사 순서 불확실
-        </span>
-      </div>
-    </template>
+      <template v-else-if="v.kind === 'firing'">
+        <div class="r1">
+          <span class="sym" aria-hidden="true">
+            <svg viewBox="0 0 16 16">
+              <path v-if="v.tone === 'del'" d="M3 8h10" />
+              <template v-else-if="v.tone === 'upd'">
+                <path d="M3 13l.7-3.2 7.1-7.1 2.5 2.5-7.1 7.1z" />
+                <path d="M9.6 4l2.4 2.4" />
+              </template>
+              <path v-else-if="v.tone === 'add'" d="M8 3v10M3 8h10" />
+              <path v-else d="M3.5 6h9M3.5 10h9" />
+            </svg>
+          </span>
+          <span class="res">{{ v.result }}</span>
+          <span v-if="v.extra" class="xtra">{{ v.extra }}</span>
+          <span v-if="v.keysOnly" class="keys" title="행 이미지 없이 키만 수집함(KEYS)">키만</span>
+          <span v-if="data.order !== null" class="num" :title="`화면 표시 순번 ${data.order}`">{{ data.order }}</span>
+        </div>
+        <div class="r2 mono"><span class="sch">{{ v.schema }}</span><span class="nm">{{ v.name }}</span></div>
+      </template>
 
-    <template v-else-if="n.type === 'trigger'">
-      <div class="main">{{ n.trigger }}</div>
-      <div class="row">
-        <span class="chip" :class="n.observed ? 'chip-ok' : ''">
-          {{ n.observed ? '관측됨' : '관측 안 됨(추정)' }}
-        </span>
-        <span class="muted">문장 #{{ n.statementIndex }}</span>
-      </div>
-    </template>
+      <template v-else-if="v.kind === 'trigger'">
+        <svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M9 1.8L3.5 9h4l-.6 5.2L12.5 7h-4z" /></svg>
+        <span class="tgn mono">{{ v.name }}</span>
+        <span v-if="!v.observed" class="tgs">추정</span>
+      </template>
 
-    <template v-else-if="n.type === 'residual'">
-      <div class="main">{{ n.table }}</div>
-      <div class="row">
-        <span class="chip chip-warn">{{ RESIDUAL_CATEGORY_LABEL[n.category] }}</span>
-      </div>
-    </template>
+      <template v-else>
+        <div class="r1">
+          <span class="sym" aria-hidden="true">
+            <svg v-if="v.kind === 'group'" viewBox="0 0 16 16"><path d="M3 5h10M3 8h10M3 11h10" /></svg>
+            <svg v-else viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.8" /><path d="M4 12L12 4" /></svg>
+          </span>
+          <span class="res">{{ v.title }}</span>
+        </div>
+        <div class="sub">{{ v.sub }}</div>
+      </template>
 
-    <template v-else-if="n.type === 'error'">
-      <div class="main">오류 {{ n.errorNumber }}</div>
-      <div class="msg">{{ n.message }}</div>
-      <div v-if="n.isToolFault" class="row"><span class="chip chip-err">도구 오류</span></div>
-    </template>
+      <Handle type="source" :position="Position.Right" :connectable="false" :style="handleStyle" />
+    </div>
 
-    <template v-else-if="n.type === 'group'">
-      <div class="main">묶음 {{ n.members.length }}개</div>
-      <div class="row">
-        <span class="chip">{{ n.rowCount }}행</span>
-        <span class="muted">같은 테이블·연산·깊이</span>
-      </div>
-    </template>
-
-    <Handle type="source" :position="Position.Right" :connectable="false" />
+    <button
+      v-if="data.zeroChip"
+      type="button"
+      class="zchip nodrag nopan"
+      :aria-expanded="ctx.showZeroRows.value"
+      :aria-label="`0행 쓰기 ${data.zeroChip}건 ${ctx.showZeroRows.value ? '접기' : '보기'}`"
+      @click.stop="ctx.toggleZeroRows()"
+      @keydown.enter.stop
+      @keydown.space.stop
+    >
+      {{ chipText }}
+    </button>
   </div>
 </template>
 
 <style scoped>
-.rnode {
-  padding: 6px 10px 8px;
-  background: var(--bg-elev);
-  border: 1.5px solid var(--border);
-  border-left-width: 5px;
-  border-radius: var(--radius);
-  color: var(--fg);
-  font-size: 12px;
+.rn {
+  position: relative;
+  color: var(--nd-t);
   cursor: pointer;
-  overflow: hidden;
+  transition: opacity var(--m-out) var(--ease);
 }
-.rnode:hover {
+.box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--nd);
+  border: 1.5px solid var(--nd-s);
+  border-radius: var(--r);
+  transition:
+    border-color var(--m-out) var(--ease),
+    box-shadow var(--m-out) var(--ease);
+}
+.rn:hover .box,
+.rn.on .box {
   border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
-.rnode.sel {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+.rn.sel .box {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
 }
-.kind {
-  font-size: 11px;
-  color: var(--fg-muted);
-  font-weight: 600;
+.rn.dim {
+  opacity: 0.28;
 }
-.main {
-  font-weight: 650;
-  font-size: 12.5px;
+.mono {
+  font-family: var(--mono);
+}
+.ni {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 문장: 진한 알약 */
+.t-statement .box {
+  padding: 0 18px 0 16px;
+  background: var(--st-bg);
+  border-color: var(--st-s);
+  border-radius: 999px;
+  color: var(--st-fg);
+}
+.t-statement .ni {
+  color: var(--st-verb);
+}
+.txt {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+.l1 {
+  font-size: 13px;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.main.mono {
-  font-weight: 500;
+.vb {
+  color: var(--st-verb);
 }
-.msg {
+.l2 {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--st-fg2);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  color: var(--err);
-}
-.row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-wrap: wrap;
-  margin-top: 3px;
-}
-.row.flags {
-  margin-top: 2px;
-}
-.chip.is-zero {
-  color: var(--fg-muted);
-  font-weight: 500;
-}
-.chip.op-insert {
-  background: var(--ok-bg);
-  color: var(--ok);
-  border-color: transparent;
-}
-.chip.op-update {
-  background: var(--info-bg);
-  color: var(--info);
-  border-color: transparent;
-}
-.chip.op-delete {
-  background: var(--err-bg);
-  color: var(--err);
-  border-color: transparent;
+  overflow-wrap: anywhere;
 }
 
-/* 노드 종류는 왼쪽 띠 색과 위의 글자("문장" 등)로 함께 구분한다 */
-.t-statement {
-  border-left-color: #4a86e8;
+/* 묶음·오류·잔차·접힌 묶음: 결과 카드 */
+.t-firing .box,
+.t-error .box,
+.t-residual .box,
+.t-group .box {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 10px 0 11px;
 }
-.t-firing {
-  border-left-color: #3fae5f;
+.r1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
-.t-trigger {
-  border-left-color: #8791a0;
+.sym {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--nd-s);
 }
-.t-residual {
-  border-left-color: #d9902b;
+.sym svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--nd);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.t-error {
-  border-left-color: #dc4b44;
+.res {
+  font: 700 16px / 1.2 var(--ui);
+  white-space: nowrap;
 }
-.t-group {
-  border-left-color: #a463d8;
-  border-style: double;
-  border-width: 4px;
+.xtra {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
 }
-/* observed:false → 점선 테두리, 흐리게 */
-.unobserved {
+.keys {
+  padding: 0 8px;
+  font: 600 12px / 18px var(--ui);
+  color: var(--warn);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.num {
+  flex: none;
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border: 1px solid var(--nd-s);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--fg);
+  font: 700 12px var(--mono);
+}
+.r2,
+.sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sch {
+  font-size: 12px;
+  color: var(--nd-t2);
+}
+.nm {
+  font-size: 13px;
+  font-weight: 700;
+}
+.sub {
+  font-size: 13px;
+  color: var(--fg);
+}
+.op-del .box {
+  background: color-mix(in srgb, var(--del-bg) 55%, var(--nd));
+  border-color: var(--del-fg);
+}
+.op-del .res {
+  color: var(--del-fg);
+}
+.op-del .sym {
+  background: var(--del-fg);
+}
+.op-upd .box {
+  background: color-mix(in srgb, var(--chg-bg) 55%, var(--nd));
+  border-color: var(--warn);
+}
+.op-upd .res {
+  color: var(--warn);
+}
+.op-upd .sym {
+  background: var(--warn);
+}
+.op-add .box {
+  background: color-mix(in srgb, var(--add-bg) 55%, var(--nd));
+  border-color: var(--add-fg);
+}
+.op-add .res {
+  color: var(--add-fg);
+}
+.op-add .sym {
+  background: var(--add-fg);
+}
+.op-zero .box {
+  background: var(--sunk);
+}
+.op-zero .res {
+  color: var(--muted);
+}
+.op-zero .sym {
+  background: var(--muted);
+}
+.op-zero .nm {
+  color: var(--muted);
+}
+.t-error .box,
+.t-residual .box {
+  background: var(--err-bg);
+  border-color: var(--err);
+}
+.t-residual .box {
   border-style: dashed;
-  opacity: 0.72;
 }
+.t-error .res,
+.t-residual .res {
+  color: var(--err);
+}
+.t-error .sym,
+.t-residual .sym {
+  background: var(--err);
+}
+
+/* 트리거: 작은 알약 */
+.t-trigger .box {
+  padding: 0 14px 0 12px;
+  background: var(--nd-trig);
+  border-color: var(--k-fires);
+  border-radius: 999px;
+}
+.t-trigger.unobs .box {
+  border-style: dashed;
+}
+.t-trigger .ni {
+  color: var(--k-fires);
+}
+.tgn {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tgs {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* 0행 칩 */
+.zchip {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--ctl);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--fg);
+  font: 600 12px var(--ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.zchip:hover,
+.zchip:focus-visible {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+}
+
 :deep(.vue-flow__handle) {
-  width: 6px;
-  height: 6px;
+  width: 1px;
+  height: 1px;
   min-width: 0;
   min-height: 0;
-  background: var(--fg-muted);
+  background: transparent;
   border: none;
+}
+</style>
+
+<style>
+/* 배율 80% 미만: 부가 줄·순번·문장 둘째 줄을 숨기고 결과 글자를 키운다(.lo는 PropagationGraph가 붙인다). 이름은 폭 어림이 깨지지 않게 그대로 둔다. */
+.lo .rn .xtra,
+.lo .rn .sch,
+.lo .rn .num,
+.lo .rn .l2,
+.lo .rn .sub,
+.lo .rn .tgs {
+  display: none;
+}
+.lo .rn .res {
+  font-size: 17px;
 }
 </style>

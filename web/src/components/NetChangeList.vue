@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// NetChange 목록(롤백 뒤 남은 변경). 테이블, 키, 변경 종류, 바뀐 열을 한 줄씩 보인다.
+// NetChange 목록(롤백 뒤 남은 변경). 레일 폭에 맞춰 한 건을 두 줄로 보인다: 테이블·키 / 변경 종류·바뀐 열.
 import type { NetChange } from '../api/types'
 import { NET_CHANGE_LABEL, keyText } from '../lib/format'
 
@@ -13,29 +13,45 @@ function summary(c: NetChange): string {
 </script>
 
 <template>
-  <p v-if="items.length === 0" class="muted empty">{{ emptyText ?? '없음' }}</p>
-  <table v-else class="data">
-    <thead>
-      <tr>
-        <th>테이블</th>
-        <th>키</th>
-        <th>변경</th>
-        <th>바뀐 열</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr v-for="(c, i) in items" :key="i">
-        <td>{{ c.table }}</td>
-        <td class="mono">{{ keyText(c.key) }}</td>
-        <td>{{ summary(c) }}</td>
-        <td>{{ c.changedColumns.join(', ') || '-' }}</td>
-      </tr>
-    </tbody>
-  </table>
+  <p v-if="items.length === 0" class="empty">{{ emptyText ?? '없음' }}</p>
+  <ul v-else class="nc">
+    <li v-for="(c, i) in items" :key="i">
+      <span class="t">{{ c.table }}</span>
+      <code class="k">{{ keyText(c.key) }}</code>
+      <span class="m">
+        {{ summary(c) }}
+        <template v-if="c.changedColumns.length"> · {{ c.changedColumns.join(', ') }}</template>
+      </span>
+    </li>
+  </ul>
 </template>
 
 <style scoped>
 .empty {
   margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.nc {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.nc li {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.t {
+  font-weight: 600;
+}
+.k {
+  margin-left: 6px;
+}
+.m {
+  display: block;
+  color: var(--muted);
 }
 </style>

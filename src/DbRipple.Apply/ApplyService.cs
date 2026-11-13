@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Security.Cryptography;
 using DbRipple.Contracts;
+using DbRipple.Core.Baseline;
 using DbRipple.Core.Capture;
 
 namespace DbRipple.Apply;
@@ -14,7 +16,10 @@ namespace DbRipple.Apply;
 /// <item>선행 조건(ApplyPrecondition): 상태 ok(D8 truncated 차단 포함), ContractFormulas.SqlHash(record.Sql) == result.SqlHash == request.SqlHash(있으면), CreatedAt + PreviewExpiry 안이고 미리보기의 기준선이 현재 기준선과 같음(아니면 PREVIEW_EXPIRED),
 ///   원본 지문(Core Fingerprint.ReadAsync(원본)) == baseline.Fingerprint == 미리보기 지문, 원본에 ExecuteAsUser 있음(Q30, 만들지 않는다). 어기면 precondition_failed(원본에 아무것도 안 함).</item>
 /// <item>analyzer.Analyze(record.Sql, baseline) 재분석(문장 원문 얻기). 거부·문장 수·번호·종류·대상이 미리보기와 다르면 precondition_failed(SQL_HASH_MISMATCH와 같은 취급, 메시지로 구분).</item>
-/// <item>원본 스냅샷: Core BaselineSql.DropSnapshot·CreateSnapshot(OriginDb + 접미사, 원본 데이터 파일 논리 이름). 스냅샷을 만들 수 없는 DB(A14)면 KEYSET으로 낮추고 Limitations에 이유, 이름 충돌·권한 오류면 실행하지 않고 error. ForceKeyset이면 만들지 않는다.</item>
+/// <item>검증 모드(2026-11-13): 선행 조건 단계에서 원본 CREATE DATABASE 권한과 FILESTREAM·메모리 최적화 유무로 정한다. 스냅샷을 만들 수 없으면 KEYSET이고,
+///   요청에 allowKeysetVerification=true가 없으면 precondition_failed(WEAK_VERIFICATION_NOT_ACCEPTED). ForceKeyset은 설정 동의로 본다.</item>
+/// <item>원본 스냅샷: Core BaselineSql.DropSnapshot·CreateSnapshot(SingleServer = OriginDb + 접미사, Split = 거기에 _PC_적용id, 스파스 파일은 원본 데이터 파일 폴더).
+///   생성 실패는 원인과 상관없이 실행하지 않고 error(KEYSET으로 조용히 낮추지 않는다).</item>
 /// <item>전용 연결(풀링 끔, InitialCatalog = OriginDb) → runner.PrepareAsync → "BEGIN TRAN;" → CURRENT_TRANSACTION_ID().</item>
 /// <item>드리프트: DriftChecker로 미리보기 NetChanges의 before 행(UPDATED·DELETED·MULTISET_REMOVED)을 UPDLOCK, HOLDLOCK으로 읽어 비교. 있으면 ROLLBACK, drift_detected.</item>
 /// <item>KEYSET이면 KeysetVerifier.CountAll(BEGIN TRAN 직후 COUNT_BIG(*)).</item>
@@ -33,9 +38,9 @@ public sealed class ApplyService : IApplyService
     readonly IOriginDatabase origin;
     readonly ConcurrentDictionary<string, byte> committed = new(StringComparer.Ordinal);
 
-    /// <summary>Host 조립용(§6.4 생성자 확정, week3-plan §4).</summary>
+    /// <summary>Host 조립용(§6.4 생성자 확정, week3-plan §4). 원본 연결 타입만 받는다(2026-11-13).</summary>
     public ApplyService(
-        string connectionString,
+        OriginConnection origin,
         ApplySettings settings,
         IPreviewStore store,
         ISandboxManager sandbox,
@@ -43,7 +48,7 @@ public sealed class ApplyService : IApplyService
         IStatementRunner runner,
         INetDiffer netDiffer,
         TimeProvider clock)
-        : this(new SqlOriginDatabase(Required(connectionString), settings ?? throw new ArgumentNullException(nameof(settings))),
+        : this(new SqlOriginDatabase((origin ?? throw new ArgumentNullException(nameof(origin))).ConnectionString, settings ?? throw new ArgumentNullException(nameof(settings))),
                settings, store, sandbox, analyzer, runner, netDiffer, clock)
     {
     }
@@ -67,12 +72,6 @@ public sealed class ApplyService : IApplyService
         Runner = runner ?? throw new ArgumentNullException(nameof(runner));
         NetDiffer = netDiffer ?? throw new ArgumentNullException(nameof(netDiffer));
         Clock = clock ?? throw new ArgumentNullException(nameof(clock));
-    }
-
-    static string Required(string connectionString)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
-        return connectionString;
     }
 
     /// <summary>설정.</summary>
@@ -141,8 +140,23 @@ public sealed class ApplyService : IApplyService
         return run.Notes.Count == 0 ? result : result with { Message = Join(result.Message, run.Notes) };
     }
 
+    /// <summary>Split [적용]의 실행 주체 한계(결과·문서에 표시).</summary>
+    public const string PrincipalLimitation =
+        "실행 주체 불일치: 미리보기는 샌드박스의 dbr_preview_user로, [적용]은 원본에서 본인 로그인으로 실행함(권한 차이, 트리거의 USER_NAME·SUSER_SNAME 값이 다를 수 있음)";
+
+    /// <summary>Split 원본 로그인이 sysadmin일 때 결과 한계(막지 않음, N4).</summary>
+    public const string SysadminLimitation =
+        "원본 로그인이 sysadmin: 권한으로 막히는 문장이 없어 대상 서버·DB를 잘못 골라도 서버가 막지 않음(확인 상자에서 다시 확인)";
+
     bool TryStartRefresh(Run run)
     {
+        if (Settings.Mode == ServerMode.Split)
+        {
+            // Split: 재구축은 원본 백업·복사를 동반하므로 자동으로 하지 않는다. 기준선 오래됨으로만 표시하고 사용자가 새로 고친다.
+            Sandbox.MarkStale("[적용]으로 원본이 바뀜");
+            run.Notes.Add("원본이 바뀌어 샌드박스 기준선이 오래됨(자동 재구축 안 함, 새로 고침 필요).");
+            return false;
+        }
         try
         {
             Sandbox.StartRefresh();
@@ -159,9 +173,25 @@ public sealed class ApplyService : IApplyService
     {
         var context = await Sandbox.GetContextAsync(ct);
         var mode = Settings.ForceKeyset ? VerificationMode.Keyset : VerificationMode.SnapshotNetdiff;
+        string? keysetReason = Settings.ForceKeyset ? "ForceKeyset 설정으로 원본 스냅샷 없이 KEYSET으로 검증함" : null;
 
         // 3. 선행 조건(원본에 아무것도 하지 않는다)
         var (failures, reasons) = await CheckPreconditionsAsync(record, request, context, ct);
+        if (!Settings.ForceKeyset && !failures.Contains(ApplyPrecondition.OriginUnreachable))
+        {
+            // 3b. 검증 모드 사전 결정(읽기만). 스냅샷을 못 만들면 KEYSET이고, 약한 검증은 요청의 명시 동의가 있어야 한다.
+            var capability = await origin.CheckSnapshotCapabilityAsync(context.OriginDb, ct);
+            if (!capability.CanSnapshot)
+            {
+                mode = VerificationMode.Keyset;
+                keysetReason = $"원본 스냅샷을 만들 수 없어 KEYSET으로 검증함(요청 동의): {capability.Reason}";
+                if (!request.AllowKeysetVerification)
+                {
+                    failures.Add(ApplyPrecondition.WeakVerificationNotAccepted);
+                    reasons.Add($"원본 스냅샷을 만들 수 없어({capability.Reason}) KEYSET(행 수가 그대로인 UPDATE를 놓칠 수 있음)으로만 검증할 수 있음. 동의하면 allowKeysetVerification=true로 다시 요청할 것.");
+                }
+            }
+        }
         AnalysisResult? analysis = null;
         if (failures.Count == 0)
         {
@@ -181,32 +211,33 @@ public sealed class ApplyService : IApplyService
             };
 
         var tables = context.Catalog.ToCaptureInput().Where(t => !AuditTriggerGenerator.IsCaptureStore(t)).ToList();
-        var snapshotDb = context.OriginDb + Settings.OriginSnapshotSuffix;
+        var snapshotDb = Settings.Mode == ServerMode.Split
+            ? RunNames.OriginSnapshot(context.OriginDb, Settings.OriginSnapshotSuffix, Settings.MachineTag, Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4)))
+            : context.OriginDb + Settings.OriginSnapshotSuffix;
         var limitations = new List<string>();
+        if (Settings.Mode == ServerMode.Split) limitations.Add(PrincipalLimitation);
+        if (Settings.Mode == ServerMode.Split && context.OriginIsSysadmin == true) limitations.Add(SysadminLimitation);
         var snapshotCreated = false;
         try
         {
-            // 5. 원본 스냅샷(실패하면 KEYSET)
+            // 5. 원본 스냅샷(실패하면 error, KEYSET으로 낮추지 않는다)
             run.Watch.Restart();
             if (mode == VerificationMode.SnapshotNetdiff)
             {
                 var (outcome, reason) = await origin.CreateSnapshotAsync(context.OriginDb, snapshotDb, ct);
                 snapshotCreated = outcome == SnapshotOutcome.Created;
-                if (outcome == SnapshotOutcome.Failed)
+                if (!snapshotCreated)
                 {
-                    // 이름 충돌·권한 오류는 설정 문제다: KEYSET으로 낮추지 않고 원본에 아무것도 하지 않은 채 끝낸다.
                     run.Snapshot = run.Lap();
                     return Make(record, ApplyStatus.Error, new ApplyVerification { Mode = mode, Limitations = limitations }, [],
                         $"원본 스냅샷을 준비하지 못해 실행하지 않음: {reason}", run);
                 }
-                if (outcome == SnapshotOutcome.Unsupported)
-                {
-                    mode = VerificationMode.Keyset;
-                    limitations.Add($"원본 스냅샷을 만들 수 없어 KEYSET으로 검증함: {reason}");
-                }
             }
-            else limitations.Add("ForceKeyset 설정으로 원본 스냅샷 없이 KEYSET으로 검증함");
-            if (mode == VerificationMode.Keyset) limitations.Add(KeysetVerifier.Limitation);
+            else
+            {
+                limitations.Add(keysetReason!);
+                limitations.Add(KeysetVerifier.Limitation);
+            }
             run.Snapshot = run.Lap();
 
             // 6. 전용 연결
@@ -269,7 +300,7 @@ public sealed class ApplyService : IApplyService
         var runContext = new StatementRunContext
         {
             Baseline = context,
-            ExecuteAsUser = Settings.ExecuteAsUser,
+            ExecuteAsUser = Settings.Mode == ServerMode.Split ? null : Settings.ExecuteAsUser, // Split: 원본에서 가장하지 않는다(본인 로그인)
             CommandTimeoutSeconds = Settings.CommandTimeoutSeconds,
             TransactionId = tranId,
         };
@@ -461,13 +492,24 @@ public sealed class ApplyService : IApplyService
             reasons.Add("미리보기를 만든 뒤 기준선이 바뀜(새로 고침). 다시 미리보기 할 것.");
         }
 
-        var originFingerprint = await origin.ReadFingerprintAsync(context.OriginDb, ct);
-        if (!context.FingerprintMatch || originFingerprint != context.Fingerprint || b.Fingerprint != context.Fingerprint)
+        // SingleServer는 레코드 전체 일치(기존), Split은 차단 항목 일치(FingerprintComparison). 미리보기 지문은 샌드박스 지문과 같아야 한다.
+        Fingerprint originFingerprint;
+        try { originFingerprint = await origin.ReadFingerprintAsync(context.OriginDb, ct); }
+        catch (SandboxUnavailableException ex)
+        {
+            // 원본에 연결할 수 없음(N4): 나머지 원본 조건은 읽지 않고 막는다. 메시지는 번호만 담는다(OriginConnections).
+            failures.Add(ApplyPrecondition.OriginUnreachable);
+            reasons.Add(ex.Message + ".");
+            return (failures, reasons);
+        }
+        var comparison = FingerprintComparison.Compare(originFingerprint, context.Fingerprint, Settings.Mode);
+        if (!context.FingerprintMatch || !comparison.Match || b.Fingerprint != context.Fingerprint)
         {
             failures.Add(ApplyPrecondition.FingerprintMismatch);
-            reasons.Add("원본·샌드박스·미리보기의 환경 지문이 같지 않음.");
+            reasons.Add("원본·샌드박스·미리보기의 환경 지문이 같지 않음." + (comparison.Mismatches.Count > 0 ? " " + string.Join("; ", comparison.Mismatches) + "." : ""));
         }
-        if (Settings.ExecuteAsUser is { } user && !await origin.UserExistsAsync(context.OriginDb, user, ct))
+        // Split은 가장하지 않는다(Host가 ExecuteAsUser = null). 이 조건은 SingleServer에서만 의미가 있다.
+        if (Settings.Mode == ServerMode.SingleServer && Settings.ExecuteAsUser is { } user && !await origin.UserExistsAsync(context.OriginDb, user, ct))
         {
             failures.Add(ApplyPrecondition.ExecuteAsUserMissing);
             reasons.Add($"원본에 실행 사용자 {user}가 없음(원본 준비 단계에서 만들어 둘 것, 적용 중에는 DDL을 하지 않음).");

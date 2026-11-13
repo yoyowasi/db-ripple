@@ -9,11 +9,15 @@ import type {
   PreviewRequest,
   PreviewResult,
   ProblemDetails,
+  ProblemReason,
   RejectItem,
   RowChange,
   RowPage,
   RowView,
   SandboxStatus,
+  SettingsRequest,
+  SettingsTestResult,
+  SettingsView,
 } from './types'
 
 const BASE = '/api'
@@ -37,9 +41,14 @@ export class ApiError extends Error {
     this.problem = problem
   }
 
-  /** 409의 사유(3주차 추가). */
-  get reason(): ConflictReason | undefined {
+  /** 409·401의 사유(3주차·N4 추가). */
+  get reason(): ProblemReason | undefined {
     return this.problem?.reason
+  }
+
+  /** 실행 파일이 연 브라우저 창의 세션 쿠키가 없다(401 NO_SESSION). */
+  get isNoSession(): boolean {
+    return this.status === 401 && this.problem?.reason === 'NO_SESSION'
   }
 
   /** 422의 거부 목록. */
@@ -61,6 +70,19 @@ interface RequestOptions {
   body?: unknown
   query?: Record<string, string | number | null | undefined>
   signal?: AbortSignal
+}
+
+/**
+ * 개발 서버에서 주소에 ?fixture=… 가 있으면 백엔드 대신 dev/fakeApi 의 시험 응답을 돌려준다.
+ * import.meta.env.DEV 가 false인 운영 빌드에서는 이 분기와 dev/ 모듈이 통째로 빠진다.
+ */
+async function devFixtureFetch(method: string, url: string, body: string | undefined, signal?: AbortSignal): Promise<Response | null> {
+  if (import.meta.env.DEV) {
+    const fake = await import('../dev/fakeApi')
+    const fixture = fake.currentFixture()
+    if (fixture) return fake.fakeFetch(fixture, method, url, body, signal)
+  }
+  return null
 }
 
 async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
@@ -86,7 +108,7 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
 
   let res: Response
   try {
-    res = await fetch(url, { method, headers, body, signal: opts.signal })
+    res = (await devFixtureFetch(method, url, body, opts.signal)) ?? (await fetch(url, { method, headers, body, signal: opts.signal }))
   } catch (e) {
     if (isAbortError(e)) throw e
     throw new ApiError(0, null, UNREACHABLE_TEXT)
@@ -156,8 +178,9 @@ export function getRows(
   })
 }
 
-export function applyPreview(id: string, sqlHash: string | null): Promise<ApplyResult> {
-  const body: ApplyRequest = { sqlHash }
+/** allowKeysetVerification은 사용자가 약한 검증(KEYSET)에 동의했을 때만 true로 보낸다(아니면 필드를 빼서 옛 서버와 같은 요청). */
+export function applyPreview(id: string, sqlHash: string | null, allowKeysetVerification = false): Promise<ApplyResult> {
+  const body: ApplyRequest = allowKeysetVerification ? { sqlHash, allowKeysetVerification: true } : { sqlHash }
   return request<ApplyResult>('POST', `/previews/${encodeURIComponent(id)}/apply`, { body })
 }
 
@@ -166,13 +189,30 @@ export async function cancelPreview(id: string): Promise<void> {
   await request<void>('POST', `/previews/${encodeURIComponent(id)}/cancel`)
 }
 
+// ---- 설정(N4 계약 §4) ----
+
+export function getSettings(signal?: AbortSignal): Promise<SettingsView> {
+  return request<SettingsView>('GET', '/settings', { signal })
+}
+
+/** 204. 400이면 ApiError.problem.errors 에 필드별 오류가 있다. 환경 변수 설정이면 409 ENV_OVERRIDE. */
+export async function saveSettings(body: SettingsRequest): Promise<void> {
+  await request<void>('PUT', '/settings', { body })
+}
+
+/** 저장하지 않고 연결만 시험한다. */
+export function testSettings(body: SettingsRequest, signal?: AbortSignal): Promise<SettingsTestResult> {
+  return request<SettingsTestResult>('POST', '/settings/test', { body, signal })
+}
+
 export function exportUrl(id: string): string {
   return `${BASE}/previews/${encodeURIComponent(id)}/export`
 }
 
 // ---- 오류 문장 ----
 
-const CONFLICT_TEXT: Record<ConflictReason, string> = {
+const CONFLICT_TEXT: Record<ConflictReason | 'ENV_OVERRIDE', string> = {
+  ENV_OVERRIDE: '설정이 환경 변수로 정해져 있어 화면에서 바꿀 수 없습니다.',
   LOCKED: '다른 미리보기나 적용이 진행 중입니다. 끝난 뒤 다시 시도하세요.',
   BUILDING: '기준선을 만드는 중입니다. 상태가 ready가 될 때까지 기다리세요.',
   NO_BASELINE: '기준선이 없습니다. 샌드박스를 새로 고쳐 기준선을 만드세요.',
@@ -181,7 +221,7 @@ const CONFLICT_TEXT: Record<ConflictReason, string> = {
 }
 
 /** 이 사유일 때 [샌드박스 새로 고침]을 권한다. */
-export function conflictNeedsRefresh(reason: ConflictReason | undefined): boolean {
+export function conflictNeedsRefresh(reason: ProblemReason | undefined): boolean {
   return reason === 'NO_BASELINE' || reason === 'FINGERPRINT_MISMATCH' || reason === 'DIRTY'
 }
 
@@ -194,12 +234,14 @@ export function describeApiError(e: ApiError): string {
       const lines = Object.entries(p?.errors ?? {}).flatMap(([field, msgs]) => msgs.map((m) => `${field}: ${m}`))
       return lines.length ? `요청이 올바르지 않습니다. ${lines.join(' / ')}` : `요청이 올바르지 않습니다. ${e.message}`
     }
+    case 401:
+      return '실행 파일이 연 브라우저 창에서만 쓸 수 있습니다. 실행 파일을 다시 여세요.'
     case 403:
       return `요청이 거부되었습니다(403). ${p?.detail ?? p?.title ?? '요청 출처 확인 헤더가 없거나 허용되지 않은 출처입니다.'} 화면을 새로 고친 뒤 다시 시도하세요.`
     case 404:
       return '미리보기를 찾을 수 없습니다. 만료(30분)됐거나 적용·취소로 지워졌습니다.'
     case 409:
-      return e.reason ? CONFLICT_TEXT[e.reason] : `충돌: ${e.message}`
+      return e.reason && e.reason in CONFLICT_TEXT ? CONFLICT_TEXT[e.reason as keyof typeof CONFLICT_TEXT] : `충돌: ${e.message}`
     case 422:
       return '미리보기할 수 없는 문장이 있습니다. 아래 거부 사유를 확인하세요.'
     case 501:

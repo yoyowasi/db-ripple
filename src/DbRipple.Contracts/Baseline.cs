@@ -28,6 +28,35 @@ public sealed record BaselineContext
     public required IReadOnlyList<TriggerStaticInfo> Triggers { get; init; }
     /// <summary>수집 범위 매니페스트(§6.2, Core CaptureManifest). 기준선 구축 때 쓴 manifest.json을 읽는다(샌드박스 카탈로그로 다시 만들면 감사 트리거가 Last 점유로 보여 틀린다).</summary>
     public required CaptureManifest Manifest { get; init; }
+    /// <summary>서버 배치(2026-11-13). 기본 SingleServer(기존 동작).</summary>
+    public ServerMode Mode { get; init; } = ServerMode.SingleServer;
+    /// <summary>Split: 원본 @@SERVERNAME(비밀값 아님). SingleServer는 null.</summary>
+    public string? OriginServer { get; init; }
+    /// <summary>원본 연결로 읽은 지문(Split). SingleServer는 null.</summary>
+    public Fingerprint? OriginFingerprint { get; init; }
+    /// <summary>지문 경고(FingerprintComparison.Warnings, 막지 않음).</summary>
+    public IReadOnlyList<string> FingerprintWarnings { get; init; } = [];
+    /// <summary>지문 차단 항목 불일치(FingerprintComparison.Mismatches). 있으면 FingerprintMatch = false.</summary>
+    public IReadOnlyList<string> FingerprintMismatches { get; init; } = [];
+    /// <summary>원본 로그인 표시(SQL 인증이면 사용자 이름, Windows 인증이면 "Windows 인증"). 비밀값 없음.</summary>
+    public string? OriginLogin { get; init; }
+    /// <summary>원본 로그인이 sysadmin인지(IS_SRVROLEMEMBER). 모르면 null.</summary>
+    public bool? OriginIsSysadmin { get; init; }
+    /// <summary>문맥을 읽을 때 원본에 연결됐는지(Split). false면 지문 비교를 보류하고 미리보기만 허용한다(2026-11-13 N4).</summary>
+    public bool OriginReachable { get; init; } = true;
+}
+
+/// <summary>원본 표시(§6.4 SandboxStatus.origin, 2026-11-13 추가). 비밀값 없음.</summary>
+public sealed record OriginInfo
+{
+    /// <summary>원본 @@SERVERNAME(SingleServer는 null).</summary>
+    public string? Server { get; init; }
+    /// <summary>원본 DB 이름.</summary>
+    public required string Database { get; init; }
+    /// <summary>원본 로그인(SQL 인증 사용자 이름 또는 "Windows 인증"). 비밀값 없음(2026-11-13 N4).</summary>
+    public string? Login { get; init; }
+    /// <summary>원본 로그인이 sysadmin인지. 모르면 null(2026-11-13 N4).</summary>
+    public bool? IsSysadmin { get; init; }
 }
 
 /// <summary>매니페스트 요약(§6.4 SandboxStatus.manifest).</summary>
@@ -54,6 +83,18 @@ public sealed record SandboxStatus
     public required bool Locked { get; init; }
     /// <summary>매니페스트 요약. 기준선이 없으면 null.</summary>
     public ManifestSummary? Manifest { get; init; }
+    /// <summary>서버 배치 split | single_server(2026-11-13 추가).</summary>
+    public ServerMode Mode { get; init; } = ServerMode.SingleServer;
+    /// <summary>원본 서버·DB(비밀값 없음). 기준선 문맥이 없으면 null.</summary>
+    public OriginInfo? Origin { get; init; }
+    /// <summary>지문 경고(막지 않음).</summary>
+    public IReadOnlyList<string> FingerprintWarnings { get; init; } = [];
+    /// <summary>지문 차단 항목 불일치(fingerprintMatch = false의 이유).</summary>
+    public IReadOnlyList<string> FingerprintMismatches { get; init; } = [];
+    /// <summary>Split: [적용]으로 원본이 바뀐 뒤 자동 재구축하지 않아 기준선이 오래됨. 새로 고침으로 풀린다.</summary>
+    public bool BaselineStale { get; init; }
+    /// <summary>원본에 연결되는지(마지막 기준선 읽기 기준). false면 미리보기는 기존 기준선으로 허용(경고), [적용]은 ORIGIN_UNREACHABLE(2026-11-13 N4).</summary>
+    public bool OriginReachable { get; init; } = true;
 }
 
 /// <summary>
@@ -74,4 +115,6 @@ public interface ISandboxManager
     Task<IAsyncDisposable> AcquirePreviewLockAsync(CancellationToken ct);
     /// <summary>롤백 뒤 남은 변경이 있어 오염으로 표시(§5.2 4). 다음 미리보기 전에 재구축한다(§5.2 2).</summary>
     void MarkDirty(string reason);
+    /// <summary>Split: [적용] 뒤 원본이 바뀌었지만 자동 재구축하지 않고 "기준선 오래됨"으로만 표시(2026-11-13). 기본은 아무것도 안 함.</summary>
+    void MarkStale(string reason) { }
 }

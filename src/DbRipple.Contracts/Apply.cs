@@ -47,6 +47,10 @@ public enum ApplyPrecondition
     [JsonStringEnumMemberName("FINGERPRINT_MISMATCH")] FingerprintMismatch,
     /// <summary>원본에 EXECUTE AS 대상 사용자가 없음. 원본에 DDL을 하지 않으므로 만들지 않고 막는다(설계 외, Q30).</summary>
     [JsonStringEnumMemberName("EXECUTE_AS_USER_MISSING")] ExecuteAsUserMissing,
+    /// <summary>원본 스냅샷을 만들 수 없어(권한·FILESTREAM·메모리 최적화) KEYSET으로만 검증할 수 있는데 요청이 allowKeysetVerification=true가 아님(2026-11-13).</summary>
+    [JsonStringEnumMemberName("WEAK_VERIFICATION_NOT_ACCEPTED")] WeakVerificationNotAccepted,
+    /// <summary>원본 서버에 연결할 수 없음(선행 조건을 읽지 못함). 원본에 아무것도 실행하지 않았다(2026-11-13 N4).</summary>
+    [JsonStringEnumMemberName("ORIGIN_UNREACHABLE")] OriginUnreachable,
 }
 
 /// <summary>드리프트 종류(§5.3 드리프트 검사). 설계는 driftRows 원소를 정하지 않았다(설계 외, Q24).</summary>
@@ -93,6 +97,8 @@ public sealed record ApplyRequest
 {
     /// <summary>"sha256:…"(PreviewResult.sqlHash 형식). null이면 저장된 원문과 PreviewResult.sqlHash만 대조한다.</summary>
     public string? SqlHash { get; init; }
+    /// <summary>원본 스냅샷을 만들 수 없을 때 약한 검증(KEYSET)에 동의. 기본 false면 WEAK_VERIFICATION_NOT_ACCEPTED로 막는다(2026-11-13).</summary>
+    public bool AllowKeysetVerification { get; init; }
 }
 
 /// <summary>문장별 직접 대상 행 수 대조(§6.4 verification.statementRowCounts 원소 `{ index, preview, actual }`).</summary>

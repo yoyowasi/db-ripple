@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DbRipple.Contracts;
+using DbRipple.Core.Baseline;
 using DbRipple.Core.Catalog;
 using DbRipple.Preview;
 using DbRipple.TestSupport;
@@ -54,7 +55,7 @@ public sealed class SandboxManagerTests : IClassFixture<SandboxManagerTests.Fixt
 
     SandboxManagerOptions Options(string? origin = null) => new()
     {
-        ConnectionString = TestDb.ConnectionString(),
+        Connections = ServerConnections.SingleServer(TestDb.ConnectionString()),
         OriginDb = origin ?? fx.Baseline!.Origin, SandboxDb = fx.Baseline!.Sandbox, SnapshotDb = fx.Baseline.Snapshot,
         BackupPath = fx.Baseline.BackupPath, ManifestPath = ManifestPath,
     };

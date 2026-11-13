@@ -17,7 +17,9 @@ internal interface IOriginDatabase
     Task<Fingerprint> ReadFingerprintAsync(string originDb, CancellationToken ct);
     /// <summary>원본에 EXECUTE AS 대상 사용자가 있는지(읽기만, Q30: 만들지 않는다).</summary>
     Task<bool> UserExistsAsync(string originDb, string user, CancellationToken ct);
-    /// <summary>원본 스냅샷 생성. Unsupported면 KEYSET으로 낮추고, Failed(이름 충돌·권한)면 error로 끝낸다.</summary>
+    /// <summary>원본 스냅샷을 만들 수 있는지(실행 전 검증 모드 결정, 읽기만): CREATE DATABASE 권한, FILESTREAM·메모리 최적화 파일 그룹.</summary>
+    Task<SnapshotCapability> CheckSnapshotCapabilityAsync(string originDb, CancellationToken ct);
+    /// <summary>원본 스냅샷 생성. 실패하면 Failed(error로 끝낸다, KEYSET으로 조용히 낮추지 않는다).</summary>
     Task<(SnapshotOutcome Outcome, string? Reason)> CreateSnapshotAsync(string originDb, string snapshotDb, CancellationToken ct);
     /// <summary>원본 스냅샷 삭제.</summary>
     Task DropSnapshotAsync(string originDb, string snapshotDb, CancellationToken ct);
@@ -68,6 +70,16 @@ internal static class OriginConnections
 /// <summary><see cref="IOriginDatabase"/>의 SQL Server 구현.</summary>
 internal sealed class SqlOriginDatabase(string connectionString, ApplySettings settings) : IOriginDatabase
 {
+    public async Task<SnapshotCapability> CheckSnapshotCapabilityAsync(string originDb, CancellationToken ct)
+    {
+        OriginNames.Validate(originDb, "원본");
+        await using var conn = await OriginConnections.OpenAsync(connectionString, "master", ct);
+        await using var cmd = new SqlCommand(OriginSnapshot.CapabilitySql(originDb), conn) { CommandTimeout = settings.ToolCommandTimeoutSeconds };
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        if (!await r.ReadAsync(ct)) throw new InvalidOperationException("원본 스냅샷 가능 여부를 읽지 못함");
+        return OriginSnapshot.Decide(r.GetInt32(0) == 1, r.GetInt32(1), r.GetInt32(2));
+    }
+
     public async Task<Fingerprint> ReadFingerprintAsync(string originDb, CancellationToken ct)
     {
         await using var conn = await OriginConnections.OpenAsync(connectionString, "master", ct);
@@ -96,6 +108,12 @@ internal sealed class SqlOriginDatabase(string connectionString, ApplySettings s
     {
         OriginNames.Validate(originDb, "원본");
         var conn = await OriginConnections.OpenAsync(connectionString, originDb, ct);
+        if (settings.Mode == ServerMode.Split && settings.OriginLockTimeoutMs > 0)
+        {
+            // 원본은 팀 서버일 수 있다: 남의 잠금을 무한히 기다리지 않는다(초과는 오류 1222 → 문장 실패·롤백).
+            await using var cmd = new SqlCommand($"SET LOCK_TIMEOUT {settings.OriginLockTimeoutMs};", conn) { CommandTimeout = settings.ToolCommandTimeoutSeconds };
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
         return new SqlOriginConnection(conn, settings.ToolCommandTimeoutSeconds);
     }
 }

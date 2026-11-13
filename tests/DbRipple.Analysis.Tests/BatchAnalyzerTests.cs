@@ -319,12 +319,13 @@ public class BatchAnalyzerTests
     }
 
     static TriggerStaticInfo Trig(string table, string name, string[]? external = null, bool dynamic = false, bool encrypted = false,
-        bool disabled = false, bool audit = false, ChangeOperation[]? events = null, bool transactionControl = false) => new()
+        bool disabled = false, bool audit = false, ChangeOperation[]? events = null, bool transactionControl = false,
+        string[]? writes = null, bool rollback = false) => new()
     {
         HasTransactionControl = transactionControl,
         Trigger = name, ObjectId = 1, Table = table, Events = events ?? [ChangeOperation.Insert, ChangeOperation.Update, ChangeOperation.Delete],
-        IsInsteadOf = false, IsDisabled = disabled, IsEncrypted = encrypted, IsAuditTrigger = audit, HasDynamicSql = dynamic, HasRollback = false,
-        ExternalSideEffects = external ?? [],
+        IsInsteadOf = false, IsDisabled = disabled, IsEncrypted = encrypted, IsAuditTrigger = audit, HasDynamicSql = dynamic, HasRollback = rollback,
+        ExternalSideEffects = external ?? [], WriteTargets = writes ?? [],
     };
 
     [Fact]
@@ -402,5 +403,90 @@ public class BatchAnalyzerTests
         Assert.True(Run("DELETE dbo.T", ctx).IsAccepted);  // 그 이벤트가 아니면 발동하지 않음
         Assert.True(Run("DELETE dbo.U", ctx).IsAccepted);  // 비활성 트리거
         Assert.Contains(AnalysisRules.RejectTriggerTransactionControl, AnalysisRules.AllRejects);
+    }
+
+    // ---- 도달 폐포(2026-11-13): 직접 대상 밖에서 발동하는 트리거 ----
+
+    [Fact]
+    public void Rejects_when_a_cascade_child_has_an_external_side_effect_trigger()
+    {
+        var ctx = Ctx([Trig("dbo.U", "dbo.trMail", external: ["msdb:msdb.dbo.sp_send_dbmail"], events: [ChangeOperation.Delete])],
+            more: b => b.ForeignKey("FK_U_T", "dbo.U", "dbo.T", onDelete: "CASCADE"));
+        AssertRejectedWith("DELETE dbo.T", AnalysisRules.RejectTriggerExternalEffect, ctx);
+        var reject = Assert.Single(Run("DELETE dbo.T", ctx).Rejects);
+        Assert.Contains("FK FK_U_T", reject.Message);       // 닿는 경로를 보인다
+        Assert.Contains("dbo.trMail", reject.Message);
+        Assert.True(Run("UPDATE dbo.T SET a = 1", ctx).IsAccepted); // ON UPDATE NO ACTION: 자식으로 번지지 않음
+        Assert.True(Run("INSERT INTO dbo.T (a) VALUES (1)", ctx).IsAccepted);
+    }
+
+    [Fact]
+    public void Set_null_reaches_the_child_as_an_update()
+    {
+        var onUpdate = Ctx([Trig("dbo.U", "dbo.trCommit", transactionControl: true, events: [ChangeOperation.Update])],
+            more: b => b.ForeignKey("FK_U_T", "dbo.U", "dbo.T", onDelete: "SET_NULL"));
+        AssertRejectedWith("DELETE dbo.T", AnalysisRules.RejectTriggerTransactionControl, onUpdate);
+
+        var onDeleteOnly = Ctx([Trig("dbo.U", "dbo.trCommit", transactionControl: true, events: [ChangeOperation.Delete])],
+            more: b => b.ForeignKey("FK_U_T", "dbo.U", "dbo.T", onDelete: "SET_NULL"));
+        Assert.True(Run("DELETE dbo.T", onDeleteOnly).IsAccepted); // 자식은 UPDATE로만 바뀐다
+    }
+
+    [Fact]
+    public void Follows_trigger_write_targets_and_then_their_cascades()
+    {
+        // T의 트리거가 Orders를 쓰고, Orders 삭제가 U로 CASCADE되고, U의 트리거가 외부 부작용을 낸다.
+        var ctx = Ctx([
+                Trig("dbo.T", "dbo.trT", writes: ["Sales.Orders"], events: [ChangeOperation.Insert]),
+                Trig("dbo.U", "dbo.trU", external: ["OPENQUERY"], events: [ChangeOperation.Delete]),
+            ],
+            more: b => b.ForeignKey("FK_U_Orders", "dbo.U", "Sales.Orders", onDelete: "CASCADE"));
+        var r = Run("INSERT INTO dbo.T (a) VALUES (1)", ctx);
+        Assert.False(r.IsAccepted);
+        var reject = Assert.Single(r.Rejects);
+        Assert.Equal(AnalysisRules.RejectTriggerExternalEffect, reject.RuleId);
+        Assert.Contains("트리거 dbo.trT", reject.Message);
+        Assert.Contains("FK FK_U_Orders", reject.Message);
+    }
+
+    [Fact]
+    public void Unknown_write_targets_reach_every_table_closed_side()
+    {
+        var bad = Ctx([
+            Trig("dbo.T", "dbo.trDyn", dynamic: true, events: [ChangeOperation.Update]),
+            Trig("Sales.Orders", "Sales.trMail", external: ["msdb:msdb.dbo.sp_send_dbmail"]),
+        ]);
+        AssertRejectedWith("UPDATE dbo.T SET a = 1", AnalysisRules.RejectTriggerExternalEffect, bad);
+        Assert.Contains(Run("UPDATE dbo.T SET a = 1", bad).Rejects, d => d.Message.Contains("쓰기 대상 미상"));
+
+        var clean = Ctx([Trig("dbo.T", "dbo.trDyn", dynamic: true, events: [ChangeOperation.Update]), Trig("dbo.U", "dbo.trU")]);
+        var ok = Run("UPDATE dbo.T SET a = 1", clean);
+        Assert.True(ok.IsAccepted);
+        Assert.Contains(ok.Warnings, w => w.RuleId == AnalysisRules.WarnTriggerDynamicSql); // 직접 대상 경고는 그대로
+    }
+
+    [Fact]
+    public void Reached_rollback_only_disabled_and_audit_triggers_are_not_rejected()
+    {
+        var ctx = Ctx([
+                Trig("dbo.U", "dbo.trRollback", rollback: true, events: [ChangeOperation.Delete]),
+                Trig("dbo.U", "dbo.trOff", external: ["OPENQUERY"], disabled: true),
+                Trig("dbo.U", "dbo.dbr_audit_U_D", external: ["xp_:x"], audit: true),
+            ],
+            more: b => b.ForeignKey("FK_U_T", "dbo.U", "dbo.T", onDelete: "CASCADE")
+                        .ForeignKey("FK_Orders_T", "Sales.Orders", "dbo.T", onDelete: "CASCADE", disabled: true));
+        Assert.True(Run("DELETE dbo.T", ctx).IsAccepted);
+    }
+
+    [Fact]
+    public void Direct_target_trigger_is_reported_once_and_cycles_terminate()
+    {
+        // 직접 대상 트리거는 CheckTargetTriggers 한 번만, 서로 쓰는 트리거 순환은 고정점에서 멈춘다.
+        var ctx = Ctx([
+            Trig("dbo.T", "dbo.trMail", external: ["OPENQUERY"], writes: ["dbo.U"]),
+            Trig("dbo.U", "dbo.trU", writes: ["dbo.T"]),
+        ]);
+        var r = Run("DELETE dbo.T", ctx);
+        Assert.Single(r.Rejects, d => d.RuleId == AnalysisRules.RejectTriggerExternalEffect);
     }
 }

@@ -34,7 +34,7 @@ public class BaselineIntegrationTests
         await TestSql.ExecAsync(src, SourceSetup);
         var o = new BaselineOptions(src, sb, ss, backup);
 
-        await using (var steps = new SqlBaselineSteps(TestSql.ConnectionString()))
+        await using (var steps = new SqlBaselineSteps(new SandboxConnection(TestSql.ConnectionString())))
         {
             var first = await BaselineBuilder.BuildAsync(o, steps, () => DateTimeOffset.Now);
             Assert.True(first.FingerprintMatch);
@@ -44,7 +44,7 @@ public class BaselineIntegrationTests
 
         // 다시 만들기: 스냅샷이 있고 샌드박스에 열린 세션이 있어도 지우고 끊고 복원한다
         await using (var held = await TestSql.OpenAsync(sb))
-        await using (var steps = new SqlBaselineSteps(TestSql.ConnectionString()))
+        await using (var steps = new SqlBaselineSteps(new SandboxConnection(TestSql.ConnectionString())))
             await AssertBaselineAsync(await BaselineBuilder.BuildAsync(o, steps, () => DateTimeOffset.Now));
 
         // 원본은 BACKUP만 했으므로 그대로다(감사 저장소 없음, DDL 로그 0행)
@@ -77,7 +77,7 @@ public class BaselineIntegrationTests
         // RESTORE 실패(대상에 스냅샷이 있어 5094) → SINGLE_USER로 남지 않고 MULTI_USER로 돌아오며 원래 오류가 그대로 나온다
         var restoreError = await Assert.ThrowsAsync<SqlException>(async () =>
         {
-            await using var steps = new SqlBaselineSteps(TestSql.ConnectionString());
+            await using var steps = new SqlBaselineSteps(new SandboxConnection(TestSql.ConnectionString()));
             await BaselineBuilder.RestoreAsync(steps, sb, backup);
         });
         Assert.Contains(restoreError.Errors.Cast<SqlError>(), e => e.Number == 5094);
@@ -86,7 +86,7 @@ public class BaselineIntegrationTests
 
         // RESTORING으로 남은 샌드박스(복원 중단)는 ALTER가 5052로 실패하므로 지우고 새로 복원한다
         await TestSql.DropAsync(ss);
-        await using (var steps = new SqlBaselineSteps(TestSql.ConnectionString()))
+        await using (var steps = new SqlBaselineSteps(new SandboxConnection(TestSql.ConnectionString())))
         {
             var files = await steps.ReadFileListAsync(BaselineSql.FileListOnly(backup), default);
             await steps.ExecuteAsync("master", BaselineSql.PrepareRestoreTarget(sb), default);
@@ -94,7 +94,7 @@ public class BaselineIntegrationTests
         }
         await using (var m = await TestSql.OpenAsync("master"))
             Assert.Equal("RESTORING", await TestSql.ScalarAsync<string>(m, $"SELECT state_desc FROM sys.databases WHERE name = N'{sb}';"));
-        await using (var steps = new SqlBaselineSteps(TestSql.ConnectionString()))
+        await using (var steps = new SqlBaselineSteps(new SandboxConnection(TestSql.ConnectionString())))
             await AssertBaselineAsync(await BaselineBuilder.BuildAsync(o, steps, () => DateTimeOffset.Now));
 
         async Task AssertBaselineAsync(BaselineResult r)
@@ -155,7 +155,7 @@ public class BaselineIntegrationTests
     static async Task<SqlException> BuildFailsAsync(BaselineOptions o) =>
         await Assert.ThrowsAsync<SqlException>(async () =>
         {
-            await using var steps = new SqlBaselineSteps(TestSql.ConnectionString());
+            await using var steps = new SqlBaselineSteps(new SandboxConnection(TestSql.ConnectionString()));
             await BaselineBuilder.BuildAsync(o, steps, () => DateTimeOffset.Now);
         });
 }

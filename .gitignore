@@ -33,3 +33,9 @@ Thumbs.db
 
 # M5 측정의 원본 미리보기 덤프(수십~수백 MB). 수치는 m5.csv·env.json으로 재현한다
 logs/eval-m5/*/store/
+
+# 미리보기 저장소 결과(행 이미지가 들어 있다). 이미 추적 중인 파일은 사용자 승인 후 git rm --cached로 뺀다(2026-11-13 N4)
+*.preview.json
+
+# 게시 결과(scripts/publish.ps1)
+artifacts/

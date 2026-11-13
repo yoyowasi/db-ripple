@@ -92,7 +92,7 @@ public sealed class Lab : IAsyncDisposable
             await seed(origin);
             var manager = new SandboxManager(new SandboxManagerOptions
             {
-                ConnectionString = TestDb.ConnectionString(),
+                Connections = ServerConnections.SingleServer(TestDb.ConnectionString()),
                 OriginDb = origin,
                 SandboxDb = origin + "_sbx",
                 SnapshotDb = origin + "_base",

@@ -52,7 +52,8 @@ public sealed class CrossSiteRequestGuardTests
     static async Task<(WebApplication App, HttpClient Client, Probe Probe)> StartAsync(Action<ConfigurationManager>? configure = null)
     {
         var probe = new Probe();
-        var builder = WebApplication.CreateBuilder();
+        // 개발 모드(Vite 5273 출처 허용)의 기존 동작을 시험한다. 실행 파일 모드는 ExecutableSecurityTests(N4).
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.WebHost.UseTestServer();
         builder.Logging.ClearProviders();
         configure?.Invoke(builder.Configuration);

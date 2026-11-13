@@ -10,6 +10,7 @@ public sealed class CatalogBuilder
     readonly List<CatalogColumn> columns = [];
     readonly List<CatalogTriggerEvent> triggers = [];
     readonly List<CatalogModule> procedures = [];
+    readonly List<CatalogForeignKeyColumn> foreignKeys = [];
     int nextId = 1000;
 
     public CatalogBuilder Table(string schema, string name, params string[] columnNames)
@@ -46,5 +47,14 @@ public sealed class CatalogBuilder
         return this;
     }
 
-    public DbCatalog Build() => new(tables, columns, [], [], triggers, [], procedures);
+    /// <summary>FK 한 개(열 하나). child가 참조하는 쪽(sys.foreign_keys.parent_object_id), parent가 참조되는 쪽. 동작은 sys 표기(NO_ACTION, CASCADE, SET_NULL, SET_DEFAULT).</summary>
+    public CatalogBuilder ForeignKey(string name, string child, string parent, string onDelete = "NO_ACTION", string onUpdate = "NO_ACTION", bool disabled = false)
+    {
+        var c = child.Split('.');
+        var p = parent.Split('.');
+        foreignKeys.Add(new CatalogForeignKeyColumn(nextId++, name, IdOf(c[0], c[1]), IdOf(p[0], p[1]), onDelete, onUpdate, disabled, false, 1, "fk", "pk"));
+        return this;
+    }
+
+    public DbCatalog Build() => new(tables, columns, [], foreignKeys, triggers, [], procedures);
 }
