@@ -37,6 +37,12 @@ public sealed record CaseScore(IReadOnlyList<string?> CaseRow, IReadOnlyList<IRe
     public GraphSignature? Signature { get; init; }
     /// <summary>M3 간선 차이("예측에만: 키", "정답에만: 키", 정정 기록 후보).</summary>
     public IReadOnlyList<string> EdgeDifferences { get; init; } = [];
+    /// <summary>v0.3 거부 차이(기대한 거부 없음, 예상 밖 거부). 거부 사례(HandCase.IsRejectCase)일 때만 채운다. 비면 일치.</summary>
+    public IReadOnlyList<string> RejectDifferences { get; init; } = [];
+    /// <summary>제품이 낸 거부(ruleId, 문장 번호). 거부 사례의 rejects.json 기록용.</summary>
+    public IReadOnlyList<(string RuleId, int? StatementIndex)> ActualRejects { get; init; } = [];
+    /// <summary>v0.3 returnValue·isToolFault 차이(preview만, 손 정답에 그 필드가 있는 사례만).</summary>
+    public IReadOnlyList<string> V03Differences { get; init; } = [];
 }
 
 /// <summary>
@@ -61,6 +67,7 @@ public sealed class CaseScorer(MetricsCalculator calculator)
     /// <summary>채점하고 누적한다.</summary>
     public CaseScore Score(CaseRun run, SuiteAccumulator suite)
     {
+        if (run.Hand.IsRejectCase) return ScoreRejectCase(run);
         var system = run.System;
         var isPreview = system == Baselines.Systems.Preview;
         var tables = run.Oracle.Tables;
@@ -162,6 +169,37 @@ public sealed class CaseScorer(MetricsCalculator calculator)
             M3Rows = m3Rows,
             Signature = isPreview ? OrderStability.Signature(record?.Result, statusActual) : null,
             EdgeDifferences = edgeDiff,
+            V03Differences = isPreview ? V03Checks.CompareStatements(hand, record?.Result) : [],
+        };
+    }
+
+    /// <summary>
+    /// v0.3 거부 사례 채점. 오라클을 실행하지 않았으므로(OracleResult.Skipped) M1·M2·M3·대조군과 스위트 누적에 넣지 않는다.
+    /// cases.csv 한 행(상태 기대 rejected 대 실제)만 만들고, (ruleId, 문장 번호) 비교는 RejectDifferences로 돌려준다. 대조군(B0·B2)은 의미가 없어 호출하지 않는다.
+    /// M4 서명은 낸다(거부는 결정적이라 유효 반복, 반복마다 서명이 같아야 한다).
+    /// </summary>
+    CaseScore ScoreRejectCase(CaseRun run)
+    {
+        var hand = run.Hand;
+        var record = run.Outcome?.Record;
+        var statusActual = run.Outcome is null ? "error" : record is null ? "rejected" : ContractEnumText(record.Result.Status);
+        var actual = V03Checks.ActualRejects(run.Outcome?.Analysis);
+        var caseRow = new List<string?>
+        {
+            run.RunId, run.System, hand.Id, hand.Pattern, hand.Database, MetricsCsv.Int(run.Repeat), record?.Result.PreviewId,
+            hand.ExpectedStatus, statusActual, MetricsCsv.Bool(statusActual == hand.ExpectedStatus),
+            MetricsCsv.Int(hand.ExpectedErrorNumber), MetricsCsv.Int((long?)null),
+            MetricsCsv.Int(hand.Statements.Count), MetricsCsv.Int(0),
+            "", "", // oracle_vs_hand_keys_match, raw_batch_match: 오라클을 실행하지 않음
+            "", "", "", "", "", "", "", // 단계별 시간
+            "", // oracle_execute_ms
+            run.RecordPath,
+        };
+        return new CaseScore(caseRow, [], [], [], [])
+        {
+            Signature = run.System == Baselines.Systems.Preview ? OrderStability.Signature(record?.Result, statusActual) : null,
+            RejectDifferences = hand.RejectDiff(actual),
+            ActualRejects = actual,
         };
     }
 

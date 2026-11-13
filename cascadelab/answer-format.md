@@ -1,8 +1,10 @@
-# CascadeLab 손 정답 형식 (v0.2)
+# CascadeLab 손 정답 형식 (v0.3)
 
 사례 하나 = `cases/CLnn-<짧은이름>.json` 파일 하나. 각 사례는 시드 직후 상태(`sql/00`→`sql/clNN.sql` 실행 직후)에서 시작한다.
 
 v0.2(2026-11-11, lab-1·eval-2 합의)는 v0.1에 필드를 더하기만 한다. v0.1 파일은 그대로 v0.2 파일이다. 추가한 것은 [v0.2 추가](#v02-추가) 절에 모았다.
+
+v0.3(2026-11-13, EXEC 미리보기용)도 더하기만 한다. v0.2 파일은 그대로 v0.3 파일이다. 추가한 것은 [v0.3 추가](#v03-추가) 절에 모았다. 새 이름은 공용 계약(EXEC)을 따르고, ruleId는 통합 때 확정한다.
 
 ## 최상위
 
@@ -137,3 +139,56 @@ v0.2(2026-11-11, lab-1·eval-2 합의)는 v0.1에 필드를 더하기만 한다.
 ### 노드 참조
 
 v0.1 그대로다. 같은 테이블·연산 묶음이 한 문장에 여럿이면 `#k`는 인과 순서다. 순서를 문서로 정할 수 없으면 사례 파일의 `observedOnly`에 무엇을 기준으로 번호를 붙였는지 적는다.
+
+## v0.3 추가
+
+EXEC(저장 프로시저 호출) 사례와 거부 사례용이다. 공용 계약(2026-11-13)의 이름을 그대로 쓴다. 하네스는 제품 계약의 새 enum에 기대지 않고 이 필드를 문자열로 읽는다(`eval/DbRipple.Eval/HandCase.cs`).
+
+### 최상위
+
+| 필드 | 뜻 |
+|---|---|
+| `statements[].returnValue` | (선택) EXEC 문장의 기대 반환값(정수). 문장이 실패하거나 반환값이 없으면 `null`. 하네스는 제품 `StatementResult.returnValue`와 비교해 `differences.txt`에 남긴다(지표 아님) |
+
+### expected
+
+| 필드 | 뜻 |
+|---|---|
+| `status` | `rejected`를 더한다(분석 단계 거부, 422). 이때 `statementStatus`는 `[]`, `changes`·`firings`·`edges`는 `[]`다 |
+| `statementStatus[].isToolFault` | (선택) 실패 문장의 기대 분류. 사용자 프로시저 때문에 실패하면 `false`(CL24). 하네스는 제품 `statements[].error.isToolFault`와 비교해 `differences.txt`에 남긴다 |
+| `rejects[]` | `[{ "ruleId", "statementIndex" }]`. 분석기가 내야 할 거부 집합. 거부 사례의 정답이다. 아래 규칙 참고 |
+
+**rejects 규칙**
+
+- 비교는 (`ruleId`, `statementIndex`) 집합이다. 문장 번호는 `statements[].index`와 같은 전역 번호다.
+- `ruleId`가 `*`로 끝나면 접두 패턴이다(예 `REJECT_PROC_*`). 규칙 이름이 아직 정해지지 않은 새 사례는 자리표시 패턴에 `"ruleIdPending": true`와 `"ruleIdHint"`(예상 이름, 설명)를 붙이고, 이름이 정해지면 실제 이름으로 바꾸고 `ruleIdPending`을 지운다. CL25a~d는 2026-11-13 통합 때 `AnalysisRules`의 실제 이름으로 확정했다(지금 자리표시를 쓰는 사례는 없다).
+- 거부 사례는 오라클을 실행하지 않고 M1·M2·M3에 넣지 않는다. 대조군(B0·B2) 행도 만들지 않는다. 거부는 결정적이라 `cases.csv`에는 `status_expected = rejected`와 미리보기 상태(`status_actual = rejected`)만 남고, (ruleId, 문장 번호) 차이는 `differences.txt`와 실행 폴더의 `rejects.json`에 쓴다.
+- 오라클을 실행하지 않는 이유: 거부된 문장은 원본에서 실행하면 안 되는 것들이다(CL25b의 남는 COMMIT은 오라클 트랜잭션을 확정해 시드를 오염시킨다).
+- `database`가 `CascadeLab`·`CascadeLab_RT`가 아닌 사례(CL25d, `CascadeLab_Reach`)는 하네스가 건너뛴다(알림 한 줄). 분석 API 회귀(`scripts/home-test.ps1` N1 단계)로 확인한다.
+
+### changes 행
+
+`causes` 값에 `PROC_DIRECT`(§6.2 cause.kind 새 값)를 더한다. EXEC 문장 창 안, 깊이 1, FK로 설명되지 않는 쓰기다. 안쪽 프로시저가 쓴 행도 `PROC_DIRECT`다. 프로시저가 쓴 테이블의 FK 연쇄·트리거 쓰기는 기존 원인(`FK_CASCADE`, `TRIGGER` …)을 그대로 쓴다. M2는 `PROC_DIRECT` 버킷을 따로 센다(`HandCase.Causes`의 아홉 번째 값).
+
+프로시저가 먼저 지운 FK 자식(CL22 ChildA)은 `PROC_DIRECT`다. `FK_CASCADE`로 적지 않는다(부모 DELETE 때 FK가 지울 행이 없었다).
+
+### 노드 참조
+
+| 표기 | 노드 |
+|---|---|
+| `P:<스키마.프로시저>` | 프로시저 호출 노드(그래프 노드 type `procedureCall`). 예 `P:cl21.usp_Outer` |
+
+- `P:` 노드는 EXEC 문장의 프로시저다. 안쪽에서 호출된 프로시저는 노드로 만들지 않는다(제품은 `expandedCalls[]`로만 알린다).
+- EXEC 문장에는 `S` 노드가 없다. 제품은 문장 노드 자리(id `st-n`)에 `procedureCall` 노드를 두므로 `P:`가 그 문장의 뿌리이고 `S` → `P:` 간선도 없다. 실패한 EXEC의 오류 노드 `E:<번호>`도 부모가 `P:`다(2026-11-13 통합 확정).
+
+### edges 항목
+
+- `kind`에 `PROC_DIRECT`를 더한다. parent `P:<스키마.프로시저>`, child 변경 묶음 `F:…`, name = EXEC 문장에 쓴 프로시저 이름(`cl21.usp_Outer`), confidence `certain`(§6.3, 공용 계약).
+- 안쪽 프로시저가 쓴 묶음의 name도 EXEC 문장에 쓴 프로시저다(제품은 묶음별 안쪽 프로시저를 가리지 않는다).
+- FK 확신도(결정): 프로시저의 정적 쓰기 대상에 자식 테이블이 있으면 그 FK 간선은 `inferred`로 낮출 수 있다. 정답은 실제 원인을 적는다. 프로시저가 직접 지운 자식(CL22 ChildA)에는 FK 간선을 두지 않고, 프로시저가 건드리지 않은 자식(CL22 ChildB)은 `certain` FK 간선이다.
+- 실패 문장의 오류 노드(`E:<번호>`)는 CL12a와 같이 `S` → `E:`의 `BLOCKED` 간선으로 적는다(통합 때 확정).
+
+### 사례
+
+CL21~CL25(a~d)와 스키마(`sql/cl21.sql`~`sql/cl25.sql`, `sql/extra/cl25d.sql`)는 [README.md](README.md)의 사례 요약에 있다.
+

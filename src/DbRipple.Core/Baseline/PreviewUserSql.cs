@@ -17,8 +17,16 @@ public static class PreviewUserSql
     /// <summary>실행 사용자 이름(Q12).</summary>
     public const string UserName = "dbr_preview_user";
 
-    /// <summary>스키마마다 주는 권한(DML만, D5 허용 목록 INSERT·UPDATE·DELETE와 그 WHERE·조인을 위한 SELECT).</summary>
+    /// <summary>스키마마다 주는 DML 권한(D5 허용 목록 INSERT·UPDATE·DELETE와 그 WHERE·조인을 위한 SELECT).</summary>
     public static readonly IReadOnlyList<string> Permissions = ["SELECT", "INSERT", "UPDATE", "DELETE"];
+
+    /// <summary>
+    /// EXEC 미리보기용 EXECUTE 권한(2026-11-13, 보안 검토 반영). 스키마 단위로 주면 사용자 정의 함수(CLR·EXECUTE AS 포함)까지 DML 경로에서 실행할 수 있게 되므로,
+    /// EXECUTE AS CALLER인 T-SQL 사용자 프로시저(본문을 읽을 수 있는 것, audit 스키마 제외)마다 개체 단위로 준다. 함수에는 주지 않는다.
+    /// 목록은 배치 안에서 sys.procedures·sys.sql_modules로 만들고 이름은 QUOTENAME으로 인용한다. 기준 스냅샷 전(4b)에 주므로 그 DDL 트리거 기록도 기준선에 들어간다.
+    /// 첫 EXEC 판이 준 스키마 EXECUTE는 거둔다(REVOKE, 그때만 DDL).
+    /// </summary>
+    public const string ExecutePermission = "EXECUTE";
 
     /// <summary>EnsureBatch가 처음 실행될 때 내는 DDL 이벤트(DDL 트리거 부작용 기록용).</summary>
     public static readonly IReadOnlyList<string> DdlEvents = ["CREATE_USER", "GRANT_DATABASE"];
@@ -45,7 +53,17 @@ public static class PreviewUserSql
             sb.Append($"IF (SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id = USER_ID({u}) AND class = 3 AND major_id = SCHEMA_ID({sl})")
               .Append($" AND state = 'G' AND permission_name IN ({perms})) < {Permissions.Count}\n")
               .Append($"BEGIN GRANT {string.Join(", ", Permissions)} ON SCHEMA::{SqlText.Quote(s)} TO {q}; SET @ddl = 1; END;\n");
+            sb.Append($"IF EXISTS (SELECT 1 FROM sys.database_permissions WHERE grantee_principal_id = USER_ID({u}) AND class = 3 AND major_id = SCHEMA_ID({sl}) AND permission_name = N'{ExecutePermission}')\n")
+              .Append($"BEGIN REVOKE {ExecutePermission} ON SCHEMA::{SqlText.Quote(s)} FROM {q}; SET @ddl = 1; END;\n");
         }
+        // EXEC 미리보기: EXECUTE AS CALLER인 T-SQL 사용자 프로시저마다 EXECUTE(이미 있으면 건너뛴다)
+        sb.Append("DECLARE @dbr_grants nvarchar(max) = (SELECT STRING_AGG(CONVERT(nvarchar(max), N'GRANT EXECUTE ON OBJECT::' + QUOTENAME(SCHEMA_NAME(p.schema_id)) + N'.' + QUOTENAME(p.name)")
+          .Append($" + N' TO ' + QUOTENAME({u}) + N';'), N'')\n")
+          .Append("    FROM sys.procedures AS p JOIN sys.sql_modules AS m ON m.object_id = p.object_id\n")
+          .Append($"    WHERE p.is_ms_shipped = 0 AND p.type = 'P' AND m.definition IS NOT NULL AND m.execute_as_principal_id IS NULL AND SCHEMA_NAME(p.schema_id) <> {SqlText.NLiteral(AuditTriggerGenerator.StoreSchema)}\n")
+          .Append($"      AND NOT EXISTS (SELECT 1 FROM sys.database_permissions AS d WHERE d.grantee_principal_id = USER_ID({u}) AND d.class = 1 AND d.major_id = p.object_id")
+          .Append($" AND d.minor_id = 0 AND d.permission_name = N'{ExecutePermission}' AND d.state = 'G'));\n")
+          .Append("IF @dbr_grants IS NOT NULL BEGIN EXEC sys.sp_executesql @dbr_grants; SET @ddl = 1; END;\n");
         sb.Append("SELECT @ddl;\n");
         return sb.ToString();
     }

@@ -31,7 +31,7 @@ public sealed class TriggerAnalyzer : ITriggerAnalyzer
     public const string UnparsedMarker = "unparsed";
 
     /// <summary>프로시저 펼치기 깊이 상한(트리거가 직접 부르는 프로시저가 1).</summary>
-    public const int MaxProcedureDepth = 4;
+    public const int MaxProcedureDepth = ProcedureAnalyzer.MaxProcedureDepth;
 
     /// <inheritdoc />
     public IReadOnlyList<TriggerStaticInfo> Analyze(DbCatalog catalog)
@@ -114,7 +114,7 @@ public sealed class TriggerAnalyzer : ITriggerAnalyzer
         fragment.Accept(finder);
         if (finder.Statements.Count == 0) return Body.Unparsed;
 
-        var a = new Accumulator(triggerSchema, resolver, catalog);
+        var a = new Accumulator(triggerSchema, resolver, catalog, expander.Index);
         foreach (var stmt in finder.Statements)
         {
             stmt.StatementList.Accept(new CtePrepass(a.CteDefinitions));
@@ -142,216 +142,11 @@ public sealed class TriggerAnalyzer : ITriggerAnalyzer
         };
     }
 
-    /// <summary>프로시저 본문 하나를 분석한 결과. Parsed는 본문을 읽은 경우의 누적값(못 펼쳤어도 외부 부작용·트랜잭션 제어는 합친다), Resolved는 쓰기 대상을 다 안다는 뜻.</summary>
-    readonly record struct Expansion(bool Resolved, Accumulator? Parsed);
-
-    /// <summary>프로시저 펼치기(인계 1). 깊이 상한·재귀 판정이 호출 경로마다 달라 캐시하지 않는다(트리거 수 × 호출 수가 작다).</summary>
-    sealed class ProcedureExpander(DbCatalog catalog, TableResolver resolver)
-    {
-        readonly Dictionary<string, CatalogModule> byName = catalog.ProcedureModules
-            .GroupBy(m => m.Schema + "." + m.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-
-        public CatalogModule? Find(SchemaObjectName n, string callerSchema)
-        {
-            if (n.ServerIdentifier != null || n.DatabaseIdentifier != null) return null; // 다른 DB·서버(현재 DB 이름이어도 확인하지 않음, 닫힌 쪽)
-            var name = n.BaseIdentifier.Value;
-            if (n.SchemaIdentifier != null) return byName.GetValueOrDefault(n.SchemaIdentifier.Value + "." + name);
-            return byName.GetValueOrDefault(callerSchema + "." + name) ?? byName.GetValueOrDefault("dbo." + name);
-        }
-
-        public Expansion Expand(SchemaObjectName call, string callerSchema, int depth, HashSet<int> stack)
-        {
-            var module = Find(call, callerSchema);
-            if (module?.Definition is null || depth > MaxProcedureDepth || stack.Contains(module.ObjectId)) return new(false, null);
-
-            TSqlFragment? fragment;
-            IList<ParseError> errors;
-            try { fragment = SqlSyntax.Parse(module.Definition, out errors); }
-            catch (Exception) { return new(false, null); }
-            if (fragment is null || errors.Count > 0) return new(false, null);
-            var finder = new ProcedureFinder();
-            fragment.Accept(finder);
-            if (finder.Statements.Count != 1 || finder.Statements[0].StatementList is not { } body) return new(false, null);
-
-            var a = new Accumulator(module.Schema, resolver, catalog);
-            body.Accept(new CtePrepass(a.CteDefinitions));
-            body.Accept(new BodyVisitor(a));
-
-            var resolved = !a.DynamicSql;
-            stack.Add(module.ObjectId);
-            foreach (var (_, node) in a.Calls.ToList())
-            {
-                var inner = Expand(node, module.Schema, depth + 1, stack);
-                if (inner.Parsed is { } p) a.Merge(p);
-                resolved &= inner.Resolved;
-            }
-            stack.Remove(module.ObjectId);
-            return new(resolved, a);
-        }
-    }
-
-    sealed class ProcedureFinder : TSqlFragmentVisitor
-    {
-        public readonly List<ProcedureStatementBody> Statements = [];
-        public override void Visit(CreateProcedureStatement node) => Statements.Add(node);
-        public override void Visit(AlterProcedureStatement node) => Statements.Add(node);
-        public override void Visit(CreateOrAlterProcedureStatement node) => Statements.Add(node);
-    }
-
-    sealed class Accumulator(string triggerSchema, TableResolver resolver, DbCatalog catalog)
-    {
-        public readonly string TriggerSchema = triggerSchema;
-        public readonly TableResolver Resolver = resolver;
-        public readonly DbCatalog Catalog = catalog;
-        public readonly SortedSet<string> WriteTargets = new(StringComparer.OrdinalIgnoreCase);
-        public readonly SortedSet<string> ProcedureCalls = new(StringComparer.OrdinalIgnoreCase);
-        public readonly SortedSet<string> External = new(StringComparer.OrdinalIgnoreCase);
-        public readonly HashSet<TableColumn> NondeterministicWrites = [];
-        public readonly Dictionary<string, List<QueryExpression>> CteDefinitions = new(StringComparer.OrdinalIgnoreCase);
-        public bool DynamicSql;
-        public bool Rollback;
-        public bool TransactionControl;
-        /// <summary>이름 해석 전 프로시저 호출(이름 그대로, 구문 노드). ProcedureCalls와 같은 이름들이다.</summary>
-        public readonly List<(string Name, SchemaObjectName Node)> Calls = [];
-
-        /// <summary>
-        /// 펼친(또는 본문만 읽은) 프로시저 결과를 합친다: 쓰기 대상, 비결정 쓰기, 외부 부작용, ROLLBACK, 트랜잭션 제어.
-        /// 동적 SQL·프로시저 호출 이름은 합치지 않는다(트리거 본문 속성이고, 프로시저 쪽 미상은 UnresolvedProcedureCalls로 나타낸다).
-        /// 못 펼친 프로시저의 쓰기 대상을 합쳐도 해롭지 않다: 그 호출이 UnresolvedProcedureCalls에 있어 C13이 미상으로 본다.
-        /// </summary>
-        public void Merge(Accumulator p)
-        {
-            WriteTargets.UnionWith(p.WriteTargets);
-            NondeterministicWrites.UnionWith(p.NondeterministicWrites);
-            External.UnionWith(p.External);
-            Rollback |= p.Rollback;
-            TransactionControl |= p.TransactionControl;
-        }
-    }
-
     sealed class TriggerFinder : TSqlFragmentVisitor
     {
         public readonly List<TriggerStatementBody> Statements = [];
         public override void Visit(CreateTriggerStatement node) => Statements.Add(node);
         public override void Visit(AlterTriggerStatement node) => Statements.Add(node);
         public override void Visit(CreateOrAlterTriggerStatement node) => Statements.Add(node);
-    }
-
-    sealed class CtePrepass(Dictionary<string, List<QueryExpression>> defs) : TSqlFragmentVisitor
-    {
-        public override void Visit(CommonTableExpression node)
-        {
-            if (!defs.TryGetValue(node.ExpressionName.Value, out var list)) defs[node.ExpressionName.Value] = list = [];
-            list.Add(node.QueryExpression);
-        }
-    }
-
-    sealed class BodyVisitor(Accumulator a) : TSqlFragmentVisitor
-    {
-        public override void Visit(InsertSpecification n) => Write(n, n.Target, null);
-        public override void Visit(UpdateSpecification n) => Write(n, n.Target, n.FromClause);
-        public override void Visit(DeleteSpecification n) => Write(n, n.Target, n.FromClause);
-        public override void Visit(MergeSpecification n) => Write(n, n.Target, null);
-        public override void Visit(RollbackTransactionStatement n) => a.Rollback = true;
-        public override void Visit(CommitTransactionStatement n) => a.TransactionControl = true;
-        public override void Visit(BeginTransactionStatement n) => a.TransactionControl = true;
-        public override void Visit(SaveTransactionStatement n) => a.TransactionControl = true;
-        public override void Visit(OpenQueryTableReference n) => a.External.Add("OPENQUERY");
-        public override void Visit(OpenRowsetTableReference n) => a.External.Add("OPENROWSET");
-        public override void Visit(AdHocTableReference n) => a.External.Add("OPENDATASOURCE");
-        public override void Visit(BulkOpenRowset n) => a.External.Add("OPENROWSET");
-        public override void Visit(BulkInsertStatement n) => a.External.Add("BULK_INSERT");
-
-        public override void Visit(NamedTableReference n)
-        {
-            var s = n.SchemaObject;
-            if (s.ServerIdentifier != null) a.External.Add("4-part:" + SqlSyntax.Name(s));
-            if (string.Equals(s.DatabaseIdentifier?.Value, "msdb", StringComparison.OrdinalIgnoreCase)) a.External.Add("msdb:" + SqlSyntax.Name(s));
-        }
-
-        public override void Visit(ExecuteSpecification n)
-        {
-            if (n.LinkedServer != null) a.External.Add("linked-server:" + n.LinkedServer.Value);
-            switch (n.ExecutableEntity)
-            {
-                case ExecutableStringList:
-                    a.DynamicSql = true;
-                    break;
-                case ExecutableProcedureReference pr:
-                    var pn = pr.ProcedureReference.ProcedureReference?.Name;
-                    if (pn == null) { a.DynamicSql = true; break; } // EXEC @procvar
-                    var last = pn.BaseIdentifier.Value;
-                    if (last.Equals("sp_executesql", StringComparison.OrdinalIgnoreCase)) { a.DynamicSql = true; break; }
-                    a.ProcedureCalls.Add(SqlSyntax.Name(pn));
-                    a.Calls.Add((SqlSyntax.Name(pn), pn));
-                    if (last.StartsWith("xp_", StringComparison.OrdinalIgnoreCase)) a.External.Add("xp_:" + SqlSyntax.Name(pn));
-                    if (last.StartsWith("sp_OA", StringComparison.OrdinalIgnoreCase)) a.External.Add("sp_oa:" + SqlSyntax.Name(pn));
-                    if (pn.ServerIdentifier != null) a.External.Add("4-part:" + SqlSyntax.Name(pn));
-                    if (string.Equals(pn.DatabaseIdentifier?.Value, "msdb", StringComparison.OrdinalIgnoreCase)) a.External.Add("msdb:" + SqlSyntax.Name(pn));
-                    break;
-            }
-        }
-
-        void Write(TSqlFragment spec, TableReference? target, FromClause? from)
-        {
-            if (target is not NamedTableReference nt) return; // 변수(@t)·기타
-            var resolved = SqlSyntax.ResolveAlias(nt, from);
-            var tables = AddTarget(resolved, [], out var catalogTable);
-            if (spec is InsertSpecification or UpdateSpecification or MergeSpecification && tables.Count > 0)
-            {
-                // 비결정 값이 정해지는 (테이블, 열): 대상이 하나로 정해질 때만(CTE로 여러 개 후보면 열 귀속을 알 수 없다)
-                if (tables.Count == 1)
-                {
-                    var display = tables[0];
-                    var ct = catalogTable ?? FindTable(display);
-                    var known = ct is null ? null : a.Catalog.Columns.Where(c => c.ObjectId == ct.ObjectId).Select(c => c.Name).ToList();
-                    foreach (var col in SqlSyntax.NondeterministicColumns(spec, () => SqlSyntax.InsertableColumns(a.Catalog, ct)))
-                        a.NondeterministicWrites.Add(new TableColumn { Table = display, Column = known?.FirstOrDefault(k => k.Equals(col, StringComparison.OrdinalIgnoreCase)) ?? col });
-                }
-            }
-        }
-
-        CatalogTable? FindTable(string display)
-        {
-            var i = display.IndexOf('.');
-            return i < 0 ? null : a.Resolver.Find(display[..i], display[(i + 1)..]);
-        }
-
-        /// <summary>쓰기 대상 하나를 해석해 WriteTargets에 넣고, 넣은 이름들을 돌려준다(CTE면 정의 안의 기반 테이블들).</summary>
-        List<string> AddTarget(NamedTableReference nt, HashSet<string> visitedCtes, out CatalogTable? catalogTable)
-        {
-            catalogTable = null;
-            var so = nt.SchemaObject;
-            var baseName = so.BaseIdentifier.Value;
-            if (baseName.StartsWith('#') || baseName.StartsWith('@')) return [];
-            if (so.SchemaIdentifier == null && so.DatabaseIdentifier == null)
-            {
-                if (baseName.Equals("inserted", StringComparison.OrdinalIgnoreCase) || baseName.Equals("deleted", StringComparison.OrdinalIgnoreCase)) return [];
-                if (a.CteDefinitions.TryGetValue(baseName, out var defs))
-                {
-                    var added = new List<string>();
-                    if (!visitedCtes.Add(baseName)) return added;
-                    foreach (var def in defs)
-                    {
-                        var refs = new NamedReferenceCollector();
-                        def.Accept(refs);
-                        foreach (var r in refs.Refs)
-                            foreach (var name in AddTarget(r, visitedCtes, out _)) if (!added.Contains(name)) added.Add(name);
-                    }
-                    return added;
-                }
-            }
-            var (display, table) = a.Resolver.Resolve(so, a.TriggerSchema, "dbo");
-            catalogTable = table;
-            a.WriteTargets.Add(display);
-            return [display];
-        }
-    }
-
-    sealed class NamedReferenceCollector : TSqlFragmentVisitor
-    {
-        public readonly List<NamedTableReference> Refs = [];
-        public override void Visit(NamedTableReference n) => Refs.Add(n);
     }
 }

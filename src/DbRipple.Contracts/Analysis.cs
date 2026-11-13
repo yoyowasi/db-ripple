@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using DbRipple.Core.Catalog;
 
 namespace DbRipple.Contracts;
@@ -28,16 +29,47 @@ public sealed record AnalyzedStatement
     public required int Batch { get; init; }
     /// <summary>배치 안 순번(1부터, §6.2 Statement.position).</summary>
     public required int Position { get; init; }
-    /// <summary>INSERT/UPDATE/DELETE(D5 허용 목록).</summary>
+    /// <summary>INSERT/UPDATE/DELETE(D5 허용 목록), 저장 프로시저 호출이면 EXEC(2026-11-13).</summary>
     public required ChangeOperation Kind { get; init; }
-    /// <summary>직접 대상 테이블 "스키마.테이블". 스키마를 생략한 이름의 해석 규칙은 열린 질문 Q4.</summary>
-    public required string Target { get; init; }
+    /// <summary>직접 대상 테이블 "스키마.테이블". 스키마를 생략한 이름의 해석 규칙은 열린 질문 Q4. EXEC면 null.</summary>
+    public required string? Target { get; init; }
+    /// <summary>EXEC: 부른 프로시저 "스키마.이름"(카탈로그 철자). 그 밖에는 null.</summary>
+    public string? Procedure { get; init; }
+    /// <summary>EXEC: 매개변수 원문 목록(표시용, 예 "@id = 5"). 그 밖에는 빈 배열.</summary>
+    public IReadOnlyList<string> Parameters { get; init; } = [];
+    /// <summary>EXEC 실행·귀속 재료(분석기가 채움). JSON에는 내보내지 않는다.</summary>
+    [JsonIgnore]
+    public ProcedurePlan? Plan { get; init; }
     /// <summary>스크립트 전체 기준 위치.</summary>
     public required SourceSpan Span { get; init; }
     /// <summary>실행할 문장 원문(스크립트에서 오프셋으로 잘라낸 부분, 끝 세미콜론 포함 여부는 C6이 정함).</summary>
     public required string Sql { get; init; }
     /// <summary>문장 안 비결정 함수(GETDATE·NEWID 등)로 값이 정해지는 직접 대상 열(E1, RowChange.volatile STATEMENT_FUNCTION). 없으면 빈 배열.</summary>
     public IReadOnlyList<string> NondeterministicColumns { get; init; } = [];
+}
+
+/// <summary>
+/// EXEC 문장의 실행·귀속 재료(2026-11-13, 내부 전달용: AnalyzedStatement → StatementResult → C13). JSON 계약 밖이다.
+/// </summary>
+public sealed record ProcedurePlan
+{
+    /// <summary>ExecSql 마지막 결과 집합의 반환 값 열 이름.</summary>
+    public const string ReturnColumn = "dbr_rc";
+
+    /// <summary>ExecSql 마지막 결과 집합의 트랜잭션 수 변화 열 이름(1이면 정상).</summary>
+    public const string TranDeltaColumn = "dbr_dtc";
+
+    /// <summary>"스키마.이름"(카탈로그 철자).</summary>
+    public required string Procedure { get; init; }
+    /// <summary>
+    /// 실행할 SQL. 사용자 원문을 잇지 않고 분석기가 인용한 이름·리터럴로 만든다. 호출을 BEGIN TRAN 한 겹으로 감싸고 트랜잭션 수 변화를 돌려준다
+    /// (Analysis ExecSqlBuilder.Build 참고). 마지막 결과 집합은 (dbr_rc, dbr_dtc). 거부된 호출이면 빈 문자열.
+    /// </summary>
+    public required string ExecSql { get; init; }
+    /// <summary>펼친 본문(안쪽 호출 포함)의 정적 쓰기 대상 "스키마.테이블".</summary>
+    public IReadOnlyList<string> WriteTargets { get; init; } = [];
+    /// <summary>펼친 안쪽 프로시저 "스키마.이름"(대상 자신 제외).</summary>
+    public IReadOnlyList<string> ExpandedCalls { get; init; } = [];
 }
 
 /// <summary>

@@ -1,0 +1,44 @@
+{
+  "id": "CL24",
+  "pattern": "CL24",
+  "title": "CATCH에서 ROLLBACK한 뒤 로그 프로시저 쓰기 (uspLogError 모양, 롤백 뒤 남은 변경)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl24.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "leavesResidue": true,
+  "statements": [
+    { "index": 1, "sql": "EXEC cl24.usp_Withdraw @id = 1, @amt = 80;", "returnValue": null }
+  ],
+  "expected": {
+    "status": "failed",
+    "errorNumber": 266,
+    "statementStatus": [ { "index": 1, "status": "failed", "isToolFault": false } ],
+    "changes": [
+      { "table": "cl24.Acct", "keyColumns": ["id"], "inserted": [], "updated": [], "deleted": [],
+        "basis": "잔액 50 - 80이 CHECK(bal >= 0)를 어겨 UPDATE가 547로 실패하고, 봉투 트랜잭션은 CATCH의 ROLLBACK으로 사라진다" },
+      { "table": "cl24.ErrLog", "keyColumns": ["log_id"], "inserted": [], "updated": [], "deleted": [],
+        "basis": "트랜잭션 안 순 변경은 없다. ROLLBACK 뒤 INSERT는 residualCommitted에 있다" }
+    ],
+    "residualCommitted": [
+      { "table": "cl24.ErrLog", "keyColumns": ["log_id"], "updated": [], "deleted": [],
+        "inserted": [ { "ref": "e1", "match": { "err_no": 547, "err_proc": "usp_Withdraw", "ref_id": 1 }, "identity": ["log_id"], "causes": ["PROC_DIRECT"] } ],
+        "basis": "usp_Withdraw의 CATCH가 ROLLBACK한 뒤 usp_LogError가 ErrLog에 1행을 쓴다. 트랜잭션 밖이라 자동 커밋된다(A22와 같은 성질, CL12a). 키는 IDENTITY라 실행마다 값이 다르다" }
+    ],
+    "firings": [],
+    "edges": [
+      { "statementIndex": 1, "parent": "P:cl24.usp_Withdraw", "child": "E:266", "kind": "BLOCKED", "name": null, "confidence": "certain", "basis": "§6.3 BLOCKED(CL12a와 같은 모양). 오류 노드가 S에서 나오는지 P에서 나오는지는 통합 때 확정(OO2)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "오류 번호 266과 상태 failed", "basis": "봉투 1겹(@@TRANCOUNT 1)에서 프로시저가 CATCH의 ROLLBACK으로 카운트를 0으로 만들고 돌아오면 EXEC 뒤 트랜잭션 수 불일치(266)가 난다고 본다. 심각도와 TRY/CATCH로 잡히는지는 SP11에서 확인한다. 266이 아니면 정정 기록 대상" },
+      { "id": "OO2", "what": "오류 노드 E:266의 부모(S 또는 P)와 P 노드의 존재", "basis": "통합(2026-11-13) 확정: 오류 노드의 BLOCKED 간선은 문장 노드 id(st-n)에서 나가는데 EXEC면 그 노드가 procedureCall이다. 부모는 P:" },
+      { "id": "OO3", "what": "firings가 비는지", "basis": "CL12a OO2와 같다. 봉투 안 UPDATE 묶음은 ROLLBACK으로 사라지고, ROLLBACK 뒤 ErrLog INSERT는 트랜잭션 밖에 확정돼 residualCommitted(기준 스냅샷 비교)로 보인다" },
+      { "id": "OO4", "what": "isToolFault = false", "basis": "공용 계약: 프로시저가 ROLLBACK해 트랜잭션이 없어지면 failed + isToolFault=false + 메시지 \"프로시저가 트랜잭션을 롤백함\". 오류 프로시저가 사용자 프로시저라 수집 장치 오류가 아니다(ErrorClassification.IsToolFault)" },
+      { "id": "OO5", "what": "ROLLBACK 뒤 남은 ErrLog 행이 오라클 원본에 쌓인다", "basis": "leavesResidue. 오라클은 트랜잭션 + ROLLBACK이어도 이 행을 되돌리지 못한다(CL12a OO3). 키가 IDENTITY라 반복 실행이 실패하지 않는다. returnValue는 문장이 실패해 null" }
+    ]
+  },
+  "rationale": [
+    { "claim": "CATCH의 ROLLBACK은 바깥 트랜잭션까지 되돌리고 그 뒤 쓰기는 자동 커밋된다", "basis": "ROLLBACK TRANSACTION 문서(가장 바깥 트랜잭션까지 롤백), A22" },
+    { "claim": "이 사례는 도구의 결함이 아니라 사용자 프로시저의 트랜잭션 처리 때문에 실패한 것이므로 실패 분류는 isToolFault = false다", "basis": "공용 계약(EXEC)" },
+    { "claim": "[적용]은 막아야 하고 미리보기는 롤백 뒤 남은 변경을 보인다", "basis": "E13, §5.3 선행 조건 PREVIEW_NOT_OK" }
+  ]
+}

@@ -19,6 +19,8 @@ const CONDITIONS: { key: Exclude<GateCondition, 'other'>; label: string; onlyWhe
   { key: 'lock', label: '다른 작업 잠금 없음' },
   // 원본 연결 조건은 막혔을 때만 줄로 나온다(옛 응답·정상일 때 목록은 그대로).
   { key: 'origin', label: '원본 연결 가능', onlyWhenFailing: true },
+  // EXEC가 있으면 막힌 줄로만 나온다(미리보기 전용).
+  { key: 'proc', label: '프로시저 호출 없음(EXEC는 미리보기 전용)', onlyWhenFailing: true },
 ]
 
 export function gateItems(gate: GateResult, hasPreview: boolean): GateItem[] {

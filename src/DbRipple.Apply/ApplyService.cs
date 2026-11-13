@@ -16,17 +16,17 @@ namespace DbRipple.Apply;
 /// <item>선행 조건(ApplyPrecondition): 상태 ok(D8 truncated 차단 포함), ContractFormulas.SqlHash(record.Sql) == result.SqlHash == request.SqlHash(있으면), CreatedAt + PreviewExpiry 안이고 미리보기의 기준선이 현재 기준선과 같음(아니면 PREVIEW_EXPIRED),
 ///   원본 지문(Core Fingerprint.ReadAsync(원본)) == baseline.Fingerprint == 미리보기 지문, 원본에 ExecuteAsUser 있음(Q30, 만들지 않는다). 어기면 precondition_failed(원본에 아무것도 안 함).</item>
 /// <item>analyzer.Analyze(record.Sql, baseline) 재분석(문장 원문 얻기). 거부·문장 수·번호·종류·대상이 미리보기와 다르면 precondition_failed(SQL_HASH_MISMATCH와 같은 취급, 메시지로 구분).</item>
-/// <item>검증 모드(2026-11-13): 선행 조건 단계에서 원본 CREATE DATABASE 권한과 FILESTREAM·메모리 최적화 유무로 정한다. 스냅샷을 만들 수 없으면 KEYSET이고,
+/// <item>검증 모드(2026-11-13): 선행 조건 단계에서 원본 CREATE DATABASE 권한과 FILESTREAM·메모리 최적화 유무로 정한다. 스냅샷을 만들 수 없으면 KEYSET_HASH이고,
 ///   요청에 allowKeysetVerification=true가 없으면 precondition_failed(WEAK_VERIFICATION_NOT_ACCEPTED). ForceKeyset은 설정 동의로 본다.</item>
 /// <item>원본 스냅샷: Core BaselineSql.DropSnapshot·CreateSnapshot(SingleServer = OriginDb + 접미사, Split = 거기에 _PC_적용id, 스파스 파일은 원본 데이터 파일 폴더).
-///   생성 실패는 원인과 상관없이 실행하지 않고 error(KEYSET으로 조용히 낮추지 않는다).</item>
+///   생성 실패는 원인과 상관없이 실행하지 않고 error(KEYSET_HASH로 조용히 낮추지 않는다).</item>
 /// <item>전용 연결(풀링 끔, InitialCatalog = OriginDb) → runner.PrepareAsync → "BEGIN TRAN;" → CURRENT_TRANSACTION_ID().</item>
 /// <item>드리프트: DriftChecker로 미리보기 NetChanges의 before 행(UPDATED·DELETED·MULTISET_REMOVED)을 UPDLOCK, HOLDLOCK으로 읽어 비교. 있으면 ROLLBACK, drift_detected.</item>
-/// <item>KEYSET이면 KeysetVerifier.CountAll(BEGIN TRAN 직후 COUNT_BIG(*)).</item>
+/// <item>KEYSET_HASH면 KeysetVerifier로 원본 카탈로그 사용자 테이블의 COUNT_BIG·CHECKSUM_AGG(실행 직전).</item>
 /// <item>문장마다 runner.RunAsync. 실패(ok 아님, 트랜잭션이 끝남, 트랜잭션이 바뀜)면 ROLLBACK(남아 있으면) → 롤백 뒤 남은 변경(원본 대 원본 스냅샷, 전체 사용자 테이블) → status error.
-///   검사 자체가 예외면 Verification.ResidualCheckFailed = true(인계 7과 같은 표시). KEYSET이면 원본 스냅샷이 없어 검사할 수 없으므로 ResidualCheckFailed = true.
+///   검사 자체가 예외면 Verification.ResidualCheckFailed = true(인계 7과 같은 표시). KEYSET_HASH면 원본 스냅샷이 없어 검사할 수 없으므로 ResidualCheckFailed = true.
 ///   3609 보정: 남은 변경이 있고 실패 문장이 trigger_blocked인데 StatementRunOutcome.TriggerRollbackConfirmed = false면 그 문장을 failed로 바꾼다.</item>
-/// <item>최종 차이: netDiffer.DiffAsync(같은 세션, OriginDb, 원본 스냅샷, 감사 저장소 뺀 전체 사용자 테이블) → ApplyMatcher.Match(D7). KEYSET이면 KeysetVerifier.</item>
+/// <item>최종 차이: netDiffer.DiffAsync(같은 세션, OriginDb, 원본 스냅샷, 감사 저장소 뺀 전체 사용자 테이블) → ApplyMatcher.Match(D7). KEYSET_HASH면 KeysetVerifier(전후 상태 비교 + 키 집합). [적용] 원본 사전 경고(TRUSTWORTHY·복제·CDC·Service Broker)는 스냅샷 전에 limitations로.</item>
 /// <item>위반 0이면 COMMIT(committed), 아니면 ROLLBACK(rolled_back_mismatch). COMMIT 단계 예외는 커밋 여부 불명으로 error(메시지·Limitations에 명시)이고, 닫힌 쪽으로 커밋과 같이 재적용 차단·미리보기 삭제·새로 고침을 한다.
 ///   커밋되면 잠금 안에서 store.RemoveAsync(previewId)(잠금을 푼 직후 같은 건이 다시 적용되지 않게). finally: 트랜잭션이 남아 있으면 ROLLBACK, 연결 닫기, 원본 스냅샷 삭제.</item>
 /// <item>잠금을 푼 뒤(AD10): 원본이 바뀌었으면(committed, 남은 변경 있음, 검사 실패) sandbox.StartRefresh(), SandboxRefreshStarted = true.
@@ -172,23 +172,23 @@ public sealed class ApplyService : IApplyService
     async Task<ApplyResult> RunLockedAsync(PreviewRecord record, ApplyRequest request, Run run, CancellationToken ct)
     {
         var context = await Sandbox.GetContextAsync(ct);
-        var mode = Settings.ForceKeyset ? VerificationMode.Keyset : VerificationMode.SnapshotNetdiff;
-        string? keysetReason = Settings.ForceKeyset ? "ForceKeyset 설정으로 원본 스냅샷 없이 KEYSET으로 검증함" : null;
+        var mode = Settings.ForceKeyset ? VerificationMode.KeysetHash : VerificationMode.SnapshotNetdiff;
+        string? keysetReason = Settings.ForceKeyset ? "ForceKeyset 설정으로 원본 스냅샷 없이 KEYSET_HASH로 검증함" : null;
 
         // 3. 선행 조건(원본에 아무것도 하지 않는다)
         var (failures, reasons) = await CheckPreconditionsAsync(record, request, context, ct);
         if (!Settings.ForceKeyset && !failures.Contains(ApplyPrecondition.OriginUnreachable))
         {
-            // 3b. 검증 모드 사전 결정(읽기만). 스냅샷을 못 만들면 KEYSET이고, 약한 검증은 요청의 명시 동의가 있어야 한다.
+            // 3b. 검증 모드 사전 결정(읽기만). 스냅샷을 못 만들면 KEYSET_HASH이고, 약한 검증은 요청의 명시 동의가 있어야 한다.
             var capability = await origin.CheckSnapshotCapabilityAsync(context.OriginDb, ct);
             if (!capability.CanSnapshot)
             {
-                mode = VerificationMode.Keyset;
-                keysetReason = $"원본 스냅샷을 만들 수 없어 KEYSET으로 검증함(요청 동의): {capability.Reason}";
+                mode = VerificationMode.KeysetHash;
+                keysetReason = $"원본 스냅샷을 만들 수 없어 KEYSET_HASH로 검증함(요청 동의): {capability.Reason}";
                 if (!request.AllowKeysetVerification)
                 {
                     failures.Add(ApplyPrecondition.WeakVerificationNotAccepted);
-                    reasons.Add($"원본 스냅샷을 만들 수 없어({capability.Reason}) KEYSET(행 수가 그대로인 UPDATE를 놓칠 수 있음)으로만 검증할 수 있음. 동의하면 allowKeysetVerification=true로 다시 요청할 것.");
+                    reasons.Add($"원본 스냅샷을 만들 수 없어({capability.Reason}) KEYSET_HASH(건수·해시 비교, 해시 충돌이나 미리보기 테이블의 키 밖 UPDATE를 놓칠 수 있음)로만 검증할 수 있음. 동의하면 allowKeysetVerification=true로 다시 요청할 것.");
                 }
             }
         }
@@ -197,6 +197,12 @@ public sealed class ApplyService : IApplyService
         {
             // 4. 재분석: 문장 원문을 얻고, 분석 결과가 미리보기와 같은지 본다.
             analysis = Analyzer.Analyze(record.Sql, context);
+            if (analysis.Statements.Any(s => s.Kind == ChangeOperation.Exec))
+            {
+                // 방어 심화: 저장된 미리보기 결과가 아니라 지금 재분석한 문장으로도 EXEC를 막는다(2026-11-13).
+                failures.Add(ApplyPrecondition.ProcApplyNotSupported);
+                reasons.Add("저장 프로시저 호출(EXEC)이 있는 미리보기는 아직 적용할 수 없음(미리보기 전용).");
+            }
             var why = SameStatements(analysis, record.Result.Statements);
             if (why is not null)
             {
@@ -217,10 +223,11 @@ public sealed class ApplyService : IApplyService
         var limitations = new List<string>();
         if (Settings.Mode == ServerMode.Split) limitations.Add(PrincipalLimitation);
         if (Settings.Mode == ServerMode.Split && context.OriginIsSysadmin == true) limitations.Add(SysadminLimitation);
+        limitations.AddRange(await origin.ReadOriginWarningsAsync(context.OriginDb, ct)); // 사전 경고(막지 않음)
         var snapshotCreated = false;
         try
         {
-            // 5. 원본 스냅샷(실패하면 error, KEYSET으로 낮추지 않는다)
+            // 5. 원본 스냅샷(실패하면 error, KEYSET_HASH로 낮추지 않는다)
             run.Watch.Restart();
             if (mode == VerificationMode.SnapshotNetdiff)
             {
@@ -236,7 +243,7 @@ public sealed class ApplyService : IApplyService
             else
             {
                 limitations.Add(keysetReason!);
-                limitations.Add(KeysetVerifier.Limitation);
+                limitations.AddRange(KeysetVerifier.Limitations);
             }
             run.Snapshot = run.Lap();
 
@@ -291,9 +298,26 @@ public sealed class ApplyService : IApplyService
                 $"미리보기 뒤 원본의 before 행 {drift.Count}건이 바뀌어 실행하지 않고 롤백함. 샌드박스를 새로 고친 뒤 다시 미리보기 할 것", run);
         }
 
-        // 8. KEYSET 직후 건수
-        IReadOnlyDictionary<string, long>? countsBefore = null;
-        if (mode == VerificationMode.Keyset) countsBefore = await conn.CountAllAsync(tables, ct);
+        // 8. KEYSET_HASH 실행 직전 상태(원본 카탈로그의 사용자 테이블, 같은 세션·LOCK_TIMEOUT)
+        KeysetBaseline? keyset = null;
+        if (mode == VerificationMode.KeysetHash)
+        {
+            try
+            {
+                var targets = await conn.ReadHashTargetsAsync(ct);
+                var inPreview = KeysetVerifier.PreviewTables(record);
+                keyset = new KeysetBaseline(targets, inPreview, await conn.ReadTableStatesAsync(targets, inPreview, ct));
+                limitations.AddRange(KeysetVerifier.ExcludedColumnNotes(targets, inPreview));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException and not SandboxUnavailableException)
+            {
+                // 문장 실행 전: 롤백하면 원본은 그대로다(잠금 시간 초과 1222 등).
+                await conn.RollbackAsync(CancellationToken.None);
+                run.Commit = run.Lap();
+                return Make(record, ApplyStatus.Error, new ApplyVerification { Mode = mode, Limitations = limitations }, [],
+                    $"KEYSET_HASH 실행 전 상태를 읽지 못해 실행하지 않고 롤백함: {ex.Message}", run);
+            }
+        }
 
         // 9. 문장 실행
         run.Watch.Restart();
@@ -313,6 +337,8 @@ public sealed class ApplyService : IApplyService
                 statements.Add(NotRun(st));
                 continue;
             }
+            // 선행 조건이 이미 막는다. 여기 닿으면 코드 결함이므로 원본에서 실행하지 않고 예외로 롤백 경로에 넘긴다.
+            if (st.Kind == ChangeOperation.Exec) throw new InvalidOperationException("EXEC 문장은 [적용]하지 않는다(PROC_APPLY_NOT_SUPPORTED).");
             run.OriginTouched = true;
             var outcome = await Runner.RunAsync(conn.Session, st, runContext, ct);
             statements.Add(outcome.Result with { CaptureSeqRange = null });
@@ -335,9 +361,11 @@ public sealed class ApplyService : IApplyService
             else
             {
                 var (rows, statementMismatches) = ApplyMatcher.CompareStatements(record.Result.Statements, statements);
-                var (counts, keyset) = await conn.VerifyKeysetAsync(record, countsBefore!, tables, context, ct);
+                var after = await conn.ReadTableStatesAsync(keyset!.Targets, keyset.PreviewTables, ct);
+                var (counts, stateMismatches) = KeysetVerifier.CompareStates(record, keyset.States, after, keyset.PreviewTables);
+                var keyRows = await conn.VerifyKeyRowsAsync(record, tables, context, ct);
                 tableCounts = counts;
-                match = new MatchOutcome { StatementRowCounts = rows, NetSummaryMatch = false, Mismatches = [.. statementMismatches, .. keyset] };
+                match = new MatchOutcome { StatementRowCounts = rows, NetSummaryMatch = false, Mismatches = [.. statementMismatches, .. stateMismatches, .. keyRows] };
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException and not SandboxUnavailableException)
@@ -437,12 +465,12 @@ public sealed class ApplyService : IApplyService
             statements, Join(message, Optional(checkMessage)), run);
     }
 
-    /// <summary>롤백 뒤 남은 변경(원본 대 원본 스냅샷, 트랜잭션 없이). 검사가 예외면 실패 표시(Q31: 던지지 않는다). KEYSET은 스냅샷이 없어 검사할 수 없다.</summary>
+    /// <summary>롤백 뒤 남은 변경(원본 대 원본 스냅샷, 트랜잭션 없이). 검사가 예외면 실패 표시(Q31: 던지지 않는다). KEYSET_HASH는 스냅샷이 없어 검사할 수 없다.</summary>
     async Task<(IReadOnlyList<NetChange> Residual, bool Failed, string? Message)> ResidualAsync(
         IOriginConnection conn, BaselineContext context, IReadOnlyList<TableInfo> tables, VerificationMode mode, string snapshotDb, CancellationToken ct)
     {
-        if (mode == VerificationMode.Keyset)
-            return ([], true, "KEYSET 모드라 원본 스냅샷이 없어 롤백 뒤 남은 변경을 확인할 수 없음(원본 상태를 알 수 없어 샌드박스를 새로 고침)");
+        if (mode == VerificationMode.KeysetHash)
+            return ([], true, "KEYSET_HASH 모드라 원본 스냅샷이 없어 롤백 뒤 남은 변경을 확인할 수 없음(원본 상태를 알 수 없어 샌드박스를 새로 고침)");
         try
         {
             return (await NetDiffer.DiffAsync(conn.Session, context.OriginDb, snapshotDb, tables, ct), false, null);
@@ -466,6 +494,12 @@ public sealed class ApplyService : IApplyService
             reasons.Add(result.Status == PreviewStatus.Truncated || result.Capture.Truncated
                 ? "미리보기가 이미지 상한을 넘어 잘렸으므로 적용할 수 없음(D8)."
                 : "미리보기 상태가 ok가 아님.");
+        }
+        if (result.Statements.Any(s => s.Kind == ChangeOperation.Exec))
+        {
+            // EXEC [적용]은 2차(2026-11-13): 원본에서 프로시저를 다시 돌려 미리보기와 대조하는 경로가 아직 없다.
+            failures.Add(ApplyPrecondition.ProcApplyNotSupported);
+            reasons.Add("저장 프로시저 호출(EXEC)이 있는 미리보기는 아직 적용할 수 없음(미리보기 전용).");
         }
         if (!string.Equals(ContractFormulas.SqlHash(record.Sql), result.SqlHash, StringComparison.Ordinal))
         {

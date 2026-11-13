@@ -22,6 +22,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\DbRipple.Apply\DbRipple.Apply.csproj" />
     <ProjectReference Include="..\DbRipple.TestSupport\DbRipple.TestSupport.csproj" />
+    <!-- 2026-11-13: DDL 트리거 위험 판정 단위 테스트(DdlTriggerSafetyTests)가 실제 TriggerAnalyzer와 Preview DdlTriggerSafety를 쓴다. -->
+    <ProjectReference Include="..\..\src\DbRipple.Analysis\DbRipple.Analysis.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Preview\DbRipple.Preview.csproj" />
   </ItemGroup>
 
   <!--
@@ -32,11 +35,9 @@
     <DefineConstants>$(DefineConstants);APPLY_INTEGRATION</DefineConstants>
   </PropertyGroup>
   <ItemGroup Condition="'$(ApplyIntegration)' == 'true'">
-    <ProjectReference Include="..\..\src\DbRipple.Analysis\DbRipple.Analysis.csproj" />
     <ProjectReference Include="..\..\src\DbRipple.Attribution\DbRipple.Attribution.csproj" />
     <ProjectReference Include="..\..\src\DbRipple.Diff\DbRipple.Diff.csproj" />
     <ProjectReference Include="..\..\src\DbRipple.Execution\DbRipple.Execution.csproj" />
-    <ProjectReference Include="..\..\src\DbRipple.Preview\DbRipple.Preview.csproj" />
   </ItemGroup>
 
 </Project>

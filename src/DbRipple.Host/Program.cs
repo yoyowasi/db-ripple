@@ -1,6 +1,6 @@
 // 조립 루트(§3.1 백엔드). 두 가지로 돈다(2026-11-13 N4):
-// - 개발 모드(ASPNETCORE_ENVIRONMENT=Development, Properties/launchSettings.json): Vite(5273)가 /api를 5080으로 프록시. 연결은 환경 변수(scripts/env.ps1, 출력 금지).
-// - 실행 파일 모드(그 밖): wwwroot의 web 빌드를 같은 출처로 서빙, 실행 토큰 쿠키 필수, 시작 뒤 기본 브라우저로 실행 URL을 연다(--no-browser로 끔).
+// - 개발 모드(Debug 빌드 + --dev 인자 + 실행 파일 폴더에 wwwroot 없음, Properties/launchSettings.json): Vite(5273)가 /api를 5080으로 프록시. 연결은 환경 변수(scripts/env.ps1, 출력 금지).
+// - 실행 파일 모드(그 밖, 환경 변수와 무관): wwwroot의 web 빌드를 같은 출처로 서빙, 실행 토큰 쿠키 + 요청 키 필수, 시작 뒤 기본 브라우저로 실행 URL을 연다(--no-browser로 끔).
 // 연결은 환경 변수(DBRIPPLE_*_CONNECTION)가 있으면 그것(설정 API 읽기 전용), 없으면 %LOCALAPPDATA%\db-ripple\profile.json(설정 API로 저장).
 // 포트는 루프백에만 연다(R13). 데이터 폴더는 개발 모드 = 콘텐츠 루트 기준 .data/, 실행 파일 모드 = DataDir(기본 %LOCALAPPDATA%\db-ripple).
 using System.Diagnostics;
@@ -25,16 +25,31 @@ using ContractBackup = DbRipple.Contracts.BackupSettings;
 
 const string NoBrowserArg = "--no-browser";
 var openBrowser = !args.Contains(NoBrowserArg, StringComparer.OrdinalIgnoreCase);
-var hostArgs = args.Where(a => !string.Equals(a, NoBrowserArg, StringComparison.OrdinalIgnoreCase)).ToArray();
+var hostArgs = args.Where(a => !string.Equals(a, NoBrowserArg, StringComparison.OrdinalIgnoreCase)
+    && !string.Equals(a, LaunchMode.DevArg, StringComparison.OrdinalIgnoreCase)).ToArray();
 
+// 실행 모드 판정은 환경 변수에 묶지 않는다(N4 보강): wwwroot가 있으면 항상 실행 파일 모드, 개발 모드는 Debug + --dev + wwwroot 없음.
+#if DEBUG
+const bool debugBuild = true;
+#else
+const bool debugBuild = false;
+#endif
+var mode = LaunchMode.Resolve(AppContext.BaseDirectory, args, debugBuild);
+var exeMode = mode.Executable;
+if (mode.IgnoredDevReason is { } ignored)
+{
+    Console.ForegroundColor = ConsoleColor.Yellow;
+    Console.WriteLine($"경고: {LaunchMode.DevArg}를 무시하고 실행 파일 모드(실행 토큰·요청 키 필수)로 엽니다. 이유: {ignored}.");
+    Console.ResetColor();
+}
 // 실행 파일 모드는 콘텐츠 루트를 실행 파일 폴더로(바로 가기·다른 폴더에서 실행해도 wwwroot·appsettings를 찾게).
-var envName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
+// 환경 이름도 모드로 정한다(실행 파일 모드에서 ASPNETCORE_ENVIRONMENT=Development여도 개발자 예외 페이지·5273 출처·OpenAPI가 켜지지 않게).
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = hostArgs,
-    ContentRootPath = string.Equals(envName, Environments.Development, StringComparison.OrdinalIgnoreCase) ? null : AppContext.BaseDirectory,
+    ContentRootPath = exeMode ? AppContext.BaseDirectory : null,
+    EnvironmentName = exeMode ? Environments.Production : Environments.Development,
 });
-var exeMode = !builder.Environment.IsDevelopment();
 var cfg = builder.Configuration.GetSection("DbRipple");
 
 // 포트: 설정 주소(루프백만). 실행 파일 모드에서 이미 쓰이면 127.0.0.1의 빈 포트(0)로 열고 실제 주소를 로그·URL·허용 출처에 쓴다.
@@ -127,15 +142,24 @@ app.Logger.LogInformation("DbRipple {Mode} 모드, 데이터 {DataDir}, 매니�
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
-if (app.Environment.IsDevelopment()) app.MapOpenApi();
+if (!exeMode) app.MapOpenApi();
 // web 빌드(wwwroot) 같은 출처 서빙. 문서·API는 실행 토큰 쿠키가 있어야 여기까지 온다(LaunchSession, 실행 파일 모드).
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapDbRippleApi();
 app.MapFallback("/api/{**path}", () => TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "없는 API 경로입니다"));
 app.MapFallbackToFile("index.html").WithMetadata(new HttpMethodMetadata([HttpMethods.Get, HttpMethods.Head]));
-if (exeMode && !File.Exists(Path.Combine(app.Environment.WebRootPath ?? "", "index.html")))
+var hasWebRoot = File.Exists(Path.Combine(app.Environment.WebRootPath ?? "", "index.html"));
+if (exeMode && !hasWebRoot)
     app.Logger.LogWarning("wwwroot/index.html이 없습니다. scripts/publish.ps1로 게시한 폴더에서 실행하세요.");
+if (!exeMode)
+{
+    Console.ForegroundColor = ConsoleColor.Yellow;
+    Console.WriteLine(hasWebRoot
+        ? $"경고: 개발 모드({LaunchMode.DevArg})인데 콘텐츠 루트에 wwwroot/index.html이 있습니다. 실행 토큰 없이 화면과 API가 열립니다. 배포용이면 게시본 폴더에서 실행하세요."
+        : $"개발 모드({LaunchMode.DevArg}): 실행 토큰 없이 API가 열립니다(Vite 5273 프록시용).");
+    Console.ResetColor();
+}
 
 await app.StartAsync();
 
@@ -189,6 +213,7 @@ Engine CreateEngine(IServiceProvider sp, RuntimeProfile profile)
             BackupPath = cfg["BackupPath"] ?? throw new InvalidOperationException("DbRipple:BackupPath 없음"),
             ManifestPath = manifestPath,
             Backup = mode == ServerMode.Split ? SplitBackup(profile.Backup) : null,
+            AllowRiskyDdlTriggers = cfg.GetValue("AllowRiskyDdlTriggers", false),
         },
         sp.GetRequiredService<ITriggerAnalyzer>(), clock);
     var executor = new PreviewExecutor(profile.Connections.Sandbox.ConnectionString, sp.GetRequiredService<ExecutionSettings>(), sp.GetRequiredService<INetDiffer>());

@@ -236,7 +236,7 @@ export const usePreviewStore = defineStore('preview', () => {
 
   // ---- 적용(C15) ----
 
-  /** allowKeyset: 사용자가 약한 검증(KEYSET)에 동의했다(확인 상자 체크). */
+  /** allowKeyset: 사용자가 약한 검증(KEYSET_HASH)에 동의했다(확인 상자 체크). */
   async function applyNow(allowKeyset = false): Promise<void> {
     const p = preview.value
     if (!p || applying.value) return

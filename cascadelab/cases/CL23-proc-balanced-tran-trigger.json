@@ -1,0 +1,46 @@
+{
+  "id": "CL23",
+  "pattern": "CL23",
+  "title": "균형 BEGIN/COMMIT 프로시저 + 트리거가 붙은 테이블 쓰기 (깊이 2 트리거 귀속)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl23.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "EXEC cl23.usp_Pay @id = 1, @ledger_id = 900, @amt = 30;", "returnValue": 0 }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl23.Acct", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [ { "key": { "id": 1 }, "causes": ["PROC_DIRECT"], "changedColumns": ["bal"], "after": { "bal": 70 } } ],
+        "basis": "usp_Pay의 UPDATE: id = 1, bal 100 - 30. id 2는 그대로" },
+      { "table": "cl23.AcctHist", "keyColumns": ["acct_id"], "updated": [], "deleted": [],
+        "inserted": [ { "key": { "acct_id": 1 }, "causes": ["TRIGGER"] } ],
+        "basis": "trg_Acct_upd: inserted(Acct 1)마다 1행" },
+      { "table": "cl23.Ledger", "keyColumns": ["ledger_id"], "updated": [], "deleted": [],
+        "inserted": [ { "key": { "ledger_id": 900 }, "causes": ["PROC_DIRECT"] } ],
+        "basis": "usp_Pay의 INSERT(@ledger_id = 900)" }
+    ],
+    "firings": [
+      { "node": "F:cl23.Acct:UPDATE", "statementIndex": 1, "table": "cl23.Acct", "operation": "UPDATE", "rowCount": 1, "causeKind": "PROC_DIRECT", "depth": 1, "pairing": "BY_PK" },
+      { "node": "F:cl23.Ledger:INSERT", "statementIndex": 1, "table": "cl23.Ledger", "operation": "INSERT", "rowCount": 1, "causeKind": "PROC_DIRECT", "depth": 1 },
+      { "node": "F:cl23.AcctHist:INSERT", "statementIndex": 1, "table": "cl23.AcctHist", "operation": "INSERT", "rowCount": 1, "causeKind": "TRIGGER", "depth": 2 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "P:cl23.usp_Pay", "child": "F:cl23.Acct:UPDATE", "kind": "PROC_DIRECT", "name": "cl23.usp_Pay", "confidence": "certain", "basis": "공용 계약 PROC_DIRECT" },
+      { "statementIndex": 1, "parent": "P:cl23.usp_Pay", "child": "F:cl23.Ledger:INSERT", "kind": "PROC_DIRECT", "name": "cl23.usp_Pay", "confidence": "certain", "basis": "공용 계약 PROC_DIRECT" },
+      { "statementIndex": 1, "parent": "F:cl23.Acct:UPDATE", "child": "T:cl23.trg_Acct_upd", "kind": "FIRES", "name": "cl23.trg_Acct_upd", "confidence": "inferred", "basis": "§6.3 FIRES, §7.3" },
+      { "statementIndex": 1, "parent": "T:cl23.trg_Acct_upd", "child": "F:cl23.AcctHist:INSERT", "kind": "WRITES", "name": "cl23.trg_Acct_upd", "confidence": "inferred", "basis": "§7.2 2·4단계(정적 쓰기 대상 AcctHist, 후보 1개)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "트리거 안 묶음(AcctHist)의 depth가 2인지(프로시저 중첩이 TRIGGER_NESTLEVEL에 안 더해지는지)", "basis": "A7: 인자 없는 TRIGGER_NESTLEVEL()은 트리거 스택 수다. 프로시저 호출은 @@NESTLEVEL만 올린다. SP12에서 확인" },
+      { "id": "OO2", "what": "문장 상태가 ok이고 266이 나지 않는지(BEGIN/COMMIT 균형, 바깥 트랜잭션 1겹)", "basis": "SP11: 균형 패턴은 봉투 1겹·2겹에서 @@TRANCOUNT가 들어갈 때와 나올 때 같다고 본다. 바깥 트랜잭션은 COMMIT으로 확정되지 않는다(내부 COMMIT은 카운트만 1 줄인다)" }
+    ]
+  },
+  "rationale": [
+    { "claim": "프로시저의 BEGIN TRANSACTION은 바깥 트랜잭션 안에서 중첩 카운트만 올리고, 짝이 맞는 COMMIT은 카운트만 내려 바깥 트랜잭션을 확정하지 않는다", "basis": "BEGIN TRANSACTION·COMMIT TRANSACTION 문서(중첩 트랜잭션: 가장 바깥 COMMIT만 확정). SP11로 실측" },
+    { "claim": "트리거 쓰기는 프로시저 직접 쓰기보다 한 단계 깊다(depth 2), 트리거 간선은 CL07과 같다", "basis": "A7, CL07" }
+  ]
+}

@@ -49,7 +49,8 @@ const MISMATCH_LABEL: Record<MismatchKind, string> = {
   IDENTITY_UNPAIRED: 'IDENTITY 짝을 못 찾음',
   UNEXPECTED_TABLE: '예상 밖 테이블 변경',
   VOLATILE_FORMAT: '예상값 형식 불일치',
-  KEYSET_TABLE_COUNT: 'KEYSET 테이블 건수',
+  KEYSET_TABLE_COUNT: '테이블 건수 변화(약한 검증)',
+  OUTSIDE_TABLE_CHANGED: '미리보기에 없던 테이블이 바뀜',
 }
 const DRIFT_LABEL: Record<DriftRow['kind'], string> = {
   CHANGED: '값이 바뀜',
@@ -63,7 +64,7 @@ const v = computed(() => props.result.verification)
 const staleAfterCommit = computed(
   () => props.result.status === 'committed' && !props.result.sandboxRefreshStarted && sandbox.status?.mode === 'split',
 )
-const isKeyset = computed(() => v.value.mode === 'KEYSET')
+const isKeyset = computed(() => v.value.mode === 'KEYSET_HASH')
 const totalMs = computed(() => Object.values(props.result.timingsMs).reduce((a, b) => a + b, 0))
 
 /** 표 안에서 점 뒤에서 줄바꿈할 수 있게 한다. */
@@ -160,8 +161,8 @@ function samePair(p: { previewKey: Parameters<typeof keyText>[0]; actualKey: Par
       <div v-if="isKeyset" class="banner banner-warn gap">
         <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.2L14.2 13H1.8z" /><path d="M8 6.6v3M8 11.4v.1" /></svg>
         <div>
-          <strong>KEYSET 검증(제한된 검증)</strong>
-          키 집합과 테이블 건수만 비교했습니다. 값 수준 검증이 약합니다.
+          <strong>KEYSET_HASH 검증(제한된 검증)</strong>
+          키 집합·테이블 건수·미리보기에 없던 테이블의 해시(CHECKSUM)만 비교했습니다. 해시 충돌이나 비교할 수 없는 형식의 열은 놓칠 수 있습니다.
         </div>
       </div>
     </header>
@@ -311,11 +312,9 @@ function samePair(p: { previewKey: Parameters<typeof keyText>[0]; actualKey: Par
         <dt>다음</dt>
         <dd>{{ NEXT[result.status] }}</dd>
       </dl>
-      <ul v-if="!isKeyset && v.limitations.length" class="list tight lim" aria-label="검증의 한계">
+      <!-- 한계 문구에는 원본 사전 경고(TRUSTWORTHY ON·복제 게시·CDC·Service Broker)도 들어온다. 적용을 막지는 않는다. -->
+      <ul v-if="v.limitations.length" class="list tight lim" aria-label="검증의 한계와 원본 사전 경고">
         <li v-for="(l, i) in v.limitations" :key="i">한계: {{ l }}</li>
-      </ul>
-      <ul v-else-if="v.limitations.length" class="list tight lim">
-        <li v-for="(l, i) in v.limitations" :key="i">{{ l }}</li>
       </ul>
     </section>
 

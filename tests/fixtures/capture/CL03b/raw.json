@@ -16,6 +16,8 @@
         },
         "status": "failed",
         "rowsAffected": null,
+        "returnValue": null,
+        "resultSetCount": null,
         "captureSeqRange": null,
         "error": {
           "errorNumber": 547,

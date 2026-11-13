@@ -27,7 +27,7 @@ public sealed class CrossSiteRequestGuardOptions
 /// <summary>
 /// 로컬 API(127.0.0.1:5080)를 사용자가 연 다른 웹사이트가 부르는 것(no-cors POST 등)을 막는다. <c>/api</c> 아래의 POST·PUT·PATCH·DELETE에만 적용하고 GET·HEAD·OPTIONS는 통과시킨다.
 /// <list type="number">
-/// <item>사용자 지정 헤더 <c>X-DbRipple-Request: 1</c>이 없으면 403. 교차 출처에서 이 헤더를 붙이면 preflight가 필요한데 서버는 CORS를 허용하지 않으므로 브라우저가 막는다.</item>
+/// <item>사용자 지정 헤더 <c>X-DbRipple-Request: 1</c>(실행 모드는 세션 요청 키, <see cref="LaunchSession"/>)이 없으면 403. 교차 출처에서 이 헤더를 붙이면 preflight가 필요한데 서버는 CORS를 허용하지 않으므로 브라우저가 막는다.</item>
 /// <item><c>Origin</c> 헤더가 있으면 허용 목록에 있어야 한다. 아니면 403(<c>null</c> 출처 포함).</item>
 /// <item><c>Sec-Fetch-Site</c>가 <c>cross-site</c>면 403.</item>
 /// </list>
@@ -39,7 +39,7 @@ public static class CrossSiteRequestGuard
     /// <summary>요청 표지 헤더 이름. 웹 클라이언트는 모든 /api 요청에 붙인다.</summary>
     public const string HeaderName = "X-DbRipple-Request";
 
-    /// <summary>요청 표지 헤더 값.</summary>
+    /// <summary>요청 표지 헤더 값(개발 모드). 실행 모드에서는 같은 헤더에 세션 요청 키를 보낸다(<see cref="LaunchSession"/>).</summary>
     public const string HeaderValue = "1";
 
     /// <summary>구성 키(문자열 배열).</summary>
@@ -54,6 +54,8 @@ public static class CrossSiteRequestGuard
                 : environment.IsDevelopment() ? [.. CrossSiteRequestGuardOptions.DefaultOrigins, .. CrossSiteRequestGuardOptions.DevelopmentOrigins]
                 : CrossSiteRequestGuardOptions.DefaultOrigins;
         });
+        // 보안 헤더는 서비스 목록 맨 앞에 넣어 Host 필터(ConfigureWebDefaults가 먼저 등록)보다 바깥에서 돈다. 잘못된 Host의 400에도 헤더가 붙는다.
+        services.Insert(0, ServiceDescriptor.Transient<IStartupFilter, SecurityHeadersStartupFilter>());
         services.AddTransient<IStartupFilter, GuardStartupFilter>();
         return services;
     }
@@ -63,10 +65,11 @@ public static class CrossSiteRequestGuard
         request.Path.StartsWithSegments("/api") && (HttpMethods.IsPost(request.Method) || HttpMethods.IsPut(request.Method)
             || HttpMethods.IsPatch(request.Method) || HttpMethods.IsDelete(request.Method));
 
-    /// <summary>요청을 검사해 거부 사유(응답에 쓰는 고정 문구)를 돌려준다. 통과면 null.</summary>
-    internal static string? Check(HttpRequest request, IReadOnlyCollection<string> allowedOrigins)
+    /// <summary>요청을 검사해 거부 사유(응답에 쓰는 고정 문구)를 돌려준다. 통과면 null.
+    /// <paramref name="markerVerified"/>: 실행 모드에서 <see cref="LaunchSession"/>이 헤더 값을 세션 요청 키로 이미 확인했다(고정 값 "1" 대신).</summary>
+    internal static string? Check(HttpRequest request, IReadOnlyCollection<string> allowedOrigins, bool markerVerified = false)
     {
-        if (!string.Equals(request.Headers[HeaderName].ToString(), HeaderValue, StringComparison.Ordinal))
+        if (!markerVerified && !string.Equals(request.Headers[HeaderName].ToString(), HeaderValue, StringComparison.Ordinal))
             return $"{HeaderName} 헤더가 필요합니다.";
 
         if (request.Headers.TryGetValue("Origin", out var origin) && origin.Count > 0
@@ -79,7 +82,16 @@ public static class CrossSiteRequestGuard
         return null;
     }
 
-    // 파이프라인 맨 앞: 보안 헤더(모든 응답) → 실행 토큰(켜졌을 때) → 교차 사이트 방어. 허용 출처는 요청마다 읽는다(Host가 시작 뒤 실제 주소로 바꾼다).
+    sealed class SecurityHeadersStartupFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use((context, nextMiddleware) => { SecurityHeaders.Register(context.Response); return nextMiddleware(context); });
+            next(app);
+        };
+    }
+
+    // 보안 헤더 다음: 실행 토큰(켜졌을 때) → 교차 사이트 방어. 허용 출처는 요청마다 읽는다(Host가 시작 뒤 실제 주소로 바꾼다).
     sealed class GuardStartupFilter(IOptions<CrossSiteRequestGuardOptions> options) : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
@@ -87,9 +99,8 @@ public static class CrossSiteRequestGuard
             var session = app.ApplicationServices.GetService<LaunchSession>();
             app.Use(async (context, nextMiddleware) =>
             {
-                SecurityHeaders.Register(context.Response);
                 if (session is not null && !await session.GateAsync(context)) return;
-                if (IsGuarded(context.Request) && Check(context.Request, Normalize(options.Value.AllowedOrigins)) is { } reason)
+                if (IsGuarded(context.Request) && Check(context.Request, Normalize(options.Value.AllowedOrigins), markerVerified: session is not null) is { } reason)
                 {
                     var problem = new ProblemDetails
                     {

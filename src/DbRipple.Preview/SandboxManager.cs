@@ -24,6 +24,8 @@ public sealed record SandboxManagerOptions
     public SplitBackupSettings? Backup { get; init; }
     /// <summary>기준선 구축 때 쓴 manifest.json 경로(호스트 파일). 재구축하면 다시 쓴다.</summary>
     public required string ManifestPath { get; init; }
+    /// <summary>위험한 DB 범위 DDL 트리거(불투명·동적 SQL·외부 부작용)가 있어도 기준선을 만든다(DbRipple:AllowRiskyDdlTriggers, 기본 false).</summary>
+    public bool AllowRiskyDdlTriggers { get; init; }
 
     /// <summary>비밀값을 뺀 표시.</summary>
     public override string ToString() => $"{OriginDb} → {SandboxDb} / {SnapshotDb}";
@@ -121,6 +123,7 @@ public sealed class SandboxManager(SandboxManagerOptions options, ITriggerAnalyz
                 FingerprintMismatches = c?.FingerprintMismatches ?? [],
                 BaselineStale = stale,
                 OriginReachable = c?.OriginReachable ?? true,
+                InstanceWarnings = c?.InstanceWarnings ?? [],
             };
         }
     }
@@ -217,6 +220,7 @@ public sealed class SandboxManager(SandboxManagerOptions options, ITriggerAnalyz
                 Source = Options.OriginDb, Sandbox = Options.SandboxDb, Snapshot = Options.SnapshotDb,
                 BackupServerDir = b.ServerPath, SharePath = b.SharePath, ImportFile = b.ImportFile,
                 ImportContainerDir = b.ImportContainerDir, DeleteImportedBackup = b.DeleteAfterRestore, MachineTag = b.MachineTag,
+                DdlTriggerGuard = DdlGuard,
             };
             await using var steps = new SqlBaselineSteps(Options.Connections.Sandbox);
             result = await BaselineBuilder.BuildSplitAsync(o, new SqlOriginSteps(Options.Connections.Origin), steps,
@@ -224,7 +228,7 @@ public sealed class SandboxManager(SandboxManagerOptions options, ITriggerAnalyz
         }
         else
         {
-            var o = new BaselineOptions(Options.OriginDb, Options.SandboxDb, Options.SnapshotDb, Options.BackupPath);
+            var o = new BaselineOptions(Options.OriginDb, Options.SandboxDb, Options.SnapshotDb, Options.BackupPath) { DdlTriggerGuard = DdlGuard };
             await using var steps = new SqlBaselineSteps(Options.Connections.Sandbox);
             result = await BaselineBuilder.BuildAsync(o, steps, () => Clock.GetLocalNow(), CancellationToken.None);
         }
@@ -235,6 +239,8 @@ public sealed class SandboxManager(SandboxManagerOptions options, ITriggerAnalyz
         await File.WriteAllTextAsync(BaselineInfoPath, JsonSerializer.Serialize(new BaselineInfoFile(result.BackupCompletedAt), ManifestJson));
         return await ReadContextAsync(manifest, result.BackupCompletedAt, CancellationToken.None);
     }
+
+    string? DdlGuard(DbCatalog catalog) => DdlTriggerSafety.Guard(catalog, TriggerAnalyzer, Options.AllowRiskyDdlTriggers);
 
     async Task EnsureLoadedAsync(CancellationToken ct)
     {
@@ -283,6 +289,7 @@ public sealed class SandboxManager(SandboxManagerOptions options, ITriggerAnalyz
         string? originServer = null;
         bool? sysadmin = null;
         var reachable = true;
+        IReadOnlyList<string> instanceWarnings;
         await using (var master = Open(Options.Connections.Sandbox.ConnectionString, BaselineBuilder.Master))
         {
             await master.OpenAsync(ct);
@@ -293,6 +300,7 @@ public sealed class SandboxManager(SandboxManagerOptions options, ITriggerAnalyz
             }
             sandbox = await Fingerprint.ReadAsync(master, Options.SandboxDb, ct);
             backupAt ??= await SnapshotCreatedAtAsync(master, ct);
+            instanceWarnings = await ReadInstanceWarningsAsync(master, ct);
         }
         if (mode == ServerMode.Split)
         {
@@ -336,7 +344,28 @@ public sealed class SandboxManager(SandboxManagerOptions options, ITriggerAnalyz
             OriginLogin = LoginOf(Options.Connections.Origin.ConnectionString),
             OriginIsSysadmin = sysadmin,
             OriginReachable = reachable,
+            InstanceWarnings = instanceWarnings,
         };
+    }
+
+    // 샌드박스 인스턴스 설정 점검(Sandbox 연결 master, 읽기만, 막지 않음). 읽지 못하면 "확인 못 함" 경고.
+    static async Task<IReadOnlyList<string>> ReadInstanceWarningsAsync(SqlConnection master, CancellationToken ct)
+    {
+        try
+        {
+            var options = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var servers = new List<string>();
+            await using var cmd = new SqlCommand(SandboxInstanceCheck.Sql, master);
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct)) options[r.GetString(0)] = r.GetInt32(1);
+            if (await r.NextResultAsync(ct))
+                while (await r.ReadAsync(ct)) servers.Add(r.GetString(0));
+            return SandboxInstanceCheck.Warnings(options, servers);
+        }
+        catch (SqlException)
+        {
+            return [SandboxInstanceCheck.Unknown];
+        }
     }
 
     /// <summary>원본에 연결할 수 없을 때 지문 경고(N4).</summary>
@@ -393,5 +422,58 @@ public sealed class SandboxManager(SandboxManagerOptions options, ITriggerAnalyz
             }
             return ValueTask.CompletedTask;
         }
+    }
+}
+
+/// <summary>
+/// 기준선 구축 전 DB 범위 DDL 트리거 검사(2026-11-13). 감사 장치·실행 사용자 설치 DDL이 이 트리거를 발동시키므로, 본문을 C6 TriggerAnalyzer로 분석해
+/// 불투명(암호화·CLR)·동적 SQL·외부 부작용(xp_·sp_OA·OPENROWSET·연결된 서버·msdb·파싱 실패)·펼칠 수 없는 프로시저 호출이 있으면 멈춘다.
+/// TriggerAnalyzer는 테이블 부모 트리거만 분석하므로, DDL 트리거를 가상 테이블(dbo 스키마) 부모로 바꾼 카탈로그를 넘긴다(분석기는 고치지 않는다).
+/// </summary>
+public static class DdlTriggerSafety
+{
+    /// <summary>위험을 넘기는 설정 키.</summary>
+    public const string AllowSettingKey = "DbRipple:AllowRiskyDdlTriggers";
+
+    const int HostObjectId = int.MinValue;
+    const string HostTable = "__dbripple_ddl_scope__";
+
+    /// <summary>켜진 DB 범위 DDL 트리거마다 위험 이유("트리거: 이유"). 없으면 빈 목록.</summary>
+    public static IReadOnlyList<string> Risks(DbCatalog catalog, ITriggerAnalyzer analyzer)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(analyzer);
+        var ddl = catalog.Triggers.Where(t => t.ParentClass == "DATABASE" && !t.IsDisabled).ToList();
+        if (ddl.Count == 0) return [];
+        var names = ddl.GroupBy(t => t.ObjectId).ToDictionary(g => g.Key, g => g.First().Name);
+        var view = catalog with
+        {
+            Tables = [.. catalog.Tables, new CatalogTable(HostObjectId, "dbo", HostTable, TemporalType.None, false)],
+            Triggers = ddl.Select(t => t with { ParentClass = "OBJECT_OR_COLUMN", ParentId = HostObjectId, IsInsteadOf = false }).ToList(),
+        };
+        var risks = new List<string>();
+        foreach (var info in analyzer.Analyze(view).Where(i => names.ContainsKey(i.ObjectId)).OrderBy(i => names[i.ObjectId], StringComparer.Ordinal))
+        {
+            var why = new List<string>();
+            if (info.IsEncrypted) why.Add("본문을 볼 수 없음(암호화·CLR)");
+            else
+            {
+                if (info.HasDynamicSql) why.Add("동적 SQL");
+                if (info.ExternalSideEffects.Count > 0) why.Add("외부 부작용(" + string.Join(", ", info.ExternalSideEffects) + ")");
+                if (info.UnresolvedProcedureCalls.Count > 0) why.Add("펼칠 수 없는 프로시저 호출(" + string.Join(", ", info.UnresolvedProcedureCalls) + ")");
+            }
+            if (why.Count > 0) risks.Add($"{names[info.ObjectId]}: {string.Join(", ", why)}");
+        }
+        return risks;
+    }
+
+    /// <summary>BaselineOptions.DdlTriggerGuard 구현: 위험이 있고 allow가 아니면 멈출 이유, 아니면 null.</summary>
+    public static string? Guard(DbCatalog catalog, ITriggerAnalyzer analyzer, bool allow)
+    {
+        if (allow) return null;
+        var risks = Risks(catalog, analyzer);
+        return risks.Count == 0 ? null
+            : $"복원한 DB의 DB 범위 DDL 트리거가 설치 DDL에 발동하면 샌드박스 밖에 부작용을 낼 수 있음({string.Join("; ", risks)}). "
+              + $"트리거를 확인한 뒤에만 {AllowSettingKey}=true로 넘길 것";
     }
 }

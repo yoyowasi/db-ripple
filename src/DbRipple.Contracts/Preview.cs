@@ -130,3 +130,59 @@ public interface IPreviewPipeline
     /// <summary>미리보기 한 건. 거부면 저장하지 않고 PreviewOutcome.Record = null. 지문 불일치·잠금 충돌은 InvalidOperationException.</summary>
     Task<PreviewOutcome> RunAsync(string sql, PreviewOptions options, IEvaluationHook? hook, CancellationToken ct);
 }
+
+/// <summary>
+/// 행 페이지 계산(C14 저장소와 rows API 공용, 2026-11-13 table 필터). 거른 행을 새 목록으로 복사하지 않고 한 번 훑으며 total을 세고 offset·limit 구간만 담는다.
+/// offset·limit 범위 검사는 호출자(저장소 ArgumentException, API 400)가 한다.
+/// </summary>
+public static partial class RowPages
+{
+    /// <summary>table 값 최대 길이(스키마 128 + "." + 테이블 128).</summary>
+    public const int MaxTableLength = 257;
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^[^.\p{Cc}]{1,128}\.[^\p{Cc}]{1,128}\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex TablePattern();
+
+    /// <summary>"스키마.테이블" 형식(스키마에 '.' 없음, 제어 문자 없음, 각 1~128자)인지.</summary>
+    public static bool IsValidTable(string? table) => table is { Length: > 0 and <= MaxTableLength } && TablePattern().IsMatch(table);
+
+    /// <summary>view=event: firingId로만 거른다.</summary>
+    public static RowPage<RowChange> Events(PreviewRecord record, RowPageQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        ArgumentNullException.ThrowIfNull(query);
+        Func<RowChange, bool>? filter = query.FiringId is { } f ? x => x.FiringId == f : null;
+        return Page(record.RowChanges, filter, RowView.Event, query);
+    }
+
+    /// <summary>view=net: firingId(explainedBy.firingIds 포함)와 table("스키마.테이블" 정확히 같음)로 거른다. table이 null이면 거르지 않는다. 없는 테이블이면 total 0.</summary>
+    public static RowPage<NetChange> Net(PreviewRecord record, RowPageQuery query, string? table = null)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        ArgumentNullException.ThrowIfNull(query);
+        var f = query.FiringId;
+        Func<NetChange, bool>? filter = (f, table) switch
+        {
+            (null, null) => null,
+            (_, null) => x => x.ExplainedBy?.FiringIds.Contains(f) == true,
+            (null, _) => x => string.Equals(x.Table, table, StringComparison.Ordinal),
+            _ => x => string.Equals(x.Table, table, StringComparison.Ordinal) && x.ExplainedBy?.FiringIds.Contains(f) == true,
+        };
+        return Page(record.NetChanges, filter, RowView.Net, query);
+    }
+
+    static RowPage<T> Page<T>(IReadOnlyList<T> rows, Func<T, bool>? filter, RowView view, RowPageQuery q)
+    {
+        if (filter is null)
+            return new RowPage<T> { Total = rows.Count, View = view, Offset = q.Offset, Limit = q.Limit, Rows = rows.Skip(q.Offset).Take(q.Limit).ToList() };
+        var page = new List<T>(Math.Min(q.Limit, 256));
+        long total = 0;
+        foreach (var x in rows)
+        {
+            if (!filter(x)) continue;
+            if (total >= q.Offset && page.Count < q.Limit) page.Add(x);
+            total++;
+        }
+        return new RowPage<T> { Total = total, View = view, Offset = q.Offset, Limit = q.Limit, Rows = page };
+    }
+}

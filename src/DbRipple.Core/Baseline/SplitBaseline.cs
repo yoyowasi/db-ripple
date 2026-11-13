@@ -122,6 +122,8 @@ public sealed record SplitBaselineOptions
     public bool DeleteImportedBackup { get; init; } = true;
     /// <summary>PC 이름 조각(RunNames.MachineTag).</summary>
     public required string MachineTag { get; init; }
+    /// <summary>설치 전 DB 범위 DDL 트리거 검사(BaselineOptions.DdlTriggerGuard와 같음). null이면 검사하지 않는다.</summary>
+    public Func<Catalog.DbCatalog, string?>? DdlTriggerGuard { get; init; }
 
     public void Validate()
     {

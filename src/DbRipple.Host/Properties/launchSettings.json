@@ -3,6 +3,7 @@
   "profiles": {
     "DbRipple.Host (개발: Vite 5273 프록시)": {
       "commandName": "Project",
+      "commandLineArgs": "--dev",
       "launchBrowser": false,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"

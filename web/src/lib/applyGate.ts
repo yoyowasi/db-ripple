@@ -18,7 +18,7 @@ export interface GateInput {
 }
 
 /** 화면의 조건 목록 한 줄에 대응하는 키. 'other'는 목록 밖 이유(이미 지워짐·이미 적용 시도·처리 중 등). */
-export type GateCondition = 'preview' | 'fingerprint' | 'window' | 'sql' | 'residual' | 'sandbox' | 'lock' | 'origin' | 'other'
+export type GateCondition = 'preview' | 'fingerprint' | 'window' | 'sql' | 'residual' | 'sandbox' | 'lock' | 'origin' | 'proc' | 'other'
 
 export interface GateFailure {
   condition: GateCondition
@@ -71,6 +71,9 @@ export function evaluateApplyGate(i: GateInput): GateResult {
       fail('preview', '변경이 수집 상한을 넘어 행 이미지가 잘렸습니다. 검증할 수 없어 적용할 수 없습니다(D8).')
       break
   }
+
+  // EXEC는 미리보기 전용(1차). 서버도 PROC_APPLY_NOT_SUPPORTED로 막지만 화면에서 미리 막는다.
+  if (p.statements.some((s) => s.kind === 'EXEC')) fail('proc', '프로시저 호출은 아직 적용할 수 없습니다(미리보기 전용).')
 
   if (p.residualCheckFailed) {
     fail('residual', '롤백 뒤 남은 변경을 확인하지 못했습니다(잔여 확인 실패). 샌드박스가 오염 상태입니다.')

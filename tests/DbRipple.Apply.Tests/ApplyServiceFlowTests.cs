@@ -78,7 +78,7 @@ public sealed class ApplyServiceFlowTests
             Context = context;
             return Task.FromResult(Outcome?.Invoke(statement) ?? new StatementRunOutcome
             {
-                Result = Statement(statement.Index, 1, statement.Target, statement.Kind),
+                Result = Statement(statement.Index, 1, statement.Target!, statement.Kind),
                 TransactionOpen = true,
             });
         }
@@ -99,6 +99,15 @@ public sealed class ApplyServiceFlowTests
         public IReadOnlyList<DriftRow> Drift = [];
         public Exception? CommitError;
         public IReadOnlyList<ApplyMismatch> KeysetMismatches = [];
+        public IReadOnlyList<HashTarget> Targets =
+        [
+            new("dbo", "Other", false, [new("id", "int", false, false), new("doc", "xml", false, false)]),
+            new("dbo", "T", false, [new("id", "int", false, false), new("v", "int", false, false)]),
+        ];
+        /// <summary>실행 전, 실행 뒤 순서로 꺼낸다. 비면 같은 기본 상태.</summary>
+        public readonly Queue<IReadOnlyDictionary<string, TableState>> States = new();
+        public Exception? StatesError;
+        public IReadOnlySet<string>? SeenPreviewTables;
         public SqlSession Session { get; } = new() { Connection = new SqlConnection() };
         public Task<long?> BeginTransactionAsync(CancellationToken ct) { log.Add("begin"); return Task.FromResult<long?>(42); }
         public Task CommitAsync(CancellationToken ct)
@@ -108,16 +117,18 @@ public sealed class ApplyServiceFlowTests
         }
         public Task RollbackAsync(CancellationToken ct) { log.Add("rollback"); return Task.CompletedTask; }
         public Task<IReadOnlyList<DriftRow>> CheckDriftAsync(PreviewRecord preview, IReadOnlyList<TableInfo> tables, CancellationToken ct) { log.Add("drift"); return Task.FromResult(Drift); }
-        public Task<IReadOnlyDictionary<string, long>> CountAllAsync(IReadOnlyList<TableInfo> tables, CancellationToken ct)
+        public Task<IReadOnlyList<HashTarget>> ReadHashTargetsAsync(CancellationToken ct) { log.Add("targets"); return Task.FromResult(Targets); }
+        public Task<IReadOnlyDictionary<string, TableState>> ReadTableStatesAsync(IReadOnlyList<HashTarget> targets, IReadOnlySet<string> previewTables, CancellationToken ct)
         {
             log.Add("count");
-            return Task.FromResult<IReadOnlyDictionary<string, long>>(new Dictionary<string, long> { ["dbo.T"] = 3 });
+            SeenPreviewTables = previewTables;
+            if (StatesError is { } e) return Task.FromException<IReadOnlyDictionary<string, TableState>>(e);
+            return Task.FromResult(States.Count > 0 ? States.Dequeue() : new Dictionary<string, TableState> { ["dbo.T"] = new(3, null), ["dbo.Other"] = new(5, 77) });
         }
-        public Task<(IReadOnlyList<TableCountChange> Counts, IReadOnlyList<ApplyMismatch> Mismatches)> VerifyKeysetAsync(
-            PreviewRecord preview, IReadOnlyDictionary<string, long> before, IReadOnlyList<TableInfo> tables, BaselineContext baseline, CancellationToken ct)
+        public Task<IReadOnlyList<ApplyMismatch>> VerifyKeyRowsAsync(PreviewRecord preview, IReadOnlyList<TableInfo> tables, BaselineContext baseline, CancellationToken ct)
         {
             log.Add("keyset");
-            return Task.FromResult<(IReadOnlyList<TableCountChange>, IReadOnlyList<ApplyMismatch>)>(([], KeysetMismatches));
+            return Task.FromResult(KeysetMismatches);
         }
         public ValueTask DisposeAsync() { log.Add("close"); return ValueTask.CompletedTask; }
     }
@@ -128,6 +139,8 @@ public sealed class ApplyServiceFlowTests
         public bool UserExists = true;
         public (SnapshotOutcome, string?) Snapshot = (SnapshotOutcome.Created, null);
         public SnapshotCapability Capability = new(true, null);
+        public IReadOnlyList<string> Warnings = [];
+        public Task<IReadOnlyList<string>> ReadOriginWarningsAsync(string originDb, CancellationToken ct) { log.Add("warnings"); return Task.FromResult(Warnings); }
         public readonly FakeConnection Connection = new(log);
         public Task<SnapshotCapability> CheckSnapshotCapabilityAsync(string originDb, CancellationToken ct) => Task.FromResult(Capability);
         public Exception? Unreachable;
@@ -190,7 +203,7 @@ public sealed class ApplyServiceFlowTests
         Assert.True(result.Verification.NetSummaryMatch);
         Assert.True(result.SandboxRefreshStarted);
         Assert.Equal(
-            ["lock", "context", "analyze", "snapshot Origin_pre", "open", "prepare", "begin", "drift", "run 1", "diff Origin Origin_pre", "commit", "remove",
+            ["lock", "context", "analyze", "warnings", "snapshot Origin_pre", "open", "prepare", "begin", "drift", "run 1", "diff Origin Origin_pre", "commit", "remove",
              "rollback", "close", "drop Origin_pre", "unlock", "refresh"],
             log);
         Assert.Equal(42, rig.Runner.Context!.TransactionId);
@@ -227,6 +240,20 @@ public sealed class ApplyServiceFlowTests
 
         Assert.Equal(ApplyStatus.PreconditionFailed, result!.Status);
         Assert.Equal([ApplyPrecondition.PreviewNotOk], result.PreconditionFailures);
+        AssertNothingRanOnOrigin();
+        Assert.Equal("unlock", log[^1]);
+    }
+
+    [Fact]
+    public async Task Precondition_exec_statement_is_not_applied()
+    {
+        var exec = Statement(0, null, "dbo.T", ChangeOperation.Exec) with { Target = null };
+        var rig = NewRig(Record(statements: [exec]));
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.PreconditionFailed, result!.Status);
+        Assert.Contains(ApplyPrecondition.ProcApplyNotSupported, result.PreconditionFailures);
         AssertNothingRanOnOrigin();
         Assert.Equal("unlock", log[^1]);
     }
@@ -410,7 +437,7 @@ public sealed class ApplyServiceFlowTests
 
         Assert.Equal(ApplyStatus.PreconditionFailed, result!.Status);
         Assert.Equal([ApplyPrecondition.WeakVerificationNotAccepted], result.PreconditionFailures);
-        Assert.Equal(VerificationMode.Keyset, result.Verification.Mode);
+        Assert.Equal(VerificationMode.KeysetHash, result.Verification.Mode);
         Assert.Contains("allowKeysetVerification", result.Message);
         AssertNothingRanOnOrigin();
     }
@@ -458,7 +485,7 @@ public sealed class ApplyServiceFlowTests
         var result = await rig.ApplyAsync(new ApplyRequest { AllowKeysetVerification = true });
 
         Assert.Equal(ApplyStatus.Committed, result!.Status);
-        Assert.Equal(VerificationMode.Keyset, result.Verification.Mode);
+        Assert.Equal(VerificationMode.KeysetHash, result.Verification.Mode);
         Assert.Null(result.Verification.NetSummaryMatch);
         Assert.Contains(result.Verification.Limitations, l => l.Contains("FILESTREAM", StringComparison.Ordinal));
         Assert.Contains(KeysetVerifier.Limitation, result.Verification.Limitations);
@@ -543,7 +570,7 @@ public sealed class ApplyServiceFlowTests
         var result = await rig.ApplyAsync();
 
         Assert.Equal(ApplyStatus.RolledBackMismatch, result!.Status);
-        Assert.Equal(VerificationMode.Keyset, result.Verification.Mode);
+        Assert.Equal(VerificationMode.KeysetHash, result.Verification.Mode);
         Assert.DoesNotContain(log, e => e.StartsWith("snapshot", StringComparison.Ordinal));
         Assert.DoesNotContain("commit", log);
     }
@@ -635,5 +662,99 @@ public sealed class ApplyServiceFlowTests
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             OriginSnapshot.CreateAsync("Server=unused.invalid;Connect Timeout=1", "Origin", "origin", 5, CancellationToken.None));
+    }
+
+    // ---- KEYSET_HASH(2026-11-13) ----
+
+    static Dictionary<string, TableState> States(int? other) => new() { ["dbo.T"] = new(3, null), ["dbo.Other"] = new(5, other) };
+
+    [Fact]
+    public async Task Keyset_hash_same_states_commits_and_reads_states_around_statements()
+    {
+        var rig = NewRig(settings: new ApplySettings { ForceKeyset = true });
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.Committed, result!.Status);
+        Assert.Equal(VerificationMode.KeysetHash, result.Verification.Mode);
+        Assert.Equal(["drift", "targets", "count", "run 1", "count", "keyset", "commit"],
+            log.Where(e => e is "drift" or "targets" or "count" or "run 1" or "keyset" or "commit"));
+        Assert.Equal(["dbo.T"], rig.Origin.Connection.SeenPreviewTables!);             // 미리보기 테이블은 해시하지 않는다
+        Assert.All(KeysetVerifier.Limitations, l => Assert.Contains(l, result.Verification.Limitations));
+        Assert.Contains(result.Verification.Limitations, l => l.Contains("dbo.Other.doc(xml)", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Keyset_hash_outside_table_checksum_change_rolls_back()
+    {
+        // 미리보기에 없던 dbo.Other에서 행 수가 그대로인 UPDATE(해시만 바뀜)
+        var rig = NewRig(settings: new ApplySettings { ForceKeyset = true });
+        rig.Origin.Connection.States.Enqueue(States(77));
+        rig.Origin.Connection.States.Enqueue(States(78));
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.RolledBackMismatch, result!.Status);
+        var m = Assert.Single(result.Verification.Mismatches);
+        Assert.Equal(MismatchKind.OutsideTableChanged, m.Kind);
+        Assert.Equal("dbo.Other", m.Table);
+        Assert.Equal("count=5,checksum=77", m.Expected);
+        Assert.Equal("count=5,checksum=78", m.Actual);
+        Assert.DoesNotContain("commit", log);
+        var json = System.Text.Json.JsonSerializer.Serialize(result, ContractJson.Options);
+        Assert.Contains("\"KEYSET_HASH\"", json);
+        Assert.Contains("\"OUTSIDE_TABLE_CHANGED\"", json);
+    }
+
+    [Fact]
+    public async Task Keyset_hash_state_read_failure_before_statements_is_error_without_running()
+    {
+        var rig = NewRig(settings: new ApplySettings { ForceKeyset = true });
+        rig.Origin.Connection.StatesError = new InvalidOperationException("Lock request time out period exceeded(1222)");
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.Error, result!.Status);
+        Assert.Contains("1222", result.Message);
+        Assert.DoesNotContain(log, e => e.StartsWith("run", StringComparison.Ordinal));
+        Assert.DoesNotContain("commit", log);
+        Assert.False(result.SandboxRefreshStarted);                               // 원본에 실행하지 않았다
+    }
+
+    [Fact]
+    public async Task Keyset_hash_with_consent_from_capability_check_uses_keyset_hash()
+    {
+        var rig = NewRig();
+        rig.Origin.Capability = OriginSnapshot.Decide(canCreateDatabase: false, filestreamGroups: 0, memoryOptimizedGroups: 0);
+
+        var denied = await rig.ApplyAsync();
+        Assert.Equal([ApplyPrecondition.WeakVerificationNotAccepted], denied!.PreconditionFailures);
+        Assert.Contains("KEYSET_HASH", denied.Message);
+
+        var result = await rig.ApplyAsync(new ApplyRequest { AllowKeysetVerification = true });
+        Assert.Equal(ApplyStatus.Committed, result!.Status);
+        Assert.Equal(VerificationMode.KeysetHash, result.Verification.Mode);
+    }
+
+    [Fact]
+    public async Task Origin_warnings_are_limitations_and_do_not_block()
+    {
+        var rig = NewRig();
+        rig.Origin.Warnings = [OriginWarnings.Trustworthy, OriginWarnings.Cdc];
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.Committed, result!.Status);
+        Assert.Contains(OriginWarnings.Trustworthy, result.Verification.Limitations);
+        Assert.Contains(OriginWarnings.Cdc, result.Verification.Limitations);
+        Assert.True(log.IndexOf("warnings") < log.IndexOf("snapshot Origin_pre"));  // 원본에 쓰기(스냅샷) 전에 읽기만
+    }
+
+    [Fact]
+    public async Task Origin_warnings_are_not_read_when_preconditions_fail()
+    {
+        var rig = NewRig(Record(status: PreviewStatus.Truncated, truncated: true));
+        await rig.ApplyAsync();
+        Assert.DoesNotContain("warnings", log);
     }
 }

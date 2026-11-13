@@ -25,5 +25,34 @@ services:
       timeout: 5s
       retries: 12
       start_period: 30s
+  # SP17·SP18·SP20·SP21 전용 "원본 서버" 모사: SQL Server 2022 Developer(샌드박스 2025와 다른 주버전). 기본 `docker compose up`에는 뜨지 않는다(profile origin).
+  #   기동: docker compose --profile origin up -d sql-origin   (비밀번호는 sql과 같은 .env의 MSSQL_SA_PASSWORD)
+  #   종료: docker compose --profile origin stop sql-origin    (원본 데이터까지 지우려면 컨테이너를 내린 뒤 docker volume rm db-ripple_mssql-origin-data)
+  #   백업 폴더 /var/opt/mssql/backup = 호스트 ORIGIN_BACKUP_DIR(기본 ./.data/origin-backup). Split의 UNC 공유(DbRipple:Backup:SharePath) 대역이다.
+  #     가져오기 폴더(./.data/import)와 같은 폴더로 두면 도구가 같은 파일을 자기 자신에게 복사하려 하므로 기본은 다른 폴더다(docs/spikes/SP17.md).
+  sql-origin:
+    profiles: ["origin"]
+    image: mcr.microsoft.com/mssql/server:${ORIGIN_IMAGE_TAG:-2022-latest}
+    container_name: dbripple-sql-origin
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?.env에 MSSQL_SA_PASSWORD를 설정하세요}
+      MSSQL_AGENT_ENABLED: "false"
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+      MSSQL_COLLATION: ${MSSQL_COLLATION:-SQL_Latin1_General_CP1_CI_AS}
+    mem_limit: 3g
+    ports:
+      - "127.0.0.1:${ORIGIN_HOST_PORT:-14334}:1433"
+    volumes:
+      - mssql-origin-data:/var/opt/mssql
+      - ${ORIGIN_BACKUP_DIR:-./.data/origin-backup}:/var/opt/mssql/backup
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" -b -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 volumes:
   mssql-data:
+  mssql-origin-data:

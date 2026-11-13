@@ -29,6 +29,7 @@ public static class OrderStability
             nodes.Add(n switch
             {
                 StatementNode s => $"S#{s.StatementIndex.ToString(CultureInfo.InvariantCulture)} {CaseScorer.ContractEnumText(s.Status)}",
+                ProcedureCallNode pc => $"P:{pc.Procedure}#{pc.StatementIndex.ToString(CultureInfo.InvariantCulture)} {CaseScorer.ContractEnumText(pc.Status)}",
                 FiringNode f => $"F:{f.Table}:{CaseScorer.ContractEnumText(f.Operation)}@{f.Depth.ToString(CultureInfo.InvariantCulture)} rows={f.RowCount.ToString(CultureInfo.InvariantCulture)}",
                 TriggerNode t => $"T:{t.Trigger}@{(t.ParentFiringId is { } p && firings.TryGetValue(p, out var pf) ? pf.Depth : 0).ToString(CultureInfo.InvariantCulture)} observed={(t.Observed ? "1" : "0")}",
                 ResidualNode r => $"R:{r.Table} {CaseScorer.ContractEnumText(r.Category)}",

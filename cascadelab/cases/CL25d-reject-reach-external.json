@@ -1,0 +1,32 @@
+{
+  "id": "CL25d",
+  "pattern": "CL25",
+  "title": "거부: 도달 폐포(FK 연쇄) 안의 외부 부작용 트리거 — 직접 DELETE와 EXEC (별도 DB)",
+  "database": "CascadeLab_Reach",
+  "schemaScript": "sql/extra/cl25d.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "DELETE FROM cl25d.Parent WHERE id = 1;" },
+    { "index": 2, "sql": "EXEC cl25d.usp_DeleteParent @id = 2;" }
+  ],
+  "expected": {
+    "status": "rejected",
+    "errorNumber": null,
+    "statementStatus": [],
+    "changes": [],
+    "firings": [],
+    "edges": [],
+    "rejects": [
+      { "ruleId": "REJECT_TRIGGER_EXTERNAL_EFFECT", "statementIndex": 1, "ruleIdPending": false },
+      { "ruleId": "REJECT_TRIGGER_EXTERNAL_EFFECT", "statementIndex": 2 }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "문장 1은 N1(도달 폐포 거부, BatchAnalyzer.CheckReachedTriggers)의 회귀 사례다", "basis": "직접 대상 Parent에는 트리거가 없어 직접 대상 검사로는 통과하고 FK CASCADE로 닿는 Child의 외부 부작용 트리거 때문에만 거부된다. 도달 폐포 검사가 없던 때는 이 문장이 통과(ok)했다" },
+      { "id": "OO2", "what": "이 사례는 평가 하네스(CLI cascadelab)가 돌리지 않는다", "basis": "database가 CascadeLab_Reach라 하네스는 건너뛰고(알림 한 줄) 분석 API 회귀(scripts/home-test.ps1 N1 단계, docs/home-test-plan.md)로만 확인한다. 이유는 cascadelab/sql/extra/cl25d.sql 머리말" }
+    ]
+  },
+  "rationale": [
+    { "claim": "외부 부작용 트리거는 샌드박스에서 재현하면 실제 부작용이 생길 수 있어 거부한다. 직접 대상뿐 아니라 FK 참조 동작과 트리거 쓰기 대상으로 닿는 트리거도 같다", "basis": "D5·E18, architecture.md:1061(도달 폐포 검사, 2026-11-13)" },
+    { "claim": "쓰기 대상을 모르는 트리거(CL10의 동적 SQL)가 있는 DB에 외부 부작용 트리거를 함께 두면 CL10이 거부로 바뀐다. 그래서 별도 DB에 둔다", "basis": "BatchAnalyzer.CheckReachedTriggers: unknownWrites이면 모든 사용자 테이블 도달" }
+  ]
+}

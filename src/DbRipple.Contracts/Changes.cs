@@ -22,16 +22,23 @@ public sealed record StatementResult
     public required int Batch { get; init; }
     /// <summary>배치 안 순번.</summary>
     public required int Position { get; init; }
-    /// <summary>INSERT/UPDATE/DELETE.</summary>
+    /// <summary>INSERT/UPDATE/DELETE, 저장 프로시저 호출이면 EXEC.</summary>
     public required ChangeOperation Kind { get; init; }
-    /// <summary>직접 대상 "스키마.테이블".</summary>
-    public required string Target { get; init; }
+    /// <summary>직접 대상 "스키마.테이블". EXEC면 null.</summary>
+    public required string? Target { get; init; }
     /// <summary>스크립트 전체 기준 위치.</summary>
     public required SourceSpan Span { get; init; }
     /// <summary>ok, failed, trigger_blocked, not_run.</summary>
     public required StatementStatus Status { get; init; }
-    /// <summary>드라이버 영향 행 수(SqlCommand 결과, A9·SP2(c)). not_run·실패면 null.</summary>
+    /// <summary>드라이버 영향 행 수(SqlCommand 결과, A9·SP2(c)). not_run·실패면 null. EXEC는 늘 null(A9: EXECUTE는 이전 @@ROWCOUNT를 유지).</summary>
     public long? RowsAffected { get; init; }
+    /// <summary>EXEC: 프로시저 반환 값(RETURN). 그 밖·실패면 null.</summary>
+    public int? ReturnValue { get; init; }
+    /// <summary>EXEC: 프로시저가 낸 결과 집합 수(내용은 버린다). 그 밖·실패면 null.</summary>
+    public int? ResultSetCount { get; init; }
+    /// <summary>EXEC 귀속 재료(AnalyzedStatement.Plan 그대로). JSON에는 내보내지 않는다.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public ProcedurePlan? Plan { get; init; }
     /// <summary>
     /// [이 문장 묶음의 최소 captureSeq, 최대 captureSeq](§6.2 captureSeqRange, 2원소 배열). 묶음이 없으면 null.
     /// 문장 귀속 자체는 경계(이전 문장 경계, 이 문장 경계]로 한다(§7.2 1단계, RawCapture.Executions).

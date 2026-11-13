@@ -33,6 +33,8 @@ const OP_TEXT = {
       <summary>읽는 법</summary>
       <ul>
         <li v-if="present.statement"><i class="sw sw-st" />진한 알약 = 출발점(문장)</li>
+        <li v-if="present.procedure"><i class="sw sw-proc" />초록 알약 = 출발점(EXEC 프로시저 호출). 반환 값·결과 집합 수와, 안쪽에서 펼친 프로시저를 작은 줄로 보입니다</li>
+        <li v-if="present.unobservedWrite"><i class="sw sw-proc d" />점선 "관측 안 됨" = 프로시저가 정적으로 쓰는 테이블이지만 이번 실행에서는 변경이 관측되지 않음</li>
         <li v-for="o in present.ops" :key="o"><i class="sw" :class="`sw-${o}`" />{{ OP_TEXT[o] }}</li>
         <li v-if="present.keysOnly"><i class="sw sw-keys" />"키만" = 행 값 없이 키만 수집함(KEYS)</li>
         <li v-if="present.error"><i class="sw sw-err" />빨강 카드 · 금지 기호 = 문장이 실패하거나 트리거가 거부한 오류</li>
@@ -138,6 +140,15 @@ const OP_TEXT = {
   border-radius: 7px;
   background: var(--st-bg);
   border: 1px solid var(--st-s);
+}
+.sw-proc {
+  width: 22px;
+  border-radius: 7px;
+  background: var(--nd-proc);
+  border: 1.6px solid var(--nd-proc-s);
+}
+.sw-proc.d {
+  border-style: dashed;
 }
 .sw-tg {
   width: 22px;

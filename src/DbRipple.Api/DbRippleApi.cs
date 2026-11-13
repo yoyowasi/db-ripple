@@ -96,22 +96,28 @@ public static class DbRippleApi
             .WithName("GetPreview").WithSummary("미리보기 결과");
 
         api.MapGet("/previews/{id}/rows", async Task<Results<Ok<RowPage<RowChange>>, Ok<RowPage<NetChange>>, ValidationProblem, NotFound>> (
-                string id, string? view, string? firingId, int? offset, int? limit, [FromServices] IPreviewStore store, CancellationToken ct) =>
+                string id, string? view, string? firingId, string? table, int? offset, int? limit, [FromServices] IPreviewStore store, CancellationToken ct) =>
             {
                 RowView? v = view switch { null or "event" => RowView.Event, "net" => RowView.Net, _ => null };
+                if (string.IsNullOrEmpty(table)) table = null;
                 var off = offset ?? 0;
                 var lim = limit ?? RowPageQuery.DefaultLimit;
                 var errors = new Dictionary<string, string[]>();
                 if (v is null) errors["view"] = ["event 또는 net"];
                 if (off < 0) errors["offset"] = ["0 이상"];
                 if (lim is < 1 or > RowPageQuery.MaxLimit) errors["limit"] = [$"1..{RowPageQuery.MaxLimit}"];
+                if (table is not null && v == RowView.Event) errors["table"] = ["view=net에서만 쓸 수 있음"];
+                else if (table is not null && !RowPages.IsValidTable(table)) errors["table"] = [$"스키마.테이블({RowPages.MaxTableLength}자 이하)"];
                 if (errors.Count > 0) return TypedResults.ValidationProblem(errors);
                 var query = new RowPageQuery { View = v!.Value, FiringId = firingId, Offset = off, Limit = lim };
                 if (query.View == RowView.Event)
                     return await store.PageEventsAsync(id, query, ct) is { } e ? TypedResults.Ok(e) : TypedResults.NotFound();
+                if (table is not null)
+                    // table 필터(2026-11-13): 저장소 인터페이스를 바꾸지 않고 같은 페이지 계산(RowPages)으로 거른다. total은 거른 수.
+                    return await store.GetAsync(id, ct) is { } r ? TypedResults.Ok(RowPages.Net(r, query, table)) : TypedResults.NotFound();
                 return await store.PageNetAsync(id, query, ct) is { } n ? TypedResults.Ok(n) : TypedResults.NotFound();
             })
-            .WithName("GetPreviewRows").WithSummary("행 페이지(view=event: RowChange[], view=net: NetChange[])");
+            .WithName("GetPreviewRows").WithSummary("행 페이지(view=event: RowChange[], view=net: NetChange[], view=net&table=스키마.테이블: 그 테이블만)");
 
         api.MapPost("/previews/{id}/apply", async Task<Results<Ok<ApplyResult>, NotFound>> (
                 string id, [FromBody] ApplyRequest? request, [FromServices] IApplyService apply, CancellationToken ct) =>

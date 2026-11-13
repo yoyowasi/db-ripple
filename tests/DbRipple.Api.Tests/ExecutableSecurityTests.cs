@@ -46,15 +46,26 @@ public sealed class ExecutableSecurityTests
         }
     }
 
-    sealed record Rig(WebApplication App, HttpClient Client, Sandbox Sandbox, LogSink Logs) : IAsyncDisposable
+    sealed record Rig(WebApplication App, HttpClient Client, Sandbox Sandbox, LogSink Logs, string Root) : IAsyncDisposable
     {
         public LaunchSession Session => App.Services.GetRequiredService<LaunchSession>();
-        public ValueTask DisposeAsync() => App.DisposeAsync();
+        public async ValueTask DisposeAsync()
+        {
+            await App.DisposeAsync();
+            try { Directory.Delete(Root, recursive: true); } catch (IOException) { }
+        }
     }
 
-    static async Task<Rig> StartAsync(bool session, string environment = "Production", Action<ConfigurationManager>? configure = null)
+    const string IndexHtml = "<!doctype html><html><head><meta charset=\"UTF-8\" /><title>app</title></head><body><div id=\"app\"></div></body></html>";
+
+    // 콘텐츠 루트 = 게시본처럼 wwwroot/index.html·assets/app.js가 있는 임시 폴더.
+    static async Task<Rig> StartAsync(bool session, string environment = "Production", Action<ConfigurationManager>? configure = null, bool openApi = false)
     {
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment });
+        var root = Path.Combine(Path.GetTempPath(), "dbrt_exe_" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(Path.Combine(root, "wwwroot", "assets"));
+        File.WriteAllText(Path.Combine(root, "wwwroot", "index.html"), IndexHtml);
+        File.WriteAllText(Path.Combine(root, "wwwroot", "assets", "app.js"), "console.log(1)");
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment, ContentRootPath = root, WebRootPath = "wwwroot" });
         builder.WebHost.UseTestServer();
         builder.Logging.ClearProviders();
         var logs = new LogSink();
@@ -66,24 +77,45 @@ public sealed class ExecutableSecurityTests
         builder.Services.AddSingleton<ISandboxManager>(sandbox);
         var app = builder.Build();
         app.UseExceptionHandler();
+        if (openApi) app.MapOpenApi();
+        app.UseStaticFiles();
         app.MapDbRippleApi();
         app.MapGet("/", () => TypedResults.Content("<!doctype html><title>app</title>", "text/html"));
         await app.StartAsync();
-        return new Rig(app, app.GetTestClient(), sandbox, logs);
+        return new Rig(app, app.GetTestClient(), sandbox, logs, root);
     }
+
+    static readonly string CookieName = LaunchSession.CookieNameFor(0); // TestServer 포트
 
     static string SessionCookie(HttpResponseMessage res)
     {
         var header = Assert.Single(res.Headers.GetValues("Set-Cookie"));
-        Assert.StartsWith(LaunchSession.CookieName + "=", header);
+        Assert.StartsWith(CookieName + "=", header);
         return header.Split(';')[0];
     }
 
-    static Task<HttpResponseMessage> GetAsync(HttpClient client, string path, string? cookie = null, string? host = null)
+    /// <summary>실행 URL → 쿠키, 쿠키로 연 index.html의 meta → 요청 키.</summary>
+    static async Task<(string Cookie, string Key)> LoginAsync(Rig rig)
+    {
+        var cookie = SessionCookie(await GetAsync(rig.Client, $"/?launch={rig.Session.Token}"));
+        var doc = await GetAsync(rig.Client, "/", cookie);
+        Assert.Equal(HttpStatusCode.OK, doc.StatusCode);
+        return (cookie, MetaKey(await doc.Content.ReadAsStringAsync()));
+    }
+
+    static string MetaKey(string html)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(html, "<meta name=\"dbr-request-key\" content=\"([A-Za-z0-9_-]{43})\" />");
+        Assert.True(m.Success, "요청 키 meta 없음");
+        return m.Groups[1].Value;
+    }
+
+    static Task<HttpResponseMessage> GetAsync(HttpClient client, string path, string? cookie = null, string? host = null, string? key = null)
     {
         var req = new HttpRequestMessage(HttpMethod.Get, path);
         if (cookie is not null) req.Headers.Add("Cookie", cookie);
         if (host is not null) req.Headers.Host = host;
+        if (key is not null) req.Headers.Add(CrossSiteRequestGuard.HeaderName, key);
         return client.SendAsync(req);
     }
 
@@ -115,8 +147,12 @@ public sealed class ExecutableSecurityTests
         Assert.DoesNotContain("secure", header);
         var cookie = SessionCookie(res);
 
-        Assert.Equal(HttpStatusCode.OK, (await GetAsync(rig.Client, "/api/sandbox", cookie)).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await GetAsync(rig.Client, "/", cookie)).StatusCode);
+        var doc = await GetAsync(rig.Client, "/", cookie);
+        Assert.Equal(HttpStatusCode.OK, doc.StatusCode);
+        Assert.Contains("no-store", doc.Headers.CacheControl?.ToString());
+        var key = MetaKey(await doc.Content.ReadAsStringAsync());
+        Assert.NotEqual(cookie.Split('=')[1], key);
+        Assert.Equal(HttpStatusCode.OK, (await GetAsync(rig.Client, "/api/sandbox", cookie, key: key)).StatusCode);
 
         // 같은 토큰 재사용 → 401(토큰은 바뀌었다)
         var reuse = await GetAsync(rig.Client, $"/?launch={token}");
@@ -135,16 +171,102 @@ public sealed class ExecutableSecurityTests
             Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
             Assert.False(res.Headers.Contains("Set-Cookie"));
         }
-        Assert.Equal(HttpStatusCode.Unauthorized, (await GetAsync(rig.Client, "/api/sandbox", LaunchSession.CookieName + "=forged")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await GetAsync(rig.Client, "/api/sandbox", CookieName + "=forged", key: "forged")).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("//evil.example/")]
+    [InlineData("/%09/evil.example/")]
+    [InlineData("/%0a/evil.example/")]
+    [InlineData("/%5Cevil.example/")]
+    [InlineData("/%2F%2Fevil.example/")]
+    [InlineData("/settings/deep")]
+    public async Task Redirect_after_launch_is_always_root(string path)
+    {
+        await using var rig = await StartAsync(session: true);
+        var res = await rig.Client.GetAsync(new Uri($"http://localhost{path}?launch={rig.Session.Token}"));
+        Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+        Assert.Equal("/", res.Headers.Location?.OriginalString);
     }
 
     [Fact]
-    public async Task Redirect_never_points_to_another_host()
+    public async Task Cookie_alone_is_not_enough_for_api_request_key_header_is_required()
     {
         await using var rig = await StartAsync(session: true);
-        var res = await rig.Client.GetAsync(new Uri($"http://localhost//evil.example/?launch={rig.Session.Token}")); // 경로가 //로 시작
-        Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
-        Assert.Equal("/", res.Headers.Location?.OriginalString);
+        var (cookie, key) = await LoginAsync(rig);
+        // 다른 포트 서버가 쿠키를 받아 재사용하는 경우: 고정 헤더 "1"이나 틀린 키로는 GET도 401.
+        foreach (var bad in new string?[] { null, "1", key + "x", key[..^1] + (key[^1] == 'A' ? 'B' : 'A') })
+            await AssertNoSessionProblemAsync(await GetAsync(rig.Client, "/api/sandbox", cookie, key: bad));
+        var put = new HttpRequestMessage(HttpMethod.Post, "/api/sandbox/refresh") { Headers = { { "Cookie", cookie }, { CrossSiteRequestGuard.HeaderName, "1" } } };
+        await AssertNoSessionProblemAsync(await rig.Client.SendAsync(put));
+
+        Assert.Equal(HttpStatusCode.OK, (await GetAsync(rig.Client, "/api/sandbox", cookie, key: key)).StatusCode);
+        var post = new HttpRequestMessage(HttpMethod.Post, "/api/sandbox/refresh") { Headers = { { "Cookie", cookie }, { CrossSiteRequestGuard.HeaderName, key } } };
+        Assert.Equal(HttpStatusCode.Accepted, (await rig.Client.SendAsync(post)).StatusCode);
+        // 요청 키는 맞아도 출처 검사는 그대로(403).
+        var cross = new HttpRequestMessage(HttpMethod.Post, "/api/sandbox/refresh") { Headers = { { "Cookie", cookie }, { CrossSiteRequestGuard.HeaderName, key }, { "Origin", "http://127.0.0.1:9999" } } };
+        Assert.Equal(HttpStatusCode.Forbidden, (await rig.Client.SendAsync(cross)).StatusCode);
+
+        // 세션마다 키가 다르다: 다른 세션의 키로는 401.
+        var (cookie2, key2) = await LoginAsync(rig);
+        Assert.NotEqual(key, key2);
+        await AssertNoSessionProblemAsync(await GetAsync(rig.Client, "/api/sandbox", cookie2, key: key));
+    }
+
+    [Fact]
+    public async Task Request_key_meta_is_injected_into_spa_documents_only_with_session()
+    {
+        await using var rig = await StartAsync(session: true);
+        var (cookie, key) = await LoginAsync(rig);
+        foreach (var path in new[] { "/index.html", "/settings/deep" }) // 클라이언트 라우트도 같은 문서
+        {
+            var res = await GetAsync(rig.Client, path, cookie);
+            Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+            Assert.Equal(key, MetaKey(await res.Content.ReadAsStringAsync()));
+        }
+        var anon = await GetAsync(rig.Client, "/index.html");
+        Assert.Equal(HttpStatusCode.Unauthorized, anon.StatusCode);
+        Assert.DoesNotContain("dbr-request-key", await anon.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public void Cookie_name_is_per_port()
+    {
+        Assert.Equal("dbr_session_5080", LaunchSession.CookieNameFor(5080));
+        Assert.NotEqual(LaunchSession.CookieNameFor(5080), LaunchSession.CookieNameFor(5081));
+    }
+
+    [Fact]
+    public async Task Development_environment_does_not_turn_off_executable_mode_security()
+    {
+        // 게시본 폴더(wwwroot/index.html 있음)는 --dev를 줘도 실행 파일 모드다(환경 변수는 보지 않는다).
+        var root = Path.Combine(Path.GetTempPath(), "dbrt_mode_" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(Path.Combine(root, "wwwroot"));
+        try
+        {
+            Assert.Equal(new LaunchMode.Result(false, null), LaunchMode.Resolve(root, ["--dev"], debugBuild: true));
+            Assert.True(LaunchMode.Resolve(root, [], debugBuild: true).Executable);
+            Assert.True(LaunchMode.Resolve(root, ["--dev"], debugBuild: false).Executable);
+            File.WriteAllText(Path.Combine(root, "wwwroot", "index.html"), IndexHtml);
+            var r = LaunchMode.Resolve(root, ["--DEV", "--no-browser"], debugBuild: true);
+            Assert.True(r.Executable);
+            Assert.NotNull(r.IgnoredDevReason);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+
+        // 실행 파일 모드 서버를 ASPNETCORE_ENVIRONMENT=Development로 띄워도: 세션 없는 /api 401, OpenAPI 404(세션이 있어도).
+        await using var rig = await StartAsync(session: true, environment: "Development", openApi: true);
+        await AssertNoSessionProblemAsync(await GetAsync(rig.Client, "/api/sandbox"));
+        var (cookie, key) = await LoginAsync(rig);
+        Assert.Equal(HttpStatusCode.NotFound, (await GetAsync(rig.Client, "/openapi/v1.json")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await GetAsync(rig.Client, "/openapi/v1.json", cookie, key: key)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Development_mode_still_serves_openapi()
+    {
+        await using var rig = await StartAsync(session: false, environment: "Development", openApi: true);
+        Assert.Equal(HttpStatusCode.OK, (await GetAsync(rig.Client, "/openapi/v1.json")).StatusCode);
     }
 
     [Fact]
@@ -160,7 +282,16 @@ public sealed class ExecutableSecurityTests
         Assert.Equal("text/html", doc.Content.Headers.ContentType?.MediaType);
         Assert.Contains(LaunchSession.NoSessionTitle, await doc.Content.ReadAsStringAsync());
 
-        Assert.NotEqual(HttpStatusCode.Unauthorized, (await GetAsync(rig.Client, "/assets/index-abc.js")).StatusCode); // 비밀 없는 정적 자산
+        // 정적 자산 예외는 실제 파일만: 있는 파일 200, /assets 아래 없는 경로는 index.html이 아니라 404.
+        var asset = await GetAsync(rig.Client, "/assets/app.js");
+        Assert.Equal(HttpStatusCode.OK, asset.StatusCode);
+        Assert.Equal("console.log(1)", await asset.Content.ReadAsStringAsync());
+        foreach (var missing in new[] { "/assets/foo", "/assets/index-abc.js", "/assets/", "/assets" })
+        {
+            var res = await GetAsync(rig.Client, missing);
+            Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+            Assert.DoesNotContain("<div id=\"app\">", await res.Content.ReadAsStringAsync());
+        }
     }
 
     [Fact]
@@ -189,18 +320,21 @@ public sealed class ExecutableSecurityTests
     public async Task Security_headers_are_on_every_response_including_errors()
     {
         await using var rig = await StartAsync(session: true);
-        var cookie = SessionCookie(await GetAsync(rig.Client, $"/?launch={rig.Session.Token}"));
+        var (cookie, key) = await LoginAsync(rig);
         rig.Sandbox.Status = () => throw new InvalidOperationException("boom");
         var responses = new[]
         {
             await GetAsync(rig.Client, "/"),                                  // 401 HTML
             await GetAsync(rig.Client, "/api/sandbox"),                       // 401 problem
-            await GetAsync(rig.Client, "/", cookie),                          // 200
-            await GetAsync(rig.Client, "/api/sandbox", cookie),               // 500(예외 처리기가 헤더를 지운 뒤)
-            await rig.Client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "/api/sandbox/refresh") { Headers = { { "Cookie", cookie } } }), // 403
+            await GetAsync(rig.Client, "/", cookie),                          // 200(요청 키 주입)
+            await GetAsync(rig.Client, "/api/sandbox", cookie, key: key),     // 500(예외 처리기가 헤더를 지운 뒤)
+            await rig.Client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "/api/sandbox/refresh")
+                { Headers = { { "Cookie", cookie }, { CrossSiteRequestGuard.HeaderName, key }, { "Sec-Fetch-Site", "cross-site" } } }), // 403
+            await GetAsync(rig.Client, "/assets/nope.js"),                    // 404
         };
         Assert.Equal(HttpStatusCode.InternalServerError, responses[3].StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, responses[4].StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, responses[5].StatusCode);
         foreach (var res in responses)
         {
             Assert.Equal(SecurityHeaders.ContentSecurityPolicy, Assert.Single(res.Headers.GetValues("Content-Security-Policy")));
@@ -219,7 +353,13 @@ public sealed class ExecutableSecurityTests
         foreach (var host in new[] { "127.0.0.1:5080", "localhost:5080", "[::1]:5080", "localhost" })
             Assert.Equal(HttpStatusCode.OK, (await GetAsync(rig.Client, "/api/sandbox", host: host)).StatusCode);
         foreach (var host in new[] { "evil.example", "evil.example:5080", "127.0.0.1.nip.io:5080", "192.168.0.10:5080" })
-            Assert.Equal(HttpStatusCode.BadRequest, (await GetAsync(rig.Client, "/api/sandbox", host: host)).StatusCode);
+        {
+            var res = await GetAsync(rig.Client, "/api/sandbox", host: host);
+            Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+            // Host 필터의 400에도 보안 헤더가 붙는다(헤더 등록이 Host 필터보다 바깥).
+            Assert.Equal(SecurityHeaders.ContentSecurityPolicy, Assert.Single(res.Headers.GetValues("Content-Security-Policy")));
+            Assert.Equal("nosniff", Assert.Single(res.Headers.GetValues("X-Content-Type-Options")));
+        }
     }
 
     [Fact]
@@ -267,5 +407,15 @@ public sealed class ExecutableSecurityTests
         Assert.Equal("Windows 인증", origin.GetProperty("login").GetString());
         Assert.Equal(JsonValueKind.Null, origin.GetProperty("isSysadmin").ValueKind);
         Assert.True(new SandboxStatus { State = SandboxState.Ready, FingerprintMatch = true, Locked = false }.OriginReachable); // 기본 true
+    }
+
+    [Fact]
+    public void Sandbox_status_serializes_instance_warnings_empty_by_default()
+    {
+        using (var doc = JsonDocument.Parse(JsonSerializer.Serialize(new SandboxStatus { State = SandboxState.Ready, FingerprintMatch = true, Locked = false }, ContractJson.Options)))
+            Assert.Equal(0, doc.RootElement.GetProperty("instanceWarnings").GetArrayLength());
+        var status = new SandboxStatus { State = SandboxState.Ready, FingerprintMatch = true, Locked = false, InstanceWarnings = ["샌드박스 인스턴스에 'xp_cmdshell'이(가) 켜짐"] };
+        using var doc2 = JsonDocument.Parse(JsonSerializer.Serialize(status, ContractJson.Options));
+        Assert.Equal("샌드박스 인스턴스에 'xp_cmdshell'이(가) 켜짐", doc2.RootElement.GetProperty("instanceWarnings")[0].GetString());
     }
 }

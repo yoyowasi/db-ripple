@@ -135,13 +135,28 @@ public sealed class ProfileSettingsService : ISettingsService
             var (errors, n) = Normalize(request);
             if (errors.Count > 0) return new SettingsSaveOutcome { Errors = errors };
             target.EnsureIdle();
-            Directory.CreateDirectory(options.DataDir);
-            WriteAtomic(ProfilePath, JsonSerializer.SerializeToUtf8Bytes(n.File, FileJson));
             var remembered = new SecretFile(
                 n.File.Mode == ServerMode.Split && n.File.Origin.RememberPassword ? n.OriginPassword : null,
                 n.File.Sandbox.RememberPassword ? n.SandboxPassword : null);
-            if (remembered.Origin is null && remembered.Sandbox is null) File.Delete(SecretPath);
-            else WriteAtomic(SecretPath, protector.Protect(JsonSerializer.SerializeToUtf8Bytes(remembered)));
+            // 보호(암호화)를 파일 쓰기보다 먼저 한다. 실패하면 아무 파일도 바꾸지 않고 400(비밀번호 기억 필드)으로 알린다.
+            byte[]? secret = null;
+            if (remembered.Origin is not null || remembered.Sandbox is not null)
+            {
+                try { secret = protector.Protect(JsonSerializer.SerializeToUtf8Bytes(remembered)); }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    const string message = "비밀번호를 이 Windows 계정의 키로 암호화하지 못했습니다. 데이터 폴더 권한을 확인하거나 비밀번호 기억을 끄고 저장하세요.";
+                    var protectErrors = new Dictionary<string, string[]>(StringComparer.Ordinal);
+                    if (remembered.Origin is not null) protectErrors["origin.rememberPassword"] = [message];
+                    if (remembered.Sandbox is not null) protectErrors["sandbox.rememberPassword"] = [message];
+                    return new SettingsSaveOutcome { Errors = protectErrors };
+                }
+            }
+            Directory.CreateDirectory(options.DataDir);
+            // 비밀번호 → 프로필 순서(프로필만 새것이고 비밀번호가 옛것인 상태를 만들지 않는다).
+            if (secret is null) File.Delete(SecretPath);
+            else WriteAtomic(SecretPath, secret);
+            WriteAtomic(ProfilePath, JsonSerializer.SerializeToUtf8Bytes(n.File, FileJson));
             RuntimeProfile runtime;
             lock (gate)
             {

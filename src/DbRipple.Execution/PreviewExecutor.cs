@@ -66,6 +66,7 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
         if (!analysis.IsAccepted) throw new ArgumentException("거부된 분석 결과는 실행하지 않는다(§5.2 1)", nameof(analysis));
         var cap = options?.ImageCap ?? Settings.DefaultImageCap;
         if (cap < 0) throw new ArgumentOutOfRangeException(nameof(options), "이미지 상한은 0 이상");
+        foreach (var x in analysis.Statements.Where(s => s.Kind == ChangeOperation.Exec)) StatementRunner.ExecSql(x); // 연결 전에 계약 위반(실행 SQL 없음)을 거른다
 
         var tables = baseline.Catalog.ToCaptureInput().Where(t => !AuditTriggerGenerator.IsCaptureStore(t)).ToList();
         var csb = new SqlConnectionStringBuilder(connectionString) { InitialCatalog = baseline.SandboxDb, Pooling = false };
@@ -108,19 +109,30 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
                     executions.Add(new StatementExecution { Result = Result(st, StatementStatus.NotRun), ModeAfter = mode, ImageCountAfter = imageCount });
                     continue;
                 }
+                var execSql = st.Kind == ChangeOperation.Exec ? StatementRunner.ExecSql(st) : null;
                 if (user is not null)
                 {
                     await ExecAsync(conn, $"EXECUTE AS USER = {SqlText.NLiteral(user)};", ct);
                     impersonating = true;
                 }
                 long? rows = null;
+                StatementRunner.ExecRead? exec = null;
                 SqlException? error = null;
                 try
                 {
-                    // Q33(오케스트레이터 승인 2026-11-11, A안): StatementRunner와 같은 식으로 센다. D7 1(문장별 행 수)은 미리보기 값과 [적용] runner 값을 비교하므로
-                    // 같은 방식이어야 한다(드라이버 영향 행 수는 NOCOUNT OFF 트리거 행까지 합산).
-                    await using var cmd = new SqlCommand(st.Sql + StatementRunner.RowCountSuffix, conn) { CommandTimeout = Settings.CommandTimeoutSeconds };
-                    rows = await StatementRunner.ReadRowCountAsync(cmd, ct);
+                    if (execSql is not null)
+                    {
+                        // EXEC: 결과 집합은 세고 버리고 반환 값만 읽는다. 영향 행 수는 null(A9: EXECUTE는 이전 @@ROWCOUNT를 유지).
+                        await using var execCmd = new SqlCommand(execSql, conn) { CommandTimeout = Settings.CommandTimeoutSeconds };
+                        exec = await StatementRunner.ReadExecAsync(execCmd, ct);
+                    }
+                    else
+                    {
+                        // Q33(오케스트레이터 승인 2026-11-11, A안): StatementRunner와 같은 식으로 센다. D7 1(문장별 행 수)은 미리보기 값과 [적용] runner 값을 비교하므로
+                        // 같은 방식이어야 한다(드라이버 영향 행 수는 NOCOUNT OFF 트리거 행까지 합산).
+                        await using var cmd = new SqlCommand(st.Sql + StatementRunner.RowCountSuffix, conn) { CommandTimeout = Settings.CommandTimeoutSeconds };
+                        rows = await StatementRunner.ReadRowCountAsync(cmd, ct);
+                    }
                 }
                 catch (SqlException ex)
                 {
@@ -140,10 +152,17 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
                 // 인계 5: 트리거가 "COMMIT; BEGIN TRAN;" 뒤 RAISERROR를 내면 오류가 있어도 트랜잭션이 바뀌어 있다 → 오류가 있어도 확정으로 본다(failed).
                 var tranReplaced = tranOpen && tranCount == 1 && currentTranId != tranId;
                 if (tranReplaced) dirty = true;
-                if (error is not null || !tranOpen || tranCount != 1 || tranReplaced)
+                var classified = error is null ? ((StatementStatus, StatementError)?)null : ErrorRules.Classify(error, baseline);
+                // EXEC: 감싼 BEGIN TRAN 기준 트랜잭션 수로 판정한다(짝 없는 COMMIT은 @@TRANCOUNT 1로 보여 아래 일반 조건에 걸리지 않는다).
+                var execAnomaly = st.Kind == ChangeOperation.Exec
+                    ? StatementRunner.ExecTransactionAnomaly(tranCount, tranReplaced, tranId, currentTranId, exec?.TranDelta, classified?.Item2)
+                    : null;
+                if (error is not null || !tranOpen || tranCount != 1 || tranReplaced || execAnomaly is not null)
                 {
-                    var (status, err) = error is not null
-                        ? Replaced(ErrorRules.Classify(error, baseline), tranReplaced)
+                    var (status, err) = execAnomaly is not null
+                        ? (StatementStatus.Failed, execAnomaly)
+                        : classified is { } cl
+                        ? Replaced(cl, tranReplaced)
                         : (StatementStatus.Failed, new StatementError
                         {
                             ErrorNumber = 0,
@@ -168,7 +187,13 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
                 }
                 executions.Add(new StatementExecution
                 {
-                    Result = Result(st, StatementStatus.Ok) with { RowsAffected = rows, CaptureSeqRange = min is long a && max is long b ? [a, b] : null },
+                    Result = Result(st, StatementStatus.Ok) with
+                    {
+                        RowsAffected = rows,
+                        ReturnValue = exec?.ReturnValue,
+                        ResultSetCount = exec?.ResultSets,
+                        CaptureSeqRange = min is long a && max is long b ? [a, b] : null,
+                    },
                     Boundary = boundary,
                     ImageCountAfter = imageCount,
                     ModeAfter = mode,
@@ -181,7 +206,8 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
             {
                 // §5.2 4: 롤백 뒤 같은 연결에서 전체 사용자 테이블을 기준 스냅샷과 비교한다. 감사 기록은 함께 롤백되어 범위를 좁힐 수 없다.
                 if (tranOpen) { await ExecAsync(conn, "ROLLBACK;", ct); tranOpen = false; }
-                if (await CommittedAuditAsync(conn, boundary0, ct)) dirty = true;
+                var committedAudit = await CommittedAuditAsync(conn, boundary0, ct);
+                if (committedAudit) dirty = true;
                 sw.Restart();
                 // 인계 7(Q31): 이 비교가 예외(예 8115)로 끝나도 미리보기 실패 결과는 돌려준다. 남은 변경을 알 수 없으므로 샌드박스는 오염으로 둔다.
                 IReadOnlyList<NetChange> residual = [];
@@ -201,11 +227,18 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
                 // 대표 오류가 3609가 아니어도(COMMIT 뒤 RAISERROR: 50000 + 3609, 또는 COMMIT; BEGIN TRAN; RAISERROR) 같은 규칙이다. 검사 실패면 남은 변경을 모르므로 그대로 둔다.
                 if (failure == StatementStatus.TriggerBlocked && residual.Count > 0
                     && executions[^1].Result is { Error: { } eb } last
-                    && !ErrorRules.EndedByRollback(eb.Procedure, last.Target, last.Kind, baseline))
+                    && !ErrorRules.EndedByRollback(eb.Procedure, last.Target, last.Kind, baseline, last.Plan?.WriteTargets))
                 {
                     failure = StatementStatus.Failed;
                     executions[^1] = executions[^1] with { Result = executions[^1].Result with { Status = StatementStatus.Failed } };
                 }
+                // 검토 2026-11-13(c): EXEC 뒤 트랜잭션이 없어졌을 때 롤백이라고 쓰는 것은 롤백 뒤 남은 변경이 없다고 확인된 경우뿐이다.
+                if (executions[^1].Result is { Kind: ChangeOperation.Exec, Error: { } ee } lastExec
+                    && ee.Message.StartsWith(StatementRunner.ProcedureTranGoneMessage, StringComparison.Ordinal))
+                    executions[^1] = executions[^1] with
+                    {
+                        Result = lastExec with { Error = ee with { Message = ExecTranGoneMessage(ee.Message, committedAudit, residual.Count, residualError is not null) } },
+                    };
                 return new RawCapture
                 {
                     Status = failure == StatementStatus.TriggerBlocked ? PreviewStatus.TriggerBlocked : PreviewStatus.Failed,
@@ -270,6 +303,18 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
         {
             await CleanupAsync(conn, impersonating, tranOpen);
         }
+    }
+
+    /// <summary>
+    /// EXEC 뒤 트랜잭션이 없어진 실패의 최종 메시지(순수). 롤백 뒤 감사 기록·사용자 테이블에 남은 변경이 없고 검사도 성공했으면 "프로시저가 트랜잭션을 롤백함"(계약 문구),
+    /// 남은 변경이 있으면 확정 흔적을 적고, 검사가 실패했으면 모른다고 적는다. 원래 오류 꼬리(오류 266 등)는 그대로 둔다.
+    /// </summary>
+    public static string ExecTranGoneMessage(string message, bool committedAudit, int residualCount, bool residualCheckFailed)
+    {
+        var tail = message[StatementRunner.ProcedureTranGoneMessage.Length..];
+        if (residualCheckFailed) return message + " 롤백 뒤 남은 변경을 확인하지 못함(샌드박스를 다시 만듦)";
+        if (committedAudit || residualCount > 0) return message + $" 롤백 뒤에도 남은 변경이 있어 일부 변경이 확정됨(남은 최종 차이 {residualCount}건, 샌드박스를 다시 만듦)";
+        return StatementRunner.ProcedureRolledBackMessage + tail;
     }
 
     /// <summary>트랜잭션이 바뀌었으면(트리거의 COMMIT 뒤 BEGIN TRAN) 오류 판정과 상관없이 failed(앞 변경이 확정됨, 인계 5). 오류 내용은 그대로 둔다.</summary>
@@ -350,6 +395,7 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
         Target = st.Target,
         Span = st.Span,
         Status = status,
+        Plan = st.Plan,
     };
 
     static async Task<(int Xact, int TranCount, long? TranId)> StateAsync(SqlConnection conn, CancellationToken ct)
@@ -391,7 +437,13 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
                 CaptureSeq = r.GetInt64(0),
                 TableObjectId = r.GetInt32(1),
                 TableName = r.GetString(2),
-                Operation = r.GetString(3) switch { "I" => ChangeOperation.Insert, "U" => ChangeOperation.Update, _ => ChangeOperation.Delete },
+                Operation = r.GetString(3) switch
+                {
+                    "I" => ChangeOperation.Insert,
+                    "U" => ChangeOperation.Update,
+                    "D" => ChangeOperation.Delete,
+                    var x => throw new InvalidOperationException($"감사 헤더 operation 값이 I·U·D가 아님: {x}"),
+                },
                 InsertedCount = r.GetInt64(4),
                 DeletedCount = r.GetInt64(5),
                 NestLevel = r.GetInt32(6),

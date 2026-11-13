@@ -19,7 +19,9 @@ internal interface IOriginDatabase
     Task<bool> UserExistsAsync(string originDb, string user, CancellationToken ct);
     /// <summary>원본 스냅샷을 만들 수 있는지(실행 전 검증 모드 결정, 읽기만): CREATE DATABASE 권한, FILESTREAM·메모리 최적화 파일 그룹.</summary>
     Task<SnapshotCapability> CheckSnapshotCapabilityAsync(string originDb, CancellationToken ct);
-    /// <summary>원본 스냅샷 생성. 실패하면 Failed(error로 끝낸다, KEYSET으로 조용히 낮추지 않는다).</summary>
+    /// <summary>[적용] 원본 사전 경고(TRUSTWORTHY·복제·CDC·Service Broker, 읽기만). 읽지 못하면 "확인 못 함" 문구. 던지지 않는다.</summary>
+    Task<IReadOnlyList<string>> ReadOriginWarningsAsync(string originDb, CancellationToken ct);
+    /// <summary>원본 스냅샷 생성. 실패하면 Failed(error로 끝낸다, KEYSET_HASH로 조용히 낮추지 않는다).</summary>
     Task<(SnapshotOutcome Outcome, string? Reason)> CreateSnapshotAsync(string originDb, string snapshotDb, CancellationToken ct);
     /// <summary>원본 스냅샷 삭제.</summary>
     Task DropSnapshotAsync(string originDb, string snapshotDb, CancellationToken ct);
@@ -40,11 +42,12 @@ internal interface IOriginConnection : IAsyncDisposable
     Task RollbackAsync(CancellationToken ct);
     /// <summary>§5.3 드리프트 검사(UPDLOCK, HOLDLOCK).</summary>
     Task<IReadOnlyList<DriftRow>> CheckDriftAsync(PreviewRecord preview, IReadOnlyList<TableInfo> tables, CancellationToken ct);
-    /// <summary>KEYSET: 모든 사용자 테이블 COUNT_BIG(*).</summary>
-    Task<IReadOnlyDictionary<string, long>> CountAllAsync(IReadOnlyList<TableInfo> tables, CancellationToken ct);
-    /// <summary>KEYSET: 건수 변화와 키 집합 after 대조.</summary>
-    Task<(IReadOnlyList<TableCountChange> Counts, IReadOnlyList<ApplyMismatch> Mismatches)> VerifyKeysetAsync(
-        PreviewRecord preview, IReadOnlyDictionary<string, long> before, IReadOnlyList<TableInfo> tables, BaselineContext baseline, CancellationToken ct);
+    /// <summary>KEYSET_HASH: 원본 카탈로그(sys.tables 사용자 테이블)의 대상 테이블·열(읽기만).</summary>
+    Task<IReadOnlyList<HashTarget>> ReadHashTargetsAsync(CancellationToken ct);
+    /// <summary>KEYSET_HASH: 테이블마다 COUNT_BIG(*)와(미리보기에 없던 테이블은) CHECKSUM_AGG(BINARY_CHECKSUM).</summary>
+    Task<IReadOnlyDictionary<string, TableState>> ReadTableStatesAsync(IReadOnlyList<HashTarget> targets, IReadOnlySet<string> previewTables, CancellationToken ct);
+    /// <summary>KEYSET_HASH: 미리보기 키 집합 after 대조.</summary>
+    Task<IReadOnlyList<ApplyMismatch>> VerifyKeyRowsAsync(PreviewRecord preview, IReadOnlyList<TableInfo> tables, BaselineContext baseline, CancellationToken ct);
 }
 
 /// <summary>연결 열기(연결 실패 → SandboxUnavailableException, 메시지에 연결 문자열을 넣지 않는다).</summary>
@@ -98,6 +101,23 @@ internal sealed class SqlOriginDatabase(string connectionString, ApplySettings s
         return Convert.ToInt64(await cmd.ExecuteScalarAsync(ct), System.Globalization.CultureInfo.InvariantCulture) > 0;
     }
 
+    public async Task<IReadOnlyList<string>> ReadOriginWarningsAsync(string originDb, CancellationToken ct)
+    {
+        OriginNames.Validate(originDb, "원본");
+        try
+        {
+            await using var conn = await OriginConnections.OpenAsync(connectionString, originDb, ct);
+            await using var cmd = new SqlCommand(OriginWarnings.Sql, conn) { CommandTimeout = settings.ToolCommandTimeoutSeconds };
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            if (!await r.ReadAsync(ct)) return OriginWarnings.Describe(null);
+            return OriginWarnings.Describe(new OriginDbFlags(r.GetBoolean(0), r.GetBoolean(1), r.GetBoolean(2), r.GetBoolean(3), r.GetBoolean(4), r.GetBoolean(5)));
+        }
+        catch (Exception ex) when (ex is SqlException or SandboxUnavailableException or InvalidCastException)
+        {
+            return OriginWarnings.Describe(null);
+        }
+    }
+
     public Task<(SnapshotOutcome Outcome, string? Reason)> CreateSnapshotAsync(string originDb, string snapshotDb, CancellationToken ct) =>
         OriginSnapshot.CreateAsync(connectionString, originDb, snapshotDb, settings.ToolCommandTimeoutSeconds, ct);
 
@@ -148,12 +168,14 @@ internal sealed class SqlOriginConnection(SqlConnection connection, int toolTime
     public Task<IReadOnlyList<DriftRow>> CheckDriftAsync(PreviewRecord preview, IReadOnlyList<TableInfo> tables, CancellationToken ct) =>
         DriftChecker.CheckAsync(Session, preview, tables, toolTimeoutSeconds, ct);
 
-    public Task<IReadOnlyDictionary<string, long>> CountAllAsync(IReadOnlyList<TableInfo> tables, CancellationToken ct) =>
-        KeysetVerifier.CountAllAsync(Session, tables, toolTimeoutSeconds, ct);
+    public Task<IReadOnlyList<HashTarget>> ReadHashTargetsAsync(CancellationToken ct) =>
+        KeysetVerifier.ReadTargetsAsync(Session, toolTimeoutSeconds, ct);
 
-    public Task<(IReadOnlyList<TableCountChange> Counts, IReadOnlyList<ApplyMismatch> Mismatches)> VerifyKeysetAsync(
-        PreviewRecord preview, IReadOnlyDictionary<string, long> before, IReadOnlyList<TableInfo> tables, BaselineContext baseline, CancellationToken ct) =>
-        KeysetVerifier.VerifyAsync(Session, preview, before, tables, baseline, toolTimeoutSeconds, ct);
+    public Task<IReadOnlyDictionary<string, TableState>> ReadTableStatesAsync(IReadOnlyList<HashTarget> targets, IReadOnlySet<string> previewTables, CancellationToken ct) =>
+        KeysetVerifier.ReadStatesAsync(Session, targets, previewTables, toolTimeoutSeconds, ct);
+
+    public Task<IReadOnlyList<ApplyMismatch>> VerifyKeyRowsAsync(PreviewRecord preview, IReadOnlyList<TableInfo> tables, BaselineContext baseline, CancellationToken ct) =>
+        KeysetVerifier.VerifyKeyRowsAsync(Session, preview, tables, baseline, toolTimeoutSeconds, ct);
 
     async Task ExecAsync(string sql, CancellationToken ct)
     {

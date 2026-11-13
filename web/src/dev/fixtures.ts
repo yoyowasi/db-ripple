@@ -10,6 +10,7 @@ import type {
   ApplyVerification,
   CatalogSchema,
   Cause,
+  Diagnostic,
   Firing,
   GraphDto,
   GraphEdge,
@@ -46,10 +47,15 @@ export const FIXTURE_IDS = [
   'weak',
   'unreachable',
   'mismatch',
+  'outside',
   'first',
   'settings',
   'env',
   'nosession',
+  // EXEC(프로시저 호출) 미리보기 · 미리보기 전용
+  'exec',
+  'execrej',
+  'execrb',
 ] as const
 export type FixtureId = (typeof FIXTURE_IDS)[number]
 
@@ -142,6 +148,16 @@ const direct = (): Cause => ({
   evidence: ['depth'],
 })
 
+/** EXEC 문장 창 안, 깊이 1, FK로 설명되지 않는 묶음 = 프로시저 본문의 직접 쓰기(계약 §5). */
+const procDirect = (): Cause => ({
+  kind: 'PROC_DIRECT',
+  confidence: 'certain',
+  parentFiringId: null,
+  foreignKey: null,
+  triggerCandidates: [],
+  evidence: ['depth', 'staticWriteSet'],
+})
+
 const fkCascade = (parentFiringId: string, name: string, parent: string, child: string, matchedRows: number): Cause => ({
   kind: 'FK_CASCADE',
   confidence: 'certain',
@@ -195,7 +211,7 @@ function edge(source: string, target: string, kind: GraphEdge['kind'], confidenc
     kind,
     confidence,
     orderGuarantee: 'guaranteed',
-    evidence: kind === 'FK' ? ['fkKeyMatch'] : kind === 'DIRECT' ? ['depth'] : [],
+    evidence: kind === 'FK' ? ['fkKeyMatch'] : kind === 'DIRECT' || kind === 'PROC_DIRECT' ? ['depth'] : [],
     fk: fk?.name ?? null,
     action: fk ? 'CASCADE' : null,
     matchedRows: fk?.matched ?? null,
@@ -261,6 +277,7 @@ interface PreviewParts {
   totalMs: number
   capture?: PreviewResult['capture']
   originDb?: string
+  warnings?: Diagnostic[]
 }
 
 function previewOf(p: PreviewParts): (createdAt: string) => PreviewResult {
@@ -293,7 +310,7 @@ function previewOf(p: PreviewParts): (createdAt: string) => PreviewResult {
     residualCheckMessage: null,
     netSummary: p.netSummary,
     graph: p.graph,
-    warnings: [],
+    warnings: p.warnings ?? [],
     capture: p.capture ?? { imageCount: p.firings.reduce((a, f) => a + f.rowCount, 0), cap: 100000, truncated: false, manifestVersion: 'm-20261112-1427' },
     timingsMs: { analyze, execute, readLog, reread, netDiff, resolve, serialize },
   })
@@ -977,11 +994,19 @@ function splitCommitted(finishedAt: string, previewId: string, req: ApplyRequest
   }
 }
 
-/** 동의 없이는 WEAK_VERIFICATION_NOT_ACCEPTED, 동의하면 KEYSET 검증으로 커밋. */
+/** 원본 사전 경고 문구(ApplyResult.verification.limitations에 섞여 온다. 막지 않는다). 문구는 예시값(백엔드 문구와 다를 수 있음). */
+const ORIGIN_PRECHECK_WARNINGS = [
+  '원본 DB에 TRUSTWORTHY가 켜져 있습니다. 같은 SQL을 높은 권한 문맥에서 실행할 수 있습니다.',
+  '원본 테이블이 복제 게시에 들어 있습니다. 적용한 변경이 구독자에게 전파됩니다.',
+  '원본 DB에 CDC(변경 데이터 캡처)가 켜져 있습니다. 적용한 변경이 CDC 테이블에 남습니다.',
+  '원본 DB에 Service Broker가 켜져 있습니다. 트리거가 큐에 메시지를 보냈다면 롤백되지 않을 수 있습니다.',
+]
+
+/** 동의 없이는 WEAK_VERIFICATION_NOT_ACCEPTED, 동의하면 KEYSET_HASH 검증으로 커밋. */
 function weakApply(finishedAt: string, previewId: string, req: ApplyRequest): ApplyResult {
   if (!req.allowKeysetVerification) {
     return {
-      ...precondition('원본에 스냅샷 권한이 없어 약한 검증(KEYSET)이 필요합니다. 동의 없이는 적용하지 않았습니다.')(finishedAt, previewId),
+      ...precondition('원본에 스냅샷 권한이 없어 약한 검증(KEYSET_HASH)이 필요합니다. 동의 없이는 적용하지 않았습니다.')(finishedAt, previewId),
       preconditionFailures: ['WEAK_VERIFICATION_NOT_ACCEPTED'],
     }
   }
@@ -991,10 +1016,194 @@ function weakApply(finishedAt: string, previewId: string, req: ApplyRequest): Ap
     sandboxRefreshStarted: false,
     verification: {
       ...r.verification,
-      mode: 'KEYSET',
-      limitations: ['KEYSET 검증: 미리보기에 없던 테이블에서 행 수가 그대로인 UPDATE는 놓칠 수 있습니다.'],
+      mode: 'KEYSET_HASH',
+      limitations: [
+        'KEYSET_HASH 검증: 미리보기에 없던 테이블은 행 수와 CHECKSUM_AGG만 비교합니다. 해시 충돌이나 비교할 수 없는 형식의 열 변경은 놓칠 수 있습니다.',
+        ...ORIGIN_PRECHECK_WARNINGS,
+      ],
     },
   }
+}
+
+/** KEYSET_HASH 검증이 미리보기에 없던 테이블의 변화를 찾아 롤백한다(OUTSIDE_TABLE_CHANGED). 예시값. */
+function outsideApply(finishedAt: string, previewId: string, req: ApplyRequest): ApplyResult {
+  // 결과 화면을 바로 보이려고 동의 확인 단계는 건너뛴다(동의 흐름은 weak 시험 데이터에서 본다).
+  const r = weakApply(finishedAt, previewId, { ...req, allowKeysetVerification: true })
+  return {
+    ...r,
+    status: 'rolled_back_mismatch',
+    message: '미리보기에 없던 테이블이 바뀌어 롤백함. 원본은 바뀌지 않았습니다.',
+    sandboxRefreshStarted: false,
+    verification: {
+      ...r.verification,
+      mismatches: [
+        {
+          kind: 'OUTSIDE_TABLE_CHANGED',
+          statementIndex: null,
+          table: 'Production.ProductListPriceHistory',
+          key: null,
+          column: null,
+          expected: 'count=395,checksum=1203491',
+          actual: 'count=396,checksum=-88231004',
+          message: '미리보기에 없던 테이블의 행 수·체크섬이 실행 전후로 달라졌습니다(트리거나 원본에만 있는 객체가 쓴 것으로 보입니다).',
+        },
+      ],
+    },
+  }
+}
+
+// ---- EXEC(프로시저 호출) 시험 데이터: dm1(삭제)을 바탕으로 문장·그래프만 바꾼다. 미리보기 전용(적용 막힘). ----
+// 계약 contract-exec.md §5(EXEC 미리보기)의 모양. 프로시저 이름·본문 동작·경고 문구는 전부 예시값이다(백엔드 문구와 다를 수 있음).
+const EXEC_SOURCE = 'EXEC 계약(contract-exec.md · be-exec 워크트리 Contracts: AnalyzedStatement·StatementResult·procedureCall 노드·PROC_DIRECT)'
+const EXEC_EXAMPLES = '프로시저·매개변수·본문 동작·경고 문구·행 값·소요 시간은 예시값(백엔드 문구와 다를 수 있음)'
+
+const EXEC_PROC = 'Sales.uspCancelOrder'
+const EXEC_SQL = 'EXEC Sales.uspCancelOrder @SalesOrderID = 43697;'
+const execAnalyzed = (sql: string, procedure: string, parameters: string[]): AnalyzedStatement => ({
+  index: 1,
+  batch: 1,
+  position: 1,
+  kind: 'EXEC',
+  target: null,
+  procedure,
+  parameters,
+  span: line1(sql),
+  sql,
+  nondeterministicColumns: [],
+})
+const EXEC_A = execAnalyzed(EXEC_SQL, EXEC_PROC, ['@SalesOrderID = 43697'])
+
+function execResult(
+  a: AnalyzedStatement,
+  status: StatementResult['status'],
+  returnValue: number | null,
+  resultSetCount: number | null,
+  error: StatementResult['error'] = null,
+): StatementResult {
+  const { index, batch, position, span } = a
+  return {
+    index,
+    batch,
+    position,
+    kind: 'EXEC',
+    target: null,
+    span,
+    status,
+    rowsAffected: null, // EXEC는 늘 null(계약)
+    returnValue,
+    resultSetCount,
+    captureSeqRange: status === 'ok' ? [1, 4] : null,
+    error,
+  }
+}
+
+function procNode(a: AnalyzedStatement, s: StatementResult, o: Partial<Extract<GraphNode, { type: 'procedureCall' }>> = {}): GraphNode {
+  return {
+    type: 'procedureCall',
+    id: `st-${s.index}`,
+    statementIndex: s.index,
+    label: `EXEC ${a.procedure}`,
+    procedure: a.procedure ?? '',
+    status: s.status,
+    returnValue: s.returnValue ?? null,
+    resultSetCount: s.resultSetCount ?? null,
+    expandedCalls: [],
+    writeTargets: [],
+    unobservedWriteTargets: [],
+    ...o,
+  }
+}
+
+const EXEC_WARNINGS: Diagnostic[] = [
+  {
+    statementIndex: 1,
+    span: line1(EXEC_SQL),
+    severity: 'warning',
+    ruleId: 'WARN_PROC_RESULT_SET',
+    message: '프로시저가 결과 집합을 냅니다. 개수만 세고 내용은 버립니다.',
+    docRef: null,
+  },
+  {
+    statementIndex: 1,
+    span: line1(EXEC_SQL),
+    severity: 'warning',
+    ruleId: 'WARN_PROC_CATCH_SWALLOWS',
+    message: 'dbo.uspLogError 호출 경로의 TRY/CATCH가 오류를 삼킵니다(CATCH에 THROW·RAISERROR 없음). 실패해도 문장은 성공으로 끝날 수 있습니다.',
+    docRef: null,
+  },
+]
+
+// 프로시저 본문(예시값): 사유 행 삭제 → 주문 헤더 삭제(FK로 상세 연쇄) → 실패하면 dbo.uspLogError가 dbo.ErrorLog에 기록(이번엔 안 탐 = 관측 안 됨)
+const EXEC_F = [
+  firing('f-1', 1, 1, 'Sales.SalesOrderHeaderSalesReason', 'DELETE', 2, procDirect()),
+  firing('f-2', 2, 1, 'Sales.SalesOrderHeader', 'DELETE', 1, procDirect()),
+  firing('f-3', 3, 2, 'Sales.SalesOrderDetail', 'DELETE', 1, fkCascade('f-2', FK_SOD, 'Sales.SalesOrderHeader', 'Sales.SalesOrderDetail', 1)),
+]
+const EXEC_STMT = execResult(EXEC_A, 'ok', 0, 1)
+edgeSeq = 100
+const EXEC_GRAPH: GraphDto = {
+  nodes: [
+    procNode(EXEC_A, EXEC_STMT, {
+      expandedCalls: ['dbo.uspLogError'],
+      writeTargets: ['Sales.SalesOrderHeaderSalesReason', 'Sales.SalesOrderHeader', 'dbo.ErrorLog'],
+      unobservedWriteTargets: ['dbo.ErrorLog'],
+    }),
+    ...EXEC_F.map(fNode),
+  ],
+  edges: [
+    edge('st-1', 'f-1', 'PROC_DIRECT', 'certain'),
+    edge('st-1', 'f-2', 'PROC_DIRECT', 'certain'),
+    edge('f-2', 'f-3', 'FK', 'certain', { name: FK_SOD, matched: 1 }),
+  ],
+}
+const EXEC_SUM = [sum('Sales.SalesOrderDetail', 0, 0, 1), sum('Sales.SalesOrderHeader', 0, 0, 1), sum('Sales.SalesOrderHeaderSalesReason', 0, 0, 2)]
+const EXEC_EVENT: RowChange[] = [
+  rowChange('rc-1', 'f-1', 'DELETE', pk(['SalesOrderID', 'SalesReasonID'], ['43697', '5']), { SalesOrderID: '43697', SalesReasonID: '5' }, null),
+  rowChange('rc-2', 'f-1', 'DELETE', pk(['SalesOrderID', 'SalesReasonID'], ['43697', '9']), { SalesOrderID: '43697', SalesReasonID: '9' }, null),
+  rowChange('rc-3', 'f-2', 'DELETE', pk(['SalesOrderID'], ['43697']), { SalesOrderID: '43697', CustomerID: '21768', Status: '5' }, null),
+  rowChange('rc-4', 'f-3', 'DELETE', pk(['SalesOrderID', 'SalesOrderDetailID'], ['43697', '353']), { SalesOrderID: '43697', SalesOrderDetailID: '353' }, null, {
+    parentRowIds: ['rc-3'],
+  }),
+]
+const EXEC_NET: NetChange[] = EXEC_EVENT.map((r) => net(EXEC_F.find((f) => f.id === r.firingId)!.table, r.key, 'DELETED', r.before, null, [], [r.firingId]))
+
+/** EXEC는 [적용]이 막힌다. 서버가 PROC_APPLY_NOT_SUPPORTED로 돌려주는 응답(화면은 미리 막아 보통 도달하지 않는다). */
+function procApplyBlocked(finishedAt: string, previewId: string): ApplyResult {
+  return { ...precondition('프로시저 호출(EXEC)은 아직 적용할 수 없습니다(미리보기 전용).')(finishedAt, previewId), preconditionFailures: ['PROC_APPLY_NOT_SUPPORTED'] }
+}
+
+// 거부: 동적 SQL을 쓰는 프로시저(REJECT_PROC_DYNAMIC_SQL)
+const REJEXEC_SQL = "EXEC dbo.uspRunReport @TableName = N'Sales.Store';"
+const REJEXEC_A = execAnalyzed(REJEXEC_SQL, 'dbo.uspRunReport', ["@TableName = N'Sales.Store'"])
+const REJEXEC_DIAG: Diagnostic = {
+  statementIndex: 1,
+  span: line1(REJEXEC_SQL),
+  severity: 'error',
+  ruleId: 'REJECT_PROC_DYNAMIC_SQL',
+  message: '프로시저 본문(dbo.uspRunReport)에 동적 SQL(EXEC 문자열)이 있어 어떤 테이블에 쓸지 알 수 없습니다. 미리보기할 수 없습니다.',
+  docRef: null,
+}
+
+// 실패: 프로시저가 도구 트랜잭션을 ROLLBACK(계약: failed · isToolFault=false · 오류 번호 0 · 메시지 "프로시저가 트랜잭션을 롤백함")
+const RB_SQL = 'EXEC Sales.uspCancelOrderStrict @SalesOrderID = 43697;'
+const RB_A = execAnalyzed(RB_SQL, 'Sales.uspCancelOrderStrict', ['@SalesOrderID = 43697'])
+const RB_ERR = { errorNumber: 0, message: '프로시저가 트랜잭션을 롤백함', procedure: null, isToolFault: false }
+const RB_STMT = execResult(RB_A, 'failed', null, null, RB_ERR)
+const RB_WARN: Diagnostic = {
+  statementIndex: 1,
+  span: line1(RB_SQL),
+  severity: 'warning',
+  ruleId: 'WARN_PROC_ROLLBACK',
+  message: '프로시저가 ROLLBACK을 합니다. 실행되면 미리보기가 실패로 끝납니다("프로시저가 트랜잭션을 롤백함").',
+  docRef: null,
+}
+edgeSeq = 200
+const RB_GRAPH: GraphDto = {
+  nodes: [
+    procNode(RB_A, RB_STMT, { writeTargets: ['Sales.SalesOrderHeader', 'Sales.SalesOrderDetail'], unobservedWriteTargets: ['Sales.SalesOrderHeader', 'Sales.SalesOrderDetail'] }),
+    { type: 'error', id: 'err-1', errorNumber: 0, message: RB_ERR.message, isToolFault: false },
+  ],
+  edges: [edge('st-1', 'err-1', 'BLOCKED', 'certain')],
 }
 
 function variant(id: FixtureId, label: string, over: Partial<Fixture>): Fixture {
@@ -1033,10 +1242,24 @@ export const FIXTURES: Record<FixtureId, Fixture> = {
     sandbox: { ...SPLIT_SANDBOX, baselineStale: true },
     apply: splitCommitted,
   }),
-  weak: variant('weak', '약한 검증 동의(KEYSET) · sysadmin 원본', {
-    examples: N4_EXAMPLES + ' · 적용: 동의 없으면 WEAK_VERIFICATION_NOT_ACCEPTED, 동의하면 KEYSET 커밋',
-    sandbox: { ...SPLIT_SANDBOX, origin: { server: 'devsql01', database: 'AW_Origin', login: 'sa', isSysadmin: true } },
+  weak: variant('weak', '약한 검증 동의(KEYSET_HASH) · 인스턴스 경고 · 원본 사전 경고', {
+    examples:
+      N4_EXAMPLES + ' · 적용: 동의 없으면 WEAK_VERIFICATION_NOT_ACCEPTED, 동의하면 KEYSET_HASH 커밋(한계 문구에 원본 사전 경고 4종) · 인스턴스 경고 문구는 예시값',
+    sandbox: {
+      ...SPLIT_SANDBOX,
+      origin: { server: 'devsql01', database: 'AW_Origin', login: 'sa', isSysadmin: true },
+      instanceWarnings: [
+        '샌드박스 인스턴스에 xp_cmdshell이 켜져 있습니다. 미리보기 SQL이 OS 명령을 실행할 수 있는 환경입니다.',
+        '샌드박스 인스턴스에 연결된 서버(LinkedSrv01)가 있습니다. 미리보기 SQL이 다른 서버에 닿을 수 있습니다.',
+      ],
+    },
     apply: weakApply,
+  }),
+  outside: variant('outside', '약한 검증 불일치 롤백 · OUTSIDE_TABLE_CHANGED', {
+    examples: N4_EXAMPLES + ' · 미리보기 뒤 자동으로 적용: 동의 확인 없이 rolled_back_mismatch(OUTSIDE_TABLE_CHANGED), 테이블·체크섬 값은 예시값',
+    autoApply: true,
+    sandbox: { ...SPLIT_SANDBOX, origin: { server: 'devsql01', database: 'AW_Origin', login: 'dbr_app', isSysadmin: false } },
+    apply: outsideApply,
   }),
   unreachable: variant('unreachable', '원본 연결 안 됨 · 적용 막힘', {
     sandbox: { ...SPLIT_SANDBOX, originReachable: false },
@@ -1064,5 +1287,60 @@ export const FIXTURES: Record<FixtureId, Fixture> = {
   nosession: variant('nosession', '401 NO_SESSION', {
     autoRun: false,
     sandboxProblem: { status: 401, title: '실행 파일이 연 브라우저 창에서만 쓸 수 있습니다', reason: 'NO_SESSION' },
+  }),
+  exec: variant('exec', 'EXEC 성공 · 프로시저 호출 → 직접 쓰기 2 → FK 연쇄 1 (미리보기 전용)', {
+    source: EXEC_SOURCE,
+    examples: EXEC_EXAMPLES + ' · [적용]은 막힘(PROC_APPLY_NOT_SUPPORTED)',
+    sql: EXEC_SQL,
+    analysis: { ...accepted(EXEC_A), warnings: EXEC_WARNINGS, diagnostics: EXEC_WARNINGS },
+    preview: previewOf({
+      previewId: 'pv_example_exec',
+      status: 'ok',
+      sqlHash: 'sha256:example-exec',
+      statements: [EXEC_STMT],
+      firings: EXEC_F,
+      netSummary: EXEC_SUM,
+      graph: EXEC_GRAPH,
+      totalMs: 1420,
+      warnings: EXEC_WARNINGS,
+    }),
+    eventRows: EXEC_EVENT,
+    netRows: EXEC_NET,
+    apply: procApplyBlocked,
+  }),
+  execrej: variant('execrej', 'EXEC 거부 · REJECT_PROC_DYNAMIC_SQL (422)', {
+    source: EXEC_SOURCE,
+    examples: EXEC_EXAMPLES + ' · 분석이 거부해도 422 화면을 보이려고 미리보기를 한 번 보낸다',
+    sql: REJEXEC_SQL,
+    analysis: { statements: [REJEXEC_A], rejects: [REJEXEC_DIAG], warnings: [], diagnostics: [REJEXEC_DIAG], isAccepted: false },
+    preview: {
+      type: 'https://example.local/problems/rejected',
+      title: '미리보기할 수 없는 문장이 있습니다.',
+      status: 422,
+      rejects: [{ statementIndex: 1, ruleId: 'REJECT_PROC_DYNAMIC_SQL', span: REJEXEC_DIAG.span }],
+    },
+    eventRows: [],
+    netRows: [],
+    apply: null,
+  }),
+  execrb: variant('execrb', 'EXEC 실패 · 프로시저가 트랜잭션을 롤백함 (failed)', {
+    source: EXEC_SOURCE,
+    examples: EXEC_EXAMPLES + ' · 오류 번호 0은 StatementRunner.ProcedureRollbackError(원래 오류가 없을 때)를 따름',
+    sql: RB_SQL,
+    analysis: { ...accepted(RB_A), warnings: [RB_WARN], diagnostics: [RB_WARN] },
+    preview: previewOf({
+      previewId: 'pv_example_execrb',
+      status: 'failed',
+      sqlHash: 'sha256:example-execrb',
+      statements: [RB_STMT],
+      firings: [],
+      netSummary: [],
+      graph: RB_GRAPH,
+      totalMs: 980,
+      warnings: [RB_WARN],
+    }),
+    eventRows: [],
+    netRows: [],
+    apply: procApplyBlocked,
   }),
 }

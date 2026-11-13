@@ -44,6 +44,8 @@ public sealed record BaselineContext
     public bool? OriginIsSysadmin { get; init; }
     /// <summary>문맥을 읽을 때 원본에 연결됐는지(Split). false면 지문 비교를 보류하고 미리보기만 허용한다(2026-11-13 N4).</summary>
     public bool OriginReachable { get; init; } = true;
+    /// <summary>샌드박스 인스턴스 설정 경고(SandboxInstanceCheck, 막지 않음, 2026-11-13). 없으면 [].</summary>
+    public IReadOnlyList<string> InstanceWarnings { get; init; } = [];
 }
 
 /// <summary>원본 표시(§6.4 SandboxStatus.origin, 2026-11-13 추가). 비밀값 없음.</summary>
@@ -95,6 +97,8 @@ public sealed record SandboxStatus
     public bool BaselineStale { get; init; }
     /// <summary>원본에 연결되는지(마지막 기준선 읽기 기준). false면 미리보기는 기존 기준선으로 허용(경고), [적용]은 ORIGIN_UNREACHABLE(2026-11-13 N4).</summary>
     public bool OriginReachable { get; init; } = true;
+    /// <summary>샌드박스 인스턴스 설정 경고(xp_cmdshell 등 위험 설정 켜짐, 연결된 서버 있음). 막지 않는다. 비어 있으면 [](2026-11-13).</summary>
+    public IReadOnlyList<string> InstanceWarnings { get; init; } = [];
 }
 
 /// <summary>

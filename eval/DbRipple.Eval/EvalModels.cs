@@ -104,6 +104,13 @@ public sealed record OracleResult(
 
     /// <summary>ok, 또는 처음 실패한 문장의 상태(failed, trigger_blocked).</summary>
     public string Status => Statements.FirstOrDefault(s => s.Status is not ("ok" or "not_run"))?.Status ?? "ok";
+
+    /// <summary>
+    /// 오라클을 실행하지 않은 자리표시(v0.3 거부 사례). 변경·문장·오류가 모두 비어 있다. 거부된 문장은 원본에서 실행하면 안 되므로(남는 COMMIT이 오라클 트랜잭션을 확정해 시드를 오염시킨다)
+    /// 거부 사례는 오라클·원문 배치 모두 이 값을 쓴다. M1~M3·대조군은 이 값으로 계산하지 않는다(CaseScorer가 거부 사례를 따로 채점한다).
+    /// </summary>
+    public static OracleResult Skipped(string database) =>
+        new(database, [], [], [], [], false, 0, "", true, []);
 }
 
 /// <summary>

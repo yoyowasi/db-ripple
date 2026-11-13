@@ -72,6 +72,19 @@ public class BaselineTests
     }
 
     [Fact]
+    public async Task Single_server_ddl_trigger_guard_stops_before_preview_user_ddl()
+    {
+        var steps = new FakeSteps();
+        var o = new BaselineOptions("AW_Origin", "AW_Sandbox", "AW_Sandbox_base", "/b.bak") { DdlTriggerGuard = c => c.Triggers.Count > 0 ? "ddlDatabaseTriggerLog: 동적 SQL" : null };
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => BaselineBuilder.BuildAsync(o, steps, () => DateTimeOffset.UnixEpoch));
+
+        Assert.Contains("기준선 구축을 멈춤", ex.Message);
+        Assert.Equal("catalog: AW_Sandbox", steps.Log[^1]);                              // 카탈로그를 읽은 직후, 행 수·DDL 전
+        Assert.DoesNotContain(steps.Log, l => l.Contains("CREATE USER", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Build_runs_steps_in_design_order()
     {
         var steps = new FakeSteps();

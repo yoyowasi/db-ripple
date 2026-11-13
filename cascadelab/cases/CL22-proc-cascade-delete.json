@@ -1,0 +1,46 @@
+{
+  "id": "CL22",
+  "pattern": "CL22",
+  "title": "프로시저가 CASCADE FK 자식을 먼저 DELETE한 뒤 부모 DELETE (FK certain 오판 방지)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl22.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "EXEC cl22.usp_DeleteParent @id = 1;", "returnValue": 0 }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl22.Parent", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 1 }, "causes": ["PROC_DIRECT"] } ],
+        "basis": "usp_DeleteParent의 둘째 DELETE: id = 1" },
+      { "table": "cl22.ChildA", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 10 }, "causes": ["PROC_DIRECT"] }, { "key": { "id": 11 }, "causes": ["PROC_DIRECT"] } ],
+        "basis": "usp_DeleteParent의 첫 DELETE가 지웠다(parent_id = 1, 시드 10·11). 부모 DELETE 때는 이미 없어 FK CASCADE는 0행이다. 원인은 FK_CASCADE가 아니라 PROC_DIRECT다" },
+      { "table": "cl22.ChildB", "keyColumns": ["id"], "inserted": [], "updated": [],
+        "deleted": [ { "key": { "id": 100 }, "causes": ["FK_CASCADE"] } ],
+        "basis": "프로시저가 건드리지 않은 자식: 부모 DELETE의 FK_cl22_ChildB_Parent ON DELETE CASCADE로 지워졌다(시드 100). 200은 그대로" }
+    ],
+    "firings": [
+      { "node": "F:cl22.ChildA:DELETE", "statementIndex": 1, "table": "cl22.ChildA", "operation": "DELETE", "rowCount": 2, "causeKind": "PROC_DIRECT", "depth": 1 },
+      { "node": "F:cl22.Parent:DELETE", "statementIndex": 1, "table": "cl22.Parent", "operation": "DELETE", "rowCount": 1, "causeKind": "PROC_DIRECT", "depth": 1 },
+      { "node": "F:cl22.ChildB:DELETE", "statementIndex": 1, "table": "cl22.ChildB", "operation": "DELETE", "rowCount": 1, "causeKind": "FK_CASCADE", "depth": 1 }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "P:cl22.usp_DeleteParent", "child": "F:cl22.ChildA:DELETE", "kind": "PROC_DIRECT", "name": "cl22.usp_DeleteParent", "confidence": "certain", "basis": "프로시저가 직접 지운 자식. FK 간선(부모 → ChildA)을 certain으로 만들면 과신이다" },
+      { "statementIndex": 1, "parent": "P:cl22.usp_DeleteParent", "child": "F:cl22.Parent:DELETE", "kind": "PROC_DIRECT", "name": "cl22.usp_DeleteParent", "confidence": "certain", "basis": "공용 계약 PROC_DIRECT" },
+      { "statementIndex": 1, "parent": "F:cl22.Parent:DELETE", "child": "F:cl22.ChildB:DELETE", "kind": "FK", "name": "FK_cl22_ChildB_Parent", "action": "CASCADE", "event": "DELETE", "confidence": "certain", "basis": "ChildB는 프로시저의 정적 쓰기 대상이 아니라 부모 후보 1개·전 행 일치로 certain이다(§7.2 3단계, §7.3, 결정: FK 확신도는 프로시저 정적 쓰기 대상에 자식 테이블이 있을 때만 inferred로 내린다)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "제품이 부모 → ChildA FK 간선(FK_cl22_ChildA_Parent)을 inferred로 더 낼 수 있다", "basis": "정답에는 이 간선이 없다(FK가 지운 행이 0). inferred 간선은 M3 precision만 깎고, certain으로 나오면 정답에 없는 certain 간선이라 M3 certain 과신이다(목표 0)" },
+      { "id": "OO2", "what": "FK 연쇄 묶음(ChildB)의 depth 1", "basis": "H2 전제(CL01 OO1과 같다). A7: FK 연쇄는 트리거가 아니라 TRIGGER_NESTLEVEL을 올리지 않는다" },
+      { "id": "OO3", "what": "ChildA 0행 FK 연쇄가 묶음을 만들지 않는다", "basis": "SP2(d): 연쇄 0행은 미발동. 묶음이 나오면 정정 기록 대상" }
+    ]
+  },
+  "rationale": [
+    { "claim": "자식을 먼저 지우면 부모 DELETE의 CASCADE는 지울 행이 없다. 같은 최종 차이(ChildA 2행 삭제)라도 원인은 프로시저의 직접 DELETE다", "basis": "A1(ON DELETE CASCADE는 참조하는 행만 지운다), 문장 순서 E9" },
+    { "claim": "ChildB는 프로시저 본문에 없으므로 FK 연쇄가 진짜 원인이다. FK 규칙을 전부 내리지 않고 프로시저 정적 쓰기 대상에 든 자식만 내린다", "basis": "EXEC 미리보기 합의(오케스트레이터 결정): FK 확신도는 프로시저 정적 쓰기 대상에 자식 테이블이 있을 때만 inferred로 내린다" }
+  ]
+}

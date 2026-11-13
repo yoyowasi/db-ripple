@@ -39,7 +39,7 @@ const attempted = computed(() => {
 const confirming = ref(false)
 /** 확인 단계 입력: 원본 DB 이름을 직접 쳐야 확정 단추가 켜진다(N4 계약 §6). */
 const typedDb = ref('')
-/** 약한 검증(KEYSET) 한계를 이해하고 동의했다 → allowKeysetVerification:true */
+/** 약한 검증(KEYSET_HASH) 한계를 이해하고 동의했다 → allowKeysetVerification:true */
 const weakOk = ref(false)
 
 const isSplit = computed(() => sandbox.status?.mode === 'split')
@@ -250,9 +250,9 @@ function refresh(): void {
         </dl>
         <p v-if="org.sysadmin" class="warnline">원본 로그인이 sysadmin입니다. 권한이 넓으니 대상 DB가 맞는지 한 번 더 확인하세요.</p>
         <div v-if="needsWeak" class="weak">
-          <b>약한 검증(KEYSET)으로만 적용할 수 있습니다</b>
+          <b>약한 검증(KEYSET_HASH)으로만 적용할 수 있습니다</b>
           <p>
-            원본에 스냅샷(CREATE DATABASE) 권한이 없어 키 집합과 테이블 건수만 비교합니다. 미리보기에 없던 테이블에서 행 수가 그대로인 UPDATE는 놓칠 수 있습니다.
+            원본에 스냅샷(CREATE DATABASE) 권한이 없어 키 집합·테이블 건수와 미리보기에 없던 테이블의 해시(CHECKSUM)만 비교합니다. 해시 충돌이나 비교할 수 없는 형식의 열 변경은 놓칠 수 있습니다.
           </p>
           <label class="chk"><input v-model="weakOk" type="checkbox" /> 위 한계를 이해하고 약한 검증으로 적용합니다</label>
         </div>

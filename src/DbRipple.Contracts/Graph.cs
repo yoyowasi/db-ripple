@@ -22,6 +22,7 @@ public sealed record GraphDto
 [JsonDerivedType(typeof(ResidualNode), "residual")]
 [JsonDerivedType(typeof(ErrorNode), "error")]
 [JsonDerivedType(typeof(GroupNode), "group")]
+[JsonDerivedType(typeof(ProcedureCallNode), "procedureCall")]
 public abstract record GraphNode
 {
     /// <summary>노드 id(ContractIds 형식: st-, f-, t-, r-, err-, g-).</summary>
@@ -39,6 +40,31 @@ public sealed record StatementNode : GraphNode
     public long? RowsAffected { get; init; }
     /// <summary>문장 상태.</summary>
     public required StatementStatus Status { get; init; }
+}
+
+/// <summary>
+/// EXEC 문장 노드(2026-11-13, statement 노드 대신). id는 문장 노드와 같은 "st-{n}"이다. PROC_DIRECT 간선이 여기서 깊이 1 묶음으로 간다.
+/// </summary>
+public sealed record ProcedureCallNode : GraphNode
+{
+    /// <summary>문장 번호.</summary>
+    public required int StatementIndex { get; init; }
+    /// <summary>"EXEC 스키마.이름".</summary>
+    public required string Label { get; init; }
+    /// <summary>"스키마.이름".</summary>
+    public required string Procedure { get; init; }
+    /// <summary>문장 상태(statement 노드와 같은 뜻).</summary>
+    public required StatementStatus Status { get; init; }
+    /// <summary>반환 값. 실패·미실행이면 null.</summary>
+    public int? ReturnValue { get; init; }
+    /// <summary>결과 집합 수. 실패·미실행이면 null.</summary>
+    public int? ResultSetCount { get; init; }
+    /// <summary>펼친 안쪽 프로시저 "스키마.이름".</summary>
+    public IReadOnlyList<string> ExpandedCalls { get; init; } = [];
+    /// <summary>정적 쓰기 대상 "스키마.테이블"(안쪽 호출 포함).</summary>
+    public IReadOnlyList<string> WriteTargets { get; init; } = [];
+    /// <summary>WriteTargets 가운데 이 문장에서 묶음이 관측되지 않은 테이블(점선 표시용, WriteTargets의 부분집합).</summary>
+    public IReadOnlyList<string> UnobservedWriteTargets { get; init; } = [];
 }
 
 /// <summary>변경 묶음 노드(§6.3 firing). 노드 id는 묶음 id와 같다(§6.3 예시 "f-1006").</summary>

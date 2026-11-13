@@ -43,6 +43,20 @@ public sealed record HandRow(
 /// <summary>v0.2 identityRefs 값 {"table", "ref"}.</summary>
 public sealed record HandIdentityRef(string Table, string Ref);
 
+/// <summary>
+/// v0.3 expected.rejects 항목 {ruleId, statementIndex}. ruleId가 "*"로 끝나면 접두 패턴이다(예 "REJECT_PROC_*").
+/// 규칙 ID는 제품 쪽(AnalysisRules)에서 정하는 중이라 Pending이 true인 항목은 자리표시이고 통합 때 확정한다(문자열로만 다루고 제품 계약 enum에 기대지 않는다).
+/// </summary>
+public sealed record HandReject(string RuleId, int StatementIndex, bool Pending)
+{
+    /// <summary>실제 ruleId가 이 기대와 맞는지(정확히 같거나 접두 패턴).</summary>
+    public bool Matches(string actualRuleId) =>
+        RuleId.EndsWith('*') ? actualRuleId.StartsWith(RuleId[..^1], StringComparison.Ordinal) : string.Equals(RuleId, actualRuleId, StringComparison.Ordinal);
+
+    /// <summary>보고용 "ruleId@문장 n".</summary>
+    public string Display => $"{RuleId}@문장 {StatementIndex.ToString(CultureInfo.InvariantCulture)}{(Pending ? "(ruleId 자리표시, 통합 때 확정)" : "")}";
+}
+
 /// <summary>v0.2 scaling(CL20 M5 문장 틀). Statement·Generate의 {N}을 행 수로 바꾼다.</summary>
 public sealed record HandScaling(string Statement, string? Generate)
 {
@@ -112,9 +126,21 @@ public sealed record HandCase(
     /// <summary>v0.2 scaling(CL20 계열만).</summary>
     public HandScaling? Scaling { get; init; }
 
-    /// <summary>M2 원인 값(§10.4, answer-format.md v0.2). oneOf는 ONE_OF 하나로 센다. INSTEAD_OF는 v0.2(CL11)에서 더했다.</summary>
+    /// <summary>v0.3 expected.rejects(거부 사례의 정답). 없으면 빈 목록.</summary>
+    public IReadOnlyList<HandReject> ExpectedRejects { get; init; } = [];
+
+    /// <summary>v0.3 statements[].returnValue: 문장 번호 → 기대 반환값(null이면 반환값이 없어야 함). 필드가 없는 문장은 키가 없다.</summary>
+    public IReadOnlyDictionary<int, int?> ExpectedReturnValues { get; init; } = new Dictionary<int, int?>();
+
+    /// <summary>v0.3 expected.statementStatus[].isToolFault: 문장 번호 → 기대 분류(필드가 없는 문장은 키가 없다).</summary>
+    public IReadOnlyDictionary<int, bool> ExpectedToolFault { get; init; } = new Dictionary<int, bool>();
+
+    /// <summary>v0.3 거부 사례(expected.status = rejected 또는 rejects가 있음). 오라클을 실행하지 않고 M1~M3·대조군에 넣지 않는다.</summary>
+    public bool IsRejectCase => ExpectedStatus == "rejected" || ExpectedRejects.Count > 0;
+
+    /// <summary>M2 원인 값(§10.4, answer-format.md v0.3). oneOf는 ONE_OF 하나로 센다. INSTEAD_OF는 v0.2(CL11), PROC_DIRECT는 v0.3(EXEC)에서 더했다.</summary>
     public static readonly IReadOnlyList<string> Causes =
-        ["DIRECT", "FK_CASCADE", "FK_SET_NULL", "FK_SET_DEFAULT", "TRIGGER", "INSTEAD_OF", "SAME_TABLE_TRIGGER", "ONE_OF"];
+        ["DIRECT", "FK_CASCADE", "FK_SET_NULL", "FK_SET_DEFAULT", "TRIGGER", "INSTEAD_OF", "SAME_TABLE_TRIGGER", "ONE_OF", "PROC_DIRECT"];
 
     /// <summary>사례 파일 하나를 읽는다(v0.1·v0.2).</summary>
     public static HandCase Load(string path)
@@ -126,6 +152,19 @@ public sealed record HandCase(
             .OrderBy(s => s.GetProperty("index").GetInt32()).Select(s => s.GetProperty("sql").GetString()!).ToList();
         var stStatus = exp.GetProperty("statementStatus").EnumerateArray()
             .ToDictionary(s => s.GetProperty("index").GetInt32(), s => s.GetProperty("status").GetString()!);
+        // v0.3: statements[].returnValue(키가 있으면 null도 기대값), statementStatus[].isToolFault, expected.rejects[]
+        var returnValues = new Dictionary<int, int?>();
+        foreach (var s in root.GetProperty("statements").EnumerateArray())
+            if (s.TryGetProperty("returnValue", out var rv) && rv.ValueKind is JsonValueKind.Number or JsonValueKind.Null)
+                returnValues[s.GetProperty("index").GetInt32()] = rv.ValueKind == JsonValueKind.Number ? rv.GetInt32() : null;
+        var toolFault = new Dictionary<int, bool>();
+        foreach (var s in exp.GetProperty("statementStatus").EnumerateArray())
+            if (s.TryGetProperty("isToolFault", out var tf) && tf.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                toolFault[s.GetProperty("index").GetInt32()] = tf.ValueKind == JsonValueKind.True;
+        var rejects = new List<HandReject>();
+        if (exp.TryGetProperty("rejects", out var rj) && rj.ValueKind == JsonValueKind.Array)
+            foreach (var x in rj.EnumerateArray())
+                rejects.Add(new HandReject(x.GetProperty("ruleId").GetString()!, x.GetProperty("statementIndex").GetInt32(), IsTrue(x, "ruleIdPending")));
         var keyCols = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
         var rows = new List<HandRow>();
         ReadChanges(exp.GetProperty("changes"), false, keyCols, rows);
@@ -157,7 +196,28 @@ public sealed record HandCase(
             LeavesResidue = IsTrue(root, "leavesResidue") || IsTrue(exp, "leavesResidue"),
             ExpectedWarnings = Strings(exp, "warnings"),
             Scaling = scaling,
+            ExpectedRejects = rejects,
+            ExpectedReturnValues = returnValues,
+            ExpectedToolFault = toolFault,
         };
+    }
+
+    /// <summary>
+    /// v0.3 거부 비교: 기대 (ruleId 또는 접두 패턴, 문장 번호) 집합 대 제품이 낸 거부. 같은 문장 번호에서 ruleId가 맞는 거부를 하나씩 짝짓는다.
+    /// 반환: 차이 목록(비면 일치). "기대한 거부 없음"은 기대에만, "예상 밖 거부"는 실제에만 있는 항목이다.
+    /// </summary>
+    public IReadOnlyList<string> RejectDiff(IEnumerable<(string RuleId, int? StatementIndex)> actual)
+    {
+        var left = actual.ToList();
+        var diffs = new List<string>();
+        foreach (var e in ExpectedRejects)
+        {
+            var i = left.FindIndex(a => a.StatementIndex == e.StatementIndex && e.Matches(a.RuleId));
+            if (i < 0) diffs.Add($"기대한 거부 없음: {e.Display}");
+            else left.RemoveAt(i);
+        }
+        diffs.AddRange(left.Select(a => $"예상 밖 거부: {a.RuleId}@문장 {a.StatementIndex?.ToString(CultureInfo.InvariantCulture) ?? "-"}"));
+        return diffs;
     }
 
     /// <summary>폴더의 모든 사례(id 서수 순).</summary>

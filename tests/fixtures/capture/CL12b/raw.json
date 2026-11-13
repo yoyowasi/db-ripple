@@ -16,6 +16,8 @@
         },
         "status": "ok",
         "rowsAffected": 0,
+        "returnValue": null,
+        "resultSetCount": null,
         "captureSeqRange": [
           37,
           37
@@ -41,6 +43,8 @@
         },
         "status": "ok",
         "rowsAffected": 1,
+        "returnValue": null,
+        "resultSetCount": null,
         "captureSeqRange": [
           38,
           39

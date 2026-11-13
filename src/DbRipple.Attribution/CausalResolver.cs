@@ -33,12 +33,15 @@ public sealed class CausalResolver : ICausalResolver
         {
             var sf = group.ToList();
             statements.TryGetValue(group.Key, out var st);
-            var insteadOf = st is null ? null : cat.InsteadOf(st.Target, st.Kind);
+            var isExec = st?.Kind == ChangeOperation.Exec;
+            var insteadOf = st?.Target is { } stTarget && !isExec ? cat.InsteadOf(stTarget, st.Kind) : null;
+            // EXEC: 펼친 프로시저의 정적 쓰기 대상(분석기 ProcedurePlan). 모르면(계약 위반·JSON에서 복원) 빈 집합 → PROC_DIRECT를 주지 않는다(닫힌 쪽).
+            var procWrites = new HashSet<string>(isExec ? st!.Plan?.WriteTargets ?? [] : [], CatalogIndex.Names);
 
             // 5단계 직접 대상(certain).
             foreach (var f in sf)
             {
-                if (st is null || f.Depth != 1 || f.Operation != st.Kind || !CatalogIndex.Names.Equals(f.Table, st.Target)) continue;
+                if (st is null || isExec || f.Depth != 1 || f.Operation != st.Kind || !CatalogIndex.Names.Equals(f.Table, st.Target)) continue;
                 var v = new Verdict { Kind = CauseKind.Direct, Confidence = Confidence.Certain, Order = OrderGuarantee.Guaranteed };
                 v.Evidence.Add(Evidence.Depth);
                 verdicts[f.Id] = v;
@@ -51,12 +54,24 @@ public sealed class CausalResolver : ICausalResolver
             foreach (var f in sf)
             {
                 if (verdicts.ContainsKey(f.Id)) continue;
-                var res = fkJudge.Judge(f, sf, possibleWriters.Any(t => t.CanWrite(f.Table)));
+                // EXEC: 프로시저가 자식 테이블에 직접 쓸 수 있으면 FK 연쇄와 구별할 수 없다(자식 다음 부모를 지우는 본문) → certain을 주지 않는다.
+                var res = fkJudge.Judge(f, sf, possibleWriters.Any(t => t.CanWrite(f.Table)) || procWrites.Contains(f.Table));
                 if (res is null) continue;
                 verdicts[f.Id] = res.Verdict;
                 foreach (var (rc, ids) in res.ParentRowIds) parentRowIds[rc] = ids;
                 if (res.UnmatchedRowIds.Count > 0) partialFk[f.Id] = res;
             }
+
+            // EXEC: 문장 창 안 깊이 1이고 FK로 설명되지 않은 묶음 = 프로시저 본문의 직접 쓰기(PROC_DIRECT, certain).
+            // 근거: 프로시저 안 DML의 감사 트리거는 TRIGGER_NESTLEVEL() = 1이고, 분석기가 쓰기 대상을 모두 안다고 확인한 뒤에만 실행한다. SP12 뒤 재검토.
+            // 정적 쓰기 대상에 없는 테이블이면 설명할 근거가 없으므로 아래에서 UNEXPLAINED로 남는다.
+            if (isExec)
+                foreach (var f in sf.Where(f => f.Depth == 1 && !verdicts.ContainsKey(f.Id) && procWrites.Contains(f.Table)))
+                {
+                    var v = new Verdict { Kind = CauseKind.ProcDirect, Confidence = Confidence.Certain, Order = OrderGuarantee.Guaranteed };
+                    v.Evidence.AddRange([Evidence.Depth, Evidence.StaticWriteSet]);
+                    verdicts[f.Id] = v;
+                }
 
             // 4단계 트리거, 5단계 INSTEAD OF. 깊이 오름차순.
             foreach (var f in sf.OrderBy(f => f.Depth).ThenBy(f => f.CaptureSeq))
@@ -146,7 +161,7 @@ public sealed class CausalResolver : ICausalResolver
         var statementOrder = statements.Keys.Concat(firings.Select(f => f.StatementIndex)).Distinct().Order().ToList();
         foreach (var si in statementOrder)
         {
-            if (statements.TryGetValue(si, out var st) && st.Status != StatementStatus.NotRun && cat.InsteadOf(st.Target, st.Kind) is { } io)
+            if (statements.TryGetValue(si, out var st) && st.Status != StatementStatus.NotRun && st.Kind != ChangeOperation.Exec && st.Target is { } t0 && cat.InsteadOf(t0, st.Kind) is { } io)
                 executions.Add((null, si, io));
             foreach (var f in firings.Where(f => f.StatementIndex == si))
                 foreach (var t in Fired(f)) executions.Add((f.Id, si, t));

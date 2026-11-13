@@ -138,6 +138,12 @@ async Task RunCascadeLabAsync()
     catch (ArgumentException ex) { Console.Error.WriteLine(ex.Message); failures++; return; }
     var repeat = IntOpt("--repeat", 1);
     var cases = allCases.Where(c => only is null || only.Contains(c.Id)).ToList();
+    // v0.3: 하네스가 만들지 않는 DB의 사례(CL25d, CascadeLab_Reach)는 건너뛴다. 분석 API 회귀(scripts/home-test.ps1 N1 단계)로 확인한다.
+    foreach (var skipped in cases.Where(c => c.Database is not ("CascadeLab" or "CascadeLab_RT")).ToList())
+    {
+        cases.Remove(skipped);
+        Note($"{skipped.Id}: database {skipped.Database}는 이 하네스가 만들지 않아 건너뜀(분석 API 회귀로 확인)");
+    }
     if (cases.Count == 0) { Console.Error.WriteLine("고른 사례가 없음"); failures++; return; }
     extra["systems"] = string.Join(",", systems);
     extra["cases"] = string.Join(",", cases.Select(c => c.Id));
@@ -148,6 +154,7 @@ async Task RunCascadeLabAsync()
     var scorer = new CaseScorer(new MetricsCalculator());
     var suite = new SuiteAccumulator();
     var m4 = new M4Accumulator();
+    var rejectRecords = new JsonArray(); // v0.3 거부 사례(expected.rejects)의 기대·실제·차이, 끝에 rejects.json으로 쓴다
     var casesCsv = Path.Combine(outDir, "cases.csv");
     var m1Csv = Path.Combine(outDir, "m1.csv");
     var m2Csv = Path.Combine(outDir, "m2.csv");
@@ -213,11 +220,13 @@ async Task RunCascadeLabAsync()
                         await File.WriteAllTextAsync(recordPath, JsonSerializer.Serialize(rec, ContractJson.Options), MetricsCsv.Utf8NoBom, ct);
                     }
 
-                    var oracle = await oracleRunner.RunAsync(connection, d.Origin, hc.Statements, rawBatch: false, ct);
-                    var raw = await oracleRunner.RunAsync(connection, d.Origin, hc.Statements, rawBatch: true, ct);
+                    // v0.3 거부 사례는 오라클을 실행하지 않는다(거부될 문장을 원본에서 실행하면 안 된다, 예: CL25b의 남는 COMMIT).
+                    var oracle = hc.IsRejectCase ? OracleResult.Skipped(d.Origin) : await oracleRunner.RunAsync(connection, d.Origin, hc.Statements, rawBatch: false, ct);
+                    var raw = hc.IsRejectCase ? OracleResult.Skipped(d.Origin) : await oracleRunner.RunAsync(connection, d.Origin, hc.Statements, rawBatch: true, ct);
                     foreach (var system in systems)
                     {
                         var isPreview = system == Baselines.Systems.Preview;
+                        if (hc.IsRejectCase && !isPreview) continue; // 거부 사례는 대조군이 의미 없다
                         var score = scorer.Score(new CaseRun
                         {
                             RunId = runId,
@@ -235,6 +244,29 @@ async Task RunCascadeLabAsync()
                         if (score.Signature is { } sig) m4.Add(system, hc.Id, sig);
                         if (isPreview && r == 1)
                             foreach (var e in score.EdgeDifferences) Note($"{tag} M3 간선 {e}");
+                        if (isPreview && hc.IsRejectCase)
+                        {
+                            if (r == 1)
+                            {
+                                foreach (var x in score.RejectDifferences) Note($"{tag} v0.3 거부: {x}");
+                                rejectRecords.Add(new JsonObject
+                                {
+                                    ["case"] = hc.Id,
+                                    ["database"] = hc.Database,
+                                    ["expected"] = new JsonArray(hc.ExpectedRejects.Select(e => (JsonNode)new JsonObject
+                                    {
+                                        ["ruleId"] = e.RuleId, ["statementIndex"] = e.StatementIndex, ["ruleIdPending"] = e.Pending,
+                                    }).ToArray()),
+                                    ["actual"] = new JsonArray(score.ActualRejects.Select(a => (JsonNode)new JsonObject
+                                    {
+                                        ["ruleId"] = a.RuleId, ["statementIndex"] = a.StatementIndex,
+                                    }).ToArray()),
+                                    ["differences"] = new JsonArray(score.RejectDifferences.Select(x => (JsonNode)JsonValue.Create(x)!).ToArray()),
+                                });
+                            }
+                        }
+                        else if (isPreview && r == 1)
+                            foreach (var x in score.V03Differences) Note($"{tag} v0.3 {x}");
                         if (isPreview || !withPreview)
                         {
                             foreach (var x in score.HandDifferences) Note($"{tag} 손 정답 대 오라클: {x}");
@@ -243,9 +275,9 @@ async Task RunCascadeLabAsync()
                     }
 
                     if (previewError is not null) { failures++; Note($"{tag} 미리보기 예외: {previewError}"); }
-                    if (oracle.BeforeDigest != seedDigest)
+                    if (!hc.IsRejectCase && oracle.BeforeDigest != seedDigest)
                         Note($"{tag} 오라클 시작 상태가 시드와 다름({oracle.BeforeDigest} ≠ {seedDigest}){(residueSeen || hc.LeavesResidue ? ", 앞선 leavesResidue 사례의 남은 행(예상)" : "")}");
-                    if (!oracle.RestoredAfterRollback || !raw.RestoredAfterRollback)
+                    if (!hc.IsRejectCase && (!oracle.RestoredAfterRollback || !raw.RestoredAfterRollback))
                         Note($"{tag} 오라클 롤백 뒤 시작 상태로 돌아가지 않음{(hc.LeavesResidue ? "(leavesResidue, 정상)" : "")}");
                     foreach (var x in oracle.ComparatorIssues.Concat(hook?.LastIssues ?? [])) Note($"{tag} 비교기: {x}");
                     foreach (var x in oracle.Notes.Concat(hook?.LastNotes ?? []).Distinct(StringComparer.Ordinal)) Note($"{tag} 정정 기록 후보: {x}");
@@ -253,7 +285,7 @@ async Task RunCascadeLabAsync()
                         Note($"{tag} 성공 미리보기인데 평가 훅이 불리지 않음");
                     if (hc.LeavesResidue) residueSeen = true;
                     var previewText = pipeline is null ? "-" : outcome?.Record?.Result.Status.ToString() ?? (outcome is null ? "error" : "rejected");
-                    Console.WriteLine($"{tag}: preview={previewText} oracle={oracle.Status} hook={hook?.Calls.ToString(CultureInfo.InvariantCulture) ?? "-"}");
+                    Console.WriteLine($"{tag}: preview={previewText} oracle={(hc.IsRejectCase ? "-" : oracle.Status)} hook={hook?.Calls.ToString(CultureInfo.InvariantCulture) ?? "-"}");
                 }
         }
         catch (Exception ex)
@@ -271,6 +303,8 @@ async Task RunCascadeLabAsync()
     var metricsCsv = Path.Combine(outDir, "metrics.csv");
     foreach (var row in suite.Rows(runId).Concat(m4.SuiteRows(runId))) MetricsCsv.Append(metricsCsv, MetricsCsv.SuiteColumns, row);
     foreach (var row in m4.Rows(runId)) MetricsCsv.Append(Path.Combine(outDir, "m4.csv"), MetricsCsv.M4Columns, row);
+    if (rejectRecords.Count > 0)
+        File.WriteAllText(Path.Combine(outDir, "rejects.json"), rejectRecords.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }), MetricsCsv.Utf8NoBom);
 }
 
 async Task RunM5Async()

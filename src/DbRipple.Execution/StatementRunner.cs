@@ -51,6 +51,7 @@ public sealed class StatementRunner : IStatementRunner
         ArgumentNullException.ThrowIfNull(statement);
         ArgumentNullException.ThrowIfNull(context);
         EnsureOpen(session, "문장 실행");
+        var execSql = statement.Kind == ChangeOperation.Exec ? ExecSql(statement) : null; // 가장 전에 계약 위반을 거른다
 
         var impersonating = false;
         if (context.ExecuteAsUser is { } user)
@@ -60,11 +61,20 @@ public sealed class StatementRunner : IStatementRunner
         }
 
         long? rows = null;
+        ExecRead? exec = null;
         SqlException? error = null;
         try
         {
-            await using var cmd = session.CreateCommand(statement.Sql + RowCountSuffix, context.CommandTimeoutSeconds);
-            rows = await ReadRowCountAsync(cmd, ct);
+            if (execSql is not null)
+            {
+                await using var cmd = session.CreateCommand(execSql, context.CommandTimeoutSeconds);
+                exec = await ReadExecAsync(cmd, ct);
+            }
+            else
+            {
+                await using var cmd = session.CreateCommand(statement.Sql + RowCountSuffix, context.CommandTimeoutSeconds);
+                rows = await ReadRowCountAsync(cmd, ct);
+            }
         }
         catch (SqlException ex)
         {
@@ -83,7 +93,91 @@ public sealed class StatementRunner : IStatementRunner
         }
         var revert = impersonating ? await RevertAsync(session, ct) : null;
         var classified = error is null ? ((StatementStatus, StatementError)?)null : ErrorRules.Classify(error, context.Baseline);
-        return Decide(statement, context, classified, rows, xact, tranCount, currentTranId, revert);
+        var outcome = Decide(statement, context, classified, rows, xact, tranCount, currentTranId, revert, exec?.TranDelta);
+        return exec is { } x && outcome.Result.Status == StatementStatus.Ok
+            ? outcome with { Result = outcome.Result with { ReturnValue = x.ReturnValue, ResultSetCount = x.ResultSets } }
+            : outcome;
+    }
+
+    /// <summary>EXEC 문장의 실행 SQL(분석기가 만든 ProcedurePlan.ExecSql). 없으면 계약 위반이라 InvalidOperationException.</summary>
+    public static string ExecSql(AnalyzedStatement statement) =>
+        statement.Plan is { ExecSql: { Length: > 0 } sql } ? sql : throw new InvalidOperationException($"EXEC 문장 {statement.Index}에 실행 SQL이 없음(분석기 계약 위반)");
+
+    /// <summary>EXEC 실행 결과: 반환 값, 프로시저가 낸 결과 집합 수, 트랜잭션 수 변화(dbr_dtc, 못 읽었으면 null).</summary>
+    public readonly record struct ExecRead(int? ReturnValue, int ResultSets, int? TranDelta);
+
+    /// <summary>
+    /// EXEC 실행 결과를 읽는다: 프로시저가 낸 결과 집합은 개수만 세고 버리고, 마지막 결과 집합(SELECT @dbr_rc AS dbr_rc, @dbr_dtc AS dbr_dtc)에서
+    /// 반환 값과 트랜잭션 수 변화를 읽는다. 마지막 결과 집합이 그 모양이 아니면(정상 경로에서는 없음) 둘 다 null이고 모든 결과 집합을 프로시저 것으로 센다.
+    /// 오류(266 등)가 마지막 결과 집합 전에 나면 SqlException으로 나가 값을 읽지 못한다(SP11·SP14 뒤 재검토).
+    /// </summary>
+    internal static async Task<ExecRead> ReadExecAsync(SqlCommand cmd, CancellationToken ct)
+    {
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        var sets = 0;
+        int? rc = null, dtc = null;
+        var lastIsOurs = false;
+        do
+        {
+            if (r.FieldCount == 0) continue;
+            sets++;
+            var ours = r.FieldCount == 2 && r.GetName(0) == ProcedurePlan.ReturnColumn && r.GetName(1) == ProcedurePlan.TranDeltaColumn;
+            int? v0 = null, v1 = null;
+            var first = true;
+            while (await r.ReadAsync(ct))
+            {
+                if (first && ours)
+                {
+                    v0 = r.IsDBNull(0) ? null : Convert.ToInt32(r.GetValue(0), System.Globalization.CultureInfo.InvariantCulture);
+                    v1 = r.IsDBNull(1) ? null : Convert.ToInt32(r.GetValue(1), System.Globalization.CultureInfo.InvariantCulture);
+                }
+                first = false;
+            }
+            lastIsOurs = ours;
+            if (ours) (rc, dtc) = (v0, v1);
+        } while (await r.NextResultAsync(ct));
+        return lastIsOurs ? new(rc, sets - 1, dtc) : new(null, sets, null);
+    }
+
+    /// <summary>EXEC 프로시저가 도구 트랜잭션을 롤백했다고 확인된 경우의 메시지(계약). 실행기가 롤백 뒤 남은 변경이 없음을 확인했을 때만 쓴다.</summary>
+    public const string ProcedureRolledBackMessage = "프로시저가 트랜잭션을 롤백함";
+
+    /// <summary>EXEC 프로시저가 트랜잭션 수를 바꿨을 때 메시지 머리(사실만 적는다).</summary>
+    public const string ProcedureTranCountMessage = "프로시저가 트랜잭션 수를 바꿈";
+
+    /// <summary>EXEC 뒤 열린 트랜잭션이 없을 때의 메시지(롤백인지 확정인지는 롤백 뒤 남은 변경 검사로 가린다).</summary>
+    public const string ProcedureTranGoneMessage = ProcedureTranCountMessage + "(ROLLBACK 또는 짝 없는 COMMIT): 실행 뒤 열린 트랜잭션이 없음";
+
+    /// <summary>
+    /// EXEC 문장의 트랜잭션 수 판정(순수). 실행 SQL은 호출을 BEGIN TRAN 한 겹으로 감싸고, 정상이면 그 겹을 닫아 문장 뒤 @@TRANCOUNT가 1, dbr_dtc가 1이다.
+    /// <list type="bullet">
+    /// <item>오류가 수집 장치 오류이거나 266(EXECUTE 뒤 트랜잭션 수 불일치)이 아니면 null(엔진 오류는 ErrorRules 판정에 맡긴다).</item>
+    /// <item>트랜잭션이 바뀜 / 없어짐 / 1보다 많음 / dbr_dtc = 0(또는 266인데 dbr_dtc를 못 읽음)이면 failed, isToolFault = false, "프로시저가 트랜잭션 수를 바꿈..." 메시지.</item>
+    /// <item>오류도 이상도 없는데 dbr_dtc를 못 읽었으면 도구 결함.</item>
+    /// </list>
+    /// 266이 XACT_ABORT ON에서 일괄 처리를 끊는지·트랜잭션을 롤백하는지는 SP14 뒤 재검토.
+    /// </summary>
+    public static StatementError? ExecTransactionAnomaly(int tranCount, bool replaced, long? fromTranId, long? toTranId, int? tranDelta, StatementError? error)
+    {
+        if (error is { } e && (e.IsToolFault || e.ErrorNumber != ErrorRules.TranCountMismatch)) return null;
+        var message =
+            replaced ? $"{ProcedureTranCountMessage}: 도구 트랜잭션이 새 트랜잭션으로 바뀜(트랜잭션 ID {fromTranId} → {toTranId})"
+            : tranCount == 0 ? ProcedureTranGoneMessage
+            : tranCount > 1 ? $"{ProcedureTranCountMessage}: 짝 없는 BEGIN TRAN(@@TRANCOUNT = {tranCount})"
+            : tranDelta == 0 || (tranDelta is null && error is not null) ? $"{ProcedureTranCountMessage}: 짝 없는 COMMIT(감싼 BEGIN TRAN만 닫혀 도구 트랜잭션은 확정되지 않음)"
+            : null;
+        if (message is null)
+        {
+            if (tranDelta == 1) return null;
+            return new StatementError { ErrorNumber = 0, Message = $"EXEC 결과의 트랜잭션 수 변화(dbr_dtc = {tranDelta?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"})를 해석할 수 없음", IsToolFault = true };
+        }
+        return new StatementError
+        {
+            ErrorNumber = error?.ErrorNumber ?? 0,
+            Message = message + (error is null ? "" : $"(오류 {error.ErrorNumber}: {error.Message})"),
+            Procedure = error?.Procedure,
+            IsToolFault = false,
+        };
     }
 
     /// <summary>REVERT 대체 경로 기록: 첫 REVERT의 오류와, "IF @@TRANCOUNT > 0 ROLLBACK; REVERT;" 뒤 다시 읽은 @@TRANCOUNT.</summary>
@@ -98,7 +192,7 @@ public sealed class StatementRunner : IStatementRunner
     /// </list>
     /// </summary>
     public static StatementRunOutcome Decide(AnalyzedStatement statement, StatementRunContext context, (StatementStatus Status, StatementError Error)? classified,
-        long? rows, int xact, int tranCount, long? currentTranId, RevertFallback? revert)
+        long? rows, int xact, int tranCount, long? currentTranId, RevertFallback? revert, int? execTranDelta = null)
     {
         ArgumentNullException.ThrowIfNull(statement);
         ArgumentNullException.ThrowIfNull(context);
@@ -135,12 +229,17 @@ public sealed class StatementRunner : IStatementRunner
 
         StatementResult result;
         bool? rollbackConfirmed = null;
-        if (classified is { } cl)
+        if (statement.Kind == ChangeOperation.Exec
+            && ExecTransactionAnomaly(tranCount, replaced, context.TransactionId, currentTranId, execTranDelta, classified?.Error) is { } anomaly)
+        {
+            result = Result(statement, StatementStatus.Failed) with { Error = anomaly };
+        }
+        else if (classified is { } cl)
         {
             var (status, err) = PreviewExecutor.Replaced(cl, replaced);
             result = Result(statement, status) with { Error = err };
             if (status == StatementStatus.TriggerBlocked)
-                rollbackConfirmed = ErrorRules.EndedByRollback(err.Procedure, statement.Target, statement.Kind, context.Baseline);
+                rollbackConfirmed = ErrorRules.EndedByRollback(err.Procedure, statement.Target, statement.Kind, context.Baseline, statement.Plan?.WriteTargets);
         }
         else if (!open || tranCount != 1 || replaced)
         {
@@ -158,7 +257,7 @@ public sealed class StatementRunner : IStatementRunner
         }
         else
         {
-            result = Result(statement, StatementStatus.Ok) with { RowsAffected = rows };
+            result = Result(statement, StatementStatus.Ok) with { RowsAffected = statement.Kind == ChangeOperation.Exec ? null : rows };
         }
 
         return new StatementRunOutcome
@@ -199,6 +298,7 @@ public sealed class StatementRunner : IStatementRunner
         Target = st.Target,
         Span = st.Span,
         Status = status,
+        Plan = st.Plan,
     };
 
     static async Task<(int Xact, int TranCount, long? TranId)> StateAsync(SqlSession session, CancellationToken ct)

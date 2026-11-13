@@ -55,7 +55,7 @@ function testResultOf(req: SettingsRequest): SettingsTestResult {
   const sysadmin = req.origin.user === 'sa'
   const warnings: string[] = []
   if (sysadmin) warnings.push('원본 로그인이 sysadmin입니다. [적용]은 확인을 한 번 더 받습니다.')
-  if (nosnap) warnings.push('원본에 스냅샷(CREATE DATABASE) 권한이 없습니다. [적용]이 약한 검증(KEYSET)으로 동의를 묻습니다.')
+  if (nosnap) warnings.push('원본에 스냅샷(CREATE DATABASE) 권한이 없습니다. [적용]이 약한 검증(KEYSET_HASH)으로 동의를 묻습니다.')
   return {
     origin:
       req.mode === 'split'
@@ -109,12 +109,23 @@ function startRebuild(ms: number): void {
   state.baselineAt = new Date(state.buildingUntil).toISOString()
 }
 
-function page<T>(src: RowSource<T>, firingId: string | null, match: (row: T, id: string) => boolean, offset: number, limit: number) {
+/** 서버가 하는 일을 흉내 낸다: 묶음·테이블로 거른 뒤 페이지를 자르고, total은 거른 수다. 생성형 원천은 한 테이블뿐이라 첫 행의 테이블로 판정한다. */
+function page<T>(
+  src: RowSource<T>,
+  firingId: string | null,
+  match: (row: T, id: string) => boolean,
+  offset: number,
+  limit: number,
+  table: string | null = null,
+  tableOf: (row: T) => string = () => '',
+) {
   if (Array.isArray(src)) {
-    const rows = firingId ? src.filter((r) => match(r, firingId)) : src
+    let rows = firingId ? src.filter((r) => match(r, firingId)) : src
+    if (table) rows = rows.filter((r) => tableOf(r) === table)
     return { total: rows.length, rows: rows.slice(offset, offset + limit) }
   }
   if (firingId && !src.firingIds.includes(firingId)) return { total: 0, rows: [] as T[] }
+  if (table && src.total > 0 && tableOf(src.make(0)) !== table) return { total: 0, rows: [] as T[] }
   const end = Math.min(src.total, offset + limit)
   const rows: T[] = []
   for (let i = offset; i < end; i++) rows.push(src.make(i))
@@ -221,13 +232,15 @@ export async function fakeFetch(id: FixtureId, method: string, url: string, body
     const offset = Number(u.searchParams.get('offset') ?? 0)
     const limit = Number(u.searchParams.get('limit') ?? 100)
     const firingId = u.searchParams.get('firingId')
+    const table = u.searchParams.get('table') || null
     if ((view !== 'event' && view !== 'net') || !(offset >= 0) || !(limit >= 1 && limit <= 1000)) {
       return problem({ status: 400, title: '요청이 올바르지 않습니다.', errors: { query: ['view=event|net, offset>=0, 1<=limit<=1000'] } })
     }
+    if (table && view === 'event') return problem({ status: 400, title: '요청이 올바르지 않습니다.', errors: { table: ['view=net에서만 쓸 수 있음'] } })
     const res =
       view === 'event'
         ? page(fx.eventRows, firingId, (r, f) => r.firingId === f, offset, limit)
-        : page(fx.netRows, firingId, (r, f) => r.explainedBy?.firingIds.includes(f) ?? false, offset, limit)
+        : page(fx.netRows, firingId, (r, f) => r.explainedBy?.firingIds.includes(f) ?? false, offset, limit, table, (r) => r.table)
     return json(200, { total: res.total, view, offset, limit, rows: res.rows })
   }
   if (method === 'POST' && action === 'apply') {

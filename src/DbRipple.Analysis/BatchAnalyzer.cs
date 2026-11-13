@@ -59,6 +59,8 @@ public sealed class BatchAnalyzer : IBatchAnalyzer
     {
         readonly LineIndex lines = new(sql);
         readonly TableResolver resolver = new(baseline.Catalog);
+        ProcedureAnalyzer? procedures;
+        ProcedureAnalyzer Procedures => procedures ??= new ProcedureAnalyzer(baseline.Catalog, resolver);
         readonly List<Diagnostic> rejects = [];
         readonly List<Diagnostic> warnings = [];
         readonly List<AnalyzedStatement> statements = [];
@@ -145,6 +147,11 @@ public sealed class BatchAnalyzer : IBatchAnalyzer
         void AnalyzeStatement(TSqlStatement s, int index, int batch, int position)
         {
             var span = lines.Span(s);
+            if (s is ExecuteStatement exec)
+            {
+                AnalyzeExec(exec, index, batch, position, span);
+                return;
+            }
             if (s is not DataModificationStatement dml || dml is MergeStatement)
             {
                 var (rule, message, doc) = Classify(s);
@@ -197,7 +204,9 @@ public sealed class BatchAnalyzer : IBatchAnalyzer
                     else
                     {
                         CheckTargetTriggers(target, table, kind, index, lines.Span(targetNode));
-                        CheckReachedTriggers(target, kind, index, lines.Span(targetNode));
+                        // 직접 대상의 트리거는 CheckTargetTriggers가 이미 판정했다. 쓰기 대상만 넓힌다.
+                        CheckReachedTriggers([(target, kind, $"{target} {Verb(kind)}")],
+                            new HashSet<string>(Firing(target, kind).Select(t => t.Trigger), StringComparer.OrdinalIgnoreCase), index, lines.Span(targetNode));
                     }
                     if (isCte) target = null; // CTE 이름은 테이블 이름이 아니다
                 }
@@ -238,7 +247,14 @@ public sealed class BatchAnalyzer : IBatchAnalyzer
             });
         }
 
-        static string Verb(ChangeOperation k) => k switch { ChangeOperation.Insert => "INSERT", ChangeOperation.Update => "UPDATE", _ => "DELETE" };
+        static string Verb(ChangeOperation k) => k switch
+        {
+            ChangeOperation.Insert => "INSERT",
+            ChangeOperation.Update => "UPDATE",
+            ChangeOperation.Delete => "DELETE",
+            ChangeOperation.Exec => "EXEC",
+            _ => throw new ArgumentOutOfRangeException(nameof(k), k, null),
+        };
 
         void CheckTop(DataModificationStatement dml, TSqlFragment spec, ChangeOperation kind, int index, SourceSpan span)
         {
@@ -307,7 +323,8 @@ public sealed class BatchAnalyzer : IBatchAnalyzer
                 {
                     ChangeOperation.Insert => manifest.AuditOrder.Insert,
                     ChangeOperation.Update => manifest.AuditOrder.Update,
-                    _ => manifest.AuditOrder.Delete,
+                    ChangeOperation.Delete => manifest.AuditOrder.Delete,
+                    _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "행 연산만"),
                 };
                 if (!string.Equals(order, DbRipple.Core.Capture.CaptureManifest.Last, StringComparison.OrdinalIgnoreCase))
                     Warn(AnalysisRules.WarnAuditNotLast,
@@ -315,6 +332,165 @@ public sealed class BatchAnalyzer : IBatchAnalyzer
                         "E15", index, span);
             }
         }
+
+        // ---- EXEC 미리보기(2026-11-13): EXEC [스키마.]프로시저 @p = <리터럴>, ... 한 문장 ----
+
+        static readonly HashSet<string> DynamicProcedures = new(["sp_executesql", "sp_prepare", "sp_prepexec", "sp_execute"], StringComparer.OrdinalIgnoreCase);
+
+        void AnalyzeExec(ExecuteStatement s, int index, int batch, int position, SourceSpan span)
+        {
+            var spec = s.ExecuteSpecification;
+            const string dynamicMessage = "EXEC('...')·EXEC @변수·sp_executesql은 동적 SQL이라 지원하지 않습니다. EXEC 스키마.프로시저 @매개변수 = 값 모양으로 쓰세요.";
+            if (spec.ExecutableEntity is not ExecutableProcedureReference pr || pr.ProcedureReference.ProcedureReference is not { } nameRef
+                || DynamicProcedures.Contains(nameRef.Name.BaseIdentifier.Value))
+            {
+                Reject(AnalysisRules.RejectExec, dynamicMessage, "E9", index, span);
+                return;
+            }
+
+            // 1) 호출 모양(사용자 입력)
+            var form = new List<string>();
+            if (s.Options.Count > 0) form.Add("WITH 옵션(RESULT SETS·RECOMPILE)");
+            if (spec.Variable is not null) form.Add("반환 값 변수(EXEC @rc = ...)");
+            if (spec.LinkedServer is not null) form.Add("AT 링크드 서버");
+            if (spec.ExecuteContext is not null) form.Add("EXECUTE ... AS 문맥");
+            if (pr.AdHocDataSource is not null) form.Add("OPENDATASOURCE");
+            if (nameRef.Number is not null) form.Add("번호 프로시저(;n)");
+            var args = new List<(string Name, string? Value, ExecuteParameter Node)>();
+            foreach (var p in pr.Parameters)
+            {
+                if (p.Variable is null) { form.Add("위치 매개변수(이름을 붙여 @p = 값으로 쓰세요)"); continue; }
+                if (p.IsOutput) form.Add($"OUTPUT 매개변수 {p.Variable.Name}");
+                var value = ExecSqlBuilder.RenderLiteral(p.ParameterValue);
+                if (value is null)
+                {
+                    if (p.ParameterValue is VariableReference or GlobalVariableExpression)
+                        Reject(AnalysisRules.RejectVariableOrFlow, $"매개변수 {p.Variable.Name}에 변수를 쓸 수 없습니다. 값을 직접 쓰세요.", "E9", index, lines.Span(p));
+                    else form.Add($"{p.Variable.Name}의 값(리터럴·음수 리터럴·NULL·DEFAULT만)");
+                }
+                if (args.Any(x => x.Name.Equals(p.Variable.Name, StringComparison.OrdinalIgnoreCase))) form.Add($"중복 매개변수 {p.Variable.Name}");
+                args.Add((p.Variable.Name, value, p));
+            }
+            if (form.Count > 0)
+                Reject(AnalysisRules.RejectProcCallForm, $"지원하지 않는 EXEC 모양입니다: {string.Join(", ", form.Distinct())}.", "E9", index, span);
+
+            // 2) 대상 프로시저: 카탈로그 T-SQL 사용자 프로시저, 1·2부분 이름, sp_ 접두 아님
+            var pn = nameRef.Name;
+            if (pn.ServerIdentifier is not null || pn.DatabaseIdentifier is not null)
+            {
+                Reject(AnalysisRules.RejectCrossDatabase, $"3·4부분 이름 '{SqlSyntax.Name(pn)}'은 샌드박스 밖의 상태라 쓸 수 없습니다. 스키마.프로시저만 쓰세요.", "A18", index, lines.Span(pn));
+                return;
+            }
+            if (pn.BaseIdentifier.Value.StartsWith("sp_", StringComparison.OrdinalIgnoreCase))
+            {
+                Reject(AnalysisRules.RejectProcNotFound, $"sp_ 접두 프로시저 '{SqlSyntax.Name(pn)}'은 시스템 프로시저로 해석될 수 있어 지원하지 않습니다.", "E9", index, lines.Span(pn));
+                return;
+            }
+            var module = Procedures.Find(pn, DefaultSchema);
+            if (module is null)
+            {
+                Reject(AnalysisRules.RejectProcNotFound, $"'{SqlSyntax.Name(pn)}'은(는) 이 DB 카탈로그의 사용자 저장 프로시저가 아니거나 대소문자만 다른 이름이 여럿이라 정할 수 없습니다.", "E9", index, lines.Span(pn));
+                return;
+            }
+
+            var info = Procedures.Analyze(module);
+            var proc = info.Procedure;
+            var execSql = "";
+            if (info.Opaque)
+                Reject(AnalysisRules.RejectProcOpaque, $"{proc}의 본문을 읽을 수 없습니다(암호화·CLR 또는 파싱 실패).", "E18", index, span);
+            else
+            {
+                var paramOk = CheckParameters(info, args, proc, index, span);
+                CheckProcedureBody(info, index, span);
+                if (form.Count == 0 && paramOk && args.All(a => a.Value is not null))
+                {
+                    var byName = info.Parameters.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
+                    execSql = ExecSqlBuilder.Build(module.Schema, module.Name, args.Select(a => (byName[a.Name].Name, a.Value!)).ToList());
+                }
+            }
+
+            statements.Add(new AnalyzedStatement
+            {
+                Index = index,
+                Batch = batch,
+                Position = position,
+                Kind = ChangeOperation.Exec,
+                Target = null,
+                Span = span,
+                Sql = sql.Substring(s.StartOffset, s.FragmentLength),
+                Procedure = proc,
+                Parameters = args.Select(a => sql.Substring(a.Node.StartOffset, a.Node.FragmentLength)).ToList(),
+                Plan = new ProcedurePlan { Procedure = proc, ExecSql = execSql, WriteTargets = info.WriteTargets, ExpandedCalls = info.ExpandedCalls },
+            });
+        }
+
+        /// <summary>매개변수 대조: 없는 이름, 기본값 없는 필수 매개변수 누락(DEFAULT 포함), OUTPUT·READONLY 매개변수(1차 범위 밖).</summary>
+        bool CheckParameters(ProcedureStaticInfo info, List<(string Name, string? Value, ExecuteParameter Node)> args, string proc, int index, SourceSpan span)
+        {
+            var problems = new List<string>();
+            foreach (var p in info.Parameters.Where(p => p.IsOutput || p.IsReadOnly))
+                problems.Add($"{p.Name}이(가) {(p.IsOutput ? "OUTPUT" : "READONLY(테이블 값)")} 매개변수(1차 범위 밖)");
+            foreach (var a in args.Where(a => !info.Parameters.Any(p => p.Name.Equals(a.Name, StringComparison.OrdinalIgnoreCase))))
+                problems.Add($"{a.Name}은(는) {proc}의 매개변수가 아님");
+            foreach (var p in info.Parameters.Where(p => !p.HasDefault && !p.IsOutput && !p.IsReadOnly))
+            {
+                var given = args.FirstOrDefault(a => a.Name.Equals(p.Name, StringComparison.OrdinalIgnoreCase));
+                if (given.Name is null || given.Value == "DEFAULT") problems.Add($"기본값 없는 {p.Name}에 값이 없음");
+            }
+            if (problems.Count == 0) return true;
+            Reject(AnalysisRules.RejectProcParameter, $"매개변수가 {proc} 정의와 맞지 않습니다: {string.Join(", ", problems)}.", "E9", index, span);
+            return false;
+        }
+
+        /// <summary>펼친 본문 규칙(거부·경고), 쓰기 대상 검사, 도달 폐포(쓰기 대상 × 세 연산에서 FK·트리거로 고정점까지).</summary>
+        void CheckProcedureBody(ProcedureStaticInfo info, int index, SourceSpan span)
+        {
+            var proc = info.Procedure;
+            // 규칙당 진단 1개(D5): 본문 규칙 사실, 못 펼친 호출, 외부 부작용 표시를 규칙별로 모아 한 문장으로 낸다.
+            var details = info.Rejects.GroupBy(f => f.RuleId).ToDictionary(g => g.Key, g => g.Select(f => f.Detail).Distinct().ToList());
+            void More(string rule, string detail)
+            {
+                if (!details.TryGetValue(rule, out var l)) details[rule] = l = [];
+                l.Add(detail);
+            }
+            if (info.UnresolvedCalls.Count > 0)
+                More(AnalysisRules.RejectProcUnresolvedCall,
+                    $"부르는 프로시저를 펼치지 못해 쓰기 대상을 다 알 수 없음 {string.Join(", ", info.UnresolvedCalls)}(카탈로그에 없음·이름이 모호함·본문 없음·동적 SQL·재귀·깊이 {ProcedureAnalyzer.MaxProcedureDepth} 초과)");
+            if (info.External.Count > 0)
+                More(AnalysisRules.RejectProcExternalEffect,
+                    $"외부 부작용({string.Join(", ", info.External)})이 있어 샌드박스에서 실행하면 실제 부작용이 생길 수 있음");
+            foreach (var (rule, list) in details.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+                Reject(rule, $"{proc}의 펼친 본문: {string.Join("; ", list)}.", ProcDocRef(rule), index, span);
+
+            var start = new List<(string, ChangeOperation, string)>();
+            var bad = new List<string>();
+            foreach (var w in info.WriteTargets)
+            {
+                var dot = w.IndexOf('.');
+                var table = dot < 0 ? null : resolver.Find(w[..dot], w[(dot + 1)..]);
+                if (table is null || table.Schema.Equals("audit", StringComparison.OrdinalIgnoreCase)) { bad.Add(w); continue; }
+                foreach (var op in AllOps) start.Add((w, op, $"EXEC {proc} → {w}"));
+            }
+            if (bad.Count > 0)
+                Reject(AnalysisRules.RejectProcWriteTarget, $"{proc}의 쓰기 대상 {string.Join(", ", bad)}은(는) 기반 사용자 테이블이 아닙니다(뷰·동의어·없는 이름·감사 저장소).", "D5", index, span);
+            CheckReachedTriggers(start, new HashSet<string>(StringComparer.OrdinalIgnoreCase), index, span);
+
+            foreach (var g in info.Warnings.GroupBy(f => f.RuleId).OrderBy(g => g.Key, StringComparer.Ordinal))
+                Warn(g.Key, $"{proc}의 펼친 본문: {string.Join("; ", g.Select(f => f.Detail).Distinct())}.", ProcDocRef(g.Key), index, span);
+            if (info.NondeterministicWrites.Count > 0)
+                Warn(AnalysisRules.WarnProcNondeterministicWrite,
+                    $"{proc}가 비결정 값으로 쓰는 열: {string.Join(", ", info.NondeterministicWrites.Select(w => w.Table + "." + w.Column))}. 실행마다 값이 달라질 수 있습니다.", "E1", index, span);
+        }
+
+        static string ProcDocRef(string rule) => rule switch
+        {
+            AnalysisRules.RejectProcExternalEffect => "E18",
+            AnalysisRules.RejectProcDynamicSql or AnalysisRules.RejectProcUnresolvedCall => "E8",
+            AnalysisRules.RejectProcSavepoint or AnalysisRules.RejectProcUnbalancedCommit or AnalysisRules.RejectProcTrancountBranch
+                or AnalysisRules.WarnProcNestedTransaction or AnalysisRules.WarnProcRollback or AnalysisRules.WarnProcXactStateCheck => "E13",
+            AnalysisRules.RejectProcDdl => "E10",
+            _ => "E9",
+        };
 
         // ---- 도달 폐포(2026-11-13): FK 참조 동작과 트리거 쓰기 대상으로 닿는 테이블의 트리거도 D5 거부 규칙으로 본다 ----
 
@@ -329,7 +505,7 @@ public sealed class BatchAnalyzer : IBatchAnalyzer
         /// 쓰기 대상을 모르는 트리거(암호화, 파싱 실패, 동적 SQL, 못 펼친 프로시저)는 모든 사용자 테이블에 닿는다고 보고 닫힌 쪽으로 넓힌다.
         /// ROLLBACK만 하는 트리거는 거부하지 않는다(직접 대상 규칙과 같이 trigger_blocked로 보인다).
         /// </summary>
-        void CheckReachedTriggers(string target, ChangeOperation kind, int index, SourceSpan span)
+        void CheckReachedTriggers(IEnumerable<(string Table, ChangeOperation Op, string Via)> start, HashSet<string> judged, int index, SourceSpan span)
         {
             var catalog = baseline.Catalog;
             var nameById = catalog.Tables.ToDictionary(t => t.ObjectId, t => $"{t.Schema}.{t.Name}");
@@ -345,10 +521,12 @@ public sealed class BatchAnalyzer : IBatchAnalyzer
                 if (seen.Add((table.ToUpperInvariant(), op))) queue.Enqueue((table, op, via));
             }
 
-            // 직접 대상의 트리거는 CheckTargetTriggers가 이미 판정했다. 쓰기 대상만 넓힌다.
-            var judged = new HashSet<string>(Firing(target, kind).Select(t => t.Trigger), StringComparer.OrdinalIgnoreCase);
             var allTablesReached = false;
-            Add(target, kind, $"{target} {Verb(kind)}");
+            foreach (var (t0, op0, via0) in start)
+            {
+                if (op0 == ChangeOperation.Exec) throw new ArgumentOutOfRangeException(nameof(start), "행 연산만");
+                Add(t0, op0, via0);
+            }
 
             while (queue.Count > 0)
             {

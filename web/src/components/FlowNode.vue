@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 그래프 노드 6종(목업 v6): 문장 = 진한 알약, 묶음 = 결과 카드, 트리거 = 작은 알약, 오류·잔차 = 빨강 카드, 접힌 묶음 = 묶음 수 카드.
+// 그래프 노드 7종(목업 v6): 문장 = 진한 알약, EXEC 프로시저 호출 = 초록 알약(--nd-proc, 문장과 같은 계열), 묶음 = 결과 카드, 트리거 = 작은 알약, 오류·잔차 = 빨강 카드, 접힌 묶음 = 묶음 수 카드.
 // 색 띠 대신 배경 틴트·기호로 구분한다. 경로 강조·선택·축소 표시는 그래프 맥락(context)을 읽는다.
 import { Handle, Position } from '@vue-flow/core'
 import { computed } from 'vue'
@@ -46,6 +46,20 @@ const chipText = computed(() => `0행 쓰기 ${props.data.zeroChip}건 · ${ctx.
         <div class="txt">
           <div class="l1 mono"><span v-if="v.verb" class="vb">{{ v.verb }}</span> {{ ctx.compact.value ? v.targetShort : v.target }}</div>
           <div class="l2">{{ v.line2 }}</div>
+        </div>
+      </template>
+
+      <template v-else-if="v.kind === 'procedureCall'">
+        <svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3l8 5-8 5z" /></svg>
+        <div class="txt">
+          <div class="l1 mono"><span class="vb">EXEC</span> {{ ctx.compact.value ? v.targetShort : v.target }}</div>
+          <div class="l2">{{ v.line2 }}</div>
+          <div v-if="v.calls" class="l3" :title="`펼친 안쪽 프로시저: ${v.calls}`">
+            안쪽 호출 <span class="mono">{{ v.calls }}</span>
+          </div>
+          <div v-if="v.unobserved" class="l3" :title="`정적으로 쓰는 테이블인데 이번 실행에서 변경이 관측되지 않음: ${v.unobserved}`">
+            <span class="obs">관측 안 됨</span> <span class="mono">{{ v.unobserved }}</span>
+          </div>
         </div>
       </template>
 
@@ -175,6 +189,44 @@ const chipText = computed(() => `0행 쓰기 ${props.data.zeroChip}건 · ${ctx.
 }
 .vb {
   color: var(--st-verb);
+}
+
+/* EXEC 프로시저 호출: 문장 알약과 같은 모양, 색만 v6의 프로시저 토큰(--nd-proc, --k-call). 보조 줄이 있어 키가 더 클 수 있다. */
+.t-procedureCall .box {
+  padding: 0 18px 0 16px;
+  background: var(--nd-proc);
+  border: 2px solid var(--nd-proc-s);
+  border-radius: 25px;
+  color: var(--nd-t);
+}
+.t-procedureCall .ni {
+  color: var(--k-call);
+}
+.t-procedureCall .vb {
+  color: var(--k-call);
+}
+.t-procedureCall .l2 {
+  color: var(--nd-t2);
+}
+.l3 {
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--nd-t2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.l3 .mono {
+  font-size: 12px;
+}
+/* 관측 안 됨: 트리거 "추정"과 같은 점선 테두리 */
+.obs {
+  display: inline-block;
+  padding: 0 6px;
+  font: 600 12px / 15px var(--ui);
+  color: var(--nd-t);
+  border: 1px dashed var(--nd-proc-s);
+  border-radius: 999px;
 }
 .l2 {
   font-size: 12px;
@@ -395,6 +447,7 @@ const chipText = computed(() => `0행 쓰기 ${props.data.zeroChip}건 · ${ctx.
 .lo .rn .sch,
 .lo .rn .num,
 .lo .rn .l2,
+.lo .rn .l3,
 .lo .rn .sub,
 .lo .rn .tgs {
   display: none;

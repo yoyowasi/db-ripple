@@ -82,6 +82,31 @@ export const STATEMENT_STATUS_LABEL: Record<StatementStatus, string> = {
   not_run: '실행 안 함',
 }
 
+/** 문장 한 줄 표시용 대상: DML은 "스키마.테이블", EXEC는 target이 null이라 "EXEC 스키마.프로시저". */
+export function statementTarget(s: { kind: string; target: string | null; procedure?: string | null }): string {
+  if (s.kind === 'EXEC') return s.procedure ? `EXEC ${s.procedure}` : 'EXEC'
+  return s.target ?? ''
+}
+
+/** EXEC 결과 조각: ["반환 값 0", "결과 집합 1"]. 실패·미실행이면 빈 배열(표시할 값이 없다). */
+export function execResultParts(s: { returnValue?: number | null; resultSetCount?: number | null }): string[] {
+  const parts: string[] = []
+  if (s.returnValue !== null && s.returnValue !== undefined) parts.push(`반환 값 ${s.returnValue}`)
+  if (s.resultSetCount !== null && s.resultSetCount !== undefined) parts.push(`결과 집합 ${s.resultSetCount}`)
+  return parts
+}
+
+/** EXEC 결과 한 줄: "반환 값 0 · 결과 집합 1". 표시할 값이 없으면 null. */
+export function execResultText(s: { returnValue?: number | null; resultSetCount?: number | null }): string | null {
+  const parts = execResultParts(s)
+  return parts.length ? parts.join(' · ') : null
+}
+
+/** 오류 번호 0은 "프로시저가 트랜잭션을 롤백함"처럼 SQL Server 오류가 아닌 도구 판정이라 번호를 붙이지 않는다. */
+export function errorHead(e: { errorNumber: number }): string {
+  return e.errorNumber === 0 ? '오류' : `오류 ${e.errorNumber}`
+}
+
 export const RESIDUAL_CATEGORY_LABEL: Record<ResidualCategory, string> = {
   EXCLUDED_TABLE: '수집 제외 테이블',
   UNOBSERVABLE_COLUMN: '관측 불가 열',
@@ -112,7 +137,8 @@ export const PRECONDITION_LABEL: Record<ApplyPrecondition, string> = {
   PREVIEW_EXPIRED: '미리보기가 만료됐습니다(30분).',
   FINGERPRINT_MISMATCH: '원본과 환경 지문이 다릅니다.',
   EXECUTE_AS_USER_MISSING: '원본 DB에 실행 사용자(dbr_preview_user)가 없습니다. 준비 단계가 필요합니다.',
-  WEAK_VERIFICATION_NOT_ACCEPTED: '원본에 스냅샷 권한이 없어 약한 검증(KEYSET)이 필요한데 동의하지 않았습니다.',
+  WEAK_VERIFICATION_NOT_ACCEPTED: '원본에 스냅샷 권한이 없어 약한 검증(KEYSET_HASH)이 필요한데 동의하지 않았습니다.',
+  PROC_APPLY_NOT_SUPPORTED: '프로시저 호출(EXEC)은 아직 적용할 수 없습니다(미리보기 전용).',
   ORIGIN_UNREACHABLE: '원본에 연결할 수 없습니다. 연결을 복구한 뒤 샌드박스를 새로 고치고 다시 시도하세요.',
 }
 

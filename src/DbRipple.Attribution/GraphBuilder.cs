@@ -79,13 +79,30 @@ internal static class GraphBuilder
             var hasStatement = stmts.TryGetValue(si, out var st);
             if (hasStatement)
             {
-                var label = statementSql is not null && statementSql.TryGetValue(si, out var sql) ? StatementLabel(sql) : null;
-                nodes.Add(new StatementNode
+                if (st!.Kind == ChangeOperation.Exec)
                 {
-                    Id = stId, StatementIndex = si,
-                    Label = label ?? $"{st!.Kind.ToString().ToUpperInvariant()} {st.Target}",
-                    RowsAffected = st!.RowsAffected, Status = st.Status,
-                });
+                    // EXEC: statement 노드 대신 procedureCall 노드(같은 id). 관측 안 된 정적 쓰기 대상은 점선 표시용으로 따로 둔다.
+                    var proc = st.Plan?.Procedure ?? "?";
+                    var writes = st.Plan?.WriteTargets ?? [];
+                    var seenTables = firings.Where(f => f.StatementIndex == si).Select(f => f.Table).ToHashSet(CatalogIndex.Names);
+                    nodes.Add(new ProcedureCallNode
+                    {
+                        Id = stId, StatementIndex = si, Label = "EXEC " + proc, Procedure = proc, Status = st.Status,
+                        ReturnValue = st.ReturnValue, ResultSetCount = st.ResultSetCount,
+                        ExpandedCalls = st.Plan?.ExpandedCalls ?? [], WriteTargets = writes,
+                        UnobservedWriteTargets = writes.Where(w => !seenTables.Contains(w)).ToList(),
+                    });
+                }
+                else
+                {
+                    var label = statementSql is not null && statementSql.TryGetValue(si, out var sql) ? StatementLabel(sql) : null;
+                    nodes.Add(new StatementNode
+                    {
+                        Id = stId, StatementIndex = si,
+                        Label = label ?? $"{st.Kind.ToString().ToUpperInvariant()} {st.Target}",
+                        RowsAffected = st.RowsAffected, Status = st.Status,
+                    });
+                }
                 if (st.Status is StatementStatus.Failed or StatementStatus.TriggerBlocked || st.Error is not null)
                 {
                     var errId = ContractIds.ErrorNode(si);
@@ -112,6 +129,8 @@ internal static class GraphBuilder
                 {
                     if (v.Kind == CauseKind.Direct && hasStatement)
                         Edge(stId, f.Id, EdgeKind.Direct, Confidence.Certain, OrderGuarantee.Guaranteed, v.Evidence);
+                    if (v.Kind == CauseKind.ProcDirect && hasStatement)
+                        Edge(stId, f.Id, EdgeKind.ProcDirect, v.Confidence, v.Order, v.Evidence);
                     foreach (var l in v.FkLinks)
                         Edge(l.ParentFiringId, f.Id, EdgeKind.Fk, l.Confidence, v.Order, [Evidence.FkKeyMatch], l.Fk.Name, l.Action, l.MatchedRows);
                     foreach (var p in v.TriggerPairs)

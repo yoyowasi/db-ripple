@@ -97,6 +97,9 @@ const labelStyle = computed(() => ({
 .tone-direct {
   --tone: var(--k-direct);
 }
+.tone-call {
+  --tone: var(--k-call);
+}
 .tone-fk {
   --tone: var(--k-fk);
 }

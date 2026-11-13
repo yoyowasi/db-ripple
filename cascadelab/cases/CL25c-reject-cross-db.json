@@ -1,0 +1,29 @@
+{
+  "id": "CL25c",
+  "pattern": "CL25",
+  "title": "거부: 다른 DB 3부분 이름을 쓰는 프로시저 (EXEC)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl25.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "EXEC cl25.usp_CrossDb @id = 1;" }
+  ],
+  "expected": {
+    "status": "rejected",
+    "errorNumber": null,
+    "statementStatus": [],
+    "changes": [],
+    "firings": [],
+    "edges": [],
+    "rejects": [
+      { "ruleId": "REJECT_PROC_EXTERNAL_EFFECT", "statementIndex": 1 }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "ruleId", "basis": "2026-11-13 통합 때 AnalysisRules의 REJECT_PROC_EXTERNAL_EFFECT로 확정(정적 분석 단위 테스트 기준, DB 미실행)" },
+      { "id": "OO2", "what": "거부되지 않으면 실행 때 208(tempdb.dbo.cl25_scratch 없음)", "basis": "이름 해석이 실행 때까지 미뤄진다. 가장 중 3부분 이름은 916과 함께 트랜잭션을 doomed로 만든다(SP10, SP14로 재확인)" }
+    ]
+  },
+  "rationale": [
+    { "claim": "가장(EXECUTE AS USER) 중 다른 DB 참조는 사용자가 그 DB에 매핑되지 않아 916으로 트랜잭션 전체를 망가뜨리고, 샌드박스 밖 DB를 쓰는 부작용도 막을 수 없다", "basis": "SP10 사실 4, A18 설계 반영 제안 2(배치 분석에서 실행 전에 거부)" }
+  ]
+}

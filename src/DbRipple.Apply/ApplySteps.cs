@@ -312,72 +312,209 @@ internal static class DriftChecker
     }
 }
 
+/// <summary>KEYSET_HASH 대상 열(원본 카탈로그). TypeName은 CLR이면 sys.types 이름, 그 밖은 기반 시스템 형식명.</summary>
+internal sealed record HashColumn(string Name, string TypeName, bool IsAssemblyType, bool IsComputed);
+
+/// <summary>KEYSET_HASH 대상 테이블(원본 sys.tables 사용자 테이블).</summary>
+internal sealed record HashTarget(string Schema, string Name, bool IsMemoryOptimized, IReadOnlyList<HashColumn> Columns)
+{
+    /// <summary>"스키마.테이블"(TableInfo.DisplayName과 같은 형식).</summary>
+    public string Table => Schema + "." + Name;
+    /// <summary>[스키마].[테이블](QUOTENAME 규칙).</summary>
+    public string QuotedName => SqlText.Quote(Schema, Name);
+}
+
+/// <summary>테이블 상태 한 번 읽기. Checksum은 해시하지 않았거나(미리보기 테이블·비교 가능 열 없음) 빈 테이블이면 null.</summary>
+internal sealed record TableState(long Count, int? Checksum);
+
+/// <summary>실행 전 KEYSET_HASH 기준(대상 목록은 실행 뒤 읽기에도 그대로 쓴다).</summary>
+internal sealed record KeysetBaseline(IReadOnlyList<HashTarget> Targets, IReadOnlySet<string> PreviewTables, IReadOnlyDictionary<string, TableState> States);
+
 /// <summary>
-/// KEYSET 검증(§5.3 원본 스냅샷을 만들 수 없을 때). BEGIN TRAN 직후와 실행 뒤 모든 사용자 테이블 COUNT_BIG(*)를 비교하고,
-/// 미리보기 키 집합의 after 값을 비교한다. 행 수가 그대로인 UPDATE를 놓칠 수 있다는 한계를 Limitations에 적는다(호출자).
+/// KEYSET_HASH 검증(§5.3 원본 스냅샷을 만들 수 없을 때, 2026-11-13 KEYSET 대체). 원본 트랜잭션 안에서 사용자 문장 직전과 직후에
+/// 원본 카탈로그의 사용자 테이블마다 COUNT_BIG(*)를 읽고, 미리보기에 없던 테이블은 CHECKSUM_AGG(BINARY_CHECKSUM(비교 가능 열))도 읽어 비교한다.
+/// 미리보기 테이블은 건수 변화(netSummary 기대값)와 미리보기 키 집합 after 값으로 확인한다. 같은 세션이라 원본 연결의 LOCK_TIMEOUT을 그대로 탄다.
 /// </summary>
 internal static class KeysetVerifier
 {
-    /// <summary>KEYSET 한계 문구(결과 Limitations).</summary>
-    public const string Limitation =
-        "KEYSET 검증: 미리보기에 없는 테이블의 변경은 COUNT_BIG(*) 변화로만 감지하므로 행 수가 그대로인 UPDATE는 놓칠 수 있음. 새 IDENTITY 행과 그 자식 행은 건수로만 확인함";
+    /// <summary>KEYSET_HASH 한계 문구(결과 Limitations, 호출자가 모두 넣는다).</summary>
+    public static readonly IReadOnlyList<string> Limitations =
+    [
+        "KEYSET_HASH 검증: 미리보기에 있던 테이블은 행 수 변화와 미리보기 키 행 값으로만 확인하므로 키 밖 행의 UPDATE는 놓칠 수 있음. 새 IDENTITY 행과 그 자식 행은 건수로만 확인함",
+        "KEYSET_HASH 검증: 미리보기에 없던 테이블은 실행 전후 COUNT_BIG(*)와 CHECKSUM_AGG(BINARY_CHECKSUM(열))로만 비교함. 해시 충돌, 행끼리 값을 맞바꾸는 변경, 같은 행이 짝수 개 생기는 변경, 비교 불가 형식·계산 열의 변경은 놓칠 수 있음",
+        "KEYSET_HASH 검증: 원본의 모든 사용자 테이블을 실행 전후 두 번 전부 읽음(큰 DB는 느리고, 원본 LOCK_TIMEOUT을 넘으면 오류로 롤백)",
+        "KEYSET_HASH 검증: 실행 전후 읽기 사이에 다른 세션이 미리보기에 없던 테이블에 쓰면 거짓 불일치로 롤백함(커밋하지 않는 쪽으로 실패). 권한으로 보이지 않는 테이블은 비교하지 못함",
+    ];
+
+    /// <summary>예전 단일 문구 이름(첫 한계 문구).</summary>
+    public static string Limitation => Limitations[0];
+
+    /// <summary>BINARY_CHECKSUM이 무시하거나 오류를 내는 형식, 값이 늘 바뀌는 rowversion. CLR 형식(hierarchyid·geometry·geography·사용자 CLR)은 IsAssemblyType으로 뺀다.</summary>
+    static readonly HashSet<string> UncomparableTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "xml", "text", "ntext", "image", "sql_variant", "geography", "geometry", "hierarchyid", "timestamp", "rowversion", "json", "vector",
+    };
 
     const int TablesPerQuery = 50;
+    const int MaxListedColumns = 20;
 
-    /// <summary>"스키마.테이블" → COUNT_BIG(*). 세션의 현재 DB(원본)에서 센다.</summary>
-    public static async Task<IReadOnlyDictionary<string, long>> CountAllAsync(SqlSession session, IReadOnlyList<TableInfo> tables, int timeoutSeconds, CancellationToken ct)
+    /// <summary>원본 DB 문맥에서 대상 테이블·열 읽기(읽기만). 외부 테이블(PolyBase)은 원격을 읽게 되므로 뺀다.</summary>
+    public const string TargetsSql = """
+        SELECT s.name, t.name, t.is_memory_optimized, c.name,
+               CASE WHEN ty.is_assembly_type = 1 THEN ty.name ELSE TYPE_NAME(c.system_type_id) END,
+               ty.is_assembly_type, c.is_computed
+        FROM sys.tables AS t
+        JOIN sys.schemas AS s ON s.schema_id = t.schema_id
+        JOIN sys.columns AS c ON c.object_id = t.object_id
+        JOIN sys.types AS ty ON ty.user_type_id = c.user_type_id
+        WHERE t.is_ms_shipped = 0 AND t.is_external = 0
+        ORDER BY s.name, t.name, c.column_id;
+        """;
+
+    /// <summary>해시에 넣을 수 있는 열인지(계산 열은 기반 열로 대신 비교하고, 비결정 계산식의 거짓 불일치를 피한다).</summary>
+    public static bool IsComparable(HashColumn c) => !c.IsComputed && !c.IsAssemblyType && !UncomparableTypes.Contains(c.TypeName);
+
+    /// <summary>미리보기가 바꾼 테이블(netSummary·netChanges). 이 밖의 테이블이 해시 비교 대상이다.</summary>
+    public static IReadOnlySet<string> PreviewTables(PreviewRecord preview)
+    {
+        ArgumentNullException.ThrowIfNull(preview);
+        var set = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var r in preview.Result.NetSummary) set.Add(r.Table);
+        foreach (var n in preview.NetChanges) set.Add(n.Table);
+        return set;
+    }
+
+    /// <summary>테이블 묶음 하나의 상태 SQL(UNION ALL). 미리보기 테이블과 비교 가능 열이 없는 테이블은 건수만 읽는다. 메모리 최적화 테이블은 명시 트랜잭션에서 읽으려고 SNAPSHOT 힌트.</summary>
+    public static string StatesSql(IEnumerable<HashTarget> chunk, IReadOnlySet<string> previewTables) =>
+        string.Join("\nUNION ALL\n", chunk.Select(t =>
+        {
+            List<string> cols = previewTables.Contains(t.Table) ? [] : t.Columns.Where(IsComparable).Select(c => SqlText.Quote(c.Name)).ToList();
+            var hash = cols.Count == 0 ? "CAST(NULL AS int)" : $"CHECKSUM_AGG(BINARY_CHECKSUM({string.Join(", ", cols)}))";
+            var hint = t.IsMemoryOptimized ? " WITH (SNAPSHOT)" : "";
+            return $"SELECT {SqlText.NLiteral(t.Table)} AS t, COUNT_BIG(*) AS n, {hash} AS h FROM {t.QuotedName}{hint}";
+        })) + ";";
+
+    /// <summary>해시에서 뺀 열(비교 불가 형식) 한계 문구. 계산 열은 일반 문구로만 적는다. 없으면 빈 목록.</summary>
+    public static IReadOnlyList<string> ExcludedColumnNotes(IReadOnlyList<HashTarget> targets, IReadOnlySet<string> previewTables)
+    {
+        var excluded = targets.Where(t => !previewTables.Contains(t.Table))
+            .SelectMany(t => t.Columns.Where(c => !c.IsComputed && !IsComparable(c)).Select(c => $"{t.Table}.{c.Name}({c.TypeName})"))
+            .ToList();
+        var countOnly = targets.Where(t => !previewTables.Contains(t.Table) && !t.Columns.Any(IsComparable)).Select(t => t.Table).ToList();
+        var notes = new List<string>();
+        if (excluded.Count > 0)
+            notes.Add($"KEYSET_HASH 해시에서 뺀 비교 불가 형식 열 {excluded.Count}개(이 열만 바뀌는 변경은 놓침): "
+                      + string.Join(", ", excluded.Take(MaxListedColumns)) + (excluded.Count > MaxListedColumns ? " 외" : ""));
+        if (countOnly.Count > 0)
+            notes.Add($"KEYSET_HASH 비교 가능 열이 없어 행 수로만 비교한 테이블 {countOnly.Count}개: "
+                      + string.Join(", ", countOnly.Take(MaxListedColumns)) + (countOnly.Count > MaxListedColumns ? " 외" : ""));
+        return notes;
+    }
+
+    /// <summary>원본 카탈로그에서 대상 읽기(세션의 현재 DB = 원본).</summary>
+    public static async Task<IReadOnlyList<HashTarget>> ReadTargetsAsync(SqlSession session, int timeoutSeconds, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(session);
-        ArgumentNullException.ThrowIfNull(tables);
-        var counts = new Dictionary<string, long>(StringComparer.Ordinal);
-        var distinct = tables.GroupBy(t => t.DisplayName, StringComparer.Ordinal).Select(g => g.First()).OrderBy(t => t.DisplayName, StringComparer.Ordinal).ToList();
+        var result = new List<HashTarget>();
+        await using var cmd = session.CreateCommand(TargetsSql, timeoutSeconds);
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        string? schema = null, name = null;
+        var memory = false;
+        List<HashColumn>? cols = null;
+        while (await r.ReadAsync(ct))
+        {
+            var s = r.GetString(0);
+            var n = r.GetString(1);
+            if (cols is null || !string.Equals(s, schema, StringComparison.Ordinal) || !string.Equals(n, name, StringComparison.Ordinal))
+            {
+                if (cols is not null) result.Add(new HashTarget(schema!, name!, memory, cols));
+                (schema, name, memory, cols) = (s, n, r.GetBoolean(2), []);
+            }
+            cols.Add(new HashColumn(r.GetString(3), r.GetString(4), r.GetBoolean(5), r.GetBoolean(6)));
+        }
+        if (cols is not null) result.Add(new HashTarget(schema!, name!, memory, cols));
+        return result;
+    }
+
+    /// <summary>"스키마.테이블" → 상태. 세션의 현재 DB(원본)에서 읽는다(원본 연결의 LOCK_TIMEOUT을 그대로 탄다).</summary>
+    public static async Task<IReadOnlyDictionary<string, TableState>> ReadStatesAsync(
+        SqlSession session, IReadOnlyList<HashTarget> targets, IReadOnlySet<string> previewTables, int timeoutSeconds, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(targets);
+        var states = new Dictionary<string, TableState>(StringComparer.Ordinal);
+        var distinct = targets.GroupBy(t => t.Table, StringComparer.Ordinal).Select(g => g.First()).ToList();
         for (var i = 0; i < distinct.Count; i += TablesPerQuery)
         {
-            var chunk = distinct.Skip(i).Take(TablesPerQuery);
-            var sql = string.Join("\nUNION ALL\n", chunk.Select(t => $"SELECT {SqlText.NLiteral(t.DisplayName)} AS t, COUNT_BIG(*) AS n FROM {t.QuotedName}")) + ";";
-            await using var cmd = session.CreateCommand(sql, timeoutSeconds);
+            await using var cmd = session.CreateCommand(StatesSql(distinct.Skip(i).Take(TablesPerQuery), previewTables), timeoutSeconds);
             await using var reader = await cmd.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct)) counts[reader.GetString(0)] = reader.GetInt64(1);
+            while (await reader.ReadAsync(ct))
+                states[reader.GetString(0)] = new TableState(reader.GetInt64(1), reader.IsDBNull(2) ? null : reader.GetInt32(2));
         }
-        return counts;
+        return states;
     }
 
     /// <summary>
-    /// 건수 변화와 키 집합 after 대조. 건수: 모든 사용자 테이블에서 (실행 뒤 − 직후)가 미리보기 netSummary의 기대 변화(inserted + multisetAdded − deleted − multisetRemoved)와 같아야 한다.
-    /// 키 집합: INSERTED·UPDATED는 키로 읽은 현재 행을 after와(비결정 열은 존재·형식만), DELETED는 행이 없어야 한다.
-    /// IDENTITY가 있는 테이블의 INSERTED, 새 IDENTITY를 참조할 수 있는 테이블의 INSERTED, 키 없는 테이블은 건수로만 확인한다.
+    /// 전후 상태 비교. 미리보기 테이블(그리고 기대 변화가 있는 테이블): (실행 뒤 − 직전) 건수가 netSummary 기대 변화(inserted + multisetAdded − deleted − multisetRemoved)와 같아야 한다(KEYSET_TABLE_COUNT).
+    /// 미리보기에 없던 테이블: 건수와 해시가 그대로여야 한다(OUTSIDE_TABLE_CHANGED, 테이블당 1건).
     /// </summary>
-    public static async Task<(IReadOnlyList<TableCountChange> Counts, IReadOnlyList<ApplyMismatch> Mismatches)> VerifyAsync(
-        SqlSession session, PreviewRecord preview, IReadOnlyDictionary<string, long> before, IReadOnlyList<TableInfo> tables,
-        BaselineContext baseline, int timeoutSeconds, CancellationToken ct)
+    public static (IReadOnlyList<TableCountChange> Counts, IReadOnlyList<ApplyMismatch> Mismatches) CompareStates(
+        PreviewRecord preview, IReadOnlyDictionary<string, TableState> before, IReadOnlyDictionary<string, TableState> after, IReadOnlySet<string> previewTables)
     {
-        ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(preview);
         ArgumentNullException.ThrowIfNull(before);
-        ArgumentNullException.ThrowIfNull(baseline);
-        var after = await CountAllAsync(session, tables, timeoutSeconds, ct);
+        ArgumentNullException.ThrowIfNull(after);
         var expected = preview.Result.NetSummary.ToDictionary(
             r => r.Table, r => r.Inserted + r.MultisetAdded - r.Deleted - r.MultisetRemoved, StringComparer.Ordinal);
-
         var counts = new List<TableCountChange>();
         var mismatches = new List<ApplyMismatch>();
         foreach (var table in after.Keys.Union(before.Keys, StringComparer.Ordinal).Union(expected.Keys, StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal))
         {
             var b = before.GetValueOrDefault(table);
             var a = after.GetValueOrDefault(table);
+            var bn = b?.Count ?? 0;
+            var an = a?.Count ?? 0;
             var e = expected.GetValueOrDefault(table);
-            if (a - b == 0 && e == 0) continue;
-            counts.Add(new TableCountChange { Table = table, Before = b, After = a, ExpectedDelta = e });
-            if (a - b != e)
+            if (an - bn != 0 || e != 0) counts.Add(new TableCountChange { Table = table, Before = bn, After = an, ExpectedDelta = e });
+
+            if (!previewTables.Contains(table) && e == 0)
+            {
+                if (b == a) continue; // 레코드 값 비교(건수·해시, null 포함)
+                mismatches.Add(new ApplyMismatch
+                {
+                    Kind = MismatchKind.OutsideTableChanged, Table = table, Expected = Describe(b), Actual = Describe(a),
+                    Message = an != bn
+                        ? $"미리보기에 없던 {table}의 행 수가 실행 중 바뀜({bn} → {an})"
+                        : $"미리보기에 없던 {table}의 값 해시가 실행 중 바뀜(행 수 {an} 그대로, 행 수가 그대로인 UPDATE)",
+                });
+                continue;
+            }
+            if (an - bn != e)
                 mismatches.Add(new ApplyMismatch
                 {
                     Kind = MismatchKind.KeysetTableCount, Table = table,
                     Expected = e.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    Actual = (a - b).ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    Message = $"{table} 행 수 변화가 미리보기와 다름(기대 {e}, 실제 {a - b})",
+                    Actual = (an - bn).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    Message = $"{table} 행 수 변화가 미리보기와 다름(기대 {e}, 실제 {an - bn})",
                 });
         }
+        return (counts, mismatches);
+    }
 
+    static string Describe(TableState? s) =>
+        s is null ? "missing" : $"count={s.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)},checksum={(s.Checksum is { } h ? h.ToString(System.Globalization.CultureInfo.InvariantCulture) : "NULL")}";
+
+    /// <summary>
+    /// 미리보기 키 집합 after 대조: INSERTED·UPDATED는 키로 읽은 현재 행을 after와(비결정 열은 존재·형식만), DELETED는 행이 없어야 한다.
+    /// IDENTITY가 있는 테이블의 INSERTED, 새 IDENTITY를 참조할 수 있는 테이블의 INSERTED, 키 없는 테이블은 건수로만 확인한다(CompareStates).
+    /// </summary>
+    public static async Task<IReadOnlyList<ApplyMismatch>> VerifyKeyRowsAsync(
+        SqlSession session, PreviewRecord preview, IReadOnlyList<TableInfo> tables, BaselineContext baseline, int timeoutSeconds, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(preview);
+        ArgumentNullException.ThrowIfNull(baseline);
+        var mismatches = new List<ApplyMismatch>();
         var byName = tables.GroupBy(t => t.DisplayName, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
         var rules = MatchRules.Create(preview, baseline);
         var ignored = new SortedSet<string>(StringComparer.Ordinal);
@@ -410,25 +547,54 @@ internal static class KeysetVerifier
                 rules.CompareValues(n.Table, n.Change, n.Key, n.After, actual, null, mismatches, ignored);
             }
         }
-        return (counts, mismatches);
+        return mismatches;
     }
 }
 
-/// <summary>원본 스냅샷 생성 결과. 2026-11-13: 생성 실패는 모두 Failed(error)다. KEYSET은 실행 전 CheckSnapshotCapability로만 정한다(조용한 강등 없음).</summary>
+/// <summary>원본 DB 옵션(sys.databases, 읽기만). [적용] 사전 경고에 쓴다.</summary>
+internal sealed record OriginDbFlags(bool Trustworthy, bool Published, bool MergePublished, bool Subscribed, bool Cdc, bool Broker);
+
+/// <summary>[적용] 원본 사전 경고(2026-11-13, 막지 않음). 문구는 결과 verification.limitations에 들어간다.</summary>
+internal static class OriginWarnings
+{
+    /// <summary>원본 DB 문맥에서 읽는다(연결한 DB의 sys.databases 행은 늘 보인다).</summary>
+    public const string Sql =
+        "SELECT is_trustworthy_on, is_published, is_merge_published, is_subscribed, is_cdc_enabled, is_broker_enabled FROM sys.databases WHERE database_id = DB_ID();";
+
+    public const string Trustworthy = "원본 DB가 TRUSTWORTHY ON: 트리거·프로시저의 EXECUTE AS가 DB 밖 권한을 쓸 수 있어 원본 실행이 미리보기와 다를 수 있음";
+    public const string Replication = "원본 DB가 복제 게시·구독 중: 커밋한 변경이 다른 서버로 전파됨(병합 복제는 추적 행도 씀)";
+    public const string Cdc = "원본 DB에 CDC가 켜짐: 커밋한 변경이 변경 테이블에 기록되어 소비자에게 전달됨";
+    public const string Broker = "원본 DB에 Service Broker가 켜짐: 트리거·프로시저가 보낸 메시지는 커밋 뒤 다른 서비스로 전달될 수 있음(미리보기에서는 보이지 않음)";
+    public const string Unknown = "원본 DB 옵션(TRUSTWORTHY·복제·CDC·Service Broker)을 확인 못 함(sys.databases를 읽지 못함)";
+
+    /// <summary>플래그 → 문구. null이면 확인 못 함.</summary>
+    public static IReadOnlyList<string> Describe(OriginDbFlags? f)
+    {
+        if (f is null) return [Unknown];
+        var list = new List<string>();
+        if (f.Trustworthy) list.Add(Trustworthy);
+        if (f.Published || f.MergePublished || f.Subscribed) list.Add(Replication);
+        if (f.Cdc) list.Add(Cdc);
+        if (f.Broker) list.Add(Broker);
+        return list;
+    }
+}
+
+/// <summary>원본 스냅샷 생성 결과. 2026-11-13: 생성 실패는 모두 Failed(error)다. KEYSET_HASH는 실행 전 CheckSnapshotCapability로만 정한다(조용한 강등 없음).</summary>
 internal enum SnapshotOutcome
 {
     /// <summary>만들었다(SNAPSHOT_NETDIFF).</summary>
     Created,
-    /// <summary>만들지 못했다(이름 충돌, 권한, 디스크, 그 밖 SQL 오류). KEYSET으로 낮추지 않고 error로 끝낸다.</summary>
+    /// <summary>만들지 못했다(이름 충돌, 권한, 디스크, 그 밖 SQL 오류). KEYSET_HASH로 낮추지 않고 error로 끝낸다.</summary>
     Failed,
 }
 
-/// <summary>실행 전 검증 모드 결정 결과. CanSnapshot이 false면 KEYSET만 가능하고, 요청 동의(allowKeysetVerification)가 있어야 실행한다.</summary>
+/// <summary>실행 전 검증 모드 결정 결과. CanSnapshot이 false면 KEYSET_HASH만 가능하고, 요청 동의(allowKeysetVerification)가 있어야 실행한다.</summary>
 internal sealed record SnapshotCapability(bool CanSnapshot, string? Reason);
 
 /// <summary>
 /// 원본 스냅샷(§5.3 AW_Origin_pre). 남은 스냅샷을 지우고 원본 데이터 파일 논리 이름마다 Core BaselineSql.SnapshotPath로 경로를 지정해 만든다.
-/// 스냅샷을 만들 수 없는 DB(A14)만 Unsupported로 돌려 KEYSET으로 낮추고, 이름 충돌·권한 오류는 Failed로 구분한다. 원본 자체에는 DDL을 하지 않는다(스냅샷은 별도 DB).
+/// 스냅샷을 만들 수 없는 DB(A14)만 Unsupported로 돌려 KEYSET_HASH로 낮추고, 이름 충돌·권한 오류는 Failed로 구분한다. 원본 자체에는 DDL을 하지 않는다(스냅샷은 별도 DB).
 /// </summary>
 internal static class OriginSnapshot
 {
@@ -501,7 +667,7 @@ internal static class OriginSnapshot
         }
         catch (SqlException ex)
         {
-            // 예상 밖 오류도 KEYSET으로 낮추지 않는다(2026-11-13): 검증 모드는 실행 전에 정했다.
+            // 예상 밖 오류도 KEYSET_HASH로 낮추지 않는다(2026-11-13): 검증 모드는 실행 전에 정했다.
             return (SnapshotOutcome.Failed, $"원본 스냅샷 생성 실패(오류 {ex.Number}): {ex.Message}");
         }
     }

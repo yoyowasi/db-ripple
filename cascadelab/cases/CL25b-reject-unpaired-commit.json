@@ -1,0 +1,30 @@
+{
+  "id": "CL25b",
+  "pattern": "CL25",
+  "title": "거부: 짝이 안 맞는 COMMIT(BEGIN 없음) 프로시저 (EXEC)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl25.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "EXEC cl25.usp_ExtraCommit @id = 1;" }
+  ],
+  "expected": {
+    "status": "rejected",
+    "errorNumber": null,
+    "statementStatus": [],
+    "changes": [],
+    "firings": [],
+    "edges": [],
+    "rejects": [
+      { "ruleId": "REJECT_PROC_UNBALANCED_COMMIT", "statementIndex": 1 }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "ruleId", "basis": "2026-11-13 통합 때 AnalysisRules의 REJECT_PROC_UNBALANCED_COMMIT로 확정(정적 분석 단위 테스트 기준, DB 미실행)" },
+      { "id": "OO2", "what": "남는 COMMIT이 봉투 1겹에서 바깥 트랜잭션을 확정해 변경이 롤백 뒤에도 남는 것", "basis": "SP11(p_extra_commit, 봉투 1겹)이 실측한다. 이 사례를 거부하는 근거다(미리보기 트랜잭션이 확정되면 원본 격리가 깨진다)" }
+    ]
+  },
+  "rationale": [
+    { "claim": "BEGIN 없이 COMMIT하는 프로시저는 호출한 쪽 트랜잭션을 확정할 수 있어 ROLLBACK으로 되돌릴 수 없다", "basis": "COMMIT TRANSACTION 문서(@@TRANCOUNT가 1이면 확정), 트리거 안 COMMIT 거부와 같은 근거(AnalysisRules.RejectTriggerTransactionControl, E13)" },
+    { "claim": "오라클로 실행하면 이 COMMIT이 오라클 트랜잭션을 확정해 원본 시드를 오염시키므로 거부 사례는 오라클을 실행하지 않는다", "basis": "answer-format v0.3" }
+  ]
+}

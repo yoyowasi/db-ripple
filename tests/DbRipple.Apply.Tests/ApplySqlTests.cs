@@ -220,11 +220,62 @@ public sealed class ApplySqlTests
         var result = await lab.ApplyAsync(record);
 
         Assert.Equal(ApplyStatus.Committed, result!.Status);
-        Assert.Equal(VerificationMode.Keyset, result.Verification.Mode);
+        Assert.Equal(VerificationMode.KeysetHash, result.Verification.Mode);
         Assert.Null(result.Verification.NetSummaryMatch);
         Assert.Contains(result.Verification.TableCounts, c => c.Table == "cl01.A" && c.After - c.Before == -1 && c.ExpectedDelta == -1);
         Assert.Contains(KeysetVerifier.Limitation, result.Verification.Limitations);
         Assert.Equal(0, await lab.ScalarAsync<int>($"SELECT COUNT(*) FROM sys.databases WHERE name = N'{lab.Origin}_pre';"));
+    }
+
+    // KEYSET_HASH: 미리보기 뒤 원본에서만 켜지는 트리거 분기가 미리보기에 없던 테이블을 행 수 그대로 UPDATE한다.
+    static readonly string[] Outside =
+    [
+        "CREATE TABLE dbo.T (id int NOT NULL PRIMARY KEY, v int NOT NULL);",
+        "INSERT INTO dbo.T (id, v) VALUES (1, 1), (2, 5);",
+        "CREATE TABLE dbo.Flag (id int NOT NULL PRIMARY KEY, active bit NOT NULL);",
+        "INSERT INTO dbo.Flag (id, active) VALUES (1, 0);",
+        "CREATE TABLE dbo.Side (id int NOT NULL PRIMARY KEY, n int NOT NULL, doc xml NULL);",
+        "INSERT INTO dbo.Side (id, n) VALUES (1, 10);",
+        """
+        CREATE TRIGGER dbo.tr_T_side ON dbo.T AFTER UPDATE AS
+        BEGIN
+            SET NOCOUNT ON;
+            IF EXISTS (SELECT 1 FROM dbo.Flag WHERE id = 1 AND active = 1)
+                UPDATE dbo.Side SET n = n + 1 WHERE id = 1;
+        END;
+        """,
+    ];
+
+    [SqlFact]
+    public async Task Keyset_hash_catches_same_row_count_update_in_outside_table()
+    {
+        await using var lab = await ApplyLab.CustomAsync("khash", Outside, new ApplySettings { ExecuteAsUser = PreviewUserSql.UserName, ForceKeyset = true });
+        var record = await lab.PreviewAsync("UPDATE dbo.T SET v = 2 WHERE id = 1;");
+        await lab.ExecOnOriginAsync("UPDATE dbo.Flag SET active = 1 WHERE id = 1;");   // 실행 전(BEGIN TRAN 전)이라 Flag는 비교에 걸리지 않는다
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal(ApplyStatus.RolledBackMismatch, result!.Status);
+        Assert.Equal(VerificationMode.KeysetHash, result.Verification.Mode);
+        var m = Assert.Single(result.Verification.Mismatches);
+        Assert.Equal(MismatchKind.OutsideTableChanged, m.Kind);
+        Assert.Equal("dbo.Side", m.Table);
+        Assert.Contains(result.Verification.Limitations, l => l.Contains("dbo.Side.doc(xml)", StringComparison.Ordinal));
+        Assert.Equal(10, await lab.ScalarAsync<int>("SELECT n FROM dbo.Side WHERE id = 1;"));
+        Assert.Equal(1, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
+    }
+
+    [SqlFact]
+    public async Task Keyset_hash_commits_when_outside_tables_are_unchanged()
+    {
+        await using var lab = await ApplyLab.CustomAsync("khok", Outside, new ApplySettings { ExecuteAsUser = PreviewUserSql.UserName, ForceKeyset = true });
+        var record = await lab.PreviewAsync("UPDATE dbo.T SET v = 2 WHERE id = 1;");
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal(ApplyStatus.Committed, result!.Status);
+        Assert.Empty(result.Verification.Mismatches);
+        Assert.Equal(2, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
     }
 }
 #endif

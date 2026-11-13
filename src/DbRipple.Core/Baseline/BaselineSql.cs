@@ -268,6 +268,16 @@ public static class BaselineSql
             """;
     }
 
+    /// <summary>복원된 샌드박스의 TRUSTWORTHY가 켜져 있으면 끈다(로컬 샌드박스 master 문맥에서만). sa 소유 + TRUSTWORTHY ON이면 DB 안 코드가 서버 권한을 얻을 수 있다.</summary>
+    public static string TrustworthyOff(string sandbox)
+    {
+        ValidateName(sandbox, "샌드박스");
+        return $"""
+            IF EXISTS (SELECT 1 FROM sys.databases WHERE name = {SqlText.NLiteral(sandbox)} AND is_trustworthy_on = 1)
+                ALTER DATABASE {SqlText.Quote(sandbox)} SET TRUSTWORTHY OFF;
+            """;
+    }
+
     // 경로 조각에 쓸 수 없는 문자(/, .. 등)는 _로 바꾼다
     static string FilePart(string s) => Regex.Replace(s, @"[^\w\-]", "_");
 }

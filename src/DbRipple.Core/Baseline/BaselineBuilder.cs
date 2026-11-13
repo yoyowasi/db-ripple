@@ -3,7 +3,11 @@ using DbRipple.Core.Catalog;
 
 namespace DbRipple.Core.Baseline;
 
-public sealed record BaselineOptions(string Source, string Sandbox, string Snapshot, string BackupPath);
+public sealed record BaselineOptions(string Source, string Sandbox, string Snapshot, string BackupPath)
+{
+    /// <summary>감사 장치·실행 사용자 설치 전 DB 범위 DDL 트리거 검사(복원된 샌드박스 카탈로그 → 멈출 이유, 통과면 null). null이면 검사하지 않는다.</summary>
+    public Func<DbCatalog, string?>? DdlTriggerGuard { get; init; }
+}
 
 /// <summary>DB 접근 단계. database는 실행 문맥(master, 원본 또는 샌드박스).</summary>
 public interface IBaselineSteps
@@ -50,7 +54,7 @@ public static class BaselineBuilder
         await s.ExecuteAsync(Master, BaselineSql.Backup(o.Source, o.BackupPath), ct);      // 2
         var backupAt = clock();
         await RestoreAsync(s, o.Sandbox, o.BackupPath, o.Source, ct);                       // 3
-        var (catalog, plan) = await InstallAsync(s, o.Sandbox, clock, ct);                 // 4~5
+        var (catalog, plan) = await InstallAsync(s, o.Sandbox, o.DdlTriggerGuard, clock, ct); // 4~5
         var match = await s.FingerprintMatchesAsync(o.Source, o.Sandbox, ct);             // 6
         var dataFiles = catalog.Files.Where(f => f.TypeDesc == "ROWS").Select(f => f.LogicalName);
         await s.ExecuteAsync(Master, BaselineSql.CreateSnapshot(o.Snapshot, o.Sandbox, dataFiles), ct); // 7
@@ -114,10 +118,11 @@ public static class BaselineBuilder
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* 이름에 회차가 있어 다음 실행과 겹치지 않는다 */ }
             }
         }
+        await sandbox.ExecuteAsync(Master, BaselineSql.TrustworthyOff(o.Sandbox), ct); // 복원 직후(소유자를 로컬 sa로 바꾸기 전) TRUSTWORTHY 끄기
         await sandbox.ExecuteAsync(Master, BaselineSql.AfterRestoreLocal(o.Sandbox, originFingerprint.NestedTriggers, originFingerprint.DisallowResultsFromTriggers), ct);
 
         // 4~7
-        var (catalog, plan) = await InstallAsync(sandbox, o.Sandbox, clock, ct);
+        var (catalog, plan) = await InstallAsync(sandbox, o.Sandbox, o.DdlTriggerGuard, clock, ct);
         var sandboxFingerprint = await sandbox.ReadFingerprintAsync(o.Sandbox, ct);
         var comparison = FingerprintComparison.Compare(originFingerprint, sandboxFingerprint, ServerMode.Split);
         var dataFiles = catalog.Files.Where(f => f.TypeDesc == "ROWS").Select(f => f.LogicalName);
@@ -131,12 +136,16 @@ public static class BaselineBuilder
         };
     }
 
-    // 4. 카탈로그·감사 스키마 충돌 → 4b. 실행 사용자 → 5. 수집 장치 설치(전후 행 수 기록)
-    static async Task<(DbCatalog Catalog, InstallPlan Plan)> InstallAsync(IBaselineSteps s, string sandbox, Func<DateTimeOffset> clock, CancellationToken ct)
+    // 4. 카탈로그·감사 스키마 충돌·DDL 트리거 검사 → 4b. 실행 사용자 → 5. 수집 장치 설치(전후 행 수 기록)
+    static async Task<(DbCatalog Catalog, InstallPlan Plan)> InstallAsync(
+        IBaselineSteps s, string sandbox, Func<DbCatalog, string?>? ddlTriggerGuard, Func<DateTimeOffset> clock, CancellationToken ct)
     {
         var catalog = await s.ReadCatalogAsync(sandbox, ct);
         if (catalog.Tables.FirstOrDefault(t => string.Equals(t.Schema, AuditTriggerGenerator.StoreSchema, StringComparison.OrdinalIgnoreCase)) is { } clash)
             throw new InvalidOperationException($"샌드박스에 이미 {clash.Schema} 스키마 테이블({clash.Schema}.{clash.Name})이 있음: 감사 저장소 스키마(§6.2)와 겹쳐 설치하지 않음");
+        // 4a. 4b·5의 DDL(CREATE USER·GRANT·CREATE TRIGGER)은 DB 범위 DDL 트리거를 발동시킨다: 위험한 트리거면 아무 DDL도 하기 전에 멈춘다.
+        if (ddlTriggerGuard?.Invoke(catalog) is { } risky)
+            throw new InvalidOperationException($"기준선 구축을 멈춤: {risky}");
         var before = await s.ReadRowCountsAsync(sandbox, ct);
         // 4b. 실행 사용자(Q12 수정): DDL 트리거가 CREATE USER·GRANT에 남기는 자동 커밋 행이 기준 스냅샷에 들어가도록 C9 설치 전에 만든다.
         var input = catalog.ToCaptureInput();

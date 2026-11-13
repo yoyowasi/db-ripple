@@ -5,7 +5,8 @@ namespace DbRipple.Eval;
 /// <summary>
 /// 대조군(§10.5). 같은 사례·같은 지표로 잰다. system 열 값은 Systems의 상수다.
 /// <list type="bullet">
-/// <item>B0(직접 대상만, OUTPUT 기반 도구 모사): 오라클 순 변경을 문장의 직접 대상 테이블로 거른 것을 예측으로 쓴다. M3 예측 간선은 손 정답의 DIRECT 간선(certain)뿐이다.</item>
+/// <item>B0(직접 대상만, OUTPUT 기반 도구 모사): 오라클 순 변경을 문장의 직접 대상 테이블로 거른 것을 예측으로 쓴다. M3 예측 간선은 손 정답의 DIRECT 간선(certain)뿐이다.
+/// EXEC 문장(v0.3)의 직접 대상은 프로시저의 정적 쓰기 대상(손 정답 PROC_DIRECT 행 테이블 근사, DirectTargets 주석)이다. B0의 M3 간선은 PROC_DIRECT 간선을 넣지 않는다(DIRECT 간선만).</item>
 /// <item>B2(사본 + 최종 차이, Data Compare 자동화판): 오라클 순 변경을 그대로 예측으로 쓴다(M1은 오라클과 같다). 원인·순서는 없으므로 M3 예측 간선은 0개다.
 /// 작업량 지표 manual_select_tables = 직접 대상이 아닌데 바뀐 테이블 수(사용자가 원인을 알려면 직접 찾아 SELECT해야 했을 테이블).</item>
 /// <item>B1(FK 메타데이터 정적 예측)은 구현하지 않았다(자를 목록 1순위, §11.4).</item>
@@ -45,7 +46,10 @@ public static class Baselines
             var parts = m.Groups["t"].Value.Split('.').Select(p => p.Trim().Trim('[', ']')).ToList();
             if (parts.Count >= 2) set.Add(parts[^2] + "." + parts[^1]);
         }
-        foreach (var r in hand.Rows.Where(r => r.Causes.Contains("DIRECT"))) set.Add(r.Table);
+        // v0.3(EXEC, 설계 §10.5): B0은 EXEC 문장의 직접 대상을 "프로시저의 정적 쓰기 대상"으로 본다. 프로시저 본문에 INSERT/UPDATE/DELETE로 적힌 테이블 = 손 정답의 PROC_DIRECT 행 테이블이다
+        // (FK 연쇄·트리거가 바꾼 테이블은 본문에 없으니 정적으로 보이지 않는다). DIRECT 행 테이블을 쓰는 방식과 같은 근사다.
+        // TODO(통합): 제품 분석기의 공개 API(그래프 procedureCall 노드 writeTargets[])로 정적 쓰기 대상을 얻을 수 있게 되면 손 정답 근사를 그 값으로 바꾼다. 하네스 독립성(§10.3) 때문에 지금은 구현하지 않는다.
+        foreach (var r in hand.Rows.Where(r => r.Causes.Contains("DIRECT") || r.Causes.Contains("PROC_DIRECT"))) set.Add(r.Table);
         return set;
     }
 

@@ -22,6 +22,9 @@ public static class ErrorRules
     /// <summary>사용자 정의 오류 번호 하한(RAISERROR 메시지 문자열은 50000, THROW는 50000 이상).</summary>
     public const int UserErrorMin = 50000;
 
+    /// <summary>EXECUTE 뒤 트랜잭션 수가 들어갈 때와 다름(프로시저 안 ROLLBACK·COMMIT, EXEC 미리보기). SP14 뒤 재검토.</summary>
+    public const int TranCountMismatch = 266;
+
     /// <summary>오류를 문장 상태와 StatementError로 바꾼다.</summary>
     public static (StatementStatus Status, StatementError Error) Classify(SqlException ex, BaselineContext baseline)
     {
@@ -64,9 +67,12 @@ public static class ErrorRules
     /// <item>후보를 넓히면 "모름" 쪽(false)으로만 기우는 것은 아니다(ROLLBACK 트리거가 더 들어올 수 있음). 그래도 COMMIT 트리거가 하나라도 후보에 있으면 false라, 확정된 변경을 trigger_blocked로 덮는 쪽보다 failed로 보이는 쪽으로 닫힌다.</item>
     /// </list>
     /// </summary>
-    public static bool EndedByRollback(string? procedure, string target, ChangeOperation kind, BaselineContext baseline)
+    public static bool EndedByRollback(string? procedure, string? target, ChangeOperation kind, BaselineContext baseline, IReadOnlyList<string>? execWriteTargets = null)
     {
-        var candidates = CascadeTriggers(target, kind, baseline);
+        // EXEC: 프로시저의 정적 쓰기 대상마다 연산을 가리지 않고 넓힌다(쓰기 대상을 모르면 후보 없음 → false, 닫힌 쪽).
+        var candidates = kind == ChangeOperation.Exec
+            ? (execWriteTargets ?? []).SelectMany(w => CascadeTriggers(w, null, baseline)).ToList()
+            : CascadeTriggers(target ?? throw new ArgumentNullException(nameof(target)), kind, baseline);
         if (!string.IsNullOrEmpty(procedure))
             candidates.AddRange(baseline.Triggers.Where(t => !t.IsAuditTrigger && string.Equals(LastPart(t.Trigger), LastPart(procedure), StringComparison.OrdinalIgnoreCase)));
         candidates = candidates.Distinct().ToList();
@@ -76,9 +82,11 @@ public static class ErrorRules
     /// <summary>
     /// 문장 하나가 발동시킬 수 있는 활성 사용자 트리거(정적 상한). 첫 테이블은 연산이 맞는 트리거만, 그 뒤 테이블은 이벤트를 가리지 않는다(연쇄 연산을 정적으로 다 알 수 없음).
     /// 테이블 간 이동: FK 참조 동작(부모 → 자식, NO_ACTION 제외, 비활성 FK 제외)과 트리거 정적 쓰기 대상. 비활성 트리거는 발동하지 않으므로 뺀다(E22).
+    /// kind가 null이면(EXEC 프로시저의 쓰기 대상) 첫 테이블도 이벤트를 가리지 않는다.
     /// </summary>
-    public static List<TriggerStaticInfo> CascadeTriggers(string target, ChangeOperation kind, BaselineContext baseline)
+    public static List<TriggerStaticInfo> CascadeTriggers(string target, ChangeOperation? kind, BaselineContext baseline)
     {
+        if (kind == ChangeOperation.Exec) throw new ArgumentOutOfRangeException(nameof(kind), kind, "행 연산만(EXEC는 쓰기 대상마다 kind = null)");
         var tablesById = baseline.Catalog.Tables.ToDictionary(t => t.ObjectId);
         var idByName = baseline.Catalog.Tables.GroupBy(t => t.Schema + "." + t.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First().ObjectId, StringComparer.OrdinalIgnoreCase);
@@ -96,7 +104,7 @@ public static class ErrorRules
         {
             var (table, first) = queue.Dequeue();
             if (!seen.Add(table)) continue;
-            var fired = active.Where(t => string.Equals(t.Table, table, StringComparison.OrdinalIgnoreCase) && (!first || t.Events.Contains(kind))).ToList();
+            var fired = active.Where(t => string.Equals(t.Table, table, StringComparison.OrdinalIgnoreCase) && (!first || kind is not { } k || t.Events.Contains(k))).ToList();
             result.AddRange(fired);
             foreach (var w in fired.SelectMany(t => t.WriteTargets)) queue.Enqueue((w, false));
             if (idByName.TryGetValue(table, out var id) && children.TryGetValue(id, out var kids))

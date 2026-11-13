@@ -30,8 +30,11 @@ public sealed class SettingsApiTests : IAsyncLifetime
 
     sealed class Protector : ISecretProtector
     {
+        public bool Fail;
         // 시험용: 뒤집고 표지를 붙인다(평문이 파일에 그대로 남지 않는지만 본다).
-        public byte[] Protect(byte[] data) => [0xD9, .. Enumerable.Reverse(data)];
+        public byte[] Protect(byte[] data) => Fail
+            ? throw new System.Security.Cryptography.CryptographicException("키 링을 쓸 수 없음")
+            : [0xD9, .. Enumerable.Reverse(data)];
         public byte[] Unprotect(byte[] data) => data[0] == 0xD9 ? [.. Enumerable.Reverse(data.Skip(1))] : throw new InvalidDataException();
     }
 
@@ -63,7 +66,9 @@ public sealed class SettingsApiTests : IAsyncLifetime
         }
     }
 
-    ProfileSettingsService NewService() => new(new ProfileSettingsOptions { DataDir = dir, Env = env }, new Protector(), probe, target);
+    readonly Protector protector = new();
+
+    ProfileSettingsService NewService() => new(new ProfileSettingsOptions { DataDir = dir, Env = env }, protector, probe, target);
 
     public async Task InitializeAsync() => await StartAsync();
 
@@ -322,5 +327,39 @@ public sealed class SettingsApiTests : IAsyncLifetime
     public void Probe_error_text_has_number_only()
     {
         Assert.Equal("연결 실패(TimeoutException)", SqlServerProbe.Describe(new TimeoutException("Password=SECRET")));
+    }
+
+    [Fact]
+    public async Task Protect_failure_is_400_and_leaves_no_half_saved_files()
+    {
+        var profilePath = Path.Combine(dir, ProfileSettingsService.ProfileFileName);
+        var secretPath = Path.Combine(dir, ProfileSettingsService.SecretFileName);
+
+        // 처음 저장부터 실패: 파일이 하나도 생기지 않는다.
+        protector.Fail = true;
+        var first = await ErrorsAsync(await PutAsync(Body()));
+        Assert.Contains("origin.rememberPassword", first.Keys);
+        Assert.Contains("sandbox.rememberPassword", first.Keys);
+        Assert.False(File.Exists(profilePath));
+        Assert.False(File.Exists(secretPath));
+        Assert.Empty(target.Switched);
+
+        // 저장된 상태에서 실패: 프로필·비밀번호 파일 둘 다 그대로.
+        protector.Fail = false;
+        Assert.Equal(HttpStatusCode.NoContent, (await PutAsync(Body())).StatusCode);
+        var profileBefore = await File.ReadAllBytesAsync(profilePath);
+        var secretBefore = await File.ReadAllBytesAsync(secretPath);
+        protector.Fail = true;
+        var errors = await ErrorsAsync(await PutAsync(Body(originServer: "othersql", originPassword: "Other!pw")));
+        Assert.Contains("origin.rememberPassword", errors.Keys);
+        Assert.DoesNotContain(errors.Values.SelectMany(v => v), m => m.Contains("키 링", StringComparison.Ordinal)); // 예외 문구는 내보내지 않는다
+        Assert.Equal(profileBefore, await File.ReadAllBytesAsync(profilePath));
+        Assert.Equal(secretBefore, await File.ReadAllBytesAsync(secretPath));
+        Assert.Single(target.Switched);
+        Assert.False(File.Exists(profilePath + ".tmp"));
+
+        // 비밀번호 기억을 끄면 보호가 필요 없어 저장된다.
+        Assert.Equal(HttpStatusCode.NoContent, (await PutAsync(Body(remember: false))).StatusCode);
+        Assert.False(File.Exists(secretPath));
     }
 }

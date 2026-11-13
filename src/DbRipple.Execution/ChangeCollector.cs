@@ -187,9 +187,11 @@ public sealed class ChangeCollector : IChangeCollector
             case ChangeOperation.Delete:
                 drafts.AddRange(dels.Select(d => new Draft(d, null, keyed ? keyPairing : dels.Count == 1 ? Pairing.SingleRow : Pairing.Unpaired)));
                 break;
-            default:
+            case ChangeOperation.Update:
                 drafts.AddRange(PairUpdate(dels, ins, keyed, keyPairing, ctx.Table));
                 break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(f), f.Operation, "행 연산만");
         }
 
         var states = drafts.Select(d => ToRow(f, d, key, ctx)).ToList();
@@ -447,7 +449,13 @@ public sealed class ChangeCollector : IChangeCollector
     static AuditOrder Order(ManifestTable? mt, ChangeOperation op)
     {
         if (mt is null) return AuditOrder.None;
-        var v = op switch { ChangeOperation.Insert => mt.AuditOrder.Insert, ChangeOperation.Update => mt.AuditOrder.Update, _ => mt.AuditOrder.Delete };
+        var v = op switch
+        {
+            ChangeOperation.Insert => mt.AuditOrder.Insert,
+            ChangeOperation.Update => mt.AuditOrder.Update,
+            ChangeOperation.Delete => mt.AuditOrder.Delete,
+            _ => throw new ArgumentOutOfRangeException(nameof(op), op, "행 연산만"),
+        };
         return v == CaptureManifest.Last ? AuditOrder.Last : AuditOrder.None;
     }
 

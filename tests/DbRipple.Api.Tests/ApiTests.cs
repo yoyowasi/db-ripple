@@ -375,6 +375,34 @@ public sealed class ApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Rows_net_table_filter_pages_on_server_and_validates()
+    {
+        var r = TestData.Record("pv_a", clock.GetUtcNow(), rowChanges: 5, nets: 5);
+        await store.SaveAsync(r with { NetChanges = [.. r.NetChanges.Select((n, i) => i < 3 ? n : n with { Table = "Sales.Order" })] }, default);
+
+        using (var doc = await BodyAsync(await client.GetAsync("/api/previews/pv_a/rows?view=net&table=dbo.T&offset=2&limit=1")))
+        {
+            Assert.Equal(3, doc.RootElement.GetProperty("total").GetInt32());
+            var row = Assert.Single(doc.RootElement.GetProperty("rows").EnumerateArray());
+            Assert.Equal("dbo.T", row.GetProperty("table").GetString());
+            Assert.Equal("3", row.GetProperty("key").GetProperty("values")[0].GetString());
+        }
+        using (var doc = await BodyAsync(await client.GetAsync("/api/previews/pv_a/rows?view=net&table=Sales.Order")))
+            Assert.Equal(2, doc.RootElement.GetProperty("total").GetInt32());
+        using (var doc = await BodyAsync(await client.GetAsync("/api/previews/pv_a/rows?view=net&table=dbo.Nothing")))
+        {
+            Assert.Equal(0, doc.RootElement.GetProperty("total").GetInt32()); // 없는 테이블은 빈 페이지
+            Assert.Equal(0, doc.RootElement.GetProperty("rows").GetArrayLength());
+        }
+        using (var doc = await BodyAsync(await client.GetAsync("/api/previews/pv_a/rows?view=net&table=")))
+            Assert.Equal(5, doc.RootElement.GetProperty("total").GetInt32()); // 빈 값은 필터 없음
+
+        foreach (var q in new[] { "view=net&table=T", "view=net&table=dbo.", "view=net&table=dbo." + new string('x', 129), "view=event&table=dbo.T", "table=dbo.T", "view=net&table=dbo.T&limit=1001" })
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/previews/pv_a/rows?" + q)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/previews/none/rows?view=net&table=dbo.T")).StatusCode);
+    }
+
+    [Fact]
     public async Task Export_returns_preview_record_json_file()
     {
         await store.SaveAsync(TestData.Record("pv_a", clock.GetUtcNow()), default);

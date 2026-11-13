@@ -46,7 +46,7 @@ const emit = defineEmits<{
 // markRaw: 컴포넌트 정의를 반응형으로 만들지 않는다.
 const nodeTypes = { ripple: markRaw(FlowNode) } as never
 const edgeTypes = { ripple: markRaw(RippleEdge) } as never
-const TONES: EdgeTone[] = ['direct', 'fk', 'fires', 'blocked', 'residual']
+const TONES: EdgeTone[] = ['direct', 'call', 'fk', 'fires', 'blocked', 'residual']
 const FIT = { padding: 0.05, maxZoom: 1 }
 
 const { fitView, zoomIn, zoomOut, setViewport, viewport } = useVueFlow({ id: props.flowId })

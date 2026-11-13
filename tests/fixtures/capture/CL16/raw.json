@@ -16,6 +16,8 @@
         },
         "status": "ok",
         "rowsAffected": 2,
+        "returnValue": null,
+        "resultSetCount": null,
         "captureSeqRange": [
           33,
           34

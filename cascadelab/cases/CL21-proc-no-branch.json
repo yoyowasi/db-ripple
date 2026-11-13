@@ -1,0 +1,52 @@
+{
+  "id": "CL21",
+  "pattern": "CL21",
+  "title": "분기 없는 프로시저: 부모 UPDATE, 0행 UPDATE, 로그 INSERT, 안쪽 프로시저 1개 (EXEC)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl21.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "EXEC cl21.usp_Outer @id = 1, @delta = 5;", "returnValue": 0 }
+  ],
+  "expected": {
+    "status": "ok",
+    "errorNumber": null,
+    "statementStatus": [ { "index": 1, "status": "ok" } ],
+    "changes": [
+      { "table": "cl21.Parent", "keyColumns": ["id"], "inserted": [], "deleted": [],
+        "updated": [ { "key": { "id": 1 }, "causes": ["PROC_DIRECT"], "changedColumns": ["qty"], "after": { "qty": 15 } } ],
+        "basis": "usp_Outer의 첫 UPDATE: id = 1, qty 10 + 5. id 2는 그대로" },
+      { "table": "cl21.Spare", "keyColumns": ["id"], "inserted": [], "updated": [], "deleted": [],
+        "basis": "usp_Outer의 둘째 UPDATE는 id = 1인 행이 없어 0행이다(시드는 id 100뿐)" },
+      { "table": "cl21.Touch", "keyColumns": ["parent_id"], "inserted": [], "deleted": [],
+        "updated": [ { "key": { "parent_id": 1 }, "causes": ["PROC_DIRECT"], "changedColumns": ["touched"], "after": { "touched": 1 } } ],
+        "basis": "안쪽 프로시저 usp_Inner(usp_Outer가 호출)의 UPDATE. 안쪽 호출의 쓰기도 EXEC 문장 창 안이라 PROC_DIRECT다" },
+      { "table": "cl21.Log", "keyColumns": ["log_id"], "updated": [], "deleted": [],
+        "inserted": [ { "ref": "l1", "match": { "msg": "outer" }, "identity": ["log_id"], "causes": ["PROC_DIRECT"] } ],
+        "basis": "usp_Outer의 INSERT. 키는 IDENTITY라 실행마다 값이 다르다" }
+    ],
+    "firings": [
+      { "node": "F:cl21.Parent:UPDATE", "statementIndex": 1, "table": "cl21.Parent", "operation": "UPDATE", "rowCount": 1, "causeKind": "PROC_DIRECT", "depth": 1, "pairing": "BY_PK" },
+      { "node": "F:cl21.Spare:UPDATE", "statementIndex": 1, "table": "cl21.Spare", "operation": "UPDATE", "rowCount": 0, "causeKind": "PROC_DIRECT", "depth": 1 },
+      { "node": "F:cl21.Log:INSERT", "statementIndex": 1, "table": "cl21.Log", "operation": "INSERT", "rowCount": 1, "causeKind": "PROC_DIRECT", "depth": 1 },
+      { "node": "F:cl21.Touch:UPDATE", "statementIndex": 1, "table": "cl21.Touch", "operation": "UPDATE", "rowCount": 1, "causeKind": "PROC_DIRECT", "depth": 1, "pairing": "BY_PK" }
+    ],
+    "edges": [
+      { "statementIndex": 1, "parent": "P:cl21.usp_Outer", "child": "F:cl21.Parent:UPDATE", "kind": "PROC_DIRECT", "name": "cl21.usp_Outer", "confidence": "certain", "basis": "EXEC 문장 창 안, FK로 설명되지 않는 묶음(공용 계약 PROC_DIRECT)" },
+      { "statementIndex": 1, "parent": "P:cl21.usp_Outer", "child": "F:cl21.Spare:UPDATE", "kind": "PROC_DIRECT", "name": "cl21.usp_Outer", "confidence": "certain", "basis": "0행 UPDATE도 감사 트리거가 0행으로 발동한다(A3, SP2(d), E23). 포함 여부는 OO2" },
+      { "statementIndex": 1, "parent": "P:cl21.usp_Outer", "child": "F:cl21.Log:INSERT", "kind": "PROC_DIRECT", "name": "cl21.usp_Outer", "confidence": "certain", "basis": "공용 계약 PROC_DIRECT" },
+      { "statementIndex": 1, "parent": "P:cl21.usp_Outer", "child": "F:cl21.Touch:UPDATE", "kind": "PROC_DIRECT", "name": "cl21.usp_Outer", "confidence": "certain", "basis": "안쪽 프로시저의 쓰기도 문장에 쓴 프로시저(usp_Outer)의 간선이다(OO3)" }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "문장 노드 S에서 프로시저 호출 노드 P로 가는 DIRECT 간선이 있는지", "basis": "통합(2026-11-13) 확정: 제품은 EXEC 문장 노드 대신 procedureCall 노드(id st-n)를 두므로 S 노드와 S→P 간선이 없다. P:가 문장의 뿌리다. 정답에서 S→P 간선을 뺐다" },
+      { "id": "OO2", "what": "0행 UPDATE(Spare)의 묶음 F:cl21.Spare:UPDATE가 firings·간선에 나오는지", "basis": "CL12b(문장이 직접 대상인 0행 UPDATE)는 묶음과 DIRECT 간선을 정답으로 뒀다. 프로시저 안 0행 UPDATE도 같다고 본다(A3, SP2(d)). 발동 보기 기본 숨김(E23)은 화면 문제다" },
+      { "id": "OO3", "what": "안쪽 프로시저(usp_Inner)가 쓴 묶음의 PROC_DIRECT 간선 name이 usp_Outer인지 usp_Inner인지", "basis": "정답 형식 v0.3은 name = EXEC 문장에 쓴 프로시저로 정한다. 제품은 안쪽 호출을 expandedCalls로만 알리고 묶음별 안쪽 프로시저를 가리지 않는다" },
+      { "id": "OO4", "what": "returnValue 0", "basis": "RETURN 0을 명시했다. SP13(EXEC @rc 래퍼)에서 반환값을 ExecuteReader 종료 뒤 읽는 경로를 확인한다" }
+    ]
+  },
+  "rationale": [
+    { "claim": "프로시저 안 모든 DML(안쪽 프로시저 포함)은 EXEC 문장 창 안에서 일어난 직접 쓰기로 depth 1이다", "basis": "공용 계약(EXEC): Cause.kind PROC_DIRECT = EXEC 문장 창 안, 깊이 1, FK로 설명되지 않는 묶음" },
+    { "claim": "FK·트리거가 없어 모든 묶음의 원인은 PROC_DIRECT 하나다", "basis": "스키마: 이 사례에는 FK와 트리거가 없다" },
+    { "claim": "프로시저에 분기·BEGIN TRAN·동적 SQL이 없어 분석기는 이 EXEC를 거부하지 않는다", "basis": "EXEC 미리보기 합의(리터럴 매개변수, 같은 DB T-SQL 프로시저, 펼친 본문)" }
+  ]
+}

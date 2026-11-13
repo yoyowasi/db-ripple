@@ -27,8 +27,11 @@ public enum VerificationMode
 {
     /// <summary>원본 스냅샷(AW_Origin_pre) 대 원본, 전체 사용자 테이블 최종 차이(§5.3 기본 경로).</summary>
     [JsonStringEnumMemberName("SNAPSHOT_NETDIFF")] SnapshotNetdiff,
-    /// <summary>원본 스냅샷을 만들 수 없을 때의 대체 경로(§5.3, A14): 테이블 건수 변화 + 미리보기 키 집합 after 비교. 행 수가 그대로인 UPDATE는 놓칠 수 있다.</summary>
-    [JsonStringEnumMemberName("KEYSET")] Keyset,
+    /// <summary>
+    /// 원본 스냅샷을 만들 수 없을 때의 대체 경로(§5.3, A14, 2026-11-13 KEYSET 대체): 테이블 건수 변화 + 미리보기 키 집합 after 비교 +
+    /// 미리보기에 없던 테이블의 COUNT_BIG·CHECKSUM_AGG(BINARY_CHECKSUM) 전후 비교. 해시 충돌·비교 불가 형식 열은 놓칠 수 있다(limitations).
+    /// </summary>
+    [JsonStringEnumMemberName("KEYSET_HASH")] KeysetHash,
 }
 
 /// <summary>
@@ -51,6 +54,8 @@ public enum ApplyPrecondition
     [JsonStringEnumMemberName("WEAK_VERIFICATION_NOT_ACCEPTED")] WeakVerificationNotAccepted,
     /// <summary>원본 서버에 연결할 수 없음(선행 조건을 읽지 못함). 원본에 아무것도 실행하지 않았다(2026-11-13 N4).</summary>
     [JsonStringEnumMemberName("ORIGIN_UNREACHABLE")] OriginUnreachable,
+    /// <summary>미리보기에 저장 프로시저 호출(EXEC) 문장이 있음. EXEC [적용]은 2차라 원본에 아무것도 실행하지 않고 막는다(2026-11-13).</summary>
+    [JsonStringEnumMemberName("PROC_APPLY_NOT_SUPPORTED")] ProcApplyNotSupported,
 }
 
 /// <summary>드리프트 종류(§5.3 드리프트 검사). 설계는 driftRows 원소를 정하지 않았다(설계 외, Q24).</summary>
@@ -87,6 +92,8 @@ public enum MismatchKind
     [JsonStringEnumMemberName("VOLATILE_FORMAT")] VolatileFormat,
     /// <summary>KEYSET(§5.3): 테이블 COUNT_BIG(*) 변화가 미리보기 netSummary와 다름.</summary>
     [JsonStringEnumMemberName("KEYSET_TABLE_COUNT")] KeysetTableCount,
+    /// <summary>KEYSET_HASH: 미리보기에 없던 테이블의 COUNT_BIG(*)·CHECKSUM_AGG(BINARY_CHECKSUM)가 실행 전후로 다름(Expected/Actual은 "count=…,checksum=…").</summary>
+    [JsonStringEnumMemberName("OUTSIDE_TABLE_CHANGED")] OutsideTableChanged,
 }
 
 /// <summary>
@@ -97,7 +104,7 @@ public sealed record ApplyRequest
 {
     /// <summary>"sha256:…"(PreviewResult.sqlHash 형식). null이면 저장된 원문과 PreviewResult.sqlHash만 대조한다.</summary>
     public string? SqlHash { get; init; }
-    /// <summary>원본 스냅샷을 만들 수 없을 때 약한 검증(KEYSET)에 동의. 기본 false면 WEAK_VERIFICATION_NOT_ACCEPTED로 막는다(2026-11-13).</summary>
+    /// <summary>원본 스냅샷을 만들 수 없을 때 약한 검증(KEYSET_HASH)에 동의. 기본 false면 WEAK_VERIFICATION_NOT_ACCEPTED로 막는다(2026-11-13).</summary>
     public bool AllowKeysetVerification { get; init; }
 }
 
@@ -181,7 +188,7 @@ public sealed record TableCountChange
 /// <summary>[적용] 검증 내역(§6.4 ApplyResult.verification).</summary>
 public sealed record ApplyVerification
 {
-    /// <summary>SNAPSHOT_NETDIFF 또는 KEYSET.</summary>
+    /// <summary>SNAPSHOT_NETDIFF 또는 KEYSET_HASH.</summary>
     public required VerificationMode Mode { get; init; }
     /// <summary>드리프트 행. 하나라도 있으면 status = drift_detected.</summary>
     public IReadOnlyList<DriftRow> DriftRows { get; init; } = [];

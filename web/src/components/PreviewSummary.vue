@@ -50,8 +50,15 @@ const footLine = computed(() => {
 const inferredTrigger = computed(() =>
   props.preview.firings.some((f) => f.cause.kind === 'TRIGGER' && f.cause.confidence === 'inferred'),
 )
+// EXEC 문장의 프로시저 이름: StatementResult에는 없고 graph의 procedureCall 노드에 있다.
+const procedures = computed(
+  () =>
+    new Map(
+      props.preview.graph.nodes.flatMap((n) => (n.type === 'procedureCall' ? [[n.statementIndex, n.procedure] as [number, string]] : [])),
+    ),
+)
 const showStatements = computed(
-  () => props.preview.statements.length > 1 || props.preview.statements.some((s) => s.status !== 'ok'),
+  () => props.preview.statements.length > 1 || props.preview.statements.some((s) => s.status !== 'ok' || s.kind === 'EXEC'),
 )
 </script>
 
@@ -108,7 +115,7 @@ const showStatements = computed(
 
     <section v-if="showStatements" class="sec" aria-labelledby="h-st">
       <h3 id="h-st">문장별 결과</h3>
-      <StatementTable :statements="preview.statements" />
+      <StatementTable :statements="preview.statements" :procedures="procedures" />
     </section>
 
     <section v-if="preview.residualCommitted.length" class="sec" aria-labelledby="h-residual">

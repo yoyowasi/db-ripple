@@ -65,8 +65,7 @@ public sealed partial class PreviewStore(string directory, TimeProvider clock) :
     {
         Validate(query);
         if (await GetAsync(previewId, ct) is not { } r) return null;
-        var rows = query.FiringId is { } f ? r.RowChanges.Where(x => x.FiringId == f) : r.RowChanges;
-        return Page(rows, RowView.Event, query);
+        return RowPages.Events(r, query);
     }
 
     /// <inheritdoc />
@@ -74,8 +73,16 @@ public sealed partial class PreviewStore(string directory, TimeProvider clock) :
     {
         Validate(query);
         if (await GetAsync(previewId, ct) is not { } r) return null;
-        var rows = query.FiringId is { } f ? r.NetChanges.Where(x => x.ExplainedBy?.FiringIds.Contains(f) == true) : r.NetChanges;
-        return Page(rows, RowView.Net, query);
+        return RowPages.Net(r, query);
+    }
+
+    /// <summary>view=net을 table("스키마.테이블")로 거른 페이지(2026-11-13). 형식이 틀리면 ArgumentException, 없는 테이블이면 total 0. 없는 id·만료는 null.</summary>
+    public async Task<RowPage<NetChange>?> PageNetAsync(string previewId, RowPageQuery query, string? table, CancellationToken ct)
+    {
+        Validate(query);
+        if (table is not null && !RowPages.IsValidTable(table)) throw new ArgumentException($"table은 \"스키마.테이블\" 형식({RowPages.MaxTableLength}자 이하)이어야 합니다.", nameof(table));
+        if (await GetAsync(previewId, ct) is not { } r) return null;
+        return RowPages.Net(r, query, table);
     }
 
     /// <inheritdoc />
@@ -135,12 +142,6 @@ public sealed partial class PreviewStore(string directory, TimeProvider clock) :
     {
         if (q.Offset < 0) throw new ArgumentOutOfRangeException(nameof(q), "offset은 0 이상이어야 합니다.");
         if (q.Limit is < 1 or > RowPageQuery.MaxLimit) throw new ArgumentOutOfRangeException(nameof(q), $"limit은 1..{RowPageQuery.MaxLimit}이어야 합니다.");
-    }
-
-    static RowPage<T> Page<T>(IEnumerable<T> rows, RowView view, RowPageQuery q)
-    {
-        var all = rows as IReadOnlyCollection<T> ?? rows.ToList();
-        return new RowPage<T> { Total = all.Count, View = view, Offset = q.Offset, Limit = q.Limit, Rows = all.Skip(q.Offset).Take(q.Limit).ToList() };
     }
 
     string PathOf(string id) => Path.Combine(Directory, id + FileSuffix);

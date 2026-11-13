@@ -2,7 +2,7 @@
 // 플래그(§6.3, Q15): zeroRows = rowCount == 0, partial = imageMode != FULL, auditNotLast = auditOrder == NONE
 import type { Edge, Node } from '@vue-flow/core'
 import type { Firing, GraphDto, GraphEdge, GraphNode, Op } from '../api/types'
-import { OP_LABEL, RESIDUAL_CATEGORY_LABEL } from './format'
+import { OP_LABEL, RESIDUAL_CATEGORY_LABEL, errorHead, execResultText } from './format'
 import { layoutGraph, monoW, textW } from './graphLayout'
 import { EDGE_TONE, FK_ACTION_TEXT, KIND_SHORT, edgeLabel, edgeTitle } from './graphStyle'
 import type { EdgeTone } from './graphStyle'
@@ -21,6 +21,8 @@ const OP_TONE: Record<Op, OpTone> = { DELETE: 'del', UPDATE: 'upd', INSERT: 'add
 /** 노드 종류별 표시 글자(템플릿은 그대로 그린다) */
 export type NodeView =
   | { kind: 'statement'; verb: string; target: string; targetShort: string; line2: string }
+  /** EXEC 문장: "EXEC 스키마.이름" + 반환 값·결과 집합 + 보조 줄(안쪽 호출·관측 안 된 쓰기 대상) */
+  | { kind: 'procedureCall'; target: string; targetShort: string; line2: string; calls: string; unobserved: string }
   | { kind: 'firing'; tone: OpTone; result: string; extra: string; schema: string; name: string; keysOnly: boolean }
   | { kind: 'trigger'; name: string; observed: boolean }
   | { kind: 'error'; title: string; sub: string }
@@ -90,6 +92,19 @@ function statementView(n: Extract<GraphNode, { type: 'statement' }>): NodeView {
   return { kind: 'statement', verb: m[1].split(/\s+/)[0].toUpperCase(), target: m[2], targetShort: shortName(m[2]), line2 }
 }
 
+function procedureView(n: Extract<GraphNode, { type: 'procedureCall' }>): NodeView {
+  const line2 = [`문장 ${n.statementIndex}`, execResultText(n), STATUS_TEXT[n.status]].filter(Boolean).join(' · ')
+  return {
+    kind: 'procedureCall',
+    target: n.procedure,
+    targetShort: shortName(n.procedure),
+    line2,
+    calls: n.expandedCalls.join(', '),
+    // 정적으로 쓰는 테이블인데 이번 실행에서 묶음이 관측되지 않은 것(점선 표시용)
+    unobserved: n.unobservedWriteTargets.join(', '),
+  }
+}
+
 function firingView(n: Extract<GraphNode, { type: 'firing' }>, f: Firing | null): NodeView {
   const zero = n.rowCount === 0
   const [schema, name] = splitTable(n.table)
@@ -108,6 +123,8 @@ function viewOf(n: GraphNode, f: Firing | null, blockedByTrigger: boolean): Node
   switch (n.type) {
     case 'statement':
       return statementView(n)
+    case 'procedureCall':
+      return procedureView(n)
     case 'firing':
       return firingView(n, f)
     case 'trigger':
@@ -115,8 +132,12 @@ function viewOf(n: GraphNode, f: Firing | null, blockedByTrigger: boolean): Node
     case 'error':
       return {
         kind: 'error',
-        title: `오류 ${n.errorNumber}`,
-        sub: [blockedByTrigger ? '트리거가 거부함' : null, n.isToolFault ? '도구 오류' : '도구 오류 아님'].filter(Boolean).join(' · '),
+        title: errorHead(n),
+        // 오류 번호 0 = SQL Server 오류가 아닌 도구 판정(예: "프로시저가 트랜잭션을 롤백함")이라 번호 대신 그 메시지를 보인다.
+        sub:
+          n.errorNumber === 0
+            ? n.message
+            : [blockedByTrigger ? '트리거가 거부함' : null, n.isToolFault ? '도구 오류' : '도구 오류 아님'].filter(Boolean).join(' · '),
       }
     case 'residual':
       return { kind: 'residual', title: '설명되지 않은 변경', sub: `${n.table} · ${RESIDUAL_CATEGORY_LABEL[n.category]}` }
@@ -134,6 +155,16 @@ function sizeOf(v: NodeView, zeroChip: number, compact: boolean): { w: number; h
       const l2 = textW(v.line2, 12)
       const w = Math.min(400, Math.max(200, 48 + Math.max(l1, l2) + 22))
       return { w, h: l2 > w - 70 ? 66 : 50 }
+    }
+    case 'procedureCall': {
+      const l1 = monoW(`EXEC ${compact ? v.targetShort : v.target}`, 13)
+      if (compact) return { w: Math.min(320, Math.max(150, 44 + l1 + 14)), h: 44 }
+      const l2 = textW(v.line2, 12)
+      // 보조 줄(작은 글자): 안쪽 호출 · 관측 안 됨 + 테이블 이름
+      const l3 = v.calls ? textW('안쪽 호출 ', 12) + monoW(v.calls, 12) : 0
+      const l4 = v.unobserved ? 8 + textW('관측 안 됨', 12) + 14 + monoW(v.unobserved, 12) : 0
+      const w = Math.min(440, Math.max(210, 48 + Math.max(l1, l2, l3, l4) + 22))
+      return { w, h: 50 + (v.calls ? 17 : 0) + (v.unobserved ? 19 : 0) + (l2 > w - 70 ? 16 : 0) }
     }
     case 'firing': {
       const keys = v.keysOnly ? 8 + textW('키만', 12) + 14 : 0
@@ -156,12 +187,14 @@ function nodePhrase(n: GraphNode): string {
   switch (n.type) {
     case 'statement':
       return '문장'
+    case 'procedureCall':
+      return `EXEC ${n.procedure}`
     case 'firing':
       return `${shortName(n.table)} ${n.rowCount ? `${fmtN(n.rowCount)}행 ${OP_LABEL[n.operation]}` : '변경 없음(0행)'}`
     case 'trigger':
       return `${shortName(n.trigger)}${n.observed ? '' : '(추정)'}`
     case 'error':
-      return `오류 ${n.errorNumber}`
+      return errorHead(n)
     case 'residual':
       return `설명되지 않은 변경 ${shortName(n.table)}`
     case 'group':
@@ -174,6 +207,8 @@ function edgePhrase(e: GraphEdge): string | null {
   switch (e.kind) {
     case 'DIRECT':
       return null
+    case 'PROC_DIRECT':
+      return `프로시저가 직접 씀${inf}`
     case 'FK':
       return `FK ${e.action ? FK_ACTION_TEXT[e.action] : ''}`.trim() + inf
     case 'FIRES':
@@ -308,7 +343,7 @@ export function buildFlow(
   }
 
   const orderOf = (n: GraphNode) => (n.type === 'firing' ? (order.get(n.firingId) ?? null) : null)
-  const sortKey = (n: GraphNode) => (n.type === 'statement' ? -1e9 + n.statementIndex : (orderOf(n) ?? 1e6))
+  const sortKey = (n: GraphNode) => (n.type === 'statement' || n.type === 'procedureCall' ? -1e9 + n.statementIndex : (orderOf(n) ?? 1e6))
   const sized = visible
     .map((n) => {
       const firing = n.type === 'firing' ? (firingById.get(n.firingId) ?? null) : null
@@ -316,7 +351,7 @@ export function buildFlow(
         n.type === 'error' &&
         (incoming.get(n.id) ?? []).some((e) => {
           const s = byId.get(e.source)
-          return e.kind === 'BLOCKED' && s?.type === 'statement' && s.status === 'trigger_blocked'
+          return e.kind === 'BLOCKED' && (s?.type === 'statement' || s?.type === 'procedureCall') && s.status === 'trigger_blocked'
         })
       const view = viewOf(n, firing, blockedByTrigger)
       const zeroChip = chip.get(n.id) ?? 0
@@ -401,16 +436,16 @@ export function ancestorsOf(ids: Iterable<string>, incoming: ReadonlyMap<string,
 // ---- 그래프 위 한 줄 요약 ----
 
 const SUMMARY_LABEL: Partial<Record<CauseKind, string>> = { TRIGGER: '트리거 쓰기' }
-const CAUSE_ORDER: CauseKind[] = ['DIRECT', 'FK_CASCADE', 'FK_SET_NULL', 'FK_SET_DEFAULT', 'INSTEAD_OF', 'TRIGGER', 'UNEXPLAINED']
+const CAUSE_ORDER: CauseKind[] = ['DIRECT', 'PROC_DIRECT', 'FK_CASCADE', 'FK_SET_NULL', 'FK_SET_DEFAULT', 'INSTEAD_OF', 'TRIGGER', 'UNEXPLAINED']
 
 /**
  * 예: "문장 1 → 직접 1개 테이블(1행) → FK 연쇄 2개 테이블(3행) → 트리거 쓰기 2개 테이블(변경 없음 · 0행 쓰기 2건)"
  * 거부: "문장 1 → 트리거가 거부(오류 3609) → 변경 0행". 숫자는 firings·graph에서만 센다.
  */
 export function summaryLine(graph: GraphDto, firings: readonly Firing[]): string {
-  const stmts = graph.nodes.filter((n) => n.type === 'statement')
+  const stmts = graph.nodes.filter((n) => n.type === 'statement' || n.type === 'procedureCall')
   const head = `문장 ${stmts.length}`
-  const errs = graph.nodes.filter((n) => n.type === 'error').map((n) => (n.type === 'error' ? n.errorNumber : 0))
+  const errs = graph.nodes.flatMap((n) => (n.type === 'error' && n.errorNumber !== 0 ? [n.errorNumber] : []))
   const errText = errs.length ? `(오류 ${errs.join(', ')})` : ''
   if (stmts.some((n) => n.status === 'trigger_blocked')) return `${head} → 트리거가 거부${errText} → 변경 0행`
   if (firings.length === 0 && stmts.some((n) => n.status === 'failed')) return `${head} → 실패${errText} → 변경 0행`
@@ -440,6 +475,10 @@ export interface LegendPresence {
   ops: OpTone[]
   hasOrder: boolean
   statement: boolean
+  /** EXEC 프로시저 호출 노드가 있다 */
+  procedure: boolean
+  /** 호출 노드에 "관측 안 됨" 쓰기 대상이 있다 */
+  unobservedWrite: boolean
   trigger: boolean
   unobserved: boolean
   error: boolean
@@ -449,7 +488,7 @@ export interface LegendPresence {
 }
 
 const CONF_ORDER: GraphEdge['confidence'][] = ['certain', 'inferred', 'ambiguous', 'unexplained']
-const TONE_ORDER: EdgeTone[] = ['direct', 'fk', 'fires', 'blocked', 'residual']
+const TONE_ORDER: EdgeTone[] = ['direct', 'call', 'fk', 'fires', 'blocked', 'residual']
 const OP_ORDER: OpTone[] = ['del', 'upd', 'add', 'zero']
 
 export function legendOf(m: FlowModel): LegendPresence {
@@ -463,6 +502,8 @@ export function legendOf(m: FlowModel): LegendPresence {
     ops: OP_ORDER.filter((o) => ops.has(o)),
     hasOrder: m.nodes.some((n) => n.data!.order !== null),
     statement: views.some((v) => v.kind === 'statement'),
+    procedure: views.some((v) => v.kind === 'procedureCall'),
+    unobservedWrite: views.some((v) => v.kind === 'procedureCall' && v.unobserved !== ''),
     trigger: views.some((v) => v.kind === 'trigger'),
     unobserved: views.some((v) => v.kind === 'trigger' && !v.observed),
     error: views.some((v) => v.kind === 'error'),

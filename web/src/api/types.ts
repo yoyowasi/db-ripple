@@ -6,6 +6,8 @@ export type Iso = string // DateTimeOffset ISO 8601
 export type Values = Record<string, string | null> // §6.1: 값은 모두 문자열, NULL은 null
 export type KeyKind = 'PK' | 'UNIQUE' | 'ROW'
 export type Op = 'INSERT' | 'UPDATE' | 'DELETE'
+/** 문장 종류. 행 연산(Op)에 저장 프로시저 호출(EXEC)이 더해진다. Firing·RowChange에는 EXEC가 나오지 않는다. */
+export type StatementKind = Op | 'EXEC'
 export type Confidence = 'certain' | 'inferred' | 'ambiguous' | 'unexplained'
 export type OrderGuarantee = 'guaranteed' | 'observed_only'
 export type Evidence =
@@ -91,6 +93,8 @@ export interface SandboxStatus {
   baselineStale?: boolean
   /** false면 원본에 연결할 수 없다(미리보기는 기존 기준선으로 가능, 적용은 ORIGIN_UNREACHABLE) */
   originReachable?: boolean
+  /** 샌드박스 인스턴스 설정 경고(xp_cmdshell 등 위험 설정 켜짐, 연결된 서버 있음). 막지 않는다. 옛 응답에는 없다. */
+  instanceWarnings?: string[]
 }
 // POST /api/sandbox/refresh → 202, 본문 없음(Location: /api/sandbox)
 
@@ -136,8 +140,13 @@ export interface AnalyzedStatement {
   index: number
   batch: number
   position: number
-  kind: Op
-  target: string
+  kind: StatementKind
+  /** "스키마.테이블". EXEC면 null(표시는 procedure) */
+  target: string | null
+  /** EXEC: 부른 프로시저 "스키마.이름" */
+  procedure?: string | null
+  /** EXEC: 매개변수 원문 목록(표시용, 예 "@id = 5") */
+  parameters?: string[]
   span: SourceSpan
   sql: string
   nondeterministicColumns: string[]
@@ -185,11 +194,17 @@ export interface StatementResult {
   index: number
   batch: number
   position: number
-  kind: Op
-  target: string
+  kind: StatementKind
+  /** "스키마.테이블". EXEC면 null. 프로시저 이름은 이 DTO에 없다(계약): graph의 procedureCall 노드(statementIndex)에서 읽는다. */
+  target: string | null
   span: SourceSpan
   status: StatementStatus
+  /** EXEC는 늘 null */
   rowsAffected: number | null
+  /** EXEC: 프로시저 반환 값(RETURN). 실패·미실행이면 null */
+  returnValue?: number | null
+  /** EXEC: 프로시저가 낸 결과 집합 수(내용은 버린다) */
+  resultSetCount?: number | null
   captureSeqRange: [number, number] | null
   error: StatementError | null
 }
@@ -204,7 +219,7 @@ export interface ForeignKeyCause {
   unmatchedRows: number
 }
 export interface Cause {
-  kind: 'DIRECT' | 'FK_CASCADE' | 'FK_SET_NULL' | 'FK_SET_DEFAULT' | 'TRIGGER' | 'INSTEAD_OF' | 'UNEXPLAINED'
+  kind: 'DIRECT' | 'PROC_DIRECT' | 'FK_CASCADE' | 'FK_SET_NULL' | 'FK_SET_DEFAULT' | 'TRIGGER' | 'INSTEAD_OF' | 'UNEXPLAINED'
   confidence: Confidence
   parentFiringId: string | null
   foreignKey: ForeignKeyCause | null
@@ -265,6 +280,26 @@ export type GraphNode =
       status: StatementResult['status']
     }
   | {
+      /** EXEC 문장 노드(statement 노드 대신). id는 "st-{n}" */
+      type: 'procedureCall'
+      id: string
+      statementIndex: number
+      /** "EXEC 스키마.이름" */
+      label: string
+      /** "스키마.이름" */
+      procedure: string
+      status: StatementResult['status']
+      /** 실패·미실행이면 null */
+      returnValue: number | null
+      resultSetCount: number | null
+      /** 펼친 안쪽 프로시저 "스키마.이름" */
+      expandedCalls: string[]
+      /** 정적 쓰기 대상 "스키마.테이블"(안쪽 호출 포함) */
+      writeTargets: string[]
+      /** writeTargets 가운데 이 문장에서 묶음이 관측되지 않은 테이블(부분집합) */
+      unobservedWriteTargets: string[]
+    }
+  | {
       type: 'firing'
       id: string
       firingId: string
@@ -285,7 +320,7 @@ export type GraphNode =
   | { type: 'residual'; id: string; residualId: string; table: string; category: Residual['category'] }
   | { type: 'error'; id: string; errorNumber: number; message: string; isToolFault: boolean }
   | { type: 'group'; id: string; members: string[]; rowCount: number }
-export type GraphEdgeKind = 'DIRECT' | 'FK' | 'FIRES' | 'REPLACES' | 'WRITES' | 'RESIDUAL' | 'BLOCKED'
+export type GraphEdgeKind = 'DIRECT' | 'PROC_DIRECT' | 'FK' | 'FIRES' | 'REPLACES' | 'WRITES' | 'RESIDUAL' | 'BLOCKED'
 export interface GraphEdge {
   id: string
   source: string
@@ -374,10 +409,12 @@ export type ApplyPrecondition =
   | 'EXECUTE_AS_USER_MISSING'
   | 'WEAK_VERIFICATION_NOT_ACCEPTED'
   | 'ORIGIN_UNREACHABLE'
+  /** 미리보기에 EXEC 문장이 있어 적용할 수 없다(EXEC는 미리보기 전용, 서버 쪽은 오케스트레이터가 넣는 중) */
+  | 'PROC_APPLY_NOT_SUPPORTED'
 export type ApplyStatus = 'committed' | 'rolled_back_mismatch' | 'drift_detected' | 'precondition_failed' | 'error'
 export interface ApplyRequest {
   sqlHash: string | null
-  /** 원본에 스냅샷 권한이 없어 KEYSET(약한 검증)이 필요할 때 사용자가 동의했다(기본 false) */
+  /** 원본에 스냅샷 권한이 없어 KEYSET_HASH(약한 검증)가 필요할 때 사용자가 동의했다(기본 false) */
   allowKeysetVerification?: boolean
 }
 export interface DriftRow {
@@ -400,6 +437,8 @@ export type MismatchKind =
   | 'UNEXPECTED_TABLE'
   | 'VOLATILE_FORMAT'
   | 'KEYSET_TABLE_COUNT'
+  /** KEYSET_HASH: 미리보기에 없던 테이블의 COUNT_BIG·CHECKSUM_AGG가 실행 전후로 달라짐 */
+  | 'OUTSIDE_TABLE_CHANGED'
 export interface ApplyMismatch {
   kind: MismatchKind
   statementIndex: number | null
@@ -411,7 +450,7 @@ export interface ApplyMismatch {
   message: string
 }
 export interface ApplyVerification {
-  mode: 'SNAPSHOT_NETDIFF' | 'KEYSET'
+  mode: 'SNAPSHOT_NETDIFF' | 'KEYSET_HASH'
   driftRows: DriftRow[]
   statementRowCounts: { index: number; preview: number | null; actual: number | null }[]
   netSummaryMatch: boolean | null

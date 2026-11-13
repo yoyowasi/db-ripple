@@ -54,6 +54,8 @@ const stale = computed(() => st.value?.baselineStale === true)
 const unreachable = computed(() => st.value?.originReachable === false)
 const mismatches = computed(() => st.value?.fingerprintMismatches ?? [])
 const warnings = computed(() => st.value?.fingerprintWarnings ?? [])
+/** 샌드박스 인스턴스 설정 경고(xp_cmdshell 켜짐·연결된 서버 있음 등). 막지 않는다. 옛 응답에는 필드가 없다. */
+const instanceWarnings = computed(() => st.value?.instanceWarnings ?? [])
 const fpSummary = computed(() => {
   const parts: string[] = []
   if (mismatches.value.length) parts.push(`차단 ${mismatches.value.length}`)
@@ -101,6 +103,16 @@ function refresh(): void {
               <h3>경고(막지는 않습니다)</h3>
               <ul><li v-for="w in warnings" :key="w">{{ w }}</li></ul>
             </template>
+          </div>
+        </details>
+        <details v-if="instanceWarnings.length" class="fpd">
+          <summary class="iw" :aria-label="`샌드박스 인스턴스 경고 ${instanceWarnings.length}건, 자세히 보기`">
+            <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.2L14.2 13H1.8z" /><path d="M8 6.6v3M8 11.4v.1" /></svg>
+            인스턴스 경고 {{ instanceWarnings.length }}
+          </summary>
+          <div class="fpd-body">
+            <h3>샌드박스 인스턴스 경고(막지는 않습니다)</h3>
+            <ul><li v-for="w in instanceWarnings" :key="w">{{ w }}</li></ul>
           </div>
         </details>
         <span v-if="unreachable" class="chip chip-warn" role="status">원본 연결 안 됨 · 지문 비교 보류</span>
@@ -177,6 +189,13 @@ function refresh(): void {
 }
 .fpd > summary.bad {
   color: var(--err);
+  font-weight: 600;
+}
+.fpd > summary.iw {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--warn);
   font-weight: 600;
 }
 .fpd-body {

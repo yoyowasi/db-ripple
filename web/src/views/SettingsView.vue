@@ -448,7 +448,7 @@ const pwHint = (stored: boolean, auth: AuthKind): string | undefined =>
                 <dt>스냅샷(CREATE DATABASE) 권한</dt>
                 <dd>
                   {{ testResult.origin.canCreateDatabase === null || testResult.origin.canCreateDatabase === undefined ? '모름' : testResult.origin.canCreateDatabase ? '있음' : '없음' }}
-                  <span v-if="testResult.origin.canCreateDatabase === false" class="sub">없으면 [적용]이 약한 검증(KEYSET)으로 동의를 묻습니다.</span>
+                  <span v-if="testResult.origin.canCreateDatabase === false" class="sub">없으면 [적용]이 약한 검증(KEYSET_HASH)으로 동의를 묻습니다.</span>
                 </dd>
               </dl>
             </div>

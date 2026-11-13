@@ -43,6 +43,8 @@ public enum ChangeOperation
     [JsonStringEnumMemberName("UPDATE")] Update,
     /// <summary>DELETE(감사 헤더 operation 'D').</summary>
     [JsonStringEnumMemberName("DELETE")] Delete,
+    /// <summary>저장 프로시저 호출 문장(2026-11-13 EXEC 미리보기). 문장 종류(AnalyzedStatement·StatementResult.Kind)에만 쓰고 행 연산(Firing·RowChange)에는 나오지 않는다.</summary>
+    [JsonStringEnumMemberName("EXEC")] Exec,
 }
 
 /// <summary>원인 종류(§6.2 cause.kind).</summary>
@@ -63,6 +65,8 @@ public enum CauseKind
     [JsonStringEnumMemberName("INSTEAD_OF")] InsteadOf,
     /// <summary>후보 없음.</summary>
     [JsonStringEnumMemberName("UNEXPLAINED")] Unexplained,
+    /// <summary>EXEC 문장 창 안, 깊이 1, FK로 설명되지 않는 묶음 = 프로시저 본문의 직접 쓰기(2026-11-13).</summary>
+    [JsonStringEnumMemberName("PROC_DIRECT")] ProcDirect,
 }
 
 /// <summary>확신도(§6.2 cause.confidence, §7.3). 트리거 귀속 상한은 Inferred(MVP).</summary>
@@ -252,6 +256,8 @@ public enum EdgeKind
     [JsonStringEnumMemberName("RESIDUAL")] Residual,
     /// <summary>문장 → 오류: 실행 실패·거부.</summary>
     [JsonStringEnumMemberName("BLOCKED")] Blocked,
+    /// <summary>프로시저 호출 → 묶음: 프로시저 본문의 직접 쓰기(2026-11-13).</summary>
+    [JsonStringEnumMemberName("PROC_DIRECT")] ProcDirect,
 }
 
 /// <summary>진단 심각도(§6.4 Diagnostic.severity). error는 거부, warning은 실행은 함(D5).</summary>

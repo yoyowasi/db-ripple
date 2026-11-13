@@ -25,6 +25,19 @@ internal sealed class Scenario
         return this;
     }
 
+    /// <summary>EXEC 문장(2026-11-13). writes = 프로시저 정적 쓰기 대상. plan = false면 Plan 없음(계약 위반·JSON 복원 흉내).</summary>
+    public Scenario Exec(int index, string procedure, string[] writes, StatementStatus status = StatementStatus.Ok, bool plan = true, int? returnValue = 0)
+    {
+        _st.Add(new StatementResult
+        {
+            Index = index, Batch = 1, Position = index, Kind = ChangeOperation.Exec, Target = null,
+            Span = new SourceSpan { StartLine = index, StartColumn = 1, EndLine = index, EndColumn = 10 }, Status = status,
+            ReturnValue = status == StatementStatus.Ok ? returnValue : null, ResultSetCount = status == StatementStatus.Ok ? 0 : null,
+            Plan = plan ? new ProcedurePlan { Procedure = procedure, ExecSql = "x", WriteTargets = writes, ExpandedCalls = ["dbo.inner"] } : null,
+        });
+        return this;
+    }
+
     /// <summary>rows: (before, after). INSERT면 before = null, DELETE면 after = null. 키는 첫 열.</summary>
     public Scenario Firing(long seq, int stmt, int depth, string table, ChangeOperation op, params (string? Before, string? After)[] rows)
         => FiringWith(seq, stmt, depth, table, op, ImageMode.Full, rows);
@@ -113,7 +126,7 @@ internal static class GraphInvariants
         Assert.Equal(Enumerable.Range(1, g.Edges.Count).Select(i => $"e{i}"), g.Edges.Select(e => e.Id));
         foreach (var n in g.Nodes)
         {
-            var prefix = n switch { StatementNode => "st-", FiringNode => "f-", TriggerNode => "t-", ResidualNode => "r-", ErrorNode => "err-", GroupNode => "g-", _ => "?" };
+            var prefix = n switch { StatementNode or ProcedureCallNode => "st-", FiringNode => "f-", TriggerNode => "t-", ResidualNode => "r-", ErrorNode => "err-", GroupNode => "g-", _ => "?" };
             Assert.StartsWith(prefix, n.Id);
         }
         // WRITES는 그 트리거로 들어오는 FIRES·REPLACES보다 확신도가 높지 않다.

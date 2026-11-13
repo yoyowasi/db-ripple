@@ -160,7 +160,7 @@ const statementAlert = computed(() => {
   const p = store.preview
   if (!p || (p.status !== 'trigger_blocked' && p.status !== 'failed')) return null
   const s = p.statements.find((x) => x.status === p.status) ?? p.statements.find((x) => x.error)
-  const code = s?.error ? `(오류 ${s.error.errorNumber})` : ''
+  const code = s?.error && s.error.errorNumber !== 0 ? `(오류 ${s.error.errorNumber})` : ''
   return p.status === 'trigger_blocked'
     ? { title: `트리거가 문장을 거부했습니다${code}`, body: '원본에서도 같은 결과가 납니다. 변경된 행은 없습니다.' }
     : { title: `문장이 실패했습니다${code}`, body: s?.error?.message ?? '실패한 문장 뒤의 변경은 수집하지 않았습니다.' }

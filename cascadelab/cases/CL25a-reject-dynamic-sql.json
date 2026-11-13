@@ -1,0 +1,29 @@
+{
+  "id": "CL25a",
+  "pattern": "CL25",
+  "title": "거부: 프로시저 본문의 동적 SQL (EXEC)",
+  "database": "CascadeLab",
+  "schemaScript": "sql/cl25.sql",
+  "settings": { "RECURSIVE_TRIGGERS": "OFF", "nestedTriggers": 1 },
+  "statements": [
+    { "index": 1, "sql": "EXEC cl25.usp_Dynamic @id = 1;" }
+  ],
+  "expected": {
+    "status": "rejected",
+    "errorNumber": null,
+    "statementStatus": [],
+    "changes": [],
+    "firings": [],
+    "edges": [],
+    "rejects": [
+      { "ruleId": "REJECT_PROC_DYNAMIC_SQL", "statementIndex": 1 }
+    ],
+    "observedOnly": [
+      { "id": "OO1", "what": "ruleId", "basis": "2026-11-13 통합 때 AnalysisRules의 REJECT_PROC_DYNAMIC_SQL로 확정(정적 분석 단위 테스트 기준, DB 미실행)" }
+    ]
+  },
+  "rationale": [
+    { "claim": "동적 SQL은 쓰기 대상을 정적으로 알 수 없고 소유권 체인도 끊으므로 프로시저 본문에 있으면 거부한다", "basis": "EXEC 미리보기 합의(프로시저 전용 거부 규칙), 트리거의 동적 SQL 처리(§7.2 4단계, E8)와 달리 프로시저는 쓰기 대상 미상을 닫힌 쪽으로 넓히지 않고 거부한다" },
+    { "claim": "거부 사례는 오라클로 실행하지 않고 M1~M3에도 넣지 않는다. 거부 일치(ruleId, 문장 번호)만 본다", "basis": "answer-format v0.3" }
+  ]
+}

@@ -105,6 +105,7 @@ export type CauseKind = Cause['kind']
 
 export const CAUSE_LABEL: Record<CauseKind, string> = {
   DIRECT: '직접',
+  PROC_DIRECT: '프로시저 쓰기',
   FK_CASCADE: 'FK 연쇄',
   FK_SET_NULL: 'FK SET NULL',
   FK_SET_DEFAULT: 'FK SET DEFAULT',
@@ -113,7 +114,7 @@ export const CAUSE_LABEL: Record<CauseKind, string> = {
   UNEXPLAINED: '설명 안 됨',
 }
 
-const CAUSE_ORDER: CauseKind[] = ['DIRECT', 'FK_CASCADE', 'FK_SET_NULL', 'FK_SET_DEFAULT', 'INSTEAD_OF', 'TRIGGER', 'UNEXPLAINED']
+const CAUSE_ORDER: CauseKind[] = ['DIRECT', 'PROC_DIRECT', 'FK_CASCADE', 'FK_SET_NULL', 'FK_SET_DEFAULT', 'INSTEAD_OF', 'TRIGGER', 'UNEXPLAINED']
 
 export interface CauseGroup {
   kind: CauseKind
@@ -250,6 +251,7 @@ export function tableBadges(p: PreviewResult | null): Map<string, TableBadge> {
   }
   for (const s of p.statements) {
     if (s.status !== 'trigger_blocked' && s.status !== 'failed') continue
+    if (s.target === null) continue // EXEC는 대상 테이블이 없다(안쪽 쓰기 테이블은 netSummary·묶음으로 나온다)
     out.set(s.target, { kind: 'x', text: s.status === 'trigger_blocked' ? '거부' : '실패', srText: '' })
   }
   return out

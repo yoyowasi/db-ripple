@@ -198,7 +198,8 @@ public class CascadeLabTests(LabFixture lab)
                    (SELECT COUNT(*) FROM sys.database_role_members WHERE member_principal_id = dp.principal_id),
                    (SELECT COUNT(*) FROM sys.database_permissions p WHERE p.grantee_principal_id = dp.principal_id AND p.class = 3 AND p.major_id = SCHEMA_ID(N'audit')),
                    (SELECT COUNT(*) FROM sys.database_permissions p WHERE p.grantee_principal_id = dp.principal_id AND p.class = 3 AND p.permission_name NOT IN (N'SELECT', N'INSERT', N'UPDATE', N'DELETE')),
-                   (SELECT COUNT(*) FROM sys.database_permissions p WHERE p.grantee_principal_id = dp.principal_id AND p.class <> 3 AND p.permission_name <> N'CONNECT')
+                   (SELECT COUNT(*) FROM sys.database_permissions p WHERE p.grantee_principal_id = dp.principal_id AND p.class <> 3 AND p.permission_name <> N'CONNECT'
+                      AND NOT (p.class = 1 AND p.permission_name = N'EXECUTE' AND OBJECTPROPERTY(p.major_id, 'IsProcedure') = 1)) -- EXEC 미리보기: 프로시저 단위 EXECUTE만
             FROM sys.database_principals AS dp WHERE dp.name = N'{PreviewUserSql.UserName}';
             """);
         var r = Assert.Single(rows);

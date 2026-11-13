@@ -392,6 +392,82 @@ public class SplitBaselineTests
         Assert.Contains("delete dbr_devpc_20261113010203.bak", log);
     }
 
+    // ---- 샌드박스 안전 점검(2026-11-13) ----
+
+    [Fact]
+    public async Task Split_turns_trustworthy_off_on_the_sandbox_right_after_restore()
+    {
+        var log = new List<string>();
+        await BaselineBuilder.BuildSplitAsync(Options(), new FakeOrigin(log), new FakeSandbox(log), new FakeImporter(log), () => Now);
+
+        var i = log.FindIndex(l => l.Contains("TRUSTWORTHY", StringComparison.Ordinal));
+        Assert.StartsWith("sandbox master: IF EXISTS (SELECT 1 FROM sys.databases WHERE name = N'AW_Sandbox' AND is_trustworthy_on = 1)", log[i]);
+        Assert.Contains("ALTER DATABASE [AW_Sandbox] SET TRUSTWORTHY OFF;", log[i]);
+        Assert.Single(log, l => l.Contains("TRUSTWORTHY", StringComparison.Ordinal));     // 원본 쪽에는 보내지 않는다
+        Assert.True(log.FindIndex(l => l.StartsWith("sandbox master: RESTORE DATABASE", StringComparison.Ordinal)) < i);
+        Assert.True(i < log.FindIndex(l => l.StartsWith("sandbox master: DECLARE @sa sysname", StringComparison.Ordinal))); // 소유자를 sa로 바꾸기 전
+    }
+
+    [Fact]
+    public void Trustworthy_off_sql_validates_the_name()
+    {
+        Assert.Throws<ArgumentException>(() => BaselineSql.TrustworthyOff("AW]; DROP"));
+    }
+
+    [Fact]
+    public async Task Split_ddl_trigger_guard_stops_before_any_install_ddl()
+    {
+        var log = new List<string>();
+        DbCatalog? seen = null;
+        var o = Options() with { DdlTriggerGuard = c => { seen = c; return "ddlShell: 외부 부작용(xp_:xp_cmdshell)"; } };
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            BaselineBuilder.BuildSplitAsync(o, new FakeOrigin(log), new FakeSandbox(log), new FakeImporter(log), () => Now));
+
+        Assert.Contains("기준선 구축을 멈춤: ddlShell", ex.Message);
+        Assert.NotNull(seen);                                                             // 복원된 샌드박스 카탈로그로 판정
+        Assert.DoesNotContain(log, l => l.Contains("CREATE USER", StringComparison.Ordinal));
+        Assert.DoesNotContain(log, l => l.Contains("CREATE TRIGGER", StringComparison.Ordinal));
+        Assert.DoesNotContain(log, l => l.Contains("CREATE DATABASE [AW_Sandbox_base]", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Split_ddl_trigger_guard_null_continues()
+    {
+        var log = new List<string>();
+        var o = Options() with { DdlTriggerGuard = _ => null };
+        await BaselineBuilder.BuildSplitAsync(o, new FakeOrigin(log), new FakeSandbox(log), new FakeImporter(log), () => Now);
+        Assert.Contains(log, l => l.Contains("CREATE USER", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Instance_check_warns_for_risky_options_and_linked_servers()
+    {
+        var none = SandboxInstanceCheck.Warnings(new Dictionary<string, int>
+        {
+            ["xp_cmdshell"] = 0, ["Ole Automation Procedures"] = 0, ["Ad Hoc Distributed Queries"] = 0, ["clr enabled"] = 0, ["external scripts enabled"] = 0,
+        }, []);
+        Assert.Empty(none);
+
+        var warnings = SandboxInstanceCheck.Warnings(new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["xp_cmdshell"] = 1, ["Ole Automation Procedures"] = 1, ["Ad Hoc Distributed Queries"] = 1, ["clr enabled"] = 1, ["external scripts enabled"] = 1,
+        }, ["DEVSQL", "LNK"]);
+        Assert.Equal(6, warnings.Count);
+        Assert.Contains(warnings, w => w.Contains("'xp_cmdshell'", StringComparison.Ordinal));
+        Assert.Contains(warnings, w => w.Contains("'clr enabled'", StringComparison.Ordinal));
+        Assert.Contains("연결된 서버 2개(DEVSQL, LNK)", warnings[^1]);
+    }
+
+    [Fact]
+    public void Instance_check_sql_reads_only()
+    {
+        Assert.Contains("FROM sys.configurations", SandboxInstanceCheck.Sql);
+        Assert.Contains("FROM sys.servers WHERE server_id <> 0", SandboxInstanceCheck.Sql);
+        foreach (var w in new[] { "sp_configure", "RECONFIGURE", "EXEC", "ALTER" })
+            Assert.DoesNotContain(w, SandboxInstanceCheck.Sql, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task Split_requires_a_backup_source()
     {

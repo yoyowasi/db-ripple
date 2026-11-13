@@ -1,9 +1,10 @@
-# CascadeLab — 합성 정답 DB (CL01~CL20)
+# CascadeLab — 합성 정답 DB (CL01~CL25)
 
 설계 §10.2의 CascadeLab 패턴 CL01~CL20의 스키마·시드와 손 정답(1차 정답, §10.3)이다.
 정답은 설계 문서 규칙(§2 A번호, §6~§7)과 시드를 손으로 센 결과다.
 - CL01~CL08: 2026-11-10 실DB 대조 11/11 일치([verification/report-2026-11-10.md](verification/report-2026-11-10.md)).
 - CL09~CL20: 2026-11-11 작성, **아직 DB에서 실행하지 않았다**(정적 검토만). 실행 대조는 테스트 라운드에서 한다.
+- CL21~CL25: 2026-11-13 작성(EXEC 미리보기용, 정답 형식 v0.3), **DB에서 실행하지 않았다**(정적 검토만). 규칙 ID(ruleId)와 그래프 모양(EXEC 문장은 `S` 없이 `P:`가 뿌리)은 2026-11-13 통합 때 제품 코드에 맞춰 확정했다([answer-format.md](answer-format.md) v0.3).
 - `verification/CascadeLab.Verify`는 answer-format v0.1 필드만 읽는다(v0.2의 `match`·`identity`·`identityRefs`·`residualCommitted` 등은 모른다). CL09 이후 사례의 오라클 대조는 평가 하네스(`eval/DbRipple.Eval.Cli -- cascadelab`)로 한다.
 
 ## 구성
@@ -12,13 +13,14 @@
 |---|---|
 | `answer-format.md` | 정답 JSON 형식 (먼저 읽을 것) |
 | `sql/00-create-databases.sql` | `CascadeLab`(RECURSIVE_TRIGGERS OFF), `CascadeLab_RT`(ON) 생성 + 설정 확인 쿼리 |
-| `sql/cl01.sql` ~ `sql/cl20.sql` | 패턴별 스키마 `cl01`~`cl20`, 테이블·트리거·시드. 각 파일은 자기 스키마만 만든다 |
-| `cases/CLnn-*.json` | 사례별 문장·기대값·근거(형식 v0.2) |
+| `sql/cl01.sql` ~ `sql/cl25.sql` | 패턴별 스키마 `cl01`~`cl25`, 테이블·트리거·시드. 각 파일은 자기 스키마만 만든다 |
+| `cases/CLnn-*.json` | 사례별 문장·기대값·근거(형식 v0.3) |
+| `sql/extra/cl25d.sql` | CL25d 전용 DB `CascadeLab_Reach`(외부 부작용 트리거). `cl*.sql` 글롭이 줍지 않게 하위 폴더에 둔다 |
 
 ## 실행 순서
 
 1. `sql/00-create-databases.sql` (기존 두 DB를 지우고 다시 만든다)
-2. `sql/cl01.sql` … `sql/cl20.sql` (순서 무관. `cl08.sql`만 두 DB 모두에 만들고, 나머지는 `CascadeLab`에만 만든다)
+2. `sql/cl01.sql` … `sql/cl25.sql` (순서 무관. `cl08.sql`만 두 DB 모두에 만들고, 나머지는 `CascadeLab`에만 만든다)
 3. 사례마다 시드 직후 상태에서 `statements`를 실행한다. 사례 사이에는 초기화한다(§10.3 구성).
 
 - TestSupport `CascadeLabSeed`가 `sql/cl*.sql`을 모든 CascadeLab 테스트 기준선에 싣는다. 그래서 시드는 작게 두고, 스크립트는 자기 스키마 밖을 건드리지 않으며 서버 설정을 바꾸지 않는다(week3-plan 위험 4, AD11).
@@ -66,6 +68,14 @@
 | CL19 | `UPDATE cl19.Doc` xml·hierarchyid·geography·text | ok | 1 | 1 | 2 (RESIDUAL 1) |
 | CL20 | `DELETE cl20.Parent id<=2` (시드 @parents=3, M5 DELETE 틀) | ok | 3 | 10 | 4 |
 | CL20b | `UPDATE cl20.Child id<=3` (M5 UPDATE 틀) | ok | 2 | 5 | 3 |
+| CL21 | `EXEC cl21.usp_Outer @id = 1, @delta = 5` (분기 없는 프로시저, 안쪽 프로시저 1개) | ok, returnValue 0 | 3 | 3 (+0행 UPDATE 묶음 1) | 5 (PROC_DIRECT 4) |
+| CL22 | `EXEC cl22.usp_DeleteParent @id = 1` (CASCADE 자식 ChildA를 먼저 DELETE, ChildB는 FK 연쇄) | ok | 3 | 4 | 4 (FK 1, FK certain 오판 방지) |
+| CL23 | `EXEC cl23.usp_Pay @id = 1, @ledger_id = 900, @amt = 30` (균형 BEGIN/COMMIT + 트리거 쓰기) | ok | 3 | 3 | 5 (트리거 깊이 2) |
+| CL24 | `EXEC cl24.usp_Withdraw @id = 1, @amt = 80` (CATCH ROLLBACK 뒤 로그 프로시저 쓰기) | failed, 266, isToolFault false | 0 (+ 롤백 뒤 남은 ErrLog 1) | 0 (+1) | 2 (BLOCKED 1) |
+| CL25a | `EXEC cl25.usp_Dynamic @id = 1` (동적 SQL) | rejected | — | — | — (rejects 1, 규칙 ID 통합 때 확정) |
+| CL25b | `EXEC cl25.usp_ExtraCommit @id = 1` (짝 안 맞는 COMMIT) | rejected | — | — | — (rejects 1) |
+| CL25c | `EXEC cl25.usp_CrossDb @id = 1` (다른 DB 3부분 이름) | rejected | — | — | — (rejects 1) |
+| CL25d | `DELETE cl25d.Parent id=1`, `EXEC cl25d.usp_DeleteParent @id = 2` (도달 폐포 안 외부 부작용 트리거, DB `CascadeLab_Reach`) | rejected | — | — | — (rejects 2, 하네스는 건너뜀) |
 
 CL20·CL20b의 `scaling`(형식 v0.2)에 M5용 `generate`·`statement` 틀과 N별 건수 식이 있다. 데모 DM4는 CL10, DM6은 CL20 틀(N = 5만)이다.
 

@@ -2,7 +2,7 @@
 // 진단 줄: 거부(error)·경고(warning)를 먼저, statements 를 주면 거부 없는 문장의 "통과" 줄을 뒤에. 규칙 ID·위치·메시지·설계 참조.
 import { computed } from 'vue'
 import type { AnalyzedStatement, Diagnostic } from '../api/types'
-import { spanText } from '../lib/format'
+import { spanText, statementTarget } from '../lib/format'
 
 const props = defineProps<{
   items: Diagnostic[]
@@ -16,7 +16,7 @@ const passed = computed(() =>
     .filter((s) => !props.items.some((d) => d.severity === 'error' && d.statementIndex === s.index))
     .map((s) => ({
       index: s.index,
-      text: `${s.kind} ${s.target} · 경고 ${props.items.filter((d) => d.severity === 'warning' && d.statementIndex === s.index).length}건`,
+      text: `${s.kind === 'EXEC' ? '' : `${s.kind} `}${statementTarget(s)} · 경고 ${props.items.filter((d) => d.severity === 'warning' && d.statementIndex === s.index).length}건`,
       nondet: s.nondeterministicColumns,
     })),
 )
@@ -68,6 +68,8 @@ const passed = computed(() =>
   padding: 0;
   list-style: none;
   font-size: 13px;
+  /* 오른쪽 레일처럼 좁은 곳에서는 메시지를 아래 줄로 내린다(뷰포트가 아니라 이 목록의 폭 기준). */
+  container-type: inline-size;
 }
 li {
   display: grid;
@@ -102,7 +104,7 @@ li {
 .msg {
   overflow-wrap: anywhere;
 }
-@media (max-width: 599px) {
+@container (max-width: 560px) {
   li {
     grid-template-columns: 64px minmax(0, 1fr);
   }

@@ -209,7 +209,7 @@ public class BatchAnalyzerTests
         { "SET IDENTITY_INSERT dbo.T ON", AnalysisRules.RejectSetOption },
         { "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE", AnalysisRules.RejectSetOption },
         { "USE master", AnalysisRules.RejectUse },
-        { "EXEC dbo.uspX", AnalysisRules.RejectExec },
+        { "EXEC dbo.uspX", AnalysisRules.RejectProcNotFound }, // 2026-11-13 EXEC 미리보기: 카탈로그에 없는 프로시저
         { "EXEC sp_executesql N'DELETE dbo.T'", AnalysisRules.RejectExec },
         { "EXEC('DELETE dbo.T')", AnalysisRules.RejectExec },
         { "INSERT INTO dbo.T (a) EXEC dbo.uspX", AnalysisRules.RejectExec },
@@ -382,7 +382,8 @@ public class BatchAnalyzerTests
     {
         Assert.Equal(AnalysisRules.AllRejects.Count, AnalysisRules.AllRejects.Distinct().Count());
         Assert.All(AnalysisRules.AllRejects, r => Assert.StartsWith("REJECT_", r));
-        Assert.Equal(4, AnalysisRules.AllWarnings.Count);
+        Assert.Equal(AnalysisRules.AllWarnings.Count, AnalysisRules.AllWarnings.Distinct().Count());
+        Assert.Equal(13, AnalysisRules.AllWarnings.Count);
         Assert.All(AnalysisRules.AllWarnings, r => Assert.StartsWith("WARN_", r));
     }
 

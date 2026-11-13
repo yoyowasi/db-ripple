@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // "행 변경" 탭(C3). 발동 보기 = 묶음 목록 → 고른 묶음의 행, 최종 차이 보기 = 테이블 선택 → 그 테이블의 행.
-// 행은 서버 페이지로 읽는다(useRowPage). 서버 rows API에는 테이블 필터가 없어 최종 차이의 테이블 거르기는 읽은 페이지 안에서만 한다.
+// 행은 서버 페이지로 읽는다(useRowPage). 최종 차이 보기의 테이블 거르기도 서버가 한다(rows?view=net&table=): total과 페이지 모두 그 테이블 기준이다.
 import { computed, ref } from 'vue'
 import type { NetChange, PreviewResult, RowChange, RowView } from '../api/types'
 import { useRowPage } from '../composables/useRowPage'
@@ -59,16 +59,39 @@ function setView(v: RowView): void {
 const firings = computed(() => props.preview?.firings ?? [])
 const selFiring = computed(() => firings.value.find((f) => f.id === props.selectedFiringId) ?? null)
 
+// 최종 차이 보기의 테이블 고르기(읽기 조건이므로 useRowPage보다 먼저 정한다)
+const netOptions = computed(() => {
+  const p = props.preview
+  if (!p) return []
+  const badges = tableBadges(p)
+  return p.netSummary
+    .filter((s) => s.inserted + s.updated + s.deleted + s.multisetAdded + s.multisetRemoved > 0)
+    .map((s) => ({ table: s.table, label: `${s.table} · ${badges.get(s.table)?.text ?? '변경'}` }))
+})
+const pickedTable = ref<string | null>(null)
+/** 고른 테이블. 안 골랐거나 목록에 없으면 고른 묶음의 테이블, 그것도 없으면 첫 테이블. */
+const netTable = computed(() => {
+  const names = netOptions.value.map((o) => o.table)
+  if (pickedTable.value && names.includes(pickedTable.value)) return pickedTable.value
+  const fromFiring = selFiring.value?.table
+  if (fromFiring && names.includes(fromFiring)) return fromFiring
+  return names[0] ?? null
+})
+
 const previewId = computed(() => props.preview?.previewId ?? null)
 const viewRef = computed(() => props.view)
-// 최종 차이 보기는 묶음으로 거르지 않고 전체를 읽는다(테이블은 아래에서 거른다).
+// 최종 차이 보기는 묶음으로 거르지 않고 고른 테이블만 읽는다(netTable은 위에서 정한다).
 const firingRef = computed(() => (props.view === 'event' ? props.selectedFiringId : null))
-// 발동 보기는 묶음을 골라야 읽고, 0행 묶음은 읽을 것이 없다.
+const tableRef = computed(() => (props.view === 'net' ? netTable.value : null))
+// 발동 보기는 묶음을 골라야 읽고, 0행 묶음은 읽을 것이 없다. 최종 차이 보기는 테이블을 골라야 읽는다.
 const enabled = computed(
-  () => !!props.preview && !props.consumed && (props.view === 'net' || (!!selFiring.value && selFiring.value.rowCount > 0)),
+  () =>
+    !!props.preview &&
+    !props.consumed &&
+    (props.view === 'net' ? netTable.value !== null : !!selFiring.value && selFiring.value.rowCount > 0),
 )
 
-const { page, loading, error, offset, limit, next, prev } = useRowPage(previewId, viewRef, firingRef, enabled)
+const { page, loading, error, offset, limit, next, prev } = useRowPage(previewId, viewRef, firingRef, tableRef, enabled)
 
 const tableOf = computed(() => new Map(firings.value.map((f) => [f.id, f.table])))
 
@@ -118,30 +141,11 @@ const selKeysOnly = computed(() => selFiring.value?.imageMode === 'KEYS')
 const hasUnpaired = computed(() => pageRows.value.some((r) => r.unpaired))
 
 // ---- 최종 차이 보기 ----
-const netOptions = computed(() => {
-  const p = props.preview
-  if (!p) return []
-  const badges = tableBadges(p)
-  return p.netSummary
-    .filter((s) => s.inserted + s.updated + s.deleted + s.multisetAdded + s.multisetRemoved > 0)
-    .map((s) => ({ table: s.table, label: `${s.table} · ${badges.get(s.table)?.text ?? '변경'}` }))
-})
-const pickedTable = ref<string | null>(null)
-/** 고른 테이블. 안 골랐거나 목록에 없으면 고른 묶음의 테이블, 그것도 없으면 첫 테이블. */
-const netTable = computed(() => {
-  const names = netOptions.value.map((o) => o.table)
-  if (pickedTable.value && names.includes(pickedTable.value)) return pickedTable.value
-  const fromFiring = selFiring.value?.table
-  if (fromFiring && names.includes(fromFiring)) return fromFiring
-  return names[0] ?? null
-})
+// 서버가 이미 그 테이블만 준다. 테이블을 바꾼 직후 늦게 도착하는 옛 페이지만 걸러 낸다.
 const netRows = computed(() => pageRows.value.filter((r) => r.table === netTable.value))
-// 읽은 페이지가 전체가 아니면 거른 결과도 일부다.
+// 한 페이지가 전체가 아니면 [이전]/[다음]으로 넘긴다는 안내를 한다(total은 이 테이블의 행 수).
 const netPartial = computed(() => !!page.value && (page.value.offset > 0 || page.value.total > page.value.rows.length))
-const netLabel = computed(() => {
-  if (netPartial.value) return pageLabel.value
-  return `${formatCount(netRows.value.length)}행`
-})
+const netLabel = computed(() => (netPartial.value ? pageLabel.value : `${formatCount(page.value?.total ?? netRows.value.length)}행`))
 const netKeysOnly = computed(() => firings.value.some((f) => f.table === netTable.value && f.imageMode === 'KEYS'))
 
 // E6: 키 없는 테이블의 다중집합 문구. 최종 차이 보기는 고른 테이블, 발동 보기는 고른 묶음의 테이블만.
@@ -249,7 +253,7 @@ const multisetNotes = computed(() => {
               </div>
             </div>
             <p v-if="netPartial" class="hint partial" role="status">
-              이 페이지 안에서만 걸렀습니다(전체 {{ formatCount(page?.total ?? 0) }}행). 다른 행은 [이전]/[다음]으로 넘겨 보세요.
+              이 테이블의 행이 {{ formatCount(page?.total ?? 0) }}행이라 나눠 보입니다. 다른 행은 [이전]/[다음]으로 넘겨 보세요.
             </p>
             <RowGrid :rows="netRows" :loading="loading" :label="netTable ?? ''" :linked-firing-id="selectedFiringId" />
             <RowPager :text="netLabel" :loading="loading" :can-prev="canPrev" :can-next="canNext" @prev="prev()" @next="next()" />

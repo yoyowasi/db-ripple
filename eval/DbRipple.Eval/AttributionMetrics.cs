@@ -71,6 +71,10 @@ public static class GraphEdges
                     label[n.Id] = shape[n.Id] = "S";
                     stmtOf[n.Id] = s.StatementIndex;
                     break;
+                case ProcedureCallNode pc: // v0.3: EXEC 문장은 문장 노드 대신 이 노드(id st-n)다
+                    label[n.Id] = shape[n.Id] = "P:" + pc.Procedure;
+                    stmtOf[n.Id] = pc.StatementIndex;
+                    break;
                 case ErrorNode e:
                     label[n.Id] = shape[n.Id] = "E:" + e.ErrorNumber.ToString(CultureInfo.InvariantCulture);
                     if (n.Id.StartsWith("err-", StringComparison.Ordinal) && int.TryParse(n.Id.AsSpan(4), NumberStyles.None, CultureInfo.InvariantCulture, out var si))
@@ -131,6 +135,7 @@ public static class GraphEdges
                 EdgeKind.Fk => e.Fk,
                 EdgeKind.Fires or EdgeKind.Replaces => (dst as TriggerNode)?.Trigger,
                 EdgeKind.Writes or EdgeKind.Residual => (src as TriggerNode)?.Trigger,
+                EdgeKind.ProcDirect => (src as ProcedureCallNode)?.Procedure, // v0.3: name = EXEC 문장에 쓴 프로시저
                 _ => null,
             };
             var si = stmtOf.TryGetValue(e.Source, out var a) ? a : stmtOf.GetValueOrDefault(e.Target);

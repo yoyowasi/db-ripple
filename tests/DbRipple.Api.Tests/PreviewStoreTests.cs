@@ -95,6 +95,56 @@ public sealed class PreviewStoreTests : IDisposable
         Assert.All(page.Rows, r => Assert.Contains("f-1001", r.ExplainedBy!.FiringIds));
     }
 
+    static PreviewRecord TwoTables(PreviewRecord r) => r with
+    {
+        // dbo.T 1~3(f-1001,f-1002,f-1001), dbo.U 4~5(f-1002,f-1001)
+        NetChanges = [.. r.NetChanges.Select((n, i) => i < 3 ? n : n with { Table = "dbo.U" })],
+    };
+
+    [Fact]
+    public async Task Net_page_filters_by_table_before_offset_and_limit()
+    {
+        var store = NewStore();
+        await store.SaveAsync(TwoTables(Rec("pv_a", nets: 5)), default);
+
+        var t = await store.PageNetAsync("pv_a", new RowPageQuery { View = RowView.Net, Offset = 1, Limit = 1 }, "dbo.T", default);
+        Assert.Equal(3, t!.Total);                                 // total은 거른 수
+        Assert.Equal("2", Assert.Single(t.Rows).Key.Values[0]);     // 거른 뒤 offset 1
+
+        var u = await store.PageNetAsync("pv_a", new RowPageQuery { View = RowView.Net, FiringId = "f-1001" }, "dbo.U", default);
+        Assert.Equal(1, u!.Total);                                  // table과 firingId를 함께 거름
+        Assert.All(u.Rows, r => Assert.Equal("dbo.U", r.Table));
+
+        var none = await store.PageNetAsync("pv_a", new RowPageQuery { View = RowView.Net }, "dbo.Missing", default);
+        Assert.Equal(0, none!.Total);
+        Assert.Empty(none.Rows);
+
+        Assert.Equal(5, (await store.PageNetAsync("pv_a", new RowPageQuery { View = RowView.Net }, null, default))!.Total);
+        Assert.Null(await store.PageNetAsync("pv_none", new RowPageQuery { View = RowView.Net }, "dbo.T", default));
+    }
+
+    [Theory]
+    [InlineData("dbo.T", true)]
+    [InlineData("Sales.Sales Order.Header", true)]   // 테이블 이름의 '.'는 받는다(스키마는 첫 '.' 앞)
+    [InlineData("T", false)]
+    [InlineData(".T", false)]
+    [InlineData("dbo.", false)]
+    [InlineData("dbo.T\n", false)]
+    [InlineData("", false)]
+    public void Table_filter_format_is_schema_dot_table(string table, bool ok) => Assert.Equal(ok, RowPages.IsValidTable(table));
+
+    [Fact]
+    public async Task Table_filter_rejects_bad_format_and_too_long()
+    {
+        var store = NewStore();
+        await store.SaveAsync(Rec("pv_a"), default);
+        await Assert.ThrowsAsync<ArgumentException>(() => store.PageNetAsync("pv_a", new RowPageQuery { View = RowView.Net }, "T", default));
+        await Assert.ThrowsAsync<ArgumentException>(() => store.PageNetAsync("pv_a", new RowPageQuery { View = RowView.Net }, "dbo." + new string('x', 129), default));
+        Assert.False(RowPages.IsValidTable(new string('s', 128) + "." + new string('t', 129)));
+        Assert.True(RowPages.IsValidTable(new string('s', 128) + "." + new string('t', 128)));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => store.PageNetAsync("pv_a", new RowPageQuery { Limit = 1001 }, "dbo.T", default));
+    }
+
     [Fact]
     public async Task Page_accepts_limit_up_to_1000_and_rejects_out_of_range()
     {

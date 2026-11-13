@@ -24,8 +24,14 @@ const BASE = '/api'
 
 const UNREACHABLE_TEXT = 'API 서버(127.0.0.1:5080)에 연결할 수 없습니다. Host를 실행했는지 확인하세요.'
 
-/** 서버(platform-2)가 변경 요청의 출처를 확인하는 헤더. 없으면 403. */
+/** 서버가 요청 출처를 확인하는 헤더. 개발 모드는 고정 값 "1", 실행 파일 모드는 서버가 index.html에 넣은 세션 요청 키(없거나 틀리면 401). */
 const CSRF_HEADER = 'X-DbRipple-Request'
+
+/** 실행 파일 모드에서 서버가 index.html에 넣는 요청 키. 없으면(개발 모드) "1". */
+function requestKey(): string {
+  const meta = typeof document === 'undefined' ? null : document.querySelector('meta[name="dbr-request-key"]')
+  return meta?.getAttribute('content') || '1'
+}
 
 /** 서버 응답이 아닌 화면 쪽 예외를 ApiError로 감쌀 때 쓰는 상태. 0(네트워크 오류)과 구분해 "서버에 연결할 수 없음"으로 오인하지 않게 한다. */
 export const CLIENT_ERROR_STATUS = -1
@@ -98,7 +104,7 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
 
   const headers: Record<string, string> = {
     Accept: 'application/json, application/problem+json',
-    [CSRF_HEADER]: '1',
+    [CSRF_HEADER]: requestKey(),
   }
   let body: string | undefined
   if (opts.body !== undefined) {
@@ -163,6 +169,8 @@ export function getPreview(id: string, signal?: AbortSignal): Promise<PreviewRes
 export interface RowQuery {
   view: RowView
   firingId?: string | null
+  /** view=net에서만: "스키마.테이블". 서버가 그 테이블만 거른 뒤 페이지를 자르고 total도 거른 수다. */
+  table?: string | null
   offset: number
   limit: number
 }
@@ -173,12 +181,12 @@ export function getRows(
   signal?: AbortSignal,
 ): Promise<RowPage<RowChange> | RowPage<NetChange>> {
   return request('GET', `/previews/${encodeURIComponent(id)}/rows`, {
-    query: { view: q.view, firingId: q.firingId, offset: q.offset, limit: q.limit },
+    query: { view: q.view, firingId: q.firingId, table: q.table, offset: q.offset, limit: q.limit },
     signal,
   })
 }
 
-/** allowKeysetVerification은 사용자가 약한 검증(KEYSET)에 동의했을 때만 true로 보낸다(아니면 필드를 빼서 옛 서버와 같은 요청). */
+/** allowKeysetVerification은 사용자가 약한 검증(KEYSET_HASH)에 동의했을 때만 true로 보낸다(아니면 필드를 빼서 옛 서버와 같은 요청). */
 export function applyPreview(id: string, sqlHash: string | null, allowKeysetVerification = false): Promise<ApplyResult> {
   const body: ApplyRequest = allowKeysetVerification ? { sqlHash, allowKeysetVerification: true } : { sqlHash }
   return request<ApplyResult>('POST', `/previews/${encodeURIComponent(id)}/apply`, { body })

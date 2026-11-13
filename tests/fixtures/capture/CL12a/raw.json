@@ -16,6 +16,8 @@
         },
         "status": "trigger_blocked",
         "rowsAffected": null,
+        "returnValue": null,
+        "resultSetCount": null,
         "captureSeqRange": null,
         "error": {
           "errorNumber": 3609,
