@@ -17,6 +17,7 @@ public partial class CollectorTests
     [InlineData("missingFirst", false)]
     [InlineData("missingLast", false)]
     [InlineData("missingImage", false)]
+    [InlineData("deleteWithInsertedImage", false)]
     [InlineData("failedStatement", false)]
     [InlineData("failedPreview", false)]
     [InlineData("dirty", false)]
@@ -70,6 +71,13 @@ public partial class CollectorTests
             Capture = raw.Capture with { Truncated = mode == "truncated", ImageCount = raw.Images.Count,
                 ManifestVersion = mode == "wrongVersion" ? "old" : ctx.Manifest.Version },
         };
+        if (mode == "deleteWithInsertedImage")
+            raw = raw with
+            {
+                Headers = [raw.Headers[0] with { InsertedCount = 1 }, raw.Headers[1]],
+                Images = [.. raw.Images, raw.Images[0] with { ImageKind = ImageKind.Inserted }],
+                Capture = raw.Capture with { ImageCount = raw.Capture.ImageCount + 1 },
+            };
         var result = Collect(raw, ctx, analysis);
         if (proven)
             Assert.Equal(new ProcedureEntryDelete(1, "f-101", 1, ChangeOperation.Delete), Assert.Single(result.ProcedureEntryDeletes));

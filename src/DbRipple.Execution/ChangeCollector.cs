@@ -154,6 +154,8 @@ public sealed class ChangeCollector : IChangeCollector
     static bool CompleteImages(AuditHeaderRow header, List<AuditRowImageRow>? images)
     {
         if (header.ImageMode != ImageMode.Full || header.InsertedCount < 0 || header.DeletedCount < 0) return false;
+        if (header.Operation == ChangeOperation.Delete && header.InsertedCount != 0 ||
+            header.Operation == ChangeOperation.Insert && header.DeletedCount != 0) return false;
         return (images?.LongCount(i => i.ImageKind == ImageKind.Inserted) ?? 0) == header.InsertedCount &&
             (images?.LongCount(i => i.ImageKind == ImageKind.Deleted) ?? 0) == header.DeletedCount;
     }

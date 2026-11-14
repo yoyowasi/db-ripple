@@ -23,9 +23,11 @@ public class ExecEntryDeleteTests
             {"Procedure":"t.Remove","ExecSql":"x","WriteTargets":["t.C","t.P"],
              "FirstIndependentDelete":{"ModuleObjectId":7,"TargetObjectId":{{{targetId}}},"Target":"t.C","Operation":"DELETE"}}
             """)!;
-        var evidence = JsonSerializer.Deserialize<CollectResult>($$$"""
-            {"ProcedureEntryDeletes":[{"StatementIndex":1,"FiringId":"f-20","TargetObjectId":{{{targetId}}},"Operation":"DELETE"}]}
-            """)!;
+        // Collector evidence stays in memory and is deliberately excluded from JSON.
+        var evidence = new CollectResult
+        {
+            ProcedureEntryDeletes = [new ProcedureEntryDelete(1, "f-20", targetId, ChangeOperation.Delete)],
+        };
         var result = new CausalResolver().Resolve(input with
         {
             Statements = [input.Statements[0] with { Plan = plan, CaptureSeqRange = [20, 22] }],

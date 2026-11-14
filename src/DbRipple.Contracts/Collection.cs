@@ -49,6 +49,7 @@ public sealed record CollectResult
     /// <summary>§7.2 6단계 재조회 차이.</summary>
     public IReadOnlyList<RereadDifference> RereadDifferences { get; init; } = [];
     /// <summary>문장 시작 경계와 실제 첫 감사 헤더를 대조한 직접 DELETE 근거(0행 발동 포함).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
     public IReadOnlyList<ProcedureEntryDelete> ProcedureEntryDeletes { get; init; } = [];
 }
 
