@@ -11,6 +11,7 @@
   "expected": {
     "status": "ok",
     "errorNumber": null,
+    "warnings": ["WARN_PROC_NESTED_TRANSACTION"],
     "statementStatus": [ { "index": 1, "status": "ok" } ],
     "changes": [
       { "table": "cl23.Acct", "keyColumns": ["id"], "inserted": [], "deleted": [],
@@ -37,6 +38,9 @@
     "observedOnly": [
       { "id": "OO1", "what": "트리거 안 묶음(AcctHist)의 depth가 2인지(프로시저 중첩이 TRIGGER_NESTLEVEL에 안 더해지는지)", "basis": "A7: 인자 없는 TRIGGER_NESTLEVEL()은 트리거 스택 수다. 프로시저 호출은 @@NESTLEVEL만 올린다. SP12에서 확인" },
       { "id": "OO2", "what": "문장 상태가 ok이고 266이 나지 않는지(BEGIN/COMMIT 균형, 바깥 트랜잭션 1겹)", "basis": "SP11: 균형 패턴은 봉투 1겹·2겹에서 @@TRANCOUNT가 들어갈 때와 나올 때 같다고 본다. 바깥 트랜잭션은 COMMIT으로 확정되지 않는다(내부 COMMIT은 카운트만 1 줄인다)" }
+    ],
+    "corrections": [
+      { "date": "2026-11-14", "item": "expected.warnings", "before": [], "after": ["WARN_PROC_NESTED_TRANSACTION"], "evidence": "logs/home-test/2026-11-14/db-tests/dotnet-test.log", "cause": "실제 카탈로그 분석에서 균형 BEGIN/COMMIT도 중첩 트랜잭션 경고를 생성함" }
     ]
   },
   "rationale": [

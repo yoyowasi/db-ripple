@@ -40,3 +40,6 @@ logs/eval-m5/*/store/
 
 # 게시 결과(scripts/publish.ps1)
 artifacts/
+
+# 집 테스트의 원본 로그·TRX·임시 HTTP fixture는 로컬에 보관한다(docs/home-test-plan.md §6).
+logs/home-test/

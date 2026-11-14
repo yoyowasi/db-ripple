@@ -19,6 +19,7 @@ public sealed record ProcedureStaticInfo
     public required string Procedure { get; init; }
     public bool Opaque { get; init; }
     public bool Resolved { get; init; }
+    public IndependentDelete? FirstIndependentDelete { get; init; }
     public IReadOnlyList<ProcedureParameterInfo> Parameters { get; init; } = [];
     public IReadOnlyList<string> WriteTargets { get; init; } = [];
     public IReadOnlyList<string> ExpandedCalls { get; init; } = [];
@@ -41,10 +42,15 @@ public sealed class ProcedureAnalyzer
     public const int MaxProcedureDepth = 4;
 
     readonly ProcedureExpander expander;
+    readonly DbCatalog catalog;
 
     public ProcedureAnalyzer(DbCatalog catalog) : this(catalog, new TableResolver(catalog)) { }
 
-    internal ProcedureAnalyzer(DbCatalog catalog, TableResolver resolver) => expander = new ProcedureExpander(catalog, resolver);
+    internal ProcedureAnalyzer(DbCatalog catalog, TableResolver resolver)
+    {
+        this.catalog = catalog;
+        expander = new ProcedureExpander(catalog, resolver);
+    }
 
     /// <summary>카탈로그 사용자 프로시저 찾기(3·4부분 이름은 null).</summary>
     public CatalogModule? Find(SchemaObjectName name, string callerSchema) => expander.Index.Find(name, callerSchema);
@@ -64,6 +70,7 @@ public sealed class ProcedureAnalyzer
         {
             Procedure = name,
             Resolved = e.Resolved,
+            FirstIndependentDelete = e.Resolved ? EntryDeletePlanner.Find(module, body, catalog) : null,
             Parameters = parameters,
             WriteTargets = a.WriteTargets.ToList(),
             ExpandedCalls = a.Modules.Where(m => !m.Equals(name, StringComparison.OrdinalIgnoreCase)).ToList(),

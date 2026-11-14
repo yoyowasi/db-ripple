@@ -67,7 +67,10 @@ public static class AuditTriggerGenerator
         if (storeTables > 0) notes.Add($"감사 저장소({StoreSchema} 스키마) 테이블 {storeTables}개는 대상에서 뺌(이미 설치된 DB)");
 
         batches.Add(ResetBatch);
-        var manifest = new CaptureManifest("m-" + now.ToString("yyyyMMdd-HHmm"), covered, excluded, notes);
+        var manifest = new CaptureManifest("m-" + now.ToString("yyyyMMdd-HHmm"), covered, excluded, notes)
+        {
+            RecordsZeroRowDirectDelete = true,
+        };
         return new InstallPlan(batches, manifest);
     }
 

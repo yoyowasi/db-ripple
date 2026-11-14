@@ -48,7 +48,17 @@ public sealed record CollectResult
     public IReadOnlyList<TriggerContextLink> ContextLinks { get; init; } = [];
     /// <summary>§7.2 6단계 재조회 차이.</summary>
     public IReadOnlyList<RereadDifference> RereadDifferences { get; init; } = [];
+    /// <summary>문장 시작 경계와 실제 첫 감사 헤더를 대조한 직접 DELETE 근거(0행 발동 포함).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<ProcedureEntryDelete> ProcedureEntryDeletes { get; init; } = [];
 }
+
+/// <summary>수집기가 루트 프로시저의 첫 독립 DELETE로 확인한 실제 발동.</summary>
+/// <param name="StatementIndex">EXEC 문장 번호.</param>
+/// <param name="FiringId">첫 감사 헤더에서 만든 발동 ID.</param>
+/// <param name="TargetObjectId">헤더의 테이블 개체 ID.</param>
+/// <param name="Operation">헤더의 연산(DELETE).</param>
+public sealed record ProcedureEntryDelete(int StatementIndex, string FiringId, int TargetObjectId, ChangeOperation Operation);
 
 /// <summary>
 /// C11 변경 수집기(§4 C11). 헤더·행 이미지로 묶음을 만들고, 문장을 나누고(§7.2 1단계), 괄호를 판정하고(2단계), UPDATE 전후를 짝짓고, 바뀐 열을 값으로 계산하고,
