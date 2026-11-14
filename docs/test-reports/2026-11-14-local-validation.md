@@ -37,3 +37,7 @@
 - npm audit moderate 3항목은 `vue-tsc → @vue/language-core → minimatch` 개발 의존성 경로의 한 DoS advisory 영향이다. `npm audit --omit=dev`는 0건이다. 의존성을 자동 수정하지 않았다.
 - Split(2022 원본 컨테이너), SP11~21의 수동 실험, 게시본/브라우저 UX, 대량 성능·M5는 이번 자동 검증의 범위 밖이다. SP17 변경은 개발 Host 명령 수정이며 Split 성공을 뜻하지 않는다.
 - 원본 공유 DB는 공개 샘플 `AW_Origin`, `CascadeLab`, `CascadeLab_RT`, `CascadeLab_Reach`다. 통합 테스트·평가의 임시 DB는 private `dbrt_` 접두로 만들고 각 실행이 정리한다. 컨테이너와 공개 샘플은 후속 확인을 위해 유지한다.
+
+## 클라우드 후속 기록
+
+위 로컬 수치를 덮어쓰지 않는다. 2026-11-15 클라우드에서 새로 실행한 수정·검증과 실제DB/SP7/평가/N1 결과는 [코드 검증](2026-11-15-cloud-validation.md) 및 [DB 검증](2026-11-15-cloud-db-validation.md)에 별도로 기록한다.

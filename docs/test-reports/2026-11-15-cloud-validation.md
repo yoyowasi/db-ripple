@@ -14,7 +14,7 @@
 
 ## 실행 증거
 
-.NET SDK 10.0.402, Linux, Node/npm 및 PowerShell 7.5.4에서 실행했다. 원본 로그/TRX는 ignored `logs/home-test/cloud/` 또는 `/tmp/db-ripple-*.log`에 보관하며 커밋하지 않는다.
+.NET SDK 10.0.402, Linux, Node 24.22.1/npm 11.9.0 및 PowerShell 7.5.4에서 실행했다. 원본 로그/TRX는 ignored `logs/home-test/cloud/` 또는 `/tmp/db-ripple-*.log`에 보관하며 커밋하지 않는다.
 
 | 명령/범위 | 새 클라우드 결과 |
 |---|---|
@@ -28,9 +28,9 @@
 
 웹의 AG Grid 1,178.19 kB chunk 경고는 남아 있다. PowerShell 5.1은 Linux에서 실행하지 않았다. 전체 단위의 63 건너뜀은 실제 DB 검증을 대신하지 않는다.
 
-## DB 검증 진행 상태
+## DB 검증 결과
 
-Docker 29.9.2는 응답했지만 7.9GB root overlay에서 SQL 이미지의 vfs 복제로 ENOSPC가 발생해 컨테이너 생성이 실패했다. 전체 NuGet 복원도 한 번 공간 부족으로 중단됐다. 작업에서 설치한 SDK를 여유 있는 메모리 파일시스템으로 옮기고 unused SQL 이미지를 제거해 공간을 확보한 뒤 위 전체 빌드·테스트는 완료했다. 공개 SQL 이미지 레이어를 이용한 작은 컨테이너 구성으로 SQL Server 2025 CU10 `17.0.5035.5`를 기동했다. 공식 AdventureWorks 백업을 복원하고 미리보기 사용자 최소 권한도 준비했다. **신규 실제 DB 4사례는 4/4 통과**했다. 전체 DB(SP7 포함)는 **1191 통과·0 실패·0 건너뜀**으로 완료했으며 최종 orphan-image 회귀와 신규 통합 4사례도 포함됨을 TRX에서 확인했다. 기본 평가 30사례×3회는 공통103지표 동일·B1 신규33지표·certain 과신0으로 통과했다. EXEC 평가와 N1은 진행 중이며 최종 결과와 정확한 빌드 시점은 [DB 검증 보고서](2026-11-15-cloud-db-validation.md)에 기록한다.
+Docker 29.9.2는 응답했지만 7.9GB root overlay에서 SQL 이미지의 vfs 복제로 ENOSPC가 발생해 컨테이너 생성이 실패했다. 전체 NuGet 복원도 한 번 공간 부족으로 중단됐다. 작업에서 설치한 SDK를 여유 있는 메모리 파일시스템으로 옮기고 unused SQL 이미지를 제거해 공간을 확보한 뒤 위 전체 빌드·테스트는 완료했다. 공개 SQL 이미지 레이어를 이용한 작은 컨테이너 구성으로 SQL Server 2025 CU10 `17.0.5035.5`를 기동했다. 공식 AdventureWorks 백업을 복원하고 미리보기 사용자 최소 권한도 준비했다. **신규 실제 DB 4사례는 4/4 통과**했다. 전체 DB(SP7 포함)는 **1191 통과·0 실패·0 건너뜀**으로 완료했으며 최종 orphan-image 회귀와 신규 통합 4사례도 포함됨을 TRX에서 확인했다. 기본 평가 30사례×3회는 공통103지표 동일·B1 신규33지표·certain 과신0으로 통과했다. 최종 코드의 기본 평가도 재실행해 동일 결과를 확인했다. EXEC 포함 37사례×3회는 종료0·certain 과신0/171·상태불일치0이며, N1은 AW4/4·Cascade36/36·RT1/1·Reach1/1 일치했다. 세부 차이와 정확한 빌드 시점은 [DB 검증 보고서](2026-11-15-cloud-db-validation.md)에 기록한다.
 
 ## 사용량 제한과 재개
 

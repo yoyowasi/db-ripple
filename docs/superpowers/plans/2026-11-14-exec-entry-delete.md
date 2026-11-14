@@ -1,6 +1,6 @@
 # EXEC Entry DELETE Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** CL22 직접 자식 삭제를 실제 첫 감사 발동에 근거하여 올바르게 귀속한다.
 
@@ -39,10 +39,12 @@
 **Owner:** root; 새 Integration 회귀 파일, 설계·검증 보고서, Git 브랜치/PR.
 
 - [x] 실제 CL22·0행·부분 직접 삭제·조건문 fallback의 pipeline 검증 작성.
-- [ ] 전체 빌드 및 DB 테스트(SP7 포함), 기본/EXEC 평가, N1 API 회귀 실행.
-- [ ] 독립 리뷰와 검증 결과를 반영하고 allowlist 파일만 커밋·푸시.
-- [ ] PR 생성 후 diff·head·원격 CI 상태를 확인. 미검증 UI/Split 범위 명시.
+- [x] 전체 빌드 및 DB 테스트(SP7 포함), 기본/EXEC 평가, N1 API 회귀 실행.
+- [x] 독립 리뷰와 검증 결과를 반영하고 allowlist 파일만 커밋·푸시.
+- [x] PR 생성 후 diff·head·원격 CI 상태를 확인. 미검증 UI/Split 범위 명시.
 
 ## 2026-11-15 클라우드 진행
 
-`42e13e8`에서 이어서 내부 증거 JSON 호환성과 이미지 연산 무결성 gate를 수정했고 독립 리뷰를 완료했다. DB 없는 전체 1063통과/0실패/63건너뜀, 전체 빌드 경고·오류0, web 설치·타입검사·빌드 및 PS7 스크립트23/23을 확인했다. 실제 SQL2025 CU10의 새 pipeline 4사례도 4/4통과했다. 전체 DB(SP7)/기본·EXEC 평가/N1은 진행 중이므로 해당 체크박스는 아직 열어 둔다. 근거: [클라우드 검증](../../test-reports/2026-11-15-cloud-validation.md).
+`42e13e8`에서 이어서 내부 증거 JSON 호환성과 이미지 연산 무결성 gate를 수정했고 독립 리뷰를 완료했다. DB 없는 전체 1064통과/0실패/63건너뜀, 전체 빌드 경고·오류0, web 설치·타입검사·빌드 및 PS7 스크립트23/23을 확인했다. 실제 SQL2025 CU10의 새 pipeline 4사례도 4/4통과했다. 전체 DB(SP7)1191통과/0실패/0건너뜀, 최종 기본30×3 공통103지표동일, EXEC37×3 종료0·상태불일치0, N1 42/42 일치까지 완료했다. 최종 orphan gate와 Linux 프로세스 정리 수정도 독립 리뷰 및 실제 회귀를 통과했다. 기존 Draft PR #1을 같은 브랜치로 갱신하며 신규 PR·merge·배포는 하지 않는다. 최종 스크립트 회귀는 실제 프로세스 종료를 추가한 24/24다. 근거: [클라우드 검증](../../test-reports/2026-11-15-cloud-validation.md).
+
+실제 DB 상세와 남은 범위: [클라우드 DB 검증](../../test-reports/2026-11-15-cloud-db-validation.md). Split 원본 서버·SP11~21 수동 실험·브라우저 UX·대량 M5는 미검증 범위로 명시하며 Draft를 유지한다. 원격 HEAD/PR diff를 확인했고 자동 CI 체크는 등록되어 있지 않았다.

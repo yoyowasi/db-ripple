@@ -41,3 +41,7 @@ DB 환경변수를 제거한 `dotnet test DbRipple.slnx --no-build -m:1 --logger
 6. 검증 보고서와 plan 체크박스를 실제 결과에 맞게 갱신하고 같은 PR에 커밋·푸시한다. PR이 없으면 이 브랜치로 Draft PR을 만든다. 미해결 실패가 있으면 draft를 유지하며 통과했다고 하지 않는다. merge하지 않는다.
 
 Linux 클라우드에서는 경로 구분자·PowerShell 설치·.NET 10 SDK 지원을 확인한다. `web`은 `npm ci` 후 `npm run build`; 개발 의존성 minimatch 관련 moderate advisory는 기존 보고서에 기록되어 있으며 자동 audit fix는 하지 않았다.
+
+## 클라우드 후속 검증 (2026-11-15)
+
+이 문서 위쪽의 11실패/WIP 수치는 **인계 당시 이력**이다. 클라우드에서 최소 수정·독립 리뷰를 진행했고, 현재 실제 결과는 [클라우드 코드 검증](2026-11-15-cloud-validation.md)과 [클라우드 DB 검증](2026-11-15-cloud-db-validation.md)을 따른다. 내부 증거 JSON 노출·모순 이미지·헤더 없는 이미지의 gate 및 Linux 테스트 환경 문제를 수정했다. 신규 실제DB4사례와 전체DB(SP7)1191건이 통과했다. 비밀값과 원본로그는 커밋하지 않았다.
