@@ -8,7 +8,7 @@
 - 내부 증거를 JSON으로 구성하던 신규 Attribution 테스트는 실제 pipeline처럼 메모리 객체로 구성했다. 검증 assertion은 유지했다.
 - 독립 리뷰에서 DELETE 헤더에 INSERTED 이미지를 섞어도 직접 귀속 증거가 생기는 무결성 검증 누락을 발견했다. 회귀를 먼저 추가해 1실패/17통과를 확인하고, DELETE/INSERT 연산과 모순되는 이미지 count는 fallback하도록 보강했다. 리뷰어가 수정 diff를 재확인했다.
 - 추가 독립 리뷰에서 헤더가 누락되고 이미지가 남은 부분 수집도 증거를 승인함을 확인했다. orphan 이미지 회귀의 수정 전 1실패/18통과를 재현한 뒤 모든 이미지의 헤더 연결을 검사하도록 보강했고, 리뷰어가 재확인했다.
-- Linux N1의 실제 실행에서 `Start-Process -WindowStyle` 미지원 예외를 재현했다. Windows에서만 해당 옵션을 전달하도록 수정했으며 스크립트 회귀 23/23을 다시 확인했다.
+- Linux N1의 실제 실행에서 `Start-Process -WindowStyle` 미지원 예외를 재현했다. Windows에서만 해당 옵션을 전달하도록 수정했으며 스크립트 회귀 23/23을 다시 확인했다. 이후 실제 N1 cleanup에서 Windows 전용 `taskkill` 미존재도 재현해 Windows는 기존 명령을 유지하고 Linux는 .NET 프로세스 트리 종료를 사용하도록 수정했다. 실제 프로세스 종료 회귀를 추가한 최종 스크립트 검증은 24/24 통과했다.
 - Linux 전체 실행에서 Windows 경로 구분자를 고정한 Split 테스트와 importer의 플랫폼별 파일명 허용 차이가 드러났다. 호스트 경로 기대값은 `Path.Combine`으로 구성하고 importer는 양쪽 구분자·점 디렉터리를 거부한다. Unix 상대 경로 회귀도 추가했다.
 - 별도 리뷰어는 strict 직선형 계획, 활성 사용자 트리거·하위 FK 제외, 최초 raw 0행 헤더 소비, 특정 FiringId 한 번만 사용, 구형 manifest·버전·coverage·경계·depth·실패 fallback을 검토했다. 추가 미해결 지적은 없다. 중첩 팀은 사용하지 않았다.
 
@@ -24,13 +24,13 @@
 | Attribution 전체 | 156 통과 |
 | Core 전체 | 117 통과·6 DB 건너뜀 |
 | `npm ci` 및 `npm run build` | 종료 0, 타입 검사·Vite build 통과 |
-| `pwsh -NoProfile -File scripts/tests/home-test.Tests.ps1` | 23/23 통과 |
+| `pwsh -NoProfile -File scripts/tests/home-test.Tests.ps1` | 24/24 통과 |
 
 웹의 AG Grid 1,178.19 kB chunk 경고는 남아 있다. PowerShell 5.1은 Linux에서 실행하지 않았다. 전체 단위의 63 건너뜀은 실제 DB 검증을 대신하지 않는다.
 
 ## DB 검증 진행 상태
 
-Docker 29.9.2는 응답했지만 7.9GB root overlay에서 SQL 이미지의 vfs 복제로 ENOSPC가 발생해 컨테이너 생성이 실패했다. 전체 NuGet 복원도 한 번 공간 부족으로 중단됐다. 작업에서 설치한 SDK를 여유 있는 메모리 파일시스템으로 옮기고 unused SQL 이미지를 제거해 공간을 확보한 뒤 위 전체 빌드·테스트는 완료했다. 공개 SQL 이미지 레이어를 이용한 작은 컨테이너 구성으로 SQL Server 2025 CU10 `17.0.5035.5`를 기동했다. 공식 AdventureWorks 백업을 복원하고 미리보기 사용자 최소 권한도 준비했다. **신규 실제 DB 4사례는 4/4 통과**했다. 전체 DB(SP7)/기본·EXEC 평가/N1은 진행 중이며 결과는 별도 DB 검증 보고서에 추가한다.
+Docker 29.9.2는 응답했지만 7.9GB root overlay에서 SQL 이미지의 vfs 복제로 ENOSPC가 발생해 컨테이너 생성이 실패했다. 전체 NuGet 복원도 한 번 공간 부족으로 중단됐다. 작업에서 설치한 SDK를 여유 있는 메모리 파일시스템으로 옮기고 unused SQL 이미지를 제거해 공간을 확보한 뒤 위 전체 빌드·테스트는 완료했다. 공개 SQL 이미지 레이어를 이용한 작은 컨테이너 구성으로 SQL Server 2025 CU10 `17.0.5035.5`를 기동했다. 공식 AdventureWorks 백업을 복원하고 미리보기 사용자 최소 권한도 준비했다. **신규 실제 DB 4사례는 4/4 통과**했다. 전체 DB(SP7 포함)는 **1191 통과·0 실패·0 건너뜀**으로 완료했으며 최종 orphan-image 회귀와 신규 통합 4사례도 포함됨을 TRX에서 확인했다. 기본 평가 30사례×3회는 공통103지표 동일·B1 신규33지표·certain 과신0으로 통과했다. EXEC 평가와 N1은 진행 중이며 최종 결과와 정확한 빌드 시점은 [DB 검증 보고서](2026-11-15-cloud-db-validation.md)에 기록한다.
 
 ## 사용량 제한과 재개
 

@@ -285,7 +285,14 @@ function Invoke-Api([string]$Method, [string]$Path, $Body) {
 function Stop-HostProcess($Proc) {
     if ($Proc -and -not $Proc.HasExited) {
         $saved = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        try { & taskkill /PID $Proc.Id /T /F 2>$null | Out-Null } finally { $ErrorActionPreference = $saved }
+        try {
+            if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+                & taskkill /PID $Proc.Id /T /F 2>$null | Out-Null
+            } else {
+                $Proc.Kill($true)
+                [void]$Proc.WaitForExit(10000)
+            }
+        } finally { $ErrorActionPreference = $saved }
     }
 }
 

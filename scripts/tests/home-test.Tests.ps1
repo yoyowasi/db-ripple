@@ -216,6 +216,18 @@ try {
     foreach ($key in $connectionNames) { [Environment]::SetEnvironmentVariable($key, $savedEnvironment[$key], 'Process') }
     Set-Location $savedLocation
 }
+# Exercise real cleanup too: fixture Start-Process boundaries cannot detect platform failures.
+$stopNode = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Stop-HostProcess' }, $true)
+. ([scriptblock]::Create($stopNode.Extent.Text))
+$cleanupProcess = Start-Process -FilePath (Get-Process -Id $PID).Path -ArgumentList '-NoProfile -Command "Start-Sleep -Seconds 60"' -PassThru
+try {
+    Stop-HostProcess $cleanupProcess
+    [void]$cleanupProcess.WaitForExit(10000)
+    Assert-Check 'real Host cleanup terminates the process on this platform' $cleanupProcess.HasExited
+} finally {
+    if (-not $cleanupProcess.HasExited) { Stop-Process -Id $cleanupProcess.Id -Force }
+    $cleanupProcess.Dispose()
+}
 $report = [ordered]@{ powershell = $PSVersionTable.PSVersion.ToString(); scratch = $scratch; checks = @($checks); httpRequests = $serverState.Requests; refreshRequests = $serverState.Refreshes }
 [IO.File]::WriteAllText((Join-Path $outputRoot 'regression-results.json'), ($report | ConvertTo-Json -Depth 5), $utf8)
 $failed = @($checks | Where-Object { -not $_.passed }).Count
