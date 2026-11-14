@@ -29,6 +29,7 @@ New-Item -ItemType Directory -Force $outDir | Out-Null
 $logFile = Join-Path $outDir 'home-test.log'
 $script:Results = New-Object System.Collections.ArrayList
 $script:Facts = [ordered]@{}
+$script:LocalSqlConnection = $null
 
 function Write-Log([string]$Message) {
     $line = ('{0} {1}' -f (Get-Date -Format 'HH:mm:ss'), $Message)
@@ -94,6 +95,15 @@ function New-SqlConnection([string]$Database) {
     return New-Object System.Data.SqlClient.SqlConnection($b.ConnectionString)
 }
 
+# 이번 실행의 Env에서 로컬 연결 시험을 통과한 값만 자식 프로세스에 넘긴다.
+# 호출한 셸의 SingleServer/Split 값과 env.ps1이 일부만 설정하고 실패한 값은 신뢰하지 않는다.
+function Set-LocalDbEnvironment {
+    $env:DBRIPPLE_SQL_CONNECTION = $script:LocalSqlConnection
+    $env:DBRIPPLE_ORIGIN_CONNECTION = $null
+    $env:DBRIPPLE_SANDBOX_CONNECTION = $null
+}
+Set-LocalDbEnvironment
+
 # ---------------------------------------------------------------- Docker
 Invoke-Step 'Docker' 'Docker·SQL Server 컨테이너 확인' {
     if (-not (Test-Path (Join-Path $root '.env'))) { return @{ Status = 'FAIL'; Detail = '.env가 없음(.env.example을 복사해 MSSQL_SA_PASSWORD를 채운다)' } }
@@ -112,7 +122,7 @@ Invoke-Step 'Docker' 'Docker·SQL Server 컨테이너 확인' {
     }
     $ver2 = Invoke-ContainerQuery "SELECT CAST(SERVERPROPERTY('ProductVersion') AS varchar(30)) + ' ' + CAST(SERVERPROPERTY('Edition') AS varchar(60))"
     $script:Facts['sqlserver'] = ($ver2 -join ' ').Trim()
-    $aw = Invoke-ContainerQuery "SELECT CASE WHEN DB_ID(N'AW_Origin') IS NULL THEN 'AW_Origin없음' ELSE 'AW_Origin있음' END"
+    $aw = Invoke-ContainerQuery "SELECT CASE WHEN DB_ID(N'AW_Origin') IS NULL THEN N'AW_Origin없음' ELSE N'AW_Origin있음' END"
     $script:Facts['awOrigin'] = ($aw -join '').Trim()
     if ($script:Facts['awOrigin'] -ne 'AW_Origin있음') {
         return @{ Status = 'WARN'; Detail = ('Docker ' + $ver + ', SQL ' + $script:Facts['sqlserver'] + '. AW_Origin이 없어 N1 AW가 실패한다: scripts\fetch-adventureworks.ps1 → scripts\restore-aw-origin.ps1') }
@@ -122,14 +132,23 @@ Invoke-Step 'Docker' 'Docker·SQL Server 컨테이너 확인' {
 
 # ---------------------------------------------------------------- Env
 Invoke-Step 'Env' '연결 설정(SingleServer)과 시험' {
-    . (Join-Path $PSScriptRoot 'env.ps1')
-    if ([string]::IsNullOrEmpty($env:DBRIPPLE_SQL_CONNECTION)) { return @{ Status = 'FAIL'; Detail = 'DBRIPPLE_SQL_CONNECTION이 만들어지지 않음' } }
-    $conn = New-SqlConnection 'master'
     try {
-        $conn.Open()
-        $cmd = $conn.CreateCommand(); $cmd.CommandText = "SELECT CAST(SERVERPROPERTY('ProductVersion') AS varchar(30))"
-        $v = [string]$cmd.ExecuteScalar()
-    } finally { $conn.Dispose() }
+        . (Join-Path $PSScriptRoot 'env.ps1')
+        if ([string]::IsNullOrEmpty($env:DBRIPPLE_SQL_CONNECTION)) { throw 'DBRIPPLE_SQL_CONNECTION이 만들어지지 않음' }
+        try { $b = New-Object System.Data.SqlClient.SqlConnectionStringBuilder($env:DBRIPPLE_SQL_CONNECTION) }
+        catch { throw '로컬 DB 연결 설정 형식 오류(연결 문자열은 출력하지 않음)' }
+        if ($b.DataSource -notmatch '^127\.0\.0\.1,([0-9]{1,5})$' -or [int]$Matches[1] -lt 1 -or [int]$Matches[1] -gt 65535) {
+            throw '로컬 Docker 주소(127.0.0.1,유효 포트)만 허용(연결 문자열은 출력하지 않음)'
+        }
+        $conn = New-SqlConnection 'master'
+        try {
+            $conn.Open()
+            $cmd = $conn.CreateCommand(); $cmd.CommandText = "SELECT CAST(SERVERPROPERTY('ProductVersion') AS varchar(30))"
+            $v = [string]$cmd.ExecuteScalar()
+        } finally { $conn.Dispose() }
+        $script:LocalSqlConnection = $b.ConnectionString
+        $script:Facts['dbConnectionValidated'] = $true
+    } finally { Set-LocalDbEnvironment }
     return @{ Status = 'PASS'; Detail = ('연결 확인(SingleServer, 서버 ' + $v + '). 연결 문자열은 출력하지 않음') }
 }
 
@@ -145,7 +164,8 @@ Invoke-Step 'Build' 'dotnet build DbRipple.slnx' {
 
 # ---------------------------------------------------------------- Tests
 Invoke-Step 'Tests' 'dotnet test DbRipple.slnx (DB 테스트 포함)' {
-    $dbSet = -not [string]::IsNullOrEmpty($env:DBRIPPLE_SQL_CONNECTION)
+    Set-LocalDbEnvironment
+    $dbSet = -not [string]::IsNullOrEmpty($script:LocalSqlConnection)
     $trx = Join-Path $outDir 'trx'
     if (Test-Path $trx) { Remove-Item $trx -Recurse -Force }
     $log = Join-Path $outDir 'dotnet-test.log'
@@ -162,6 +182,7 @@ Invoke-Step 'Tests' 'dotnet test DbRipple.slnx (DB 테스트 포함)' {
     $summary = ('전체 ' + $total + ', 통과 ' + $passed + ', 실패 ' + $failed + ', 건너뜀 ' + $skipped + ' (TRX ' + $files.Count + '개)')
     if ($failedNames.Count -gt 0) { [System.IO.File]::WriteAllText((Join-Path $outDir 'failed-tests.txt'), ($failedNames -join "`r`n"), $utf8) }
     if ($files.Count -eq 0) { return @{ Status = 'FAIL'; Detail = ('TRX가 없음(종료 코드 ' + $code + '), 로그 ' + $log) } }
+    $script:Facts['testsDbEnabled'] = $dbSet
     if ($failed -gt 0 -or $code -ne 0) {
         return @{ Status = 'FAIL'; Detail = ($summary + ', 종료 코드 ' + $code + '. 실패 목록 failed-tests.txt, 로그 ' + $log) }
     }
@@ -186,7 +207,8 @@ function Test-RejectMatch($Expected, [string]$RuleId) {
 }
 
 Invoke-Step 'Eval' '평가 빠른 실행과 이전 결과 비교(M1~M4)' {
-    if ([string]::IsNullOrEmpty($env:DBRIPPLE_SQL_CONNECTION)) { return @{ Status = 'FAIL'; Detail = 'DBRIPPLE_SQL_CONNECTION 없음(Env 단계 필요)' } }
+    Set-LocalDbEnvironment
+    if ([string]::IsNullOrEmpty($script:LocalSqlConnection)) { return @{ Status = 'FAIL'; Detail = '검증된 로컬 DB 연결 없음(Env 단계 성공 필요)' } }
     # 기본: EXEC·거부 사례(CL21~CL25)는 제외해 이전 평가(CL01~CL20)와 같은 사례 집합으로 비교한다. EXEC는 합쳐졌으므로 -IncludeExec로 한 번 더 돌린다.
     $cases = @(Get-HandCases)
     $ids = @($cases | Where-Object {
@@ -256,7 +278,7 @@ function Invoke-Api([string]$Method, [string]$Path, $Body) {
     $uri = 'http://127.0.0.1:' + $N1Port + $Path
     $headers = @{ 'X-DbRipple-Request' = '1' }
     if ($Method -eq 'GET') { return Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 120 }
-    $bytes = if ($null -ne $Body) { $utf8.GetBytes(($Body | ConvertTo-Json -Compress -Depth 8)) } else { [byte[]]@() }
+    [byte[]]$bytes = if ($null -ne $Body) { $utf8.GetBytes(($Body | ConvertTo-Json -Compress -Depth 8)) } else { [byte[]]@() }
     return Invoke-WebRequest -Uri $uri -Method $Method -Headers $headers -ContentType 'application/json; charset=utf-8' -Body $bytes -UseBasicParsing -TimeoutSec 300
 }
 
@@ -267,8 +289,19 @@ function Stop-HostProcess($Proc) {
     }
 }
 
+function Assert-N1PortAvailable {
+    $listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $N1Port)
+    try {
+        $listener.Server.ExclusiveAddressUse = $true
+        $listener.Start()
+    } catch {
+        throw ('N1 포트 127.0.0.1:' + $N1Port + '가 이미 사용 중이거나 바인딩할 수 없음. 임시 Host 시작 전에 중단')
+    } finally { $listener.Stop() }
+}
+
 # 한 DB를 대상으로 임시 Host를 띄워 SQL 목록을 분석한다. $Items = @{ id; sql; expected = @(…expected.rejects…) } 배열. 결과: 대상별 판정 문자열 목록
 function Invoke-N1Target([string]$Name, [string]$OriginDb, [object[]]$Items) {
+    Assert-N1PortAvailable
     $tdir = Join-Path (Join-Path $outDir 'n1') $Name
     New-Item -ItemType Directory -Force $tdir | Out-Null
     $sandbox = $(if ($OriginDb -eq 'AW_Origin') { 'AW_Sandbox' } else { $OriginDb + '_Sandbox' })
@@ -362,7 +395,9 @@ function Initialize-CascadeLabDatabases([string]$Target) {
 }
 
 Invoke-Step 'N1' '분석기 거부 목록 회귀(도달 폐포 N1): CascadeLab 사례·AW 시연 SQL' {
-    if ([string]::IsNullOrEmpty($env:DBRIPPLE_SQL_CONNECTION)) { return @{ Status = 'FAIL'; Detail = 'DBRIPPLE_SQL_CONNECTION 없음(Env 단계 필요)' } }
+    Set-LocalDbEnvironment
+    if ([string]::IsNullOrEmpty($script:LocalSqlConnection)) { return @{ Status = 'FAIL'; Detail = '검증된 로컬 DB 연결 없음(Env 단계 성공 필요)' } }
+    Assert-N1PortAvailable
     $hostDll = Join-Path $root 'src\DbRipple.Host\bin'
     if (-not (Test-Path $hostDll)) { return @{ Status = 'FAIL'; Detail = 'Host가 빌드되지 않음(Build 단계 필요)' } }
     $hand = @(Get-HandCases)
@@ -396,6 +431,7 @@ Invoke-Step 'N1' '분석기 거부 목록 회귀(도달 폐포 N1): CascadeLab �
                 }
                 $r = Invoke-N1Target $t $t $items
             }
+            $script:Facts['n1CompletedTargets'] = @($script:Facts['n1CompletedTargets']) + @($t) | Where-Object { $_ }
             $summary.Add(($t + ': ' + ($r.total - $r.bad) + '/' + $r.total + ' 일치' + $(if ($r.bad -gt 0) { ' — 불일치 ' + (($r.lines | Where-Object { $_ -match 'FAIL' }) -join ' | ') } else { '' }))) | Out-Null
             if ($r.bad -gt 0) { $worst = 'FAIL' }
         } catch {
@@ -421,7 +457,18 @@ $md = New-Object System.Text.StringBuilder
 [void]$md.AppendLine('|---|---|---|---|')
 foreach ($r in $script:Results) { [void]$md.AppendLine('| ' + $r.step + ' | ' + $r.status + ' | ' + $r.seconds + ' | ' + ($r.detail -replace '\|', '/') + ' |') }
 [void]$md.AppendLine('')
-[void]$md.AppendLine('증거 범위: DB 실측(로컬 Docker 컨테이너, SingleServer) + 임시 Host API(127.0.0.1:' + $N1Port + ', 개발 모드). 실행하지 않은 단계는 SKIP이다.')
+$evidence = New-Object System.Collections.ArrayList
+if ($script:Facts['dbConnectionValidated']) { [void]$evidence.Add('DB 연결 시험 성공(로컬 Docker, SingleServer)') }
+else { [void]$evidence.Add('DB 연결 시험 성공 증거 없음') }
+if ($script:Facts.Contains('testsDbEnabled')) {
+    [void]$evidence.Add('Tests TRX(DB 연결 ' + $(if ($script:Facts['testsDbEnabled']) { '검증됨; 개별 실행·건너뜀은 TRX 참조' } else { '없음; DB 테스트 미확인' }) + ')')
+}
+if ($script:Facts['evalRun']) { [void]$evidence.Add('Eval 산출물(성공 여부는 Eval 단계 결과 참조)') }
+$completedN1Targets = @($script:Facts['n1CompletedTargets'] | Where-Object { $_ })
+if ($completedN1Targets.Count -gt 0) {
+    [void]$evidence.Add('임시 Host API(127.0.0.1:' + $N1Port + ', 개발 모드), 완료 대상: ' + ($completedN1Targets -join ', '))
+} else { [void]$evidence.Add('완료된 N1 API 대상 없음') }
+[void]$md.AppendLine('증거 범위: ' + ($evidence -join ' / ') + '. 실행하지 않은 단계는 SKIP이다.')
 [void]$md.AppendLine('남은 수동 단계(Split·스파이크 SP11~SP21·실행 파일 화면·큰 DELETE 성능)는 docs/home-test-plan.md 5절 이후를 따른다.')
 [System.IO.File]::WriteAllText((Join-Path $outDir 'summary.md'), $md.ToString(), $utf8)
 $json = [ordered]@{ date = $Date; overall = $overall; commit = $head; facts = $script:Facts; steps = @($script:Results) }

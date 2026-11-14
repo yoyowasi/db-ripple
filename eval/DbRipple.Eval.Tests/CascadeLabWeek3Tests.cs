@@ -56,15 +56,19 @@ public class CascadeLabWeek3Tests
     }
 
     /// <summary>
-    /// CL09~CL20 오라클 대 손 정답(정정 기록 후보 찾기). 사례마다 새 전용 원본을 만들어 서로의 남은 행(leavesResidue)과 IDENTITY 소비가 섞이지 않게 한다.
+    /// CL09~CL24의 실행 가능한 사례를 오라클 대 손 정답으로 비교한다. 사례마다 새 전용 원본을 만들어 서로의 남은 행(leavesResidue)과 IDENTITY 소비가 섞이지 않게 한다.
     /// CL20 계열은 시드 기본(@parents = 3) 그대로다. 실패 사례는 오라클 after가 롤백 뒤 상태여야 한다(인계 4).
     /// </summary>
     [SqlFact]
     public async Task Oracle_matches_hand_answers_for_week3_cases()
     {
         var log = OracleLog.LoadCases(Path.Combine(RepoPaths.CascadeLab, "verification", "logs", "oracle-2026-11-10.json"));
-        var cases = Cases().Where(c => !log.ContainsKey(c.Id)).ToList();
+        // 생산 Eval CLI와 같은 경계: 분석 거부 사례는 원본에서 실행하지 않고, 별도 Reach DB는 이 시더가 만들지 않는다.
+        var cases = Cases().Where(c => !log.ContainsKey(c.Id) && !c.IsRejectCase
+            && c.Database is "CascadeLab" or "CascadeLab_RT").ToList();
         Assert.NotEmpty(cases);
+        foreach (var id in new[] { "CL21", "CL22", "CL23", "CL24" })
+            Assert.Contains(cases, c => c.Id == id); // 새 EXEC 사례를 제외해 실제 불일치를 숨기지 않는다.
         var runner = new OracleRunner(new HashSnapshotComparer());
         var cs = TestDb.ConnectionString();
         var problems = new List<string>();

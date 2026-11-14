@@ -13,6 +13,10 @@ public sealed record CaptureManifest(
     public const string Last = "LAST";
     public const string None = "NONE";
 
+    /// <summary>직접 DELETE가 0행이어도 발동 헤더를 기록한다. 예전 매니페스트는 이 보장이 없다.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool RecordsZeroRowDirectDelete { get; init; }
+
     static readonly JsonSerializerOptions Options = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

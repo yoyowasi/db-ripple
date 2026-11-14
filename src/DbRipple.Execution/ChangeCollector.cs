@@ -96,7 +96,66 @@ public sealed class ChangeCollector : IChangeCollector
             RowChanges = nodes.SelectMany(n => n.Rows.Select(r => r.Change)).ToList(),
             ContextLinks = links.OrderBy(l => SeqOf(l.ChildFiringId)).ToList(),
             RereadDifferences = differences,
+            ProcedureEntryDeletes = EntryDeletes(raw, analysis, baseline, tables, manifest, imagesBySeq),
         };
+    }
+
+    static IReadOnlyList<ProcedureEntryDelete> EntryDeletes(RawCapture raw, AnalysisResult? analysis, BaselineContext baseline,
+        IReadOnlyDictionary<int, TableInfo> tables, IReadOnlyDictionary<string, ManifestTable> manifest,
+        IReadOnlyDictionary<long, List<AuditRowImageRow>> imagesBySeq)
+    {
+        if (analysis is not { IsAccepted: true } || !analysis.Statements.Any(s => s.Plan?.FirstIndependentDelete is not null) ||
+            raw.Status != PreviewStatus.Ok || raw.SandboxDirty || raw.ResidualCheckFailed || raw.ResidualCommitted.Count != 0 ||
+            raw.Capture.Truncated || !baseline.Manifest.RecordsZeroRowDirectDelete || raw.Capture.ManifestVersion != baseline.Manifest.Version ||
+            raw.Executions.Count != analysis.Statements.Count) return [];
+
+        // Work with the entire raw sequence. Filtering by table, depth or positive count first could
+        // mistake a later cascade for a direct DELETE when the entry DELETE affected zero rows.
+        var headers = raw.Headers.OrderBy(h => h.CaptureSeq).ToArray();
+        if (raw.Images.LongCount(i => i.RowJson is not null) != raw.Capture.ImageCount ||
+            !headers.All(h => CompleteImages(h, imagesBySeq.GetValueOrDefault(h.CaptureSeq)))) return [];
+
+        var proofs = new List<ProcedureEntryDelete>();
+        var previous = raw.Boundary0;
+        int next = 0;
+        for (int i = 0; i < raw.Executions.Count; i++)
+        {
+            var execution = raw.Executions[i];
+            var result = execution.Result;
+            var statement = analysis.Statements[i];
+            if (result.Status != StatementStatus.Ok || execution.Boundary is not long high || high < previous ||
+                statement.Index != result.Index || statement.Kind != result.Kind) return [];
+            int start = next;
+            while (next < headers.Length && headers[next].CaptureSeq <= high) next++;
+            if (start == next)
+            {
+                if (result.CaptureSeqRange is not null || high != previous) return [];
+            }
+            else
+            {
+                var first = headers[start];
+                if (result.CaptureSeqRange is not [var lowSeq, var highSeq] || first.CaptureSeq <= previous ||
+                    first.CaptureSeq != lowSeq || headers[next - 1].CaptureSeq != highSeq || highSeq != high) return [];
+
+                if (statement.Kind == ChangeOperation.Exec && statement.Plan?.FirstIndependentDelete is { } entry &&
+                    result.Plan?.FirstIndependentDelete == entry && statement.Procedure == result.Procedure &&
+                    baseline.Catalog.ProcedureModules.Any(m => m.ObjectId == entry.ModuleObjectId && m.Schema + "." + m.Name == result.Procedure) &&
+                    first.Operation == ChangeOperation.Delete && entry.Operation == first.Operation && first.NestLevel == 1 &&
+                    first.TableObjectId == entry.TargetObjectId && tables.TryGetValue(entry.TargetObjectId, out var table) &&
+                    table.QuotedName == first.TableName && table.DisplayName == entry.Target &&
+                    manifest.GetValueOrDefault(entry.Target) is { Covered: true })
+                    proofs.Add(new(result.Index, ContractIds.Firing(first.CaptureSeq), entry.TargetObjectId, first.Operation));
+            }
+            previous = high;
+        }
+        return next == headers.Length ? proofs : [];
+    }
+
+    static bool CompleteImages(AuditHeaderRow header, List<AuditRowImageRow>? images)
+    {
+        if (header.ImageMode != ImageMode.Full || header.InsertedCount < 0 || header.DeletedCount < 0) return false;
+        return (images?.LongCount(i => i.ImageKind == ImageKind.Inserted) ?? 0) == header.InsertedCount &&
+            (images?.LongCount(i => i.ImageKind == ImageKind.Deleted) ?? 0) == header.DeletedCount;
     }
 
     // ---------------- 2단계 ----------------

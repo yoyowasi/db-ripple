@@ -6,7 +6,7 @@ using DbRipple.Core.Catalog;
 namespace DbRipple.Execution.Tests;
 
 /// <summary>C11 순수 단위 테스트(DB 없음): §6.1 숫자 원문, 짝짓기 4종과 Q11, volatile·derived, 괄호(NONE 보완), 문장 나누기, 최종 after와 Q14.</summary>
-public class CollectorTests
+public partial class CollectorTests
 {
     // ---- 작은 카탈로그 ----
     // dbo.T(id PK, code NOT NULL UNIQUE, v int, amt decimal, c AS 계산 열) object 1

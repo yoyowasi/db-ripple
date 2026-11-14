@@ -1,0 +1,44 @@
+# EXEC Entry DELETE Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** CL22 직접 자식 삭제를 실제 첫 감사 발동에 근거하여 올바르게 귀속한다.
+
+**Architecture:** 선택적 분석 계획과 0행 수집 capability를 결합한다. 수집기가 검증한 첫 발동의 근거만 C13에 전달하고, 모든 미지원·누락 경로는 기존 판정을 유지한다.
+
+**Tech Stack:** .NET 10, ScriptDom, SQL Server 2025, xUnit.
+
+**Spec:** ../specs/2026-11-14-exec-entry-delete.md
+
+## Global Constraints
+
+- 원본 프로시저·실행 SQL 변경 없음. EXEC Apply 금지 유지.
+- 0행 헤더 보존, 특정 첫 FiringId만 증거 사용, 구형 데이터 기본 fallback.
+- 분석기 거부 규칙 및 기존 FK 검증 완화 금지.
+- 테스트 DB는 로컬 Docker와 private dbrt_ 접두만 사용. 비밀값 기록 금지.
+
+## Review Focus
+
+- 0행 직접 DELETE 뒤의 실제 FK 삭제를 직접 원인으로 오인하지 않음.
+- 부분 직접 삭제 뒤 같은 테이블의 두 번째 발동에 근거를 재사용하지 않음.
+- 사용자 트리거·self FK·분기·호출·트랜잭션 제어는 계획을 만들지 않음.
+- 누락 헤더·구형 manifest·실행 실패에는 새 certainty를 부여하지 않음.
+- 수집 정보 확장이 기존 JSON/fixture 소비자를 깨뜨리지 않음.
+
+### Task 1: 분석·수집·귀속의 선택적 증거 연결
+
+**Owner:** attribution_1; Contracts/Analysis/Core Capture manifest/Execution collector/Attribution 및 해당 단위 테스트의 필요한 파일만.
+
+- [ ] 실패하는 직접/0행/부분/fallback 회귀 작성 및 실패 확인.
+- [ ] 선택 계획·manifest capability·수집 증거를 연결하고 first-only 판정 구현.
+- [ ] 관련 Analysis/Execution/Attribution 및 계약 직렬화 테스트 실행.
+- [ ] 변경 파일과 검증 로그를 root에 전달. 독립 리뷰 후 지적 수정.
+
+### Task 2: 실제 DB 회귀와 최종 PR 검증
+
+**Owner:** root; 새 Integration 회귀 파일, 설계·검증 보고서, Git 브랜치/PR.
+
+- [ ] 실제 CL22·0행·부분 직접 삭제·조건문 fallback의 pipeline 검증 작성.
+- [ ] 전체 빌드 및 DB 테스트(SP7 포함), 기본/EXEC 평가, N1 API 회귀 실행.
+- [ ] 독립 리뷰와 검증 결과를 반영하고 allowlist 파일만 커밋·푸시.
+- [ ] PR 생성 후 diff·head·원격 CI 상태를 확인. 미검증 UI/Split 범위 명시.

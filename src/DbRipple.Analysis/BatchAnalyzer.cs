@@ -420,7 +420,11 @@ public sealed class BatchAnalyzer : IBatchAnalyzer
                 Sql = sql.Substring(s.StartOffset, s.FragmentLength),
                 Procedure = proc,
                 Parameters = args.Select(a => sql.Substring(a.Node.StartOffset, a.Node.FragmentLength)).ToList(),
-                Plan = new ProcedurePlan { Procedure = proc, ExecSql = execSql, WriteTargets = info.WriteTargets, ExpandedCalls = info.ExpandedCalls },
+                Plan = new ProcedurePlan
+                {
+                    Procedure = proc, ExecSql = execSql, WriteTargets = info.WriteTargets, ExpandedCalls = info.ExpandedCalls,
+                    FirstIndependentDelete = info.FirstIndependentDelete,
+                },
             });
         }
 
