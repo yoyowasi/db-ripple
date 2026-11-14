@@ -17,6 +17,7 @@ public partial class CollectorTests
     [InlineData("missingFirst", false)]
     [InlineData("missingLast", false)]
     [InlineData("missingImage", false)]
+    [InlineData("orphanImage", false)]
     [InlineData("deleteWithInsertedImage", false)]
     [InlineData("failedStatement", false)]
     [InlineData("failedPreview", false)]
@@ -76,6 +77,12 @@ public partial class CollectorTests
             {
                 Headers = [raw.Headers[0] with { InsertedCount = 1 }, raw.Headers[1]],
                 Images = [.. raw.Images, raw.Images[0] with { ImageKind = ImageKind.Inserted }],
+                Capture = raw.Capture with { ImageCount = raw.Capture.ImageCount + 1 },
+            };
+        if (mode == "orphanImage")
+            raw = raw with
+            {
+                Images = [.. raw.Images, raw.Images[0] with { CaptureSeq = 102 }],
                 Capture = raw.Capture with { ImageCount = raw.Capture.ImageCount + 1 },
             };
         var result = Collect(raw, ctx, analysis);

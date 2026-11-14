@@ -322,8 +322,10 @@ function Invoke-N1Target([string]$Name, [string]$OriginDb, [object[]]$Items) {
     try {
         $hostOut = Join-Path $tdir 'host.out.log'
         # --dev: launchSettings를 쓰지 않으므로 개발 모드(실행 토큰 없음)를 직접 켠다. 없으면 실행 파일 모드라 /api가 401이다.
+        $windowOptions = @{}
+        if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) { $windowOptions['WindowStyle'] = 'Hidden' }
         $proc = Start-Process -FilePath 'dotnet' -ArgumentList @('run', '--project', (ConvertTo-Arg (Join-Path $root 'src\DbRipple.Host')), '--no-launch-profile', '--no-build', '--', '--dev') `
-            -PassThru -WindowStyle Hidden -RedirectStandardOutput $hostOut -RedirectStandardError ($hostOut + '.err')
+            -PassThru @windowOptions -RedirectStandardOutput $hostOut -RedirectStandardError ($hostOut + '.err')
         $deadline = (Get-Date).AddSeconds(90)
         $up = $false
         while ((Get-Date) -lt $deadline -and -not $proc.HasExited) {

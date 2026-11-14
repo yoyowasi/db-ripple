@@ -41,4 +41,3 @@ public class ExecEntryDeleteTests
         Assert.Equal(["rc-22-1"], result.Model.RowChanges.Single(r => r.FiringId == "f-21").ParentRowIds);
     }
 }
-

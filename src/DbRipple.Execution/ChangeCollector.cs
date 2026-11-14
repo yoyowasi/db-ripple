@@ -112,7 +112,9 @@ public sealed class ChangeCollector : IChangeCollector
         // Work with the entire raw sequence. Filtering by table, depth or positive count first could
         // mistake a later cascade for a direct DELETE when the entry DELETE affected zero rows.
         var headers = raw.Headers.OrderBy(h => h.CaptureSeq).ToArray();
-        if (raw.Images.LongCount(i => i.RowJson is not null) != raw.Capture.ImageCount ||
+        var headerSequences = headers.Select(h => h.CaptureSeq).ToHashSet();
+        if (imagesBySeq.Keys.Any(seq => !headerSequences.Contains(seq)) ||
+            raw.Images.LongCount(i => i.RowJson is not null) != raw.Capture.ImageCount ||
             !headers.All(h => CompleteImages(h, imagesBySeq.GetValueOrDefault(h.CaptureSeq)))) return [];
 
         var proofs = new List<ProcedureEntryDelete>();
