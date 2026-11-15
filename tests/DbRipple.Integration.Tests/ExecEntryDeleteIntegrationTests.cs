@@ -58,22 +58,22 @@ public sealed class ExecEntryDeleteIntegrationTests
             var first = childFirings[0];
             Assert.Equal(directlyDeleted, first.RowCount);
             Assert.Equal((CauseKind.ProcDirect, Confidence.Certain), (first.Cause!.Kind, first.Cause.Confidence));
-            var directEdge = Assert.Single(record.Result.Graph.Edges.Where(e => e.Target == first.Id));
+            var directEdge = Assert.Single(record.Result.Graph.Edges, e => e.Target == first.Id);
             Assert.Equal(EdgeKind.ProcDirect, directEdge.Kind);
-            Assert.IsType<ProcedureCallNode>(Assert.Single(record.Result.Graph.Nodes.Where(n => n.Id == directEdge.Source)));
+            Assert.IsType<ProcedureCallNode>(Assert.Single(record.Result.Graph.Nodes, n => n.Id == directEdge.Source));
             Assert.All(record.RowChanges.Where(r => r.FiringId == first.Id), r => Assert.Empty(r.ParentRowIds));
         }
 
         if (cascadeDeleted > 0)
         {
-            var cascade = Assert.Single(childFirings.Where(f => f.RowCount == cascadeDeleted &&
-                (variant == "branch" || f.Id != childFirings[0].Id)));
+            var cascade = Assert.Single(childFirings, f => f.RowCount == cascadeDeleted &&
+                (variant == "branch" || f.Id != childFirings[0].Id));
             Assert.Equal(CauseKind.FkCascade, cascade.Cause!.Kind);
             Assert.NotEqual(CauseKind.ProcDirect, cascade.Cause.Kind);
             Assert.Contains(record.Result.Graph.Edges, e => e.Target == cascade.Id && e.Kind == EdgeKind.Fk);
             Assert.All(record.RowChanges.Where(r => r.FiringId == cascade.Id), r => Assert.NotEmpty(r.ParentRowIds));
         }
-        var childB = Assert.Single(record.Result.Firings.Where(f => f.Table == "dbo.ChildB" && f.RowCount > 0));
+        var childB = Assert.Single(record.Result.Firings, f => f.Table == "dbo.ChildB" && f.RowCount > 0);
         Assert.Equal((CauseKind.FkCascade, Confidence.Certain), (childB.Cause!.Kind, childB.Cause.Confidence));
 
         // 원본·샌드박스의 프로시저를 재작성하지 않으며 모든 사용자 데이터가 롤백된다.
