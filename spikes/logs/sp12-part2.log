@@ -1,0 +1,37 @@
+# spikes/sql/sp12_10_run.sql db=SpikeLab_SP12 part=2 at=2026-11-16T08:43:39.1326188+09:00 elapsedSec=1.59 exit=0
+Changed database context to 'SpikeLab_SP12'.
+
+(2 rows affected)
+
+(2 rows affected)
+
+(0 rows affected)
+scenario seq who nestLevel trgNest procDepth tc
+-------- --- --- --------- ------- --------- --
+S1 1 trg_P_upd 1 1 0 2
+S1 2 trg_C_upd 2 2 0 2
+S1 3 trg_M_ins 3 3 0 2
+S2 4 usp_Inner 1 0 1 2
+S2 5 trg_P_upd 2 1 1 2
+S2 6 trg_C_upd 3 2 1 2
+S2 7 trg_M_ins 4 3 1 2
+S3 8 usp_Outer 1 0 1 2
+S3 9 usp_Inner 2 0 2 2
+S3 10 trg_P_upd 3 1 2 2
+S3 11 trg_C_upd 4 2 2 2
+S3 12 trg_M_ins 5 3 2 2
+S4 13 usp_Outer2 1 0 1 2
+S4 14 usp_Outer 2 0 2 2
+S4 15 usp_Inner 3 0 3 2
+S4 16 trg_P_upd 4 1 3 2
+S4 17 trg_C_upd 5 2 3 2
+S4 18 trg_M_ins 6 3 3 2
+S5 19 usp_Del 1 0 1 2
+S5 20 trg_C_del 2 1 1 2
+S6 21 trg_C_del 1 1 0 2
+hypothesis verdict detail
+---------- ------- ------
+H1_trigger_depth_unchanged_by_procedure_nesting PASS S1:trg_M_ins=3 ; S1:trg_P_upd=1 ; S2:trg_M_ins=3 ; S2:trg_P_upd=1 ; S3:trg_M_ins=3 ; S3:trg_P_upd=1 ; S4:trg_M_ins=3 ; S4:trg_P_upd=1
+H2_nestlevel_minus_trigger_nestlevel_equals_procedure_depth PASS NULL
+H3_fk_cascade_trigger_depth_equals_parent_level_with_and_without_procedure PASS S5:1 ; S6:1
+H4_procedure_does_not_raise_trigger_nestlevel PASS NULL

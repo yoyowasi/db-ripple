@@ -1,0 +1,57 @@
+# spikes/sql/sp11_10_run.sql db=SpikeLab_SP11 part=2 at=2026-11-16T08:43:27.2564911+09:00 elapsedSec=1.47 exit=0
+Changed database context to 'SpikeLab_SP11'.
+scenario depth step tc xstate errNo sev tSnap logRows msg
+-------- ----- ---- -- ------ ----- --- ----- ------- ---
+p_balanced 0 before 0 1 NULL NULL 1:10,2:20,3:30 0 NULL
+p_balanced 0 after_exec 0 1 NULL NULL 1:11,2:20,3:30 0 NULL
+p_balanced 0 after_final 0 1 NULL NULL 1:11,2:20,3:30 0 NULL
+p_balanced 1 before 1 1 NULL NULL 1:10,2:20,3:130 0 NULL
+p_balanced 1 after_exec 1 1 NULL NULL 1:11,2:20,3:130 0 NULL
+p_balanced 1 after_final 0 1 NULL NULL 1:10,2:20,3:30 0 NULL
+p_balanced 2 before 2 1 NULL NULL 1:10,2:20,3:130 0 NULL
+p_balanced 2 after_exec 2 1 NULL NULL 1:11,2:20,3:130 0 NULL
+p_balanced 2 after_final 0 1 NULL NULL 1:10,2:20,3:30 0 NULL
+p_extra_commit 0 before 0 1 NULL NULL 1:10,2:20,3:30 0 NULL
+p_extra_commit 0 caught 0 1 3902 16 1:11,2:20,3:30 0 The COMMIT TRANSACTION request has no corresponding BEGIN TRANSACTION.
+p_extra_commit 0 after_final 0 1 NULL NULL 1:11,2:20,3:30 0 NULL
+p_extra_commit 1 before 1 1 NULL NULL 1:10,2:20,3:130 0 NULL
+p_extra_commit 1 caught 0 1 266 16 1:11,2:20,3:130 0 Transaction count after EXECUTE indicates a mismatching number of BEGIN and COMMIT statements. Previous count = 1, current count = 0.
+p_extra_commit 1 after_final 0 1 NULL NULL 1:11,2:20,3:130 0 NULL
+p_extra_commit 2 before 2 1 NULL NULL 1:10,2:20,3:130 0 NULL
+p_extra_commit 2 caught 1 -1 266 16 1:11,2:20,3:130 0 Transaction count after EXECUTE indicates a mismatching number of BEGIN and COMMIT statements. Previous count = 2, current count = 1.
+p_extra_commit 2 after_final 0 1 NULL NULL 1:10,2:20,3:30 0 NULL
+p_catch_rollback_log 0 before 0 1 NULL NULL 1:10,2:20,3:30 0 NULL
+p_catch_rollback_log 0 after_exec 0 1 NULL NULL 1:10,2:20,3:30 1 NULL
+p_catch_rollback_log 0 after_final 0 1 NULL NULL 1:10,2:20,3:30 1 NULL
+p_catch_rollback_log 1 before 1 1 NULL NULL 1:10,2:20,3:130 0 NULL
+p_catch_rollback_log 1 caught 0 1 266 16 1:10,2:20,3:30 1 Transaction count after EXECUTE indicates a mismatching number of BEGIN and COMMIT statements. Previous count = 1, current count = 0.
+p_catch_rollback_log 1 after_final 0 1 NULL NULL 1:10,2:20,3:30 1 NULL
+p_catch_rollback_log 2 before 2 1 NULL NULL 1:10,2:20,3:130 0 NULL
+p_catch_rollback_log 2 caught 0 1 266 16 1:10,2:20,3:30 1 Transaction count after EXECUTE indicates a mismatching number of BEGIN and COMMIT statements. Previous count = 2, current count = 0.
+p_catch_rollback_log 2 after_final 0 1 NULL NULL 1:10,2:20,3:30 1 NULL
+p_begin_only 0 before 0 1 NULL NULL 1:10,2:20,3:30 0 NULL
+p_begin_only 0 caught 1 -1 266 16 1:11,2:20,3:30 0 Transaction count after EXECUTE indicates a mismatching number of BEGIN and COMMIT statements. Previous count = 0, current count = 1.
+p_begin_only 0 after_final 0 1 NULL NULL 1:10,2:20,3:30 0 NULL
+p_begin_only 1 before 1 1 NULL NULL 1:10,2:20,3:130 0 NULL
+p_begin_only 1 caught 2 -1 266 16 1:11,2:20,3:130 0 Transaction count after EXECUTE indicates a mismatching number of BEGIN and COMMIT statements. Previous count = 1, current count = 2.
+p_begin_only 1 after_final 0 1 NULL NULL 1:10,2:20,3:30 0 NULL
+p_begin_only 2 before 2 1 NULL NULL 1:10,2:20,3:130 0 NULL
+p_begin_only 2 caught 3 -1 266 16 1:11,2:20,3:130 0 Transaction count after EXECUTE indicates a mismatching number of BEGIN and COMMIT statements. Previous count = 2, current count = 3.
+p_begin_only 2 after_final 0 1 NULL NULL 1:10,2:20,3:30 0 NULL
+p_save 0 before 0 1 NULL NULL 1:10,2:20,3:30 0 NULL
+p_save 0 caught 0 1 628 16 1:10,2:20,3:30 0 Cannot issue SAVE TRANSACTION when there is no active transaction.
+p_save 0 after_final 0 1 NULL NULL 1:10,2:20,3:30 0 NULL
+p_save 1 before 1 1 NULL NULL 1:10,2:20,3:130 0 NULL
+p_save 1 after_exec 1 1 NULL NULL 1:10,2:20,3:131 0 NULL
+p_save 1 after_final 0 1 NULL NULL 1:10,2:20,3:30 0 NULL
+p_save 2 before 2 1 NULL NULL 1:10,2:20,3:130 0 NULL
+p_save 2 after_exec 2 1 NULL NULL 1:10,2:20,3:131 0 NULL
+p_save 2 after_final 0 1 NULL NULL 1:10,2:20,3:30 0 NULL
+hypothesis verdict detail
+---------- ------- ------
+H1_balanced_no_error_any_envelope PASS rows=3
+H2_balanced_rolled_back_in_envelope_1_and_2 PASS 0=1:11,2:20,3:30 ; 1=1:10,2:20,3:30 ; 2=1:10,2:20,3:30
+H3_extra_commit_in_envelope_1_leaks_change_past_rollback PASS depth1 final=1:11,2:20,3:130
+H4_catch_rollback_log_in_envelope_1_gives_266_and_keeps_log_row PASS depth1 err=266 sev=16 logRows=1
+H5_begin_only_gives_266_in_every_envelope PASS 0=266 ; 1=266 ; 2=266
+H6_save_keeps_trancount_and_undoes_only_to_savepoint_in_envelope_1 PASS 0=628 ; 1=none ; 2=none

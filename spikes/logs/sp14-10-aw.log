@@ -1,0 +1,46 @@
+# spikes/sql/sp14_10_aw.sql db=AW_SpikeB part=0 at=2026-11-16T08:45:17.7304871+09:00 elapsedSec=4.68 exit=0
+db
+--
+AW_SpikeB
+definition_head
+---------------
+
+CREATE PROCEDURE [HumanResources].[uspUpdateEmployeeHireInfo]
+    @BusinessEntityID [int],
+    @JobTitle [nvarchar](50),
+    @HireDate [datetime],
+    @RateChangeDate [datetime],
+    @Rate [money],
+    @PayFrequency [tinyint],
+    @CurrentFlag [db
+name type_name
+---- ---------
+@BusinessEntityID int
+@JobTitle nvarchar
+@HireDate datetime
+@RateChangeDate datetime
+@Rate money
+@PayFrequency tinyint
+@CurrentFlag Flag
+what permission_name state_desc class_desc schema_name
+---- --------------- ---------- ---------- -----------
+  GRANT_DATABASE - .HumanResources
+what permission_name state_desc class_desc schema_name
+---- --------------- ---------- ---------- -----------
+permissions_after_grant EXECUTE GRANT SCHEMA HumanResources
+what hire_before hire_after pay_rows_delta
+---- ----------- ---------- --------------
+a_after_rollback 2009-01-14 2009-01-14 0
+what ErrorLogID ErrorNumber ErrorProcedure UserName
+---- ---------- ----------- -------------- --------
+b_errorlog_last 1 547 HumanResources.uspUpdateEmployeeHireInfo dbr_preview_user
+scenario ok errNo errMsg xstateAfter tcAfter userDuring payHistRowsInTran hireDateInTran errorLogRowsAfterRollback
+-------- -- ----- ------ ----------- ------- ---------- ----------------- -------------- -------------------------
+a 1 NULL NULL 1 1 dbr_preview_user 1 2010-01-15 0
+b 0 266 Transaction count after EXECUTE indicates a mismatching number of BEGIN and COMMIT statements. Previous count = 1, current count = 0. 0 0 dbr_preview_user NULL NULL 1
+c0 0 229 The EXECUTE permission was denied on the object 'uspUpdateEmployeeHireInfo', database 'AW_SpikeB', schema 'HumanResources'. -1 1 dbr_preview_user NULL NULL 0
+hypothesis verdict detail
+---------- ------- ------
+H1_no_execute_grant_gives_229 PASS errNo=229
+H2_schema_execute_grant_allows_success_path_as_preview_user PASS ok=1 errNo=none payRows=1
+H3_fk_violation_path_ends_with_266_and_logs_error_row PASS ok=0 errNo=266 errorLogRows=1
