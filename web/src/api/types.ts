@@ -14,6 +14,7 @@ export type Evidence =
   | 'depth'
   | 'postorderBracket'
   | 'staticWriteSet'
+  | 'procedureEntryDelete'
   | 'fkKeyMatch'
   | 'catalogInsteadOf'
   | 'reread'

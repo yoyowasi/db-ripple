@@ -75,7 +75,9 @@ public class CascadeLabV03Tests
         // 2026-11-13 통합: be-exec-1의 AnalysisRules 이름으로 확정(자리표시 없음)
         Assert.Equal(("REJECT_PROC_DYNAMIC_SQL", 1, false), One(cases["CL25a"]));
         Assert.Equal(("REJECT_PROC_UNBALANCED_COMMIT", 1, false), One(cases["CL25b"]));
-        Assert.Equal(("REJECT_PROC_EXTERNAL_EFFECT", 1, false), One(cases["CL25c"]));
+        Assert.Equal(new[] { ("REJECT_PROC_EXTERNAL_EFFECT", 1, false), ("REJECT_PROC_WRITE_TARGET", 1, false) },
+            cases["CL25c"].ExpectedRejects.OrderBy(r => r.RuleId, StringComparer.Ordinal)
+                .Select(r => (r.RuleId, r.StatementIndex, r.Pending)).ToArray());
         // CL25d: 문장 1은 직접 DELETE(N1 회귀), 문장 2는 EXEC의 쓰기 대상에서 닿는 트리거(같은 도달 폐포 규칙). 하네스가 만들지 않는 DB
         var d = cases["CL25d"];
         Assert.Equal("CascadeLab_Reach", d.Database);

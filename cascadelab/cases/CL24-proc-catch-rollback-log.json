@@ -12,6 +12,7 @@
   "expected": {
     "status": "failed",
     "errorNumber": 266,
+    "warnings": ["WARN_PROC_CATCH_SWALLOWS", "WARN_PROC_NESTED_TRANSACTION", "WARN_PROC_ROLLBACK", "WARN_PROC_XACT_STATE_CHECK"],
     "statementStatus": [ { "index": 1, "status": "failed", "isToolFault": false } ],
     "changes": [
       { "table": "cl24.Acct", "keyColumns": ["id"], "inserted": [], "updated": [], "deleted": [],
@@ -21,7 +22,7 @@
     ],
     "residualCommitted": [
       { "table": "cl24.ErrLog", "keyColumns": ["log_id"], "updated": [], "deleted": [],
-        "inserted": [ { "ref": "e1", "match": { "err_no": 547, "err_proc": "usp_Withdraw", "ref_id": 1 }, "identity": ["log_id"], "causes": ["PROC_DIRECT"] } ],
+        "inserted": [ { "ref": "e1", "match": { "err_no": 547, "err_proc": "cl24.usp_Withdraw", "ref_id": 1 }, "identity": ["log_id"], "causes": ["PROC_DIRECT"] } ],
         "basis": "usp_Withdraw의 CATCH가 ROLLBACK한 뒤 usp_LogError가 ErrLog에 1행을 쓴다. 트랜잭션 밖이라 자동 커밋된다(A22와 같은 성질, CL12a). 키는 IDENTITY라 실행마다 값이 다르다" }
     ],
     "firings": [],
@@ -34,6 +35,10 @@
       { "id": "OO3", "what": "firings가 비는지", "basis": "CL12a OO2와 같다. 봉투 안 UPDATE 묶음은 ROLLBACK으로 사라지고, ROLLBACK 뒤 ErrLog INSERT는 트랜잭션 밖에 확정돼 residualCommitted(기준 스냅샷 비교)로 보인다" },
       { "id": "OO4", "what": "isToolFault = false", "basis": "공용 계약: 프로시저가 ROLLBACK해 트랜잭션이 없어지면 failed + isToolFault=false + 메시지 \"프로시저가 트랜잭션을 롤백함\". 오류 프로시저가 사용자 프로시저라 수집 장치 오류가 아니다(ErrorClassification.IsToolFault)" },
       { "id": "OO5", "what": "ROLLBACK 뒤 남은 ErrLog 행이 오라클 원본에 쌓인다", "basis": "leavesResidue. 오라클은 트랜잭션 + ROLLBACK이어도 이 행을 되돌리지 못한다(CL12a OO3). 키가 IDENTITY라 반복 실행이 실패하지 않는다. returnValue는 문장이 실패해 null" }
+    ],
+    "corrections": [
+      { "date": "2026-11-14", "item": "residualCommitted.err_proc", "before": "usp_Withdraw", "after": "cl24.usp_Withdraw", "evidence": "logs/home-test/2026-11-14/setup/errproc-probe.log", "cause": "SQL Server 2025의 ERROR_PROCEDURE() 실측값은 스키마를 포함함. 오류 547과 호출 오류 266은 기존 기대와 일치" },
+      { "date": "2026-11-14", "item": "expected.warnings", "before": [], "after": ["WARN_PROC_CATCH_SWALLOWS", "WARN_PROC_NESTED_TRANSACTION", "WARN_PROC_ROLLBACK", "WARN_PROC_XACT_STATE_CHECK"], "evidence": "logs/home-test/2026-11-14/db-tests/dotnet-test.log", "cause": "실제 카탈로그 분석에서 확인한 프로시저 트랜잭션 경고를 정답에 기록" }
     ]
   },
   "rationale": [

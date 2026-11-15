@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DbRipple.Contracts;
 using DbRipple.Core.Baseline;
+using DbRipple.Core.Capture;
 using DbRipple.Core.Catalog;
 using DbRipple.TestSupport;
 
@@ -98,7 +99,11 @@ public class CascadeLabAnalysisTests(CascadeLabFixture fx) : IClassFixture<Casca
     public static TheoryData<string> CaseFiles() => Files(id => string.CompareOrdinal(id, "CL09") < 0);
 
     /// <summary>CL09~CL20(lab-1, answer-format v0.2).</summary>
-    public static TheoryData<string> Week3CaseFiles() => Files(id => string.CompareOrdinal(id, "CL09") >= 0);
+    public static TheoryData<string> Week3CaseFiles() => Files(id => string.CompareOrdinal(id, "CL09") >= 0 && string.CompareOrdinal(id, "CL21") < 0);
+
+    public static TheoryData<string> ExecCaseFiles() => Files(id => string.CompareOrdinal(id, "CL21") >= 0 && string.CompareOrdinal(id, "CL25") < 0);
+
+    public static TheoryData<string> RejectCaseFiles() => Files(id => string.CompareOrdinal(id, "CL25a") >= 0 && string.CompareOrdinal(id, "CL25d") < 0);
 
     static TheoryData<string> Files(Func<string, bool> include)
     {
@@ -138,6 +143,105 @@ public class CascadeLabAnalysisTests(CascadeLabFixture fx) : IClassFixture<Casca
         Assert.True(all.IsAccepted, id);
         Assert.Equal(sqls.Count, all.Statements.Count);
         Assert.Equal(warnings, all.Warnings.Select(d => d.RuleId).Distinct().Order(StringComparer.Ordinal).ToList());
+    }
+
+    /// <summary>CL21~CL24는 실제 DB에서 읽은 프로시저·트리거 카탈로그로 분석한다. 분석만 하며 호출은 실행하지 않는다.</summary>
+    [SqlTheory]
+    [MemberData(nameof(ExecCaseFiles))]
+    public void Exec_cascadelab_cases_are_accepted_with_exact_warnings(string file)
+    {
+        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepoPaths.CascadeLab, "cases", file)));
+        var root = doc.RootElement;
+        Assert.Equal("CascadeLab", root.GetProperty("database").GetString());
+        var sqls = root.GetProperty("statements").EnumerateArray().Select(s => s.GetProperty("sql").GetString()!).ToList();
+        Assert.NotEmpty(sqls);
+        var expectedNode = root.GetProperty("expected");
+        var expected = expectedNode.TryGetProperty("warnings", out var warnings)
+            ? warnings.EnumerateArray().Select(w => w.GetString()!).Order(StringComparer.Ordinal).ToArray()
+            : [];
+
+        foreach (var sql in sqls)
+        {
+            var result = new BatchAnalyzer().Analyze(sql, fx.Context);
+            Assert.True(result.IsAccepted, string.Join("; ", result.Diagnostics.Select(d => d.RuleId + " " + d.Message)));
+            Assert.Empty(result.Rejects);
+            var statement = Assert.Single(result.Statements);
+            Assert.Equal(ChangeOperation.Exec, statement.Kind);
+            Assert.Equal(sql, statement.Sql);
+            Assert.NotNull(statement.Plan);
+            Assert.False(string.IsNullOrWhiteSpace(statement.Plan.ExecSql));
+            Assert.Equal(expected, result.Warnings.Select(d => d.RuleId).Order(StringComparer.Ordinal).ToArray());
+        }
+
+        var all = new BatchAnalyzer().Analyze(string.Join("\nGO\n", sqls), fx.Context);
+        Assert.True(all.IsAccepted);
+        Assert.Equal(sqls.Count, all.Statements.Count);
+        Assert.Equal(expected, all.Warnings.Select(d => d.RuleId).Distinct().Order(StringComparer.Ordinal).ToArray());
+    }
+
+    /// <summary>CL25a~c는 실행하지 않고 실제 카탈로그 분석의 거부 규칙과 문장 번호를 정확히 검증한다.</summary>
+    [SqlTheory]
+    [MemberData(nameof(RejectCaseFiles))]
+    public void Rejected_exec_cases_report_exact_rules_without_execution(string file)
+    {
+        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepoPaths.CascadeLab, "cases", file)));
+        var root = doc.RootElement;
+        var expectedNode = root.GetProperty("expected");
+        Assert.Equal("rejected", expectedNode.GetProperty("status").GetString());
+        var expected = expectedNode.GetProperty("rejects").EnumerateArray()
+            .Select(d => (RuleId: d.GetProperty("ruleId").GetString()!, StatementIndex: (int?)d.GetProperty("statementIndex").GetInt32()))
+            .OrderBy(d => d.RuleId, StringComparer.Ordinal).ToArray();
+        Assert.NotEmpty(expected);
+        Assert.Equal("CascadeLab", root.GetProperty("database").GetString());
+        var statement = Assert.Single(root.GetProperty("statements").EnumerateArray());
+        var result = new BatchAnalyzer().Analyze(statement.GetProperty("sql").GetString()!, fx.Context);
+        Assert.False(result.IsAccepted);
+        Assert.Equal(expected,
+            result.Rejects.OrderBy(d => d.RuleId, StringComparer.Ordinal).Select(d => (d.RuleId, d.StatementIndex)).ToArray());
+        Assert.All(result.Rejects, d => Assert.Equal(Severity.Error, d.Severity));
+    }
+
+    /// <summary>CL25d는 공유 CascadeLab에 외부 부작용 트리거를 섞지 않고 전용 dbrt_ana_ DB의 카탈로그로 두 문장을 분석한다.</summary>
+    [SqlFact]
+    public async Task Reach_case_rejects_both_delete_and_exec_in_private_database_without_execution()
+    {
+        var db = TestDb.NewName("ana", "reach");
+        await using var cleanup = new TestDatabases(db);
+        await TestDb.ExecAsync("master", $"CREATE DATABASE [{db}];");
+        // USE master 구간의 DROP/CREATE DATABASE는 제외하고 스키마·시드만 자기 테스트 DB에 설치한다.
+        var script = await File.ReadAllTextAsync(Path.Combine(RepoPaths.CascadeLab, "sql", "extra", "cl25d.sql"));
+        var batches = CascadeLabSeed.BatchesFor(script, "CascadeLab_Reach").ToArray();
+        Assert.NotEmpty(batches);
+        await TestDb.ExecAsync(db, batches);
+        await using var conn = await TestDb.OpenAsync(db);
+        var catalog = await CatalogReader.ReadAsync(conn);
+        var context = fx.Context with
+        {
+            OriginDb = db, SandboxDb = db, SnapshotDb = db,
+            Catalog = catalog,
+            Triggers = new TriggerAnalyzer().Analyze(catalog),
+            Manifest = new CaptureManifest("analysis-only", [], [], []),
+        };
+        Assert.Contains(catalog.Tables, t => t.Schema == "cl25d" && t.Name == "Parent");
+        Assert.Contains(context.Triggers, t => t.Table == "cl25d.Child" && t.ExternalSideEffects.Count > 0);
+
+        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepoPaths.CascadeLab, "cases", "CL25d-reject-reach-external.json")));
+        var sqls = doc.RootElement.GetProperty("statements").EnumerateArray().Select(s => s.GetProperty("sql").GetString()!).ToList();
+        Assert.Equal(2, sqls.Count);
+        foreach (var sql in sqls)
+        {
+            var one = new BatchAnalyzer().Analyze(sql, context);
+            Assert.False(one.IsAccepted);
+            var rejection = Assert.Single(one.Rejects);
+            Assert.Equal((AnalysisRules.RejectTriggerExternalEffect, (int?)1), (rejection.RuleId, rejection.StatementIndex));
+        }
+        var all = new BatchAnalyzer().Analyze(string.Join("\nGO\n", sqls), context);
+        Assert.False(all.IsAccepted);
+        Assert.Equal(new[] { (AnalysisRules.RejectTriggerExternalEffect, (int?)1), (AnalysisRules.RejectTriggerExternalEffect, (int?)2) },
+            all.Rejects.OrderBy(d => d.StatementIndex).Select(d => (d.RuleId, d.StatementIndex)).ToArray());
+        // 테이블에 쓰는 DELETE/EXEC는 한 번도 실행하지 않았으며 시드가 그대로 남아 있어야 한다.
+        Assert.Equal(2, await TestDb.ScalarAsync<int>(conn, "SELECT COUNT(*) FROM cl25d.Parent;"));
+        Assert.Equal(2, await TestDb.ScalarAsync<int>(conn, "SELECT COUNT(*) FROM cl25d.Child;"));
     }
 
     /// <summary>

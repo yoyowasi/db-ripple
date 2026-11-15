@@ -194,7 +194,9 @@ public sealed class FileBackupImporter(string importDir) : IBackupImporter
 
     string Target(string fileName)
     {
-        if (fileName != Path.GetFileName(fileName)) throw new ArgumentException("가져오기 파일 이름에 경로를 쓸 수 없음", nameof(fileName));
+        if (string.IsNullOrWhiteSpace(fileName) || fileName is "." or ".." ||
+            fileName.Contains('/') || fileName.Contains('\\') || fileName != Path.GetFileName(fileName))
+            throw new ArgumentException("가져오기 파일 이름에 경로를 쓸 수 없음", nameof(fileName));
         return Path.Combine(ImportDir, fileName);
     }
 }

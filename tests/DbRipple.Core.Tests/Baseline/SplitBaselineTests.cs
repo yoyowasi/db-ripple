@@ -335,7 +335,7 @@ public class SplitBaselineTests
 
         Assert.All(log.Where(l => l.StartsWith("origin", StringComparison.Ordinal)), l => Assert.DoesNotContain(Destructive, d => l.Contains(d, StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(@"origin backup D:\Backup\dbr_devpc_20261113010203.bak", log);
-        Assert.Contains(@"import \\devsql\backup\dbr_devpc_20261113010203.bak -> dbr_devpc_20261113010203.bak", log);
+        Assert.Contains($"import {Path.Combine(Options().SharePath!, "dbr_devpc_20261113010203.bak")} -> dbr_devpc_20261113010203.bak", log);
         int I(string prefix) => log.FindIndex(l => l.StartsWith(prefix, StringComparison.Ordinal));
         Assert.True(I("origin identity") < I("sandbox marker") && I("sandbox marker") < I("origin marker") && I("origin marker") < I("origin precheck"));
         Assert.True(I("origin backup") < I("sandbox master: IF DB_ID(N'AW_Sandbox_base') IS NOT NULL"));
@@ -489,6 +489,9 @@ public class SplitBaselineTests
             await importer.ImportAsync(src, "dbr_pc_1.bak", default);
             Assert.True(File.Exists(Path.Combine(root, "import", "dbr_pc_1.bak")));
             Assert.Throws<ArgumentException>(() => importer.Delete(@"..\src.bak"));
+            Assert.Throws<ArgumentException>(() => importer.Delete("../src.bak"));
+            Assert.Throws<ArgumentException>(() => importer.Delete(".."));
+            Assert.Throws<ArgumentException>(() => importer.Delete("."));
             importer.Delete("dbr_pc_1.bak");
             Assert.False(File.Exists(Path.Combine(root, "import", "dbr_pc_1.bak")));
             Assert.True(File.Exists(src));

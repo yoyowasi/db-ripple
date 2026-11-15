@@ -16,11 +16,15 @@
     "firings": [],
     "edges": [],
     "rejects": [
-      { "ruleId": "REJECT_PROC_EXTERNAL_EFFECT", "statementIndex": 1 }
+      { "ruleId": "REJECT_PROC_EXTERNAL_EFFECT", "statementIndex": 1 },
+      { "ruleId": "REJECT_PROC_WRITE_TARGET", "statementIndex": 1 }
     ],
     "observedOnly": [
       { "id": "OO1", "what": "ruleId", "basis": "2026-11-13 통합 때 AnalysisRules의 REJECT_PROC_EXTERNAL_EFFECT로 확정(정적 분석 단위 테스트 기준, DB 미실행)" },
       { "id": "OO2", "what": "거부되지 않으면 실행 때 208(tempdb.dbo.cl25_scratch 없음)", "basis": "이름 해석이 실행 때까지 미뤄진다. 가장 중 3부분 이름은 916과 함께 트랜잭션을 doomed로 만든다(SP10, SP14로 재확인)" }
+    ],
+    "corrections": [
+      { "date": "2026-11-14", "item": "expected.rejects", "before": ["REJECT_PROC_EXTERNAL_EFFECT"], "after": ["REJECT_PROC_EXTERNAL_EFFECT", "REJECT_PROC_WRITE_TARGET"], "evidence": "logs/home-test/2026-11-14/db-tests/dotnet-test.log", "cause": "외부 DB 쓰기이면서 현재 카탈로그의 기반 사용자 테이블도 아니므로 두 거부 진단이 함께 발생함" }
     ]
   },
   "rationale": [

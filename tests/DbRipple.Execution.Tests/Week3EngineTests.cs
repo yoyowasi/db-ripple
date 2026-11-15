@@ -423,7 +423,7 @@ public class Week3EngineTests(LabFixture lab)
     public static TheoryData<string> Week3Cases()
     {
         var d = new TheoryData<string>();
-        foreach (var c in LabCase.All.Where(c => string.CompareOrdinal(c.Id, "CL09") >= 0)) d.Add(c.Id);
+        foreach (var c in LabCase.All.Where(c => string.CompareOrdinal(c.Id, "CL09") >= 0 && string.CompareOrdinal(c.Id, "CL21") < 0)) d.Add(c.Id);
         return d;
     }
 

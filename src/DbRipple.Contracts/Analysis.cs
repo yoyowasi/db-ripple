@@ -70,7 +70,16 @@ public sealed record ProcedurePlan
     public IReadOnlyList<string> WriteTargets { get; init; } = [];
     /// <summary>펼친 안쪽 프로시저 "스키마.이름"(대상 자신 제외).</summary>
     public IReadOnlyList<string> ExpandedCalls { get; init; } = [];
+    /// <summary>직선형 루트 본문이 처음 실행하는 독립 DELETE. 정적 정보만으로 발동을 확정하지 않는다.</summary>
+    public IndependentDelete? FirstIndependentDelete { get; init; }
 }
+
+/// <summary>분석한 루트 모듈과 그 첫 독립 DELETE 대상.</summary>
+/// <param name="ModuleObjectId">루트 프로시저 개체 ID.</param>
+/// <param name="TargetObjectId">삭제 대상의 개체 ID.</param>
+/// <param name="Target">카탈로그의 스키마.테이블.</param>
+/// <param name="Operation">확인한 쓰기 연산(DELETE).</param>
+public sealed record IndependentDelete(int ModuleObjectId, int TargetObjectId, string Target, ChangeOperation Operation);
 
 /// <summary>
 /// C6 결과(§4 C6 `AnalysisResult{statements[], rejects[], warnings[]}`, §6.4 POST /api/analyze). 거부가 하나라도 있으면 전체를 실행하지 않는다(D5).

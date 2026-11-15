@@ -151,11 +151,11 @@ public sealed class PipelineIntegrationTests(LabFixture labs)
     }
 
     /// <summary>
-    /// 검토 재현(2026-11-10): 트리거의 COMMIT. 대상 테이블에 붙어 있으면 분석기가 거부하고(REJECT_TRIGGER_TRANSACTION_CONTROL),
-    /// 다른 트리거를 거쳐 닿으면(분석기가 못 봄) 실행기가 트랜잭션 ID 변화로 잡아 failed + 오염으로 표시하고, 다음 미리보기 전에 기준선을 다시 만든다.
+    /// 트리거의 COMMIT은 직접 대상과 도달 폐포 모두에서 분석기가 거부한다(REJECT_TRIGGER_TRANSACTION_CONTROL, D5 2026-11-13).
+    /// 실행 기록을 만들거나 원본·샌드박스를 바꾸지 않고, 다음 정상 미리보기도 Ready 상태로 끝난다.
     /// </summary>
     [SqlFact]
-    public async Task Trigger_commit_is_rejected_when_direct_and_marks_sandbox_dirty_when_reached_indirectly()
+    public async Task Trigger_commit_is_rejected_for_direct_and_reached_triggers_without_changing_databases()
     {
         await using var lab = await Lab.CreateCustomAsync("commit",
             """
@@ -171,28 +171,41 @@ public sealed class PipelineIntegrationTests(LabFixture labs)
         Assert.Contains(ctx.Triggers, t => t.Trigger == "dbo.trg_Cb" && t.HasTransactionControl);
         Assert.Contains(ctx.Triggers, t => t.Trigger == "dbo.trg_Co" && t.HasTransactionControl);
 
-        foreach (var sql in new[] { "INSERT INTO dbo.Cb (id) VALUES (1);", "INSERT INTO dbo.Co (id) VALUES (1);" })
+        foreach (var (sql, trigger) in new[]
+        {
+            ("INSERT INTO dbo.Cb (id) VALUES (1);", "dbo.trg_Cb"),
+            ("INSERT INTO dbo.Co (id) VALUES (1);", "dbo.trg_Co"),
+            // Src 트리거 → Cb INSERT → trg_Cb의 COMMIT; BEGIN TRAN;도 실행 전에 거부한다.
+            ("INSERT INTO dbo.Src (id) VALUES (1);", "dbo.trg_Cb"),
+        })
         {
             var rejected = await lab.Pipeline.RunAsync(sql, new PreviewOptions(), null, default);
             Assert.Null(rejected.Record);
-            Assert.Contains(rejected.Analysis.Rejects, r => r.RuleId == AnalysisRules.RejectTriggerTransactionControl);
+            Assert.False(rejected.Analysis.IsAccepted);
+            var reject = Assert.Single(rejected.Analysis.Rejects);
+            Assert.Equal((AnalysisRules.RejectTriggerTransactionControl, (int?)1), (reject.RuleId, reject.StatementIndex));
+            Assert.Contains(trigger, reject.Message);
+            var status = await lab.Manager.GetStatusAsync(default);
+            Assert.Equal((SandboxState.Ready, false), (status.State, status.Locked));
+            Assert.Equal(0, await lab.SandboxDiffCountAsync());
+            await AssertUserTablesEmptyAsync();
         }
-        Assert.Equal(0, await lab.SandboxDiffCountAsync());
 
-        // 간접: Src 트리거 → Cb INSERT → trg_Cb의 COMMIT; BEGIN TRAN;
-        var indirect = await lab.Pipeline.RunAsync("INSERT INTO dbo.Src (id) VALUES (1);", new PreviewOptions(), null, default);
-        var rec = Assert.IsType<PreviewRecord>(indirect.Record);
-        Assert.Equal(PreviewStatus.Failed, rec.Result.Status);
-        Assert.Contains("트랜잭션 ID", rec.Result.Statements.Single().Error!.Message);
-        Assert.Contains(rec.Result.ResidualCommitted, n => n.Table == "dbo.Cb");
-        Assert.Contains(rec.Result.ResidualCommitted, n => n.Table == "dbo.Src");
-        Assert.Equal(SandboxState.Dirty, (await lab.Manager.GetStatusAsync(default)).State);
-        Assert.NotEqual(0, await lab.SandboxDiffCountAsync());
-
-        // 다음 미리보기는 먼저 기준선을 다시 만든다(§5.2 2)
+        // 거부 뒤에도 정상 미리보기를 실행하고 롤백할 수 있다.
         var next = await lab.Pipeline.RunAsync("INSERT INTO dbo.Plain (id) VALUES (1);", new PreviewOptions(), null, default);
         Assert.Equal(PreviewStatus.Ok, next.Record!.Result.Status);
         Assert.Equal(SandboxState.Ready, (await lab.Manager.GetStatusAsync(default)).State);
         Assert.Equal(0, await lab.SandboxDiffCountAsync());
+        await AssertUserTablesEmptyAsync();
+
+        async Task AssertUserTablesEmptyAsync()
+        {
+            foreach (var db in new[] { lab.Origin, ctx.SandboxDb })
+            {
+                await using var conn = await TestDb.OpenAsync(db);
+                Assert.Empty(await TestDb.RowsAsync(conn,
+                    "SELECT id FROM dbo.Plain UNION ALL SELECT id FROM dbo.Cb UNION ALL SELECT id FROM dbo.Co UNION ALL SELECT id FROM dbo.Src;"));
+            }
+        }
     }
 }

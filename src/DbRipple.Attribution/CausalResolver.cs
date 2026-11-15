@@ -38,6 +38,19 @@ public sealed class CausalResolver : ICausalResolver
             // EXEC: 펼친 프로시저의 정적 쓰기 대상(분석기 ProcedurePlan). 모르면(계약 위반·JSON에서 복원) 빈 집합 → PROC_DIRECT를 주지 않는다(닫힌 쪽).
             var procWrites = new HashSet<string>(isExec ? st!.Plan?.WriteTargets ?? [] : [], CatalogIndex.Names);
 
+            // C11 bound the entry proof to the first raw header, including a zero-row header.
+            // Resolve that one firing before FK matching adds a parent or row links.
+            var first = sf[0];
+            if (isExec && st!.Status == StatementStatus.Ok && st.Plan?.FirstIndependentDelete is { } entry &&
+                first.Depth == 1 && first.Operation == ChangeOperation.Delete && first.Table == entry.Target &&
+                entry.Operation == first.Operation && input.Collected.ProcedureEntryDeletes.Contains(
+                    new ProcedureEntryDelete(st.Index, first.Id, entry.TargetObjectId, first.Operation)))
+            {
+                var v = new Verdict { Kind = CauseKind.ProcDirect, Confidence = Confidence.Certain, Order = OrderGuarantee.Guaranteed };
+                v.Evidence.AddRange([Evidence.Depth, Evidence.ProcedureEntryDelete]);
+                verdicts[first.Id] = v;
+            }
+
             // 5단계 직접 대상(certain).
             foreach (var f in sf)
             {

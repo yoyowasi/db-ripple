@@ -101,6 +101,8 @@ public enum Evidence
     [JsonStringEnumMemberName("reread")] Reread,
     /// <summary>최종 차이(§7.2 6단계).</summary>
     [JsonStringEnumMemberName("netDiff")] NetDiff,
+    /// <summary>루트 프로시저의 첫 독립 DELETE와 실제 첫 감사 발동이 일치한다.</summary>
+    [JsonStringEnumMemberName("procedureEntryDelete")] ProcedureEntryDelete,
 }
 
 /// <summary>행 이미지 수집 모드(§6.2 imageMode, AuditControl.mode).</summary>
