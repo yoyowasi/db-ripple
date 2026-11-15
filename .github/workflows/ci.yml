@@ -1,0 +1,175 @@
+name: CI
+
+# PR·main push마다: dotnet(DB 없음), web, scripts-ps51, db(실제 SQL Server 2025 CU10 컨테이너, DB 테스트 전체).
+# 평가(Eval)·N1은 오래 걸려 main push와 수동 실행(workflow_dispatch)에서만 db 잡이 함께 돌린다.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  dotnet:
+    name: .NET 빌드·테스트 (DB 없음)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config', '**/packages.lock.json', '**/Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - name: 복원
+        run: dotnet restore DbRipple.slnx
+      - name: 빌드 (경고를 오류로)
+        run: dotnet build DbRipple.slnx --no-restore -warnaserror
+      - name: 테스트 (DB 연결 변수 없음, DB 테스트는 건너뜀)
+        run: dotnet test DbRipple.slnx --no-build --logger "trx;LogFileName=tests.trx" --results-directory "$RUNNER_TEMP/trx"
+      - name: TRX 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-trx
+          path: ${{ runner.temp }}/trx
+          if-no-files-found: ignore
+          retention-days: 14
+
+  web:
+    name: web 빌드
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: 타입 검사와 빌드 (AG Grid chunk 크기 경고는 실패가 아님)
+        run: npm run build
+
+  scripts-ps51:
+    name: PowerShell 5.1 스크립트 회귀
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: home-test.Tests.ps1 (Windows PowerShell 5.1, DB 불필요)
+        shell: powershell
+        run: |
+          $PSVersionTable.PSVersion
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/tests/home-test.Tests.ps1 -OutputDirectory "$env:RUNNER_TEMP\home-test-tests"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: 결과 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scripts-ps51-results
+          path: ${{ runner.temp }}/home-test-tests
+          if-no-files-found: ignore
+          retention-days: 14
+
+  db:
+    name: DB 테스트 (SQL Server 2025 CU10 컨테이너)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # 일반 PR은 Build·Tests까지. main push·수동 실행은 평가·N1(EXEC 포함)까지 돈다.
+      FULL_RUN: ${{ github.event_name != 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config', '**/packages.lock.json', '**/Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - name: .env 만들기 (SA 비밀번호는 실행마다 무작위, 로그에서 가림, 저장소 secret 안 씀)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PW="Aa1-$(openssl rand -hex 16)"
+          echo "::add-mask::$PW"
+          umask 077
+          printf 'MSSQL_SA_PASSWORD=%s\n' "$PW" > .env
+      - name: AdventureWorks 받기 (Microsoft 공식 샘플)
+        shell: pwsh
+        run: ./scripts/fetch-adventureworks.ps1
+      - name: SQL Server 컨테이너 기동
+        shell: pwsh
+        run: ./scripts/db-up.ps1 -TimeoutSec 240
+      - name: AW_Origin 복원
+        shell: pwsh
+        run: |
+          . ./scripts/env.ps1
+          ./scripts/restore-aw-origin.ps1
+      - name: home-test (Build·Tests), PR
+        if: env.FULL_RUN != 'true'
+        shell: pwsh
+        env:
+          DBRIPPLE_RUN_SP7: "1"
+        run: ./scripts/home-test.ps1 -Skip Eval,N1 -Date ci
+      - name: home-test (Build·Tests·Eval·N1, EXEC 포함), main/수동
+        if: env.FULL_RUN == 'true'
+        shell: pwsh
+        env:
+          DBRIPPLE_RUN_SP7: "1"
+        run: ./scripts/home-test.ps1 -IncludeExec -Date ci
+      - name: 진단 로그 정리 (비밀번호가 들어간 파일은 올리지 않는다)
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          mkdir -p logs/home-test
+          if [ -f .env ]; then
+            PW="$(sed -n 's/^MSSQL_SA_PASSWORD=//p' .env)"
+            if [ -n "$PW" ]; then
+              grep -rlF -- "$PW" logs/home-test 2>/dev/null | while read -r f; do
+                echo "비밀번호가 포함된 파일은 올리지 않고 삭제: $f"
+                rm -f -- "$f"
+              done
+            fi
+          fi
+          docker compose logs --tail 200 sql > logs/home-test/sql-container.log 2>/dev/null || true
+      - name: 진단 로그 올리기 (요약·TRX·실패 목록·평가·N1)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-home-test-logs
+          path: |
+            logs/home-test/ci/**/summary.md
+            logs/home-test/ci/**/failed-tests.txt
+            logs/home-test/ci/**/dotnet-*.log
+            logs/home-test/ci/**/trx/**
+            logs/home-test/ci/**/eval/**
+            logs/home-test/ci/**/n1/**
+            logs/home-test/sql-container.log
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: 컨테이너 정리
+        if: always()
+        shell: bash
+        run: docker compose down -v || true
