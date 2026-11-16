@@ -1,0 +1,40 @@
+# spikes\sql\sp19_50_hash_time.sql service=sql-origin db=CascadeLab vars= at=2026-11-16T15:38:03.7351854+09:00 elapsedSec=6.11 exit=0
+what value
+---- -----
+db CascadeLab
+tables 74
+chunks_of_50 2
+data_used_mb 8.9
+buffer_pool_target_mb 1312
+what login_ lock_timeout_ms isolation_level
+---- ------ --------------- ---------------
+session dbr_origin_user 10000 2
+round chunk tables_ rows_ ms err errmsg
+----- ----- ------- ----- -- --- ------
+1 1 50 115 132.7 NULL NULL
+1 2 24 43 45.8 NULL NULL
+2 1 50 115 .0 NULL NULL
+2 2 24 43 .0 NULL NULL
+3 1 50 115 .0 NULL NULL
+3 2 24 43 .0 NULL NULL
+round round_ms rows_ slowest_chunk_ms
+----- -------- ----- ----------------
+1 178.5 158 132.7
+2 .0 158 .0
+3 .0 158 .0
+label rows_ round4_ms
+----- ----- ---------
+cl10.Region 2 4.5
+cl03.Item 2 4.4
+cl04.P 3 4.2
+cl12.OrdHist 0 4.2
+cl23.AcctHist 0 4.2
+cl24.ErrLog 0 4.2
+cl01.A 2 4.1
+cl06.Line 3 4.1
+what value
+---- -----
+round4_total_ms 83.1
+what value login_after_revert
+---- ----- ------------------
+tran_left 0 sa

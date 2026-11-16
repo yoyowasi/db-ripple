@@ -142,7 +142,8 @@ mkdir $env:LOCALAPPDATA\db-ripple\import -Force
 ### 4.4 선택
 
 - 큰 DELETE 성능: `scripts\demo\dm6-generate.sql`로 cl20을 5만~10만 행으로 키운 뒤 DM6(`demo.http`)·M5 `--sizes 100000`(이전 105초). 개선 여부 기록.
-- SP19(큰 DB 시간)·SP9(브라우저 렌더: 창이 보이는 상태에서 크기마다 3회): 각 SP 문서 방법을 따른다.
+- SP19(큰 DB 시간): Codex 클라우드 기본판 `pwsh -NoProfile -File spikes/sql/sp19_00_run.ps1`(CascadeLab·합성 0.3GB, 3회, 약 8~12분, 먼저 `-PrecheckOnly`). 1GB는 `-Sizes 1g`, AW는 원본 모사가 2025일 때만 `-Sizes aw`. 2GB·5GB는 RAM·디스크 여유가 있는 로컬에서만 `-AllowLarge`. 순서·정리·결과 표는 [spikes/SP19.md](spikes/SP19.md).
+- SP9(브라우저 렌더: 창이 보이는 상태에서 크기마다 3회): SP9 문서 방법을 따른다.
 
 ## 5. 결과 요약 양식
 
@@ -155,7 +156,7 @@ mkdir $env:LOCALAPPDATA\db-ripple\import -Force
 | SP11·SP12·SP16·SP13·SP14 | PASS | DB 실측(로컬 2025 CU10) | 가설 FAIL 없음. SP13 Q4 정정: 래퍼는 RAISERROR 16 뒤 계속 진행해도 반환값을 못 받음(오류 문장 returnValue=null 규칙과 일치) |
 | SP17·SP18·SP20·SP21 | SP17 PASS, 기존 결함 2건 발견 → 수정 | DB 실측(컨테이너 2대) + API | SP17 기준 1~8 PASS. 전부터 있던 결함 2건을 이번에 발견: D1 스냅샷 사전 결정이 원본 DB CONTROL을 안 봄(1817), D2 드리프트 확인 잠금 1222가 HTTP 500 → #3에서 수정. 가설 정정: SP18 H3·H6, SP20 기준 1 문구, SP21 A H1 |
 | 실행 파일 | PASS | 브라우저(내장)+DB | 7/7 O([test-reports/2026-11-16-exe-check.md](test-reports/2026-11-16-exe-check.md)). #3 빌드로 재시험: 한 서버 DM1 적용 SNAPSHOT_NETDIFF 4=4, 분리 모드 D1 로그인은 동의 없으면 약한 검증 요청, 동의 후 KEYSET_HASH 커밋 |
-| 큰 DELETE·SP19·SP9(선택) | 큰 DELETE 같음, SP9 PASS, SP19 미실행 | DB 실측 + API + 브라우저(내장) | 부하 없는 재측정: M5 10만 행 p50 99.0초(이전 105.2초), DM6 5만 행 p50 46.9초. 개선은 아님, resolve·reread가 약 90%([test-reports/2026-11-16-perf.md](test-reports/2026-11-16-perf.md)). SP9는 창이 보이는 상태에서 다시 재 모두 1초 안(그래프 노드 500 815ms, 그리드 5만 행 328ms, [spikes/SP9.md](spikes/SP9.md)), 측정 화면의 그리드 반복 측정 결함도 고침. SP19는 문서 없음 |
+| 큰 DELETE·SP19·SP9(선택) | 큰 DELETE 같음, SP9 PASS, SP19 부분 | DB 실측 + API + 브라우저(내장) | 부하 없는 재측정: M5 10만 행 p50 99.0초(이전 105.2초), DM6 5만 행 p50 46.9초. 개선은 아님, resolve·reread가 약 90%([test-reports/2026-11-16-perf.md](test-reports/2026-11-16-perf.md)). SP9는 창이 보이는 상태에서 다시 재 모두 1초 안(그래프 노드 500 815ms, 그리드 5만 행 328ms, [spikes/SP9.md](spikes/SP9.md)), 측정 화면의 그리드 반복 측정 결함도 고침. SP19는 로컬 부분 측정(0.3GB까지 + 2GB 1회, Docker RAM 부족으로 중단), 나머지는 Codex 클라우드([spikes/SP19.md](spikes/SP19.md)) |
 
 실패한 항목은 같은 방법을 되풀이하지 말고 실패한 지점부터 다시 본다. 스크립트 실패와 제품 결함은 구분해 적는다(환경 실패: 컨테이너·권한·경로, 제품 결함: 판정 FAIL이 설계 가정을 깨는 경우).
 

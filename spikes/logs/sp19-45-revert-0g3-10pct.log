@@ -1,0 +1,7 @@
+# spikes\sql\sp19_45_revert.sql service=sql db=master vars=Col=RefNo,Key=LedgerId,Rounds=1,Rows=52500,SandboxDb=SP19_0G3_Sandbox,SnapshotDb=SP19_0G3_Sandbox_base,Table=dbo.StockLedger at=2026-11-16T15:40:42.2685991+09:00 elapsedSec=4.71 exit=0
+round rows_ change_ms sparse_before_mb sparse_after_change_mb diff_before single_user_ms revert_ms multi_user_ms diff_after triggers_on_before triggers_on_after log_mb_before log_mb_after
+----- ----- --------- ---------------- ---------------------- ----------- -------------- --------- ------------- ---------- ------------------ ----------------- ------------- ------------
+1 52500 2571.1 .0 .0 52500 21.5 831.5 .0 0 105 105 0 0
+what state_desc user_access_desc
+---- ---------- ----------------
+state_after ONLINE MULTI_USER

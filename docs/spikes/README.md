@@ -24,10 +24,11 @@
 | SP16 | `@@TRANCOUNT` 분기 프로시저: 봉투 안 대 자동 커밋 단독 | 예측과 일치(2026-11-16): own_tran_if_none SAME, branch_data·requires_tran DIFF | DB 실측(컨테이너 2025 CU10) | [SP16.md](SP16.md) |
 | SP17 | Split 끝까지: 원본 서버(2022, 제한 로그인) → 로컬 Docker 샌드박스(2025) | 통과(2026-11-16): 기준 1~8 PASS, 원본 `ddl_` 전후 동일, [적용]은 동의 없이 막히고 동의 뒤 KEYSET_HASH 커밋 | DB 실측(컨테이너 2대) + Host API | [SP17.md](SP17.md) |
 | SP18 | 원본 스냅샷 실패의 오류 번호(권한, 경로, 이름 충돌) | 기록(2026-11-16): H3·H6 정정 필요. 스냅샷은 CREATE DATABASE와 원본 DB CONTROL이 둘 다 필요 → 제품 결함 D1(사전 결정이 CONTROL을 안 봄, 1817) | DB 실측(컨테이너 2대) + Host API | [SP18.md](SP18.md) |
+| SP19 | 큰 DB 시간(Split 기준선 단계, 미리보기 뒤 스냅샷 되돌리기, KEYSET_HASH 해시·[적용] 잠금 보유) | 부분 측정(2026-11-16 로컬, Docker RAM 부족으로 중단): 기준선 0.3GB 5.8초·2GB 26.9초(1회), 되돌리기 0.35~0.83초(RESTORE보다 짧음), 0.3GB [적용] 잠금 보유 0.93초. 1GB·AW는 Codex 클라우드에서 잴 것 | DB 실측(컨테이너 2대) + Host API | [SP19.md](SP19.md) |
 | SP20 | 고아 dbo와 EXECUTE AS OWNER(Split 복원 뒤 소유자 정리) | 통과(2026-11-16): 복원 직후 dbo 고아·15517, ALTER AUTHORIZATION 뒤 정상. 기준 1 문구 정정 필요(소유자 sa여도 정리 필수) | DB 실측(컨테이너 2대) | [SP20.md](SP20.md) |
 | SP21 | KEYSET_HASH(약한 검증)의 검출력과 비용 | 기록(2026-11-16): A H1 정정(값 맞바꾸기 미검출, 한계 문구는 이미 있음), B PASS, C 제품 결함 D2(잠금 1222가 HTTP 500), D AW 해시 p50 462ms | DB 실측(컨테이너 2대) + Host API | [SP21.md](SP21.md) |
 
-SP11~SP21은 2026-11-16에 실행했다(로그 `spikes/logs/`). SP15·SP19는 기록 문서가 없다(SP19는 큰 DB 시간 측정 후보로 [../home-test-plan.md](../home-test-plan.md) 4.4에만 적혀 있다). 집에서 돌리는 순서는 [../home-test-plan.md](../home-test-plan.md)다.
+SP11~SP21은 2026-11-16에 실행했다(로그 `spikes/logs/`). SP15는 기록 문서가 없다. SP19는 2026-11-16 로컬 부분 측정 뒤 Codex 클라우드 기본판(`spikes/sql/sp19_00_run.ps1`, CascadeLab·합성 0.3GB, 선택 1GB·AW)으로 이어 잰다. 집에서 돌리는 순서는 [../home-test-plan.md](../home-test-plan.md)다.
 
 2026-11-06에는 작업 PC에 Docker Desktop·WSL이 없어 SP4만 실행했다. 2026-11-10에 Docker를 설치하고 나머지를 실측했다. 준비 절차는 [../dev-setup.md](../dev-setup.md)에 있다. 설계 반영은 [../architecture.md](../architecture.md) v1.3에서 "v1.3"으로 표시한 곳이다.
 

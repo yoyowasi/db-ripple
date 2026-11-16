@@ -1,0 +1,4 @@
+# spikes\sql\sp19_20_xe_start.sql service=sql-origin db=master vars= at=2026-11-16T15:30:19.1266697+09:00 elapsedSec=1.32 exit=0
+what value
+---- -----
+xe_running 1

@@ -1513,7 +1513,7 @@ dotnet run --project eval\DbRipple.Eval.Cli -- report --run logs\week4\eval\<실
 
 **진행 기록(2026-11-13):** 위 1~4주차 범위의 코드는 끝났고, DB 테스트와 평가 전체 실행은 2026-11-12에 했다([evaluation.md](evaluation.md)). 계획에 없던 일을 더했다: N4 실행 파일·보안, Split 배포 구성, N1 도달 폐포 거부, EXEC 미리보기 1차(미리보기 전용), [적용] 검증 보강(KEYSET_HASH). 이 가운데 DB로 확인한 것은 없다. 남은 일은 집에서 DB로 확인하는 것이다(SP11~SP21, Split, 실행 파일, 큰 DELETE 성능, [home-test-plan.md](home-test-plan.md)).
 
-**진행 기록(2026-11-16):** 남은 DB 확인을 모두 했다([home-test-plan.md](home-test-plan.md) 5절). GitHub Actions CI가 PR·main마다 실제 SQL Server 2025 CU10 컨테이너로 DB 테스트·기본 평가(M1~M4 기준선 비교)·N1을 돈다. Split 실측에서 [적용] 결함 2건(스냅샷 가능 판정의 원본 DB CONTROL 누락, 드리프트 확인 잠금 시간 초과의 HTTP 500)을 찾아 고쳤다. 큰 DELETE 성능은 이전과 같은 수준이고(10만 행 약 99초), SP9 브라우저 렌더는 모두 1초 안이다(그래프 노드 500 약 0.8초, 그리드 5만 행 약 0.33초).
+**진행 기록(2026-11-16):** 남은 DB 확인을 모두 했다([home-test-plan.md](home-test-plan.md) 5절). GitHub Actions CI가 PR·main마다 실제 SQL Server 2025 CU10 컨테이너로 DB 테스트·기본 평가(M1~M4 기준선 비교)·N1을 돈다. Split 실측에서 [적용] 결함 2건(스냅샷 가능 판정의 원본 DB CONTROL 누락, 드리프트 확인 잠금 시간 초과의 HTTP 500)을 찾아 고쳤다. 큰 DELETE 성능은 이전과 같은 수준이고(10만 행 약 99초), SP9 브라우저 렌더는 모두 1초 안이다(그래프 노드 500 약 0.8초, 그리드 5만 행 약 0.33초). SP19(큰 DB, 부분): Split 기준선은 0.3GB 약 5.8초·2GB 약 26.9초, 미리보기 뒤 스냅샷 되돌리기는 같은 크기 RESTORE보다 짧다. 다만 KEYSET_HASH [적용]의 원본 잠금 보유가 0.3GB에서 0.93초라, 원본 데이터 약 1GB부터 원본 LOCK_TIMEOUT 10초에 닿을 수 있다(추정, Codex 클라우드 1GB 측정으로 확인할 것, [spikes/SP19.md](spikes/SP19.md)).
 
 ### 11.4 자를 목록
 
@@ -1572,7 +1572,7 @@ dotnet run --project eval\DbRipple.Eval.Cli -- report --run logs\week4\eval\<실
 | SP9 | 3주차 1일 | 프런트 성능 | Vue Flow + dagre로 노드 50·200·500개, AG Grid로 1만·5만 행을 렌더링한다. | 노드 200개, 페이지 1개 기준으로 체감 지연이 없다(추정 목표). **v1.5: 측정 화면(`/sp9`) 준비, 정식 측정 전(참고값 1회), [spikes/SP9.md](spikes/SP9.md)** | 노드 묶기 기준을 낮추고 페이지 크기를 줄인다. |
 | SP10 | 1주차 1~2일 | 실행 주체 | 열린 트랜잭션 안에서 EXECUTE AS USER/REVERT를 반복할 수 있는지 본다. 사용자 문맥에서 감사 트리거의 헤더 INSERT와 NEXT VALUE FOR가 소유권 체인으로 성공하는지, AW 트리거가 권한 오류 없이 동작하는지 본다. | 원본에서와 같은 결과가 나오고, 감사 기록이 남는다. | 감사 SEQUENCE·테이블에 필요한 최소 권한을 샌드박스에서만 실행 사용자에게 준다(사용자 DML 의미는 바뀌지 않음). **결과(2026-11-10): 통과.** 권한 부여 없이 소유권 체인으로 감사가 기록됐다. doomed 상태에서는 ROLLBACK 뒤 REVERT해야 한다(§5.2). |
 
-**2026-11-13 추가 스파이크(SP11~SP21):** EXEC 미리보기·Split·약한 검증을 DB로 확인하기 위한 것이다. SP11 트랜잭션 제어 프로시저와 실행 봉투, SP12 깊이 신호(`TRIGGER_NESTLEVEL`과 `@@NESTLEVEL`), SP13 `EXEC @rc` 래퍼의 반환값·결과 집합, SP14 실행 사용자와 프로시저(EXECUTE 권한, 동적 SQL, 3부분 이름), SP16 `@@TRANCOUNT` 분기(봉투 안 대 자동 커밋 단독), SP17 Split 끝까지, SP18 원본 스냅샷 실패의 오류 번호, SP20 고아 dbo와 EXECUTE AS OWNER, SP21 KEYSET_HASH의 검출력과 비용. 모두 스크립트와 기록 문서(`docs/spikes/SPnn.md`)만 준비했고 **미실행**이다(정적 검토만). 번호 SP15·SP19는 기록 문서가 없다. 상태 표는 [spikes/README.md](spikes/README.md), 집에서 돌릴 순서는 [home-test-plan.md](home-test-plan.md)다.
+**2026-11-13 추가 스파이크(SP11~SP21):** EXEC 미리보기·Split·약한 검증을 DB로 확인하기 위한 것이다. SP11 트랜잭션 제어 프로시저와 실행 봉투, SP12 깊이 신호(`TRIGGER_NESTLEVEL`과 `@@NESTLEVEL`), SP13 `EXEC @rc` 래퍼의 반환값·결과 집합, SP14 실행 사용자와 프로시저(EXECUTE 권한, 동적 SQL, 3부분 이름), SP16 `@@TRANCOUNT` 분기(봉투 안 대 자동 커밋 단독), SP17 Split 끝까지, SP18 원본 스냅샷 실패의 오류 번호, SP20 고아 dbo와 EXECUTE AS OWNER, SP21 KEYSET_HASH의 검출력과 비용. 모두 스크립트와 기록 문서(`docs/spikes/SPnn.md`)만 준비했고 **미실행**이다(정적 검토만). 번호 SP15는 기록 문서가 없다. SP19(큰 DB 시간)는 2026-11-16에 부분 측정했다. 상태 표는 [spikes/README.md](spikes/README.md), 집에서 돌릴 순서는 [home-test-plan.md](home-test-plan.md)다.
 
 ## 부록 A. 출처
 

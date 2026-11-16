@@ -1,0 +1,37 @@
+# spikes\sql\sp19_50_hash_time.sql service=sql-origin db=SP19_0G3 vars= at=2026-11-16T15:40:54.9031665+09:00 elapsedSec=5.15 exit=0
+what value
+---- -----
+db SP19_0G3
+tables 35
+chunks_of_50 1
+data_used_mb 230.0
+buffer_pool_target_mb 1298
+what login_ lock_timeout_ms isolation_level
+---- ------ --------------- ---------------
+session dbr_origin_user 10000 2
+round chunk tables_ rows_ ms err errmsg
+----- ----- ------- ----- -- --- ------
+1 1 35 1376750 1077.8 NULL NULL
+2 1 35 1376750 695.0 NULL NULL
+3 1 35 1376750 1176.0 NULL NULL
+round round_ms rows_ slowest_chunk_ms
+----- -------- ----- ----------------
+1 1077.8 1376750 1077.8
+2 695.0 1376750 695.0
+3 1176.0 1376750 1176.0
+label rows_ round4_ms
+----- ----- ---------
+dbo.SalesOrderLine 700000 401.1
+dbo.StockLedger 525000 345.6
+dbo.SalesOrder 140000 95.9
+dbo.Code26 100 4.3
+dbo.Code07 100 4.2
+dbo.Code09 100 4.2
+dbo.Code04 100 4.2
+dbo.Code01 100 4.2
+what value
+---- -----
+round4_total_ms 909.6
+what value login_after_revert
+---- ----- ------------------
+tran_left 0 sa
