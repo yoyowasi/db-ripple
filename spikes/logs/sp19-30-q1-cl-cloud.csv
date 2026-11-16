@@ -1,0 +1,4 @@
+label,run,first_run,started_local,total_client_ms,pre_ms,backup_ms,copy_ms,restore_ms,restore_cmd_ms,owner_ms,install_ms,install_batches,snapshot_ms,context_ms,xe_span_ms,backup_mb,compressed_mb,state,states,fingerprint_match,mismatches,import_left
+cl,1,1,19:24:41,5224,647,97,18,513,449,23,2816,321,48,641,4803,10.1,0.6,ready,building>ready,True,0,0
+cl,2,0,19:24:56,3563,563,61,7,279,238,16,1684,321,39,611,3259,10.1,0.6,ready,building>ready,True,0,0
+cl,3,0,19:25:10,3319,564,54,10,263,225,15,1572,321,51,560,3089,10.1,0.6,ready,building>ready,True,0,0

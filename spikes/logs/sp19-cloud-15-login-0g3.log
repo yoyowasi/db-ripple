@@ -1,0 +1,8 @@
+# spikes/sql/sp19_15_limited_login.sql container=dbripple-sql-origin db=master vars=DbName=SP19_0G3 at=2026-11-16T19:25:46.0753396+09:00 elapsedSec=0.27 exit=0
+Changed database context to 'SP19_0G3'.
+what value
+---- -----
+db_roles db_backupoperator,db_datareader,db_datawriter
+what value
+---- -----
+server_roles (none)

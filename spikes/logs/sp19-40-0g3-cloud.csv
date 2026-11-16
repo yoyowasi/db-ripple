@@ -1,0 +1,7 @@
+label,shape,id,cpu_pct,state_before,preview_ms,preview_status,analyze,execute,readLog,reread,netDiff,resolve,serialize,state_after,net,apply_ms,apply_status,mode,a_snapshot,a_drift,a_execute,a_netDiff,a_commit,mismatches,message
+0g3,order1,101,load0.66/2,ready,1022,ok,81,57,5,10,409,78,122,ready,dbo.SalesOrder:i0u1d0,1692,committed,KEYSET_HASH,1,713,7,553,2,0,원본이 바뀌어 샌드박스 기준선이 오래됨(자동 재구축 안 함; 새로 고침 필요).
+0g3,order1,102,load0.66/2,ready,428,ok,0,5,0,0,292,1,0,ready,dbo.SalesOrder:i0u1d0,1370,committed,KEYSET_HASH,0,528,1,517,1,0,원본이 바뀌어 샌드박스 기준선이 오래됨(자동 재구축 안 함; 새로 고침 필요).
+0g3,order1,103,load0.84/2,ready,414,ok,0,4,0,0,271,0,0,ready,dbo.SalesOrder:i0u1d0,1458,committed,KEYSET_HASH,0,543,1,523,2,0,원본이 바뀌어 샌드박스 기준선이 오래됨(자동 재구축 안 함; 새로 고침 필요).
+0g3,ledger1,101,load0.86/2,ready,2713,ok,0,59,1,4,2513,0,0,ready,dbo.StockLedger:i0u1d0,,,,,,,,,,
+0g3,ledger1,102,load0.79/2,ready,1891,ok,0,4,0,0,1745,1,0,ready,dbo.StockLedger:i0u1d0,,,,,,,,,,
+0g3,ledger1,103,load0.72/2,ready,1930,ok,0,4,0,0,1798,1,0,ready,dbo.StockLedger:i0u1d0,,,,,,,,,,

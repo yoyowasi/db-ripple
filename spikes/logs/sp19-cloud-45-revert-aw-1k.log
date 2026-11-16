@@ -1,0 +1,13 @@
+# spikes/sql/sp19_45_revert.sql container=dbripple-sql db=master vars=Col=AddressLine1,Key=AddressID,Rounds=3,Rows=1000,SandboxDb=SP19_AW_Sandbox,SnapshotDb=SP19_AW_Sandbox_base,Table=Person.Address at=2026-11-16T19:33:13.6508277+09:00 elapsedSec=7.75 exit=0
+Nonqualified transactions are being rolled back. Estimated rollback completion: 0%.
+Nonqualified transactions are being rolled back. Estimated rollback completion: 100%.
+Nonqualified transactions are being rolled back. Estimated rollback completion: 0%.
+Nonqualified transactions are being rolled back. Estimated rollback completion: 100%.
+round rows_ change_ms sparse_before_mb sparse_after_change_mb diff_before single_user_ms revert_ms multi_user_ms diff_after triggers_on_before triggers_on_after log_mb_before log_mb_after
+----- ----- --------- ---------------- ---------------------- ----------- -------------- --------- ------------- ---------- ------------------ ----------------- ------------- ------------
+1 1000 151.3 .0 .0 1000 73.7 293.0 .0 0 224 224 72 0
+2 1000 187.7 .0 .0 1000 3005.4 202.1 .0 0 224 224 0 0
+3 1000 183.8 .0 .0 1000 3009.6 210.1 .0 0 224 224 0 0
+what state_desc user_access_desc
+---- ---------- ----------------
+state_after ONLINE MULTI_USER

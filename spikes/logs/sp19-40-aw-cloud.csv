@@ -1,0 +1,4 @@
+label,shape,id,cpu_pct,state_before,preview_ms,preview_status,analyze,execute,readLog,reread,netDiff,resolve,serialize,state_after,net,apply_ms,apply_status,mode,a_snapshot,a_drift,a_execute,a_netDiff,a_commit,mismatches,message
+aw,product1,1,load0.77/2,ready,605,ok,14,81,7,10,37,68,111,ready,Production.Product:i0u1d0,1050,committed,KEYSET_HASH,0,449,9,193,2,0,원본이 바뀌어 샌드박스 기준선이 오래됨(자동 재구축 안 함; 새로 고침 필요).
+aw,product1,2,load0.77/2,ready,144,ok,0,4,0,0,5,2,0,ready,Production.Product:i0u1d0,692,committed,KEYSET_HASH,0,181,4,168,2,0,원본이 바뀌어 샌드박스 기준선이 오래됨(자동 재구축 안 함; 새로 고침 필요).
+aw,product1,3,load0.87/2,ready,166,ok,0,9,1,0,5,16,0,ready,Production.Product:i0u1d0,697,committed,KEYSET_HASH,0,183,1,175,1,0,원본이 바뀌어 샌드박스 기준선이 오래됨(자동 재구축 안 함; 새로 고침 필요).

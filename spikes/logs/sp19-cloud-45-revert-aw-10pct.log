@@ -1,0 +1,7 @@
+# spikes/sql/sp19_45_revert.sql container=dbripple-sql db=master vars=Col=AddressLine1,Key=AddressID,Rounds=1,Rows=1961,SandboxDb=SP19_AW_Sandbox,SnapshotDb=SP19_AW_Sandbox_base,Table=Person.Address at=2026-11-16T19:33:14.5109335+09:00 elapsedSec=0.86 exit=0
+round rows_ change_ms sparse_before_mb sparse_after_change_mb diff_before single_user_ms revert_ms multi_user_ms diff_after triggers_on_before triggers_on_after log_mb_before log_mb_after
+----- ----- --------- ---------------- ---------------------- ----------- -------------- --------- ------------- ---------- ------------------ ----------------- ------------- ------------
+1 1961 288.1 .0 .0 1961 8.1 249.1 4.1 0 224 224 0 0
+what state_desc user_access_desc
+---- ---------- ----------------
+state_after ONLINE MULTI_USER

@@ -1,0 +1,4 @@
+# spikes/sql/sp19_20_xe_start.sql container=dbripple-sql db=master vars= at=2026-11-16T19:32:07.5900868+09:00 elapsedSec=0.23 exit=0
+what value
+---- -----
+xe_running 1
