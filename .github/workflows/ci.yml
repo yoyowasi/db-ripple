@@ -94,9 +94,7 @@ jobs:
     name: DB 테스트 (SQL Server 2025 CU10 컨테이너)
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    env:
-      # 일반 PR은 Build·Tests까지. main push·수동 실행은 평가·N1(EXEC 포함)까지 돈다.
-      FULL_RUN: ${{ github.event_name != 'pull_request' }}
+    # PR·main 모두 기본 실행(Build·Tests·Eval·N1)과 EXEC 포함 실행(Eval·N1)을 돈다(2026-11-16 측정: 둘 합쳐 약 10분).
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -126,18 +124,20 @@ jobs:
         run: |
           . ./scripts/env.ps1
           ./scripts/restore-aw-origin.ps1
-      - name: home-test (Build·Tests), PR
-        if: env.FULL_RUN != 'true'
+      - name: home-test 기본 (Build·Tests·Eval·N1), 전체 PASS여야 통과
         shell: pwsh
         env:
           DBRIPPLE_RUN_SP7: "1"
-        run: ./scripts/home-test.ps1 -Skip Eval,N1 -Date ci
-      - name: home-test (Build·Tests·Eval·N1, EXEC 포함), main/수동
-        if: env.FULL_RUN == 'true'
+        run: |
+          ./scripts/home-test.ps1 -Date ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # home-test는 WARN에도 0으로 끝난다. 기본 30사례 평가의 지표가 기준선과 달라지면 WARN이므로 여기서 막는다.
+          $s = Get-Content -LiteralPath logs/home-test/ci/summary.json -Raw | ConvertFrom-Json
+          "기본 실행 전체: $($s.overall)"
+          if ($s.overall -ne 'PASS') { $s.steps | Format-Table -AutoSize | Out-String -Width 400; exit 1 }
+      - name: home-test EXEC 포함 (Eval·N1), 사례 집합이 달라 WARN 허용
         shell: pwsh
-        env:
-          DBRIPPLE_RUN_SP7: "1"
-        run: ./scripts/home-test.ps1 -IncludeExec -Date ci
+        run: ./scripts/home-test.ps1 -IncludeExec -Skip Build,Tests -Date ci-exec
       # ApplySqlTests는 -p:ApplyIntegration=true에서만 컴파일되어 위 전체 테스트에 들어가지 않는다.
       - name: Apply DB 테스트 (ApplyIntegration)
         shell: pwsh
@@ -174,12 +174,13 @@ jobs:
         with:
           name: db-home-test-logs
           path: |
-            logs/home-test/ci/**/summary.md
-            logs/home-test/ci/**/failed-tests.txt
-            logs/home-test/ci/**/dotnet-*.log
-            logs/home-test/ci/**/trx/**
-            logs/home-test/ci/**/eval/**
-            logs/home-test/ci/**/n1/**
+            logs/home-test/ci*/**/summary.*
+            logs/home-test/ci*/**/failed-tests.txt
+            logs/home-test/ci*/**/dotnet-*.log
+            logs/home-test/ci*/**/eval-*.csv
+            logs/home-test/ci*/**/trx/**
+            logs/home-test/ci*/**/eval/**
+            logs/home-test/ci*/**/n1/**
             logs/home-test/sql-container.log
           if-no-files-found: ignore
           retention-days: 14
