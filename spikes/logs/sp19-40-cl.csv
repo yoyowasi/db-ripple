@@ -1,0 +1,7 @@
+label,shape,id,cpu_pct,state_before,preview_ms,preview_status,analyze,execute,readLog,reread,netDiff,resolve,serialize,state_after,net,apply_ms,apply_status,mode,a_snapshot,a_drift,a_execute,a_netDiff,a_commit,mismatches,message
+cl,cl07a,1,8,ready,1957,failed,15,87,0,0,1308,44,98,ready,,,,,,,,,,,
+cl,cl07a,2,20,ready,482,failed,0,21,0,0,187,2,0,ready,,,,,,,,,,,
+cl,cl07a,3,35,ready,316,failed,0,13,0,0,129,1,0,ready,,,,,,,,,,,
+cl,cl02dept,1,20,ready,262,ok,0,57,8,16,2,25,7,ready,,,,,,,,,,,
+cl,cl02dept,2,43,ready,172,ok,0,14,3,2,1,2,0,ready,,,,,,,,,,,
+cl,cl02dept,3,9,ready,155,ok,0,13,1,1,1,1,0,ready,,,,,,,,,,,

@@ -1,0 +1,69 @@
+# spikes\sql\sp19_10_gen_db.sql service=sql-origin db=master vars=DbName=SP19_5G,LogMB=500,Scale=7.6 at=2026-11-16T15:25:54.2872484+09:00 elapsedSec=151.49 exit=0
+what data_mb_presized at
+---- ---------------- --
+created 5232 2026-11-16 06:23:23.7842540
+Changed database context to 'SP19_5G'.
+what at
+---- --
+customer_item_done 2026-11-16 06:23:24.4796543
+what rows_ at
+---- ----- --
+salesorder_done 3040000 2026-11-16 06:23:31.8035261
+what rows_ at
+---- ----- --
+salesorderline_done 15200000 2026-11-16 06:24:13.2944959
+what rows_ at
+---- ----- --
+stockledger_done 11400000 2026-11-16 06:25:17.1028967
+what at
+---- --
+indexes_fk_done 2026-11-16 06:25:53.3360521
+Changed database context to 'master'.
+Changed database context to 'SP19_5G'.
+what name type_desc size_mb used_mb
+---- ---- --------- ------- -------
+file SP19_5G ROWS 5232 4736.4
+file SP19_5G_log LOG 512 .6
+what tbl rows_ reserved_mb indexes
+---- --- ----- ----------- -------
+table dbo.StockLedger 11400000 2990.3 2
+table dbo.SalesOrderLine 15200000 1328.5 2
+table dbo.SalesOrder 3040000 387.4 3
+table dbo.Customer 152000 18.5 2
+table dbo.Item 38000 6.5 2
+table dbo.Code01 100 .1 1
+table dbo.Code02 100 .1 1
+table dbo.Code03 100 .1 1
+table dbo.Code04 100 .1 1
+table dbo.Code05 100 .1 1
+table dbo.Code06 100 .1 1
+table dbo.Code07 100 .1 1
+table dbo.Code08 100 .1 1
+table dbo.Code09 100 .1 1
+table dbo.Code10 100 .1 1
+table dbo.Code11 100 .1 1
+table dbo.Code12 100 .1 1
+table dbo.Code13 100 .1 1
+table dbo.Code14 100 .1 1
+table dbo.Code15 100 .1 1
+table dbo.Code16 100 .1 1
+table dbo.Code17 100 .1 1
+table dbo.Code18 100 .1 1
+table dbo.Code19 100 .1 1
+table dbo.Code20 100 .1 1
+table dbo.Code21 100 .1 1
+table dbo.Code22 100 .1 1
+table dbo.Code23 100 .1 1
+table dbo.Code24 100 .1 1
+table dbo.Code25 100 .1 1
+table dbo.Code26 100 .1 1
+table dbo.Code27 100 .1 1
+table dbo.Code28 100 .1 1
+table dbo.Code29 100 .1 1
+table dbo.Code30 100 .1 1
+what tables_ indexes_ fks rows_total
+---- ------- -------- --- ----------
+totals 35 41 4 29833000
+what recovery at
+---- -------- --
+done FULL 2026-11-16 06:25:53.8585480
