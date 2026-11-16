@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using DbRipple.Contracts;
 using DbRipple.Core.Baseline;
 using DbRipple.Core.Capture;
+using Microsoft.Data.SqlClient;
 
 namespace DbRipple.Apply;
 
@@ -278,6 +279,15 @@ public sealed class ApplyService : IApplyService
         }
     }
 
+    /// <summary>실행 전 읽기 단계의 오류 이름: 잠금 시간 초과(1222)·교착 희생(1205)은 번호를 밝히고, 나머지는 일반 문구.</summary>
+    static string DescribeLockError(Exception ex) => ex switch
+    {
+        SqlException { Number: 1222 } => "미리보기 행이 다른 세션에 잠겨 LOCK_TIMEOUT 뒤 롤백(오류 1222)",
+        SqlException { Number: 1205 } => "교착 상태 희생자로 선택됨(오류 1205)",
+        SqlException { Number: var n } => $"SQL 오류 {n}",
+        _ => "오류",
+    };
+
     async Task<ApplyResult> ExecuteAsync(
         IOriginConnection conn, PreviewRecord record, AnalysisResult analysis, BaselineContext context, IReadOnlyList<TableInfo> tables,
         VerificationMode mode, string snapshotDb, List<string> limitations, Run run, CancellationToken ct)
@@ -287,7 +297,19 @@ public sealed class ApplyService : IApplyService
 
         // 7. 드리프트(잠금은 COMMIT·ROLLBACK까지)
         run.Watch.Restart();
-        var drift = await conn.CheckDriftAsync(record, tables, ct);
+        IReadOnlyList<DriftRow> drift;
+        try
+        {
+            drift = await conn.CheckDriftAsync(record, tables, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException and not SandboxUnavailableException)
+        {
+            // 문장 실행 전: 미리보기 행이 다른 세션에 잠겨 LOCK_TIMEOUT(1222)이 나도 500이 아니라 롤백한 Error로 돌려준다. 기다린 시간은 drift 칸에 둔다.
+            run.Drift = run.Lap();
+            await conn.RollbackAsync(CancellationToken.None);
+            return Make(record, ApplyStatus.Error, new ApplyVerification { Mode = mode, Limitations = limitations }, [],
+                $"드리프트 확인 중 {DescribeLockError(ex)}로 실행하지 않고 롤백함: {ex.Message}", run);
+        }
         run.Drift = run.Lap();
         if (drift.Count > 0)
         {
@@ -312,10 +334,10 @@ public sealed class ApplyService : IApplyService
             catch (Exception ex) when (ex is not OperationCanceledException and not SandboxUnavailableException)
             {
                 // 문장 실행 전: 롤백하면 원본은 그대로다(잠금 시간 초과 1222 등).
+                run.Drift += run.Lap(); // 기다린 시간은 commit이 아니라 드리프트 확인 칸에 합친다.
                 await conn.RollbackAsync(CancellationToken.None);
-                run.Commit = run.Lap();
                 return Make(record, ApplyStatus.Error, new ApplyVerification { Mode = mode, Limitations = limitations }, [],
-                    $"KEYSET_HASH 실행 전 상태를 읽지 못해 실행하지 않고 롤백함: {ex.Message}", run);
+                    $"KEYSET_HASH 실행 전 상태를 읽지 못해 실행하지 않고 롤백함({DescribeLockError(ex)}): {ex.Message}", run);
             }
         }
 

@@ -603,26 +603,29 @@ internal static class OriginSnapshot
 
     /// <summary>
     /// 권한 오류: 262(CREATE DATABASE 권한 없음), 229·230(개체·열 권한), 297·300(사용자·서버 권한), 916(DB 접근 불가), 15247(작업 권한 없음).
-    /// 오류 번호 목록은 문서 기준이고 실측하지 않았다(테스트 라운드 확인).
+    /// 1817은 원본 DB 소유자·sysadmin(CONTROL)이 아닌 로그인의 스냅샷 생성(2026-11-16 실측). 나머지 번호는 문서 기준이고 실측하지 않았다.
     /// </summary>
-    static readonly HashSet<int> PermissionErrors = [262, 229, 230, 297, 300, 916, 15247];
+    static readonly HashSet<int> PermissionErrors = [262, 229, 230, 297, 300, 916, 1817, 15247];
 
     /// <summary>
-    /// 검증 모드 결정 SQL(master 문맥, 읽기만): CREATE ANY DATABASE 또는 master의 CREATE DATABASE 권한, 원본 FILESTREAM(FD)·메모리 최적화(FX) 파일 그룹 수.
+    /// 검증 모드 결정 SQL(master 문맥, 읽기만): CREATE ANY DATABASE 또는 master의 CREATE DATABASE 권한, 원본 DB의 CONTROL(스냅샷은 둘 다 있어야 만들어진다, 2026-11-16 실측),
+    /// 원본 FILESTREAM(FD)·메모리 최적화(FX) 파일 그룹 수.
     /// HAS_PERMS_BY_NAME·sys.filegroups는 공개 권한으로 읽힌다(원본 DB 접근 권한은 필요).
     /// </summary>
     public static string CapabilitySql(string originDb) => $"""
         SELECT CASE WHEN HAS_PERMS_BY_NAME(NULL, NULL, N'CREATE ANY DATABASE') = 1
                       OR HAS_PERMS_BY_NAME(N'master', N'DATABASE', N'CREATE DATABASE') = 1 THEN 1 ELSE 0 END,
+               CASE WHEN HAS_PERMS_BY_NAME({SqlText.NLiteral(originDb)}, N'DATABASE', N'CONTROL') = 1 THEN 1 ELSE 0 END,
                (SELECT COUNT(*) FROM {SqlText.Quote(originDb)}.sys.filegroups WHERE type = N'FD'),
                (SELECT COUNT(*) FROM {SqlText.Quote(originDb)}.sys.filegroups WHERE type = N'FX');
         """;
 
     /// <summary>권한·파일 그룹으로 검증 모드를 정한다(스냅샷 불가 이유는 결과·선행 조건 메시지에 싣는다).</summary>
-    public static SnapshotCapability Decide(bool canCreateDatabase, int filestreamGroups, int memoryOptimizedGroups)
+    public static SnapshotCapability Decide(bool canCreateDatabase, int filestreamGroups, int memoryOptimizedGroups, bool hasDbControl)
     {
         var why = new List<string>();
         if (!canCreateDatabase) why.Add("원본 로그인에 CREATE DATABASE 권한이 없음(데이터베이스 스냅샷 생성 불가)");
+        if (!hasDbControl) why.Add("원본 로그인에 원본 DB의 CONTROL 권한이 없음(DB 소유자·db_owner 필요, 스냅샷 생성 불가)");
         if (filestreamGroups > 0) why.Add("원본에 FILESTREAM 파일 그룹이 있음(스냅샷에서 오프라인)");
         if (memoryOptimizedGroups > 0) why.Add("원본에 메모리 최적화 파일 그룹이 있음(스냅샷 미지원)");
         return new SnapshotCapability(why.Count == 0, why.Count == 0 ? null : string.Join(", ", why));

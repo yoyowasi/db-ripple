@@ -80,7 +80,7 @@ internal sealed class SqlOriginDatabase(string connectionString, ApplySettings s
         await using var cmd = new SqlCommand(OriginSnapshot.CapabilitySql(originDb), conn) { CommandTimeout = settings.ToolCommandTimeoutSeconds };
         await using var r = await cmd.ExecuteReaderAsync(ct);
         if (!await r.ReadAsync(ct)) throw new InvalidOperationException("원본 스냅샷 가능 여부를 읽지 못함");
-        return OriginSnapshot.Decide(r.GetInt32(0) == 1, r.GetInt32(1), r.GetInt32(2));
+        return OriginSnapshot.Decide(r.GetInt32(0) == 1, r.GetInt32(2), r.GetInt32(3), r.GetInt32(1) == 1);
     }
 
     public async Task<Fingerprint> ReadFingerprintAsync(string originDb, CancellationToken ct)
