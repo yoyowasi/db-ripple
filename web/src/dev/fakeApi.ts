@@ -55,7 +55,7 @@ function testResultOf(req: SettingsRequest): SettingsTestResult {
   const sysadmin = req.origin.user === 'sa'
   const warnings: string[] = []
   if (sysadmin) warnings.push('원본 로그인이 sysadmin입니다. [적용]은 확인을 한 번 더 받습니다.')
-  if (nosnap) warnings.push('원본에 스냅샷(CREATE DATABASE) 권한이 없습니다. [적용]이 약한 검증(KEYSET_HASH)으로 동의를 묻습니다.')
+  if (nosnap) warnings.push('원본에 스냅샷 권한(CREATE DATABASE와 원본 DB CONTROL)이 없습니다. [적용]이 약한 검증(KEYSET_HASH)으로 동의를 묻습니다.')
   return {
     origin:
       req.mode === 'split'

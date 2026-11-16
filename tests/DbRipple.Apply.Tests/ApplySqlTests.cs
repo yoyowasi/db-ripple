@@ -177,6 +177,27 @@ public sealed class ApplySqlTests
     }
 
     [SqlFact]
+    public async Task Preview_row_locked_by_another_session_is_error_without_changing_origin()
+    {
+        // 다른 세션이 미리보기 행을 잠근 채 [적용]: 드리프트 확인이 LOCK_TIMEOUT(1222)을 맞아도 500이 아니라 롤백한 Error다(2026-11-16).
+        var settings = new ApplySettings { Mode = ServerMode.Split, OriginLockTimeoutMs = 500, ExecuteAsUser = PreviewUserSql.UserName };
+        await using var lab = await ApplyLab.CustomAsync("lock", Custom, settings);
+        var record = await lab.PreviewAsync("UPDATE dbo.T SET v = v + 1 WHERE id = 1;");
+        await using var blocker = await TestDb.OpenAsync(lab.Origin);
+        await using var tx = (Microsoft.Data.SqlClient.SqlTransaction)await blocker.BeginTransactionAsync();
+        await using (var hold = new Microsoft.Data.SqlClient.SqlCommand("UPDATE dbo.T SET v = v WHERE id = 1;", blocker, tx)) await hold.ExecuteNonQueryAsync();
+
+        var result = await lab.ApplyAsync(record);
+        await tx.RollbackAsync();
+
+        Assert.Equal(ApplyStatus.Error, result!.Status);
+        Assert.Contains("1222", result.Message);
+        Assert.Empty(result.Statements);
+        Assert.False(result.SandboxRefreshStarted);
+        Assert.Equal(1, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
+    }
+
+    [SqlFact]
     public async Task Row_inserted_into_origin_after_preview_is_rolled_back_mismatch()
     {
         await using var lab = await ApplyLab.CustomAsync("mismatch", Custom);

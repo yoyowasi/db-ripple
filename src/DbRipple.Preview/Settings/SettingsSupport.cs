@@ -32,7 +32,7 @@ public interface ISecretProtector
 /// <summary>연결 시험(읽기만). 시험은 가짜를 넣는다.</summary>
 public interface ISqlServerProbe
 {
-    /// <summary>원본: 서버 이름·버전·에디션·sysadmin·BACKUP·CREATE DATABASE 권한.</summary>
+    /// <summary>원본: 서버 이름·버전·에디션·sysadmin·BACKUP 권한, 스냅샷 권한(CREATE DATABASE AND 원본 DB의 CONTROL).</summary>
     Task<OriginTestResult> ProbeOriginAsync(string connectionString, string originDb, CancellationToken ct);
     /// <summary>샌드박스: 서버 이름·버전.</summary>
     Task<SandboxTestResult> ProbeSandboxAsync(string connectionString, bool isLoopback, CancellationToken ct);
@@ -46,7 +46,8 @@ public sealed class SqlServerProbe : ISqlServerProbe
                IS_SRVROLEMEMBER(N'sysadmin'),
                HAS_PERMS_BY_NAME(@db, N'DATABASE', N'BACKUP DATABASE'),
                CASE WHEN HAS_PERMS_BY_NAME(NULL, NULL, N'CREATE ANY DATABASE') = 1
-                      OR HAS_PERMS_BY_NAME(N'master', N'DATABASE', N'CREATE DATABASE') = 1 THEN 1 ELSE 0 END,
+                      OR HAS_PERMS_BY_NAME(N'master', N'DATABASE', N'CREATE DATABASE') = 1 THEN 1 ELSE 0 END
+               & CASE WHEN HAS_PERMS_BY_NAME(@db, N'DATABASE', N'CONTROL') = 1 THEN 1 ELSE 0 END,
                DB_ID(@db);
         """;
 

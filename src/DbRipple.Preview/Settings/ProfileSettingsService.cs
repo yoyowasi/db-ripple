@@ -187,7 +187,7 @@ public sealed class ProfileSettingsService : ISettingsService
         if (f.Mode == ServerMode.Split && origin.Ok && origin.CanBackup == false && f.Backup.ImportFile is null)
             warnings.Add("원본 DB에 BACKUP 권한이 없습니다. 기준선을 만들려면 백업 파일(importFile)을 지정하세요.");
         if (origin.Ok && origin.CanCreateDatabase == false)
-            warnings.Add("원본에 CREATE DATABASE 권한이 없어 [적용] 검증은 KEYSET(약한 검증)이 됩니다.");
+            warnings.Add("원본 스냅샷을 만들 권한(CREATE DATABASE와 원본 DB의 CONTROL 둘 다 필요)이 없어 [적용] 검증은 KEYSET(약한 검증)이 됩니다.");
         return new SettingsTestOutcome { Result = new SettingsTestResult { Origin = origin, Sandbox = sandbox, Warnings = warnings } };
     }
 

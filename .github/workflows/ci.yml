@@ -138,6 +138,19 @@ jobs:
       - name: home-test EXEC 포함 (Eval·N1), 사례 집합이 달라 WARN 허용
         shell: pwsh
         run: ./scripts/home-test.ps1 -IncludeExec -Skip Build,Tests -Date ci-exec
+      # ApplySqlTests는 -p:ApplyIntegration=true에서만 컴파일되어 위 전체 테스트에 들어가지 않는다.
+      - name: Apply DB 테스트 (ApplyIntegration)
+        shell: pwsh
+        run: |
+          . ./scripts/env.ps1
+          $trx = 'logs/home-test/ci/apply-integration/trx'
+          dotnet test tests/DbRipple.Apply.Tests -p:ApplyIntegration=true --logger 'trx;LogFileName=apply-integration.trx' --results-directory $trx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # DB 변수가 빠지면 SqlFact가 조용히 건너뛰므로, 건너뜀이 있으면 실패로 본다(의도적 Skip 없음).
+          [xml]$x = Get-Content -LiteralPath (Join-Path $trx 'apply-integration.trx') -Raw
+          $c = $x.TestRun.ResultSummary.Counters
+          "Apply DB 테스트: 전체 $($c.total), 통과 $($c.passed), 실패 $($c.failed), 미실행 $($c.notExecuted)"
+          if ([int]$c.notExecuted -ne 0 -or [int]$c.total -ne [int]$c.passed) { exit 1 }
       - name: 진단 로그 정리 (비밀번호가 들어간 파일은 올리지 않는다)
         if: always()
         shell: bash
