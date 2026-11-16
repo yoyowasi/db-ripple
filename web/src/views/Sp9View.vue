@@ -109,7 +109,8 @@ async function measureGrid(n: number): Promise<void> {
   rows.value = data
 }
 
-async function onFirstDataRendered(): Promise<void> {
+// firstDataRendered는 그리드마다 한 번만 와서 두 번째 측정부터 busy가 풀리지 않았다(2026-11-16). rowDataUpdated는 rowData를 바꿀 때마다 온다.
+async function onRowDataUpdated(): Promise<void> {
   if (!gridWaiting) return
   gridWaiting = false
   await nextFrames()
@@ -213,7 +214,7 @@ async function copyCsv(): Promise<void> {
           :default-col-def="defaultColDef"
           :get-row-id="getRowId"
           @grid-ready="onGridReady"
-          @first-data-rendered="onFirstDataRendered"
+          @row-data-updated="onRowDataUpdated"
         />
       </div>
     </section>

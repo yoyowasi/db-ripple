@@ -16,7 +16,7 @@
 | SP10 | 트랜잭션 안 EXECUTE AS/REVERT, 소유권 체인 | 성립(2026-11-10). doomed면 ROLLBACK 뒤 REVERT | DB 실측(컨테이너) | [SP10.md](SP10.md) |
 | SP7 | 열린 트랜잭션 안 최종 차이(정확성, AW 전 테이블 시간) | 통과(2026-11-10, 2회): 독립 확인 10/10, p50 1.55~1.65초·p95 2.03~3.70초 | DB 실측(컨테이너) | [SP7.md](SP7.md) |
 | SP8 | AW DM1·DM2·DM3 실제 전파, 데모 대본 확정 | 확정(2026-11-12): DM1 주문 43697, DM2 상세 52, DM3 직원 1. DM2의 SalesYTD는 회계 기간 불일치로 늘 0행 | DB 실측(AW_Origin 읽기 전용 조회 + 전용 사본에서 Host 끝까지) | [SP8.md](SP8.md) |
-| SP9 | 브라우저 렌더 시간(그래프 노드 50·200·500, 그리드 1만·5만 행) | 측정 전(참고값 1회) | 브라우저(측정 화면 `/sp9`) | [SP9.md](SP9.md) |
+| SP9 | 브라우저 렌더 시간(그래프 노드 50·200·500, 그리드 1만·5만 행) | 측정 완료(2026-11-16, 창 보임·배포 빌드·3회): 그래프 노드 500 전체 815ms, 그리드 5만 행 첫 렌더 328ms | 브라우저(Claude 앱 내장, 측정 화면 `/sp9`) | [SP9.md](SP9.md) |
 | SP11 | 트랜잭션 제어 프로시저와 실행 봉투(균형 BEGIN/COMMIT, 남는 COMMIT, CATCH ROLLBACK 뒤 266, SAVE TRAN) | 통과(2026-11-16): H1~H6 PASS. 남는 COMMIT은 봉투 1겹에서 변경이 롤백 뒤 남음, CATCH ROLLBACK은 266 | DB 실측(컨테이너 2025 CU10) | [SP11.md](SP11.md) |
 | SP12 | 깊이 신호(`TRIGGER_NESTLEVEL()`과 `@@NESTLEVEL`, 프로시저 중첩 안 트리거 깊이) | 통과(2026-11-16): H1~H4 PASS. 트리거 깊이는 프로시저 중첩과 무관(PROC_DIRECT 깊이 1 가정 성립) | DB 실측(컨테이너 2025 CU10) | [SP12.md](SP12.md) |
 | SP13 | `EXEC @rc` 래퍼의 반환값·행 수·결과 집합 수 | 36행 기록, Q1~Q4 확정(2026-11-16). Q4 정정: RAISERROR 16 뒤 계속 진행해도 래퍼는 반환값을 못 받음(오류 문장 returnValue=null 규칙과 일치) | DB 실측 + 클라이언트(System.Data.SqlClient) | [SP13.md](SP13.md) |
