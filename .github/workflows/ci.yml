@@ -41,7 +41,7 @@ jobs:
       - name: 빌드 (경고를 오류로)
         run: dotnet build DbRipple.slnx --no-restore -warnaserror
       - name: 테스트 (DB 연결 변수 없음, DB 테스트는 건너뜀)
-        run: dotnet test DbRipple.slnx --no-build --logger "trx;LogFileName=tests.trx" --results-directory "$RUNNER_TEMP/trx"
+        run: dotnet test DbRipple.slnx --no-build --logger trx --results-directory "$RUNNER_TEMP/trx"
       - name: TRX 올리기
         if: always()
         uses: actions/upload-artifact@v4
