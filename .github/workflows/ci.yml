@@ -147,7 +147,8 @@ jobs:
           if [ -f .env ]; then
             PW="$(sed -n 's/^MSSQL_SA_PASSWORD=//p' .env)"
             if [ -n "$PW" ]; then
-              grep -rlF -- "$PW" logs/home-test 2>/dev/null | while read -r f; do
+              # grep은 일치가 없으면 1을 내고 pipefail이 단계를 실패시키므로 || true.
+              { grep -rlF -- "$PW" logs/home-test 2>/dev/null || true; } | while read -r f; do
                 echo "비밀번호가 포함된 파일은 올리지 않고 삭제: $f"
                 rm -f -- "$f"
               done

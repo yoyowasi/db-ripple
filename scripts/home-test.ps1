@@ -173,7 +173,8 @@ Invoke-Step 'Tests' 'dotnet test DbRipple.slnx (DB 테스트 포함)' {
     $files = @(Get-ChildItem $trx -Filter '*.trx' -ErrorAction SilentlyContinue)
     $total = 0; $passed = 0; $failed = 0; $notExec = 0; $failedNames = New-Object System.Collections.ArrayList
     foreach ($f in $files) {
-        [xml]$x = Get-Content $f.FullName -Raw
+        # dotnet은 같은 초에 끝난 TRX를 'name[1].trx'로 만든다. -Path는 []를 와일드카드로 읽으므로 -LiteralPath.
+        [xml]$x = Get-Content -LiteralPath $f.FullName -Raw
         $c = $x.TestRun.ResultSummary.Counters
         $total += [int]$c.total; $passed += [int]$c.passed; $failed += [int]$c.failed; $notExec += [int]$c.notExecuted
         foreach ($r in $x.TestRun.Results.UnitTestResult) { if ($r.outcome -eq 'Failed') { [void]$failedNames.Add($r.testName) } }
