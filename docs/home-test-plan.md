@@ -148,9 +148,9 @@ mkdir $env:LOCALAPPDATA\db-ripple\import -Force
 
 | 단계 | 결과(PASS/FAIL/WARN/미실행) | 증거 범위 | 메모(새로 생긴 문제 / 전부터 있던 문제) |
 |---|---|---|---|
-| Docker·Env·Build·Tests | PASS(2026-11-16) | DB 실측(CI 컨테이너) | 1195 통과·0 실패·0 건너뜀(#3 CI). ApplyIntegration DB 테스트 106/106(새 CI 단계) |
-| Eval M1~M4 | PASS | DB 실측(CI) | 30사례×3회: M1 1.0/1.0, M2 1.0, M3 certain 과신 0/141, M4 1.0, 기준선 대비 다른 지표 0개(#4 CI) |
-| N1 AW / CascadeLab / RT / Reach | PASS | API+DB(CI) | 기본 AW 4/4·CascadeLab 29/29·RT 1/1·Reach 1/1, EXEC 포함 CascadeLab 36/36 |
+| Docker·Env·Build·Tests | PASS(2026-11-16) | DB 실측(CI 컨테이너) | 1195 통과·0 실패·0 건너뜀(#3 CI). ApplyIntegration DB 테스트 106/106(새 CI 단계). 이 PC(Windows PS 5.1, 로컬 Docker)도 1195/1195(SP7 포함). Docker 단계의 가짜 WARN(한국어 콘솔 CP949로 한글 비교가 깨짐, 전부터 있던 결함)은 #6에서 고쳐 PASS |
+| Eval M1~M4 | PASS | DB 실측(CI, 이 PC) | 30사례×3회: M1 1.0/1.0, M2 1.0, M3 certain 과신 0/141, M4 1.0, 기준선 대비 다른 지표 0개(#4 CI) |
+| N1 AW / CascadeLab / RT / Reach | PASS | API+DB(CI, 이 PC) | 기본 AW 4/4·CascadeLab 29/29·RT 1/1·Reach 1/1, EXEC 포함 CascadeLab 36/36. 이 PC에서도 기본·EXEC 포함 모두 같은 결과 |
 | EXEC 평가·분석(`-IncludeExec`) | WARN(설계상) | DB 실측 + API(CI) | 37사례×3회 종료 0, 상태 불일치 0, certain 과신 0/171. 사례 집합이 기준선과 달라 지표 비교는 참고 |
 | SP11·SP12·SP16·SP13·SP14 | PASS | DB 실측(로컬 2025 CU10) | 가설 FAIL 없음. SP13 Q4 정정: 래퍼는 RAISERROR 16 뒤 계속 진행해도 반환값을 못 받음(오류 문장 returnValue=null 규칙과 일치) |
 | SP17·SP18·SP20·SP21 | SP17 PASS, 기존 결함 2건 발견 → 수정 | DB 실측(컨테이너 2대) + API | SP17 기준 1~8 PASS. 전부터 있던 결함 2건을 이번에 발견: D1 스냅샷 사전 결정이 원본 DB CONTROL을 안 봄(1817), D2 드리프트 확인 잠금 1222가 HTTP 500 → #3에서 수정. 가설 정정: SP18 H3·H6, SP20 기준 1 문구, SP21 A H1 |
