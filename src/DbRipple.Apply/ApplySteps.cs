@@ -603,7 +603,7 @@ internal static class OriginSnapshot
 
     /// <summary>
     /// 권한 오류: 262(CREATE DATABASE 권한 없음), 229·230(개체·열 권한), 297·300(사용자·서버 권한), 916(DB 접근 불가), 15247(작업 권한 없음).
-    /// 1817은 원본 DB 소유자·sysadmin(CONTROL)이 아닌 로그인의 스냅샷 생성(2026-11-16 실측). 나머지 번호는 문서 기준이고 실측하지 않았다.
+    /// 1817은 원본 DB의 CONTROL이 없는 로그인의 스냅샷 생성(2026-11-16 실측: CONTROL만 있으면 db_owner·소유자가 아니어도 성공, 소유자만이고 CREATE가 없으면 262). 나머지 번호는 문서 기준이고 실측하지 않았다.
     /// </summary>
     static readonly HashSet<int> PermissionErrors = [262, 229, 230, 297, 300, 916, 1817, 15247];
 

@@ -17,7 +17,7 @@ namespace DbRipple.Apply;
 /// <item>선행 조건(ApplyPrecondition): 상태 ok(D8 truncated 차단 포함), ContractFormulas.SqlHash(record.Sql) == result.SqlHash == request.SqlHash(있으면), CreatedAt + PreviewExpiry 안이고 미리보기의 기준선이 현재 기준선과 같음(아니면 PREVIEW_EXPIRED),
 ///   원본 지문(Core Fingerprint.ReadAsync(원본)) == baseline.Fingerprint == 미리보기 지문, 원본에 ExecuteAsUser 있음(Q30, 만들지 않는다). 어기면 precondition_failed(원본에 아무것도 안 함).</item>
 /// <item>analyzer.Analyze(record.Sql, baseline) 재분석(문장 원문 얻기). 거부·문장 수·번호·종류·대상이 미리보기와 다르면 precondition_failed(SQL_HASH_MISMATCH와 같은 취급, 메시지로 구분).</item>
-/// <item>검증 모드(2026-11-13): 선행 조건 단계에서 원본 CREATE DATABASE 권한과 FILESTREAM·메모리 최적화 유무로 정한다. 스냅샷을 만들 수 없으면 KEYSET_HASH이고,
+/// <item>검증 모드(2026-11-13): 선행 조건 단계에서 원본 CREATE DATABASE 권한·원본 DB의 CONTROL과 FILESTREAM·메모리 최적화 유무로 정한다. 스냅샷을 만들 수 없으면 KEYSET_HASH이고,
 ///   요청에 allowKeysetVerification=true가 없으면 precondition_failed(WEAK_VERIFICATION_NOT_ACCEPTED). ForceKeyset은 설정 동의로 본다.</item>
 /// <item>원본 스냅샷: Core BaselineSql.DropSnapshot·CreateSnapshot(SingleServer = OriginDb + 접미사, Split = 거기에 _PC_적용id, 스파스 파일은 원본 데이터 파일 폴더).
 ///   생성 실패는 원인과 상관없이 실행하지 않고 error(KEYSET_HASH로 조용히 낮추지 않는다).</item>
@@ -282,7 +282,7 @@ public sealed class ApplyService : IApplyService
     /// <summary>실행 전 읽기 단계의 오류 이름: 잠금 시간 초과(1222)·교착 희생(1205)은 번호를 밝히고, 나머지는 일반 문구.</summary>
     static string DescribeLockError(Exception ex) => ex switch
     {
-        SqlException { Number: 1222 } => "미리보기 행이 다른 세션에 잠겨 LOCK_TIMEOUT 뒤 롤백(오류 1222)",
+        SqlException { Number: 1222 } => "다른 세션의 잠금으로 LOCK_TIMEOUT 뒤 롤백(오류 1222)",
         SqlException { Number: 1205 } => "교착 상태 희생자로 선택됨(오류 1205)",
         SqlException { Number: var n } => $"SQL 오류 {n}",
         _ => "오류",
@@ -307,6 +307,7 @@ public sealed class ApplyService : IApplyService
             // 문장 실행 전: 미리보기 행이 다른 세션에 잠겨 LOCK_TIMEOUT(1222)이 나도 500이 아니라 롤백한 Error로 돌려준다. 기다린 시간은 drift 칸에 둔다.
             run.Drift = run.Lap();
             await conn.RollbackAsync(CancellationToken.None);
+            run.Commit = run.Lap(); // 계약: Commit은 COMMIT 또는 ROLLBACK 시간
             return Make(record, ApplyStatus.Error, new ApplyVerification { Mode = mode, Limitations = limitations }, [],
                 $"드리프트 확인 중 {DescribeLockError(ex)}로 실행하지 않고 롤백함: {ex.Message}", run);
         }
@@ -334,12 +335,15 @@ public sealed class ApplyService : IApplyService
             catch (Exception ex) when (ex is not OperationCanceledException and not SandboxUnavailableException)
             {
                 // 문장 실행 전: 롤백하면 원본은 그대로다(잠금 시간 초과 1222 등).
-                run.Drift += run.Lap(); // 기다린 시간은 commit이 아니라 드리프트 확인 칸에 합친다.
+                run.Drift += run.Lap(); // 기다린 시간은 드리프트 확인 칸에 합치고, 롤백 시간만 Commit 칸에 둔다.
                 await conn.RollbackAsync(CancellationToken.None);
+                run.Commit = run.Lap();
                 return Make(record, ApplyStatus.Error, new ApplyVerification { Mode = mode, Limitations = limitations }, [],
                     $"KEYSET_HASH 실행 전 상태를 읽지 못해 실행하지 않고 롤백함({DescribeLockError(ex)}): {ex.Message}", run);
             }
         }
+
+        run.Drift += run.Lap(); // KEYSET 직전 읽기 시간(성공 때도 버리지 않는다)
 
         // 9. 문장 실행
         run.Watch.Restart();

@@ -17,7 +17,7 @@ internal interface IOriginDatabase
     Task<Fingerprint> ReadFingerprintAsync(string originDb, CancellationToken ct);
     /// <summary>원본에 EXECUTE AS 대상 사용자가 있는지(읽기만, Q30: 만들지 않는다).</summary>
     Task<bool> UserExistsAsync(string originDb, string user, CancellationToken ct);
-    /// <summary>원본 스냅샷을 만들 수 있는지(실행 전 검증 모드 결정, 읽기만): CREATE DATABASE 권한, FILESTREAM·메모리 최적화 파일 그룹.</summary>
+    /// <summary>원본 스냅샷을 만들 수 있는지(실행 전 검증 모드 결정, 읽기만): CREATE DATABASE 권한과 원본 DB의 CONTROL, FILESTREAM·메모리 최적화 파일 그룹.</summary>
     Task<SnapshotCapability> CheckSnapshotCapabilityAsync(string originDb, CancellationToken ct);
     /// <summary>[적용] 원본 사전 경고(TRUSTWORTHY·복제·CDC·Service Broker, 읽기만). 읽지 못하면 "확인 못 함" 문구. 던지지 않는다.</summary>
     Task<IReadOnlyList<string>> ReadOriginWarningsAsync(string originDb, CancellationToken ct);
