@@ -625,7 +625,7 @@ internal static class OriginSnapshot
     {
         var why = new List<string>();
         if (!canCreateDatabase) why.Add("원본 로그인에 CREATE DATABASE 권한이 없음(데이터베이스 스냅샷 생성 불가)");
-        if (!hasDbControl) why.Add("원본 로그인에 원본 DB의 CONTROL 권한이 없음(DB 소유자·db_owner 필요, 스냅샷 생성 불가)");
+        if (!hasDbControl) why.Add("원본 로그인에 원본 DB의 CONTROL 권한이 없음(GRANT CONTROL·db_owner·DB 소유자 중 하나 필요, 스냅샷 생성 불가)");
         if (filestreamGroups > 0) why.Add("원본에 FILESTREAM 파일 그룹이 있음(스냅샷에서 오프라인)");
         if (memoryOptimizedGroups > 0) why.Add("원본에 메모리 최적화 파일 그룹이 있음(스냅샷 미지원)");
         return new SnapshotCapability(why.Count == 0, why.Count == 0 ? null : string.Join(", ", why));
