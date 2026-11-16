@@ -252,7 +252,7 @@ function refresh(): void {
         <div v-if="needsWeak" class="weak">
           <b>약한 검증(KEYSET_HASH)으로만 적용할 수 있습니다</b>
           <p>
-            원본에 스냅샷(CREATE DATABASE) 권한이 없어 키 집합·테이블 건수와 미리보기에 없던 테이블의 해시(CHECKSUM)만 비교합니다. 해시 충돌이나 비교할 수 없는 형식의 열 변경은 놓칠 수 있습니다.
+            원본에 스냅샷 권한(CREATE DATABASE와 원본 DB CONTROL)이 없어 키 집합·테이블 건수와 미리보기에 없던 테이블의 해시(CHECKSUM)만 비교합니다. 해시 충돌이나 비교할 수 없는 형식의 열 변경은 놓칠 수 있습니다.
           </p>
           <label class="chk"><input v-model="weakOk" type="checkbox" /> 위 한계를 이해하고 약한 검증으로 적용합니다</label>
         </div>

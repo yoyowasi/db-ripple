@@ -151,7 +151,7 @@ public sealed record OriginTestResult
     public bool? IsSysadmin { get; init; }
     /// <summary>원본 DB BACKUP DATABASE 권한(db_backupoperator 포함).</summary>
     public bool? CanBackup { get; init; }
-    /// <summary>CREATE DATABASE(스냅샷) 권한.</summary>
+    /// <summary>스냅샷 권한: CREATE DATABASE와 원본 DB CONTROL이 둘 다 있음(2026-11-16 SP18 실측, 이름은 호환 때문에 유지).</summary>
     public bool? CanCreateDatabase { get; init; }
     /// <summary>오류(번호와 짧은 설명만, 비밀값 없음).</summary>
     public string? Error { get; init; }
