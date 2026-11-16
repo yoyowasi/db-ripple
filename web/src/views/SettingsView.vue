@@ -445,7 +445,7 @@ const pwHint = (stored: boolean, auth: AuthKind): string | undefined =>
                 <dd>{{ testResult.origin.isSysadmin === null || testResult.origin.isSysadmin === undefined ? '모름' : testResult.origin.isSysadmin ? '예(권한이 넓습니다)' : '아니오' }}</dd>
                 <dt>백업 권한</dt>
                 <dd>{{ testResult.origin.canBackup === null || testResult.origin.canBackup === undefined ? '모름' : testResult.origin.canBackup ? '있음' : '없음' }}</dd>
-                <dt>스냅샷(CREATE DATABASE) 권한</dt>
+                <dt>스냅샷 권한(CREATE DATABASE + 원본 DB CONTROL)</dt>
                 <dd>
                   {{ testResult.origin.canCreateDatabase === null || testResult.origin.canCreateDatabase === undefined ? '모름' : testResult.origin.canCreateDatabase ? '있음' : '없음' }}
                   <span v-if="testResult.origin.canCreateDatabase === false" class="sub">없으면 [적용]이 약한 검증(KEYSET_HASH)으로 동의를 묻습니다.</span>

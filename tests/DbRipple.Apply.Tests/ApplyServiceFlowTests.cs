@@ -107,6 +107,7 @@ public sealed class ApplyServiceFlowTests
         /// <summary>실행 전, 실행 뒤 순서로 꺼낸다. 비면 같은 기본 상태.</summary>
         public readonly Queue<IReadOnlyDictionary<string, TableState>> States = new();
         public Exception? StatesError;
+        public Exception? DriftError;
         public IReadOnlySet<string>? SeenPreviewTables;
         public SqlSession Session { get; } = new() { Connection = new SqlConnection() };
         public Task<long?> BeginTransactionAsync(CancellationToken ct) { log.Add("begin"); return Task.FromResult<long?>(42); }
@@ -116,7 +117,7 @@ public sealed class ApplyServiceFlowTests
             return CommitError is null ? Task.CompletedTask : Task.FromException(CommitError);
         }
         public Task RollbackAsync(CancellationToken ct) { log.Add("rollback"); return Task.CompletedTask; }
-        public Task<IReadOnlyList<DriftRow>> CheckDriftAsync(PreviewRecord preview, IReadOnlyList<TableInfo> tables, CancellationToken ct) { log.Add("drift"); return Task.FromResult(Drift); }
+        public Task<IReadOnlyList<DriftRow>> CheckDriftAsync(PreviewRecord preview, IReadOnlyList<TableInfo> tables, CancellationToken ct) { log.Add("drift"); return DriftError is { } e ? Task.FromException<IReadOnlyList<DriftRow>>(e) : Task.FromResult(Drift); }
         public Task<IReadOnlyList<HashTarget>> ReadHashTargetsAsync(CancellationToken ct) { log.Add("targets"); return Task.FromResult(Targets); }
         public Task<IReadOnlyDictionary<string, TableState>> ReadTableStatesAsync(IReadOnlyList<HashTarget> targets, IReadOnlySet<string> previewTables, CancellationToken ct)
         {
@@ -431,7 +432,7 @@ public sealed class ApplyServiceFlowTests
     public async Task No_snapshot_capability_without_consent_is_precondition_failed()
     {
         var rig = NewRig();
-        rig.Origin.Capability = OriginSnapshot.Decide(canCreateDatabase: false, filestreamGroups: 0, memoryOptimizedGroups: 0);
+        rig.Origin.Capability = OriginSnapshot.Decide(canCreateDatabase: false, filestreamGroups: 0, memoryOptimizedGroups: 0, hasDbControl: true);
 
         var result = await rig.ApplyAsync();
 
@@ -450,13 +451,14 @@ public sealed class ApplyServiceFlowTests
     }
 
     [Theory]
-    [InlineData(true, 0, 0, true, null)]
-    [InlineData(false, 0, 0, false, "CREATE DATABASE")]
-    [InlineData(true, 1, 0, false, "FILESTREAM")]
-    [InlineData(true, 0, 2, false, "메모리 최적화")]
-    public void Snapshot_capability_is_decided_from_permission_and_filegroups(bool perm, int fd, int fx, bool can, string? reason)
+    [InlineData(true, true, 0, 0, true, null)]
+    [InlineData(false, true, 0, 0, false, "CREATE DATABASE")]
+    [InlineData(true, false, 0, 0, false, "원본 DB의 CONTROL")]
+    [InlineData(true, true, 1, 0, false, "FILESTREAM")]
+    [InlineData(true, true, 0, 2, false, "메모리 최적화")]
+    public void Snapshot_capability_is_decided_from_permission_and_filegroups(bool perm, bool control, int fd, int fx, bool can, string? reason)
     {
-        var c = OriginSnapshot.Decide(perm, fd, fx);
+        var c = OriginSnapshot.Decide(perm, fd, fx, control);
         Assert.Equal(can, c.CanSnapshot);
         if (reason is null) Assert.Null(c.Reason);
         else Assert.Contains(reason, c.Reason);
@@ -480,7 +482,7 @@ public sealed class ApplyServiceFlowTests
     public async Task No_snapshot_capability_with_consent_uses_keyset()
     {
         var rig = NewRig();
-        rig.Origin.Capability = OriginSnapshot.Decide(canCreateDatabase: true, filestreamGroups: 1, memoryOptimizedGroups: 0);
+        rig.Origin.Capability = OriginSnapshot.Decide(canCreateDatabase: true, filestreamGroups: 1, memoryOptimizedGroups: 0, hasDbControl: true);
 
         var result = await rig.ApplyAsync(new ApplyRequest { AllowKeysetVerification = true });
 
@@ -539,7 +541,7 @@ public sealed class ApplyServiceFlowTests
         // N4: 원본에 연결할 수 없으면 ORIGIN_UNREACHABLE로 막는다(검증 모드 판단·사용자 확인도 하지 않는다).
         var rig = NewRig(settings: new ApplySettings { Mode = ServerMode.Split });
         rig.Origin.Unreachable = new SandboxUnavailableException("원본 서버에 연결할 수 없음(DB master, 오류 53)");
-        rig.Origin.Capability = OriginSnapshot.Decide(canCreateDatabase: false, filestreamGroups: 0, memoryOptimizedGroups: 0);
+        rig.Origin.Capability = OriginSnapshot.Decide(canCreateDatabase: false, filestreamGroups: 0, memoryOptimizedGroups: 0, hasDbControl: true);
 
         var result = await rig.ApplyAsync();
 
@@ -722,10 +724,42 @@ public sealed class ApplyServiceFlowTests
     }
 
     [Fact]
+    public async Task Missing_origin_control_is_keyset_hash_with_consent_and_blocked_without()
+    {
+        var rig = NewRig();
+        rig.Origin.Capability = OriginSnapshot.Decide(canCreateDatabase: true, filestreamGroups: 0, memoryOptimizedGroups: 0, hasDbControl: false);
+
+        var denied = await rig.ApplyAsync();
+        Assert.Equal([ApplyPrecondition.WeakVerificationNotAccepted], denied!.PreconditionFailures);
+        Assert.Contains("CONTROL", denied.Message);
+        Assert.DoesNotContain(log, e => e.StartsWith("snapshot", StringComparison.Ordinal));
+
+        var result = await rig.ApplyAsync(new ApplyRequest { AllowKeysetVerification = true });
+        Assert.Equal(ApplyStatus.Committed, result!.Status);
+        Assert.Equal(VerificationMode.KeysetHash, result.Verification.Mode);
+    }
+
+    [Fact]
+    public async Task Drift_check_lock_timeout_is_error_with_rollback_and_without_running()
+    {
+        var rig = NewRig();
+        rig.Origin.Connection.DriftError = new InvalidOperationException("Lock request time out period exceeded(1222)");
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.Error, result!.Status);
+        Assert.Contains("1222", result.Message);
+        Assert.Contains("rollback", log);
+        Assert.DoesNotContain(log, e => e.StartsWith("run", StringComparison.Ordinal));
+        Assert.DoesNotContain("commit", log);
+        Assert.False(result.SandboxRefreshStarted);
+    }
+
+    [Fact]
     public async Task Keyset_hash_with_consent_from_capability_check_uses_keyset_hash()
     {
         var rig = NewRig();
-        rig.Origin.Capability = OriginSnapshot.Decide(canCreateDatabase: false, filestreamGroups: 0, memoryOptimizedGroups: 0);
+        rig.Origin.Capability = OriginSnapshot.Decide(canCreateDatabase: false, filestreamGroups: 0, memoryOptimizedGroups: 0, hasDbControl: true);
 
         var denied = await rig.ApplyAsync();
         Assert.Equal([ApplyPrecondition.WeakVerificationNotAccepted], denied!.PreconditionFailures);

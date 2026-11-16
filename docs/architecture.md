@@ -1250,7 +1250,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 - **반대 의견(패널, 1달 MVP 관점):** 원본 스냅샷 대조는 선택 기능으로 두자. → 최종 차이 계산기는 D3에서 이미 만들므로 재사용 비용이 작다. `KEYSET`(지금 이름 `KEYSET_HASH`)은 스냅샷을 만들 수 없을 때의 대체 경로일 뿐 일정 절감 수단이 아니다.
 
 **2026-11-13 결정(Split, 근거 `src/DbRipple.Apply/ApplyService.cs`·`ApplySteps.cs`, DB 미확인):**
-- **검증 모드 사전 결정:** 실행 전에 원본 연결에서 `HAS_PERMS_BY_NAME`(CREATE ANY DATABASE 또는 master의 CREATE DATABASE)과 FILESTREAM(FD)·메모리 최적화(FX) 파일 그룹으로 정한다. 스냅샷을 만들 수 있으면 `SNAPSHOT_NETDIFF`, 생성이 실패하면 원인과 상관없이 `error`다(예상 밖 SqlException을 KEYSET_HASH로 조용히 낮추던 경로 삭제, SingleServer 포함).
+- **검증 모드 사전 결정:** 실행 전에 원본 연결에서 `HAS_PERMS_BY_NAME`(CREATE ANY DATABASE 또는 master의 CREATE DATABASE, 그리고 원본 DB의 CONTROL: 둘 다 있어야 스냅샷이 만들어진다, 2026-11-16 실측)과 FILESTREAM(FD)·메모리 최적화(FX) 파일 그룹으로 정한다. 스냅샷을 만들 수 있으면 `SNAPSHOT_NETDIFF`, 생성이 실패하면 원인과 상관없이 `error`다(예상 밖 SqlException을 KEYSET_HASH로 조용히 낮추던 경로 삭제, SingleServer 포함).
 - **약한 검증 동의:** 스냅샷을 만들 수 없으면 `KEYSET_HASH`이고, 요청에 `allowKeysetVerification=true`가 없으면 `precondition_failed`(`WEAK_VERIFICATION_NOT_ACCEPTED`). `ForceKeyset` 설정은 설정 동의로 본다.
 - **이름:** Split 원본 스냅샷은 `<원본>_pre_<pc>_<적용id>`, 스파스 파일은 원본 DB 문맥 `sys.database_files.physical_name`의 폴더에 둔다. 자기가 만든 이름만 지운다. SingleServer는 `<원본>_pre` 그대로.
 - **실행 주체 불일치(한계):** Split [적용]은 가장 없이 본인 로그인으로 실행한다(원본에 사용자 생성·IMPERSONATE 없음). 미리보기는 샌드박스의 `dbr_preview_user`라 권한·`USER_NAME()` 결과가 다를 수 있어 `verification.limitations`에 적는다. `EXECUTE_AS_USER_MISSING`은 SingleServer에서만 본다. 원본 연결에 `SET LOCK_TIMEOUT`(기본 10000ms)을 건다.
