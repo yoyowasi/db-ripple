@@ -1,10 +1,10 @@
 container dbripple-sql-origin
 - -
 sp19_dbs 0
-   
+
 - -
 snapshots 0
-   
+
 - -
 xe_sp19_trace 0
   name
@@ -15,10 +15,10 @@ sp19_xel_files 0
 container dbripple-sql
 - -
 sp19_dbs 0
-   
+
 - -
 snapshots 0
-   
+
 - -
 xe_sp19_trace 0
   name
