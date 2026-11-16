@@ -1,6 +1,8 @@
 # 집에서 DB 테스트 계획 (순서대로 따라 하는 체크리스트)
 
-**상태: 준비됨, 전부 미실행(2026-11-13).** 오늘 구현했지만 DB 없이는 확인하지 못한 것을 집에서 Docker를 켜고 한 번에 확인하기 위한 문서다. 스크립트·SQL은 정적 검토만 했다(PowerShell 5.1 파서 오류 0, SQL ScriptDom TSql170 파싱 오류 0, compose YAML 구문). 아래 "결과" 칸은 모두 비어 있고, 실행하지 않은 것은 실행하지 않았다고 적는다.
+**상태: 전부 실행(2026-11-16).** 결과는 5절 표에 있다. 자동 단계(Docker·Env·Build·Tests·Eval·N1)는 이제 GitHub Actions CI(`.github/workflows/ci.yml`, Linux + SQL Server 2025 CU10 컨테이너)가 PR·main마다 돌고, 기본 30사례 평가가 기준선과 달라지면 실패한다. 수동 단계는 2026-11-16 이 PC의 로컬 Docker로 했다. 아래 2026-11-13 문단들은 준비 당시 기록이다.
+
+**준비 당시(2026-11-13):** 오늘 구현했지만 DB 없이는 확인하지 못한 것을 집에서 Docker를 켜고 한 번에 확인하기 위한 문서다. 스크립트·SQL은 정적 검토만 했다(PowerShell 5.1 파서 오류 0, SQL ScriptDom TSql170 파싱 오류 0, compose YAML 구문).
 
 **2026-11-13 갱신:** EXEC 미리보기 구현이 합쳐졌다(미리보기 전용, [적용]은 막힘). 그래서 자동 단계를 한 번 더 `-IncludeExec`로 돌린다(2절 "실행 순서"). CL25의 규칙 이름은 확정됐다. 오늘 확인한 범위는 정적 검사와 단위 테스트뿐이다(빌드 경고 0, 테스트 910 통과, DB 테스트 건너뜀).
 
@@ -146,14 +148,14 @@ mkdir $env:LOCALAPPDATA\db-ripple\import -Force
 
 | 단계 | 결과(PASS/FAIL/WARN/미실행) | 증거 범위 | 메모(새로 생긴 문제 / 전부터 있던 문제) |
 |---|---|---|---|
-| Docker·Env·Build·Tests | | DB 실측 | |
-| Eval M1~M4 | | DB 실측 | |
-| N1 AW / CascadeLab / RT / Reach | | API+DB | |
-| EXEC 평가·분석(`-IncludeExec`) | | DB 실측 + API | |
-| SP11·SP12·SP16·SP13·SP14 | | DB 실측 | |
-| SP17·SP18·SP20·SP21 | | DB 실측(컨테이너 2대) | |
-| 실행 파일 | | 브라우저+DB | |
-| 큰 DELETE·SP19·SP9(선택) | | | |
+| Docker·Env·Build·Tests | PASS(2026-11-16) | DB 실측(CI 컨테이너) | 1195 통과·0 실패·0 건너뜀(#3 CI). ApplyIntegration DB 테스트 106/106(새 CI 단계) |
+| Eval M1~M4 | PASS | DB 실측(CI) | 30사례×3회: M1 1.0/1.0, M2 1.0, M3 certain 과신 0/141, M4 1.0, 기준선 대비 다른 지표 0개(#4 CI) |
+| N1 AW / CascadeLab / RT / Reach | PASS | API+DB(CI) | 기본 AW 4/4·CascadeLab 29/29·RT 1/1·Reach 1/1, EXEC 포함 CascadeLab 36/36 |
+| EXEC 평가·분석(`-IncludeExec`) | WARN(설계상) | DB 실측 + API(CI) | 37사례×3회 종료 0, 상태 불일치 0, certain 과신 0/171. 사례 집합이 기준선과 달라 지표 비교는 참고 |
+| SP11·SP12·SP16·SP13·SP14 | PASS | DB 실측(로컬 2025 CU10) | 가설 FAIL 없음. SP13 Q4 정정: 래퍼는 RAISERROR 16 뒤 계속 진행해도 반환값을 못 받음(오류 문장 returnValue=null 규칙과 일치) |
+| SP17·SP18·SP20·SP21 | SP17 PASS, 기존 결함 2건 발견 → 수정 | DB 실측(컨테이너 2대) + API | SP17 기준 1~8 PASS. 전부터 있던 결함 2건을 이번에 발견: D1 스냅샷 사전 결정이 원본 DB CONTROL을 안 봄(1817), D2 드리프트 확인 잠금 1222가 HTTP 500 → #3에서 수정. 가설 정정: SP18 H3·H6, SP20 기준 1 문구, SP21 A H1 |
+| 실행 파일 | PASS | 브라우저(내장)+DB | 7/7 O([test-reports/2026-11-16-exe-check.md](test-reports/2026-11-16-exe-check.md)). #3 빌드로 재시험: 한 서버 DM1 적용 SNAPSHOT_NETDIFF 4=4, 분리 모드 D1 로그인은 동의 없으면 약한 검증 요청, 동의 후 KEYSET_HASH 커밋 |
+| 큰 DELETE·SP19·SP9(선택) | 큰 DELETE 같음, SP9·SP19 미실행 | DB 실측 + API | 부하 없는 재측정: M5 10만 행 p50 99.0초(이전 105.2초), DM6 5만 행 p50 46.9초. 개선은 아님, resolve·reread가 약 90%([test-reports/2026-11-16-perf.md](test-reports/2026-11-16-perf.md)). SP9는 내장 브라우저 창이 숨겨져 무효(창을 보이게 하고 다시 잰다), SP19는 문서 없음 |
 
 실패한 항목은 같은 방법을 되풀이하지 말고 실패한 지점부터 다시 본다. 스크립트 실패와 제품 결함은 구분해 적는다(환경 실패: 컨테이너·권한·경로, 제품 결함: 판정 FAIL이 설계 가정을 깨는 경우).
 
