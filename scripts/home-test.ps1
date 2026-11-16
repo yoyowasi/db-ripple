@@ -122,8 +122,9 @@ Invoke-Step 'Docker' 'Docker·SQL Server 컨테이너 확인' {
     }
     $ver2 = Invoke-ContainerQuery "SELECT CAST(SERVERPROPERTY('ProductVersion') AS varchar(30)) + ' ' + CAST(SERVERPROPERTY('Edition') AS varchar(60))"
     $script:Facts['sqlserver'] = ($ver2 -join ' ').Trim()
-    $aw = Invoke-ContainerQuery "SELECT CASE WHEN DB_ID(N'AW_Origin') IS NULL THEN N'AW_Origin없음' ELSE N'AW_Origin있음' END"
-    $script:Facts['awOrigin'] = ($aw -join '').Trim()
+    # 판정 값은 ASCII로 받는다. 한국어 Windows PowerShell 5.1은 sqlcmd의 UTF-8 출력을 CP949로 읽어 한글 비교가 깨진다.
+    $aw = (@(Invoke-ContainerQuery "SELECT CASE WHEN DB_ID(N'AW_Origin') IS NULL THEN 'AW_ORIGIN_MISSING' ELSE 'AW_ORIGIN_PRESENT' END") -join '').Trim()
+    $script:Facts['awOrigin'] = switch ($aw) { 'AW_ORIGIN_PRESENT' { 'AW_Origin있음' } 'AW_ORIGIN_MISSING' { 'AW_Origin없음' } default { 'AW_Origin확인못함(' + $aw + ')' } }
     if ($script:Facts['awOrigin'] -ne 'AW_Origin있음') {
         return @{ Status = 'WARN'; Detail = ('Docker ' + $ver + ', SQL ' + $script:Facts['sqlserver'] + '. AW_Origin이 없어 N1 AW가 실패한다: scripts\fetch-adventureworks.ps1 → scripts\restore-aw-origin.ps1') }
     }

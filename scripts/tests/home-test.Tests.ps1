@@ -208,9 +208,10 @@ try {
         Assert-Check 'Invoke-Api transmits a JSON object with sql on the HTTP wire' ($null -ne $decoded -and $decoded.PSObject.Properties.Name -contains 'sql')
         Assert-Check 'Invoke-Api preserves Korean SQL and line breaks as UTF-8' ($null -ne $decoded -and $decoded.sql -ceq "UPDATE dbo.[한글테이블] SET [설명] = N'서울';`r`nSELECT N'검증';" -and $payloadServer.LastAnalyzeContentType -match 'application/json;\s*charset=utf-8' -and [string]::IsNullOrEmpty($payloadServer.Error))
     } finally { $payloadServer.Dispose() }
-    $awQuery = $ast.Find({ param($node) $node -is [Management.Automation.Language.CommandAst] -and $node.GetCommandName() -eq 'Invoke-ContainerQuery' -and $node.Extent.Text -match 'AW_Origin없음' }, $true)
+    $awQuery = $ast.Find({ param($node) $node -is [Management.Automation.Language.CommandAst] -and $node.GetCommandName() -eq 'Invoke-ContainerQuery' -and $node.Extent.Text -match 'AW_ORIGIN_MISSING' }, $true)
     $queryText = if ($awQuery) { $awQuery.CommandElements[1].Value } else { '' }
-    Assert-Check 'AW existence query uses Unicode SQL literals for both Korean labels' ($queryText -cmatch "THEN N'AW_Origin없음' ELSE N'AW_Origin있음'")
+    # 한국어 Windows PS 5.1은 컨테이너 sqlcmd의 UTF-8 출력을 CP949로 읽는다. 판정 값에 한글이 있으면 비교가 깨진다(2026-11-16 실측).
+    Assert-Check 'AW existence query returns ASCII tokens only' ($queryText -cmatch "THEN 'AW_ORIGIN_MISSING' ELSE 'AW_ORIGIN_PRESENT'" -and $queryText -notmatch '[^\x00-\x7F]')
 } finally {
     $serverState.Dispose()
     foreach ($key in $connectionNames) { [Environment]::SetEnvironmentVariable($key, $savedEnvironment[$key], 'Process') }
