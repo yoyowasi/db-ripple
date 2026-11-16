@@ -39,7 +39,7 @@ function Invoke-Native([string]$File, [string[]]$Arguments, [string]$OutFile) {
     if ($Arguments[0] -eq 'test') {
         $trxDir = $Arguments[$Arguments.IndexOf('--results-directory') + 1]
         New-Item -ItemType Directory -Force $trxDir | Out-Null
-        [IO.File]::WriteAllText((Join-Path $trxDir 'fixture.trx'), '<TestRun><ResultSummary><Counters total="1" passed="1" failed="0" notExecuted="0" /></ResultSummary><Results /></TestRun>')
+        [IO.File]::WriteAllText((Join-Path $trxDir 'fixture[1].trx'),'<TestRun><ResultSummary><Counters total="1" passed="1" failed="0" notExecuted="0" /></ResultSummary><Results /></TestRun>')
     } else {
         $evalDir = Join-Path (Join-Path $outDir 'eval') 'eval-quick'
         New-Item -ItemType Directory -Force $evalDir | Out-Null
