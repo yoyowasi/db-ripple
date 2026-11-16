@@ -1,0 +1,7 @@
+# spikes\sql\sp21_23_outside_trigger_drop.sql service=sql-origin db=CascadeLab at=2026-11-16T09:08:17.2098362+09:00 elapsedSec=1.41 exit=0
+Changed database context to 'CascadeLab'.
+what n
+---- -
+sp21_schema_left 0
+
+(1 rows affected)

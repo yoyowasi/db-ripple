@@ -1,0 +1,19 @@
+# spikes\sql\sp18_20_snapshot_owner.sql service=sql-origin db=master at=2026-11-16T09:01:36.5978927+09:00 elapsedSec=1.39 exit=0
+Changed database context to 'master'.
+Changed database context to 'SpikeLab_SP18'.
+Changed database context to 'master'.
+n scenario product_capability_check hasDbControl isDbOwnerRole isOwner ok errNo msg
+- -------- ------------------------ ------------ ------------- ------- -- ----- ---
+9 s09_create_any_db_only_plain_user 1 0 0 0 0 1817 Only the owner of database "SpikeLab_SP18" or the system administrator can create a database snapshot on it.
+10 s10_create_any_db_plus_db_owner_role 1 1 1 0 1 NULL NULL
+11 s11_create_any_db_plus_db_owner(owner_sid) 1 1 1 1 1 NULL NULL
+12 s12_db_owner_only_no_create_any_db 0 1 1 1 0 262 CREATE DATABASE permission denied in database 'master'.
+13 s13_create_any_db_plus_control_on_db 1 1 0 0 1 NULL NULL
+hypothesis verdict detail
+---------- ------- ------
+H7_capability_check_matches_actual FAIL s09_create_any_db_only_plain_user: check=1 actual=0 err=1817
+H8_check_with_db_control_matches_actual PASS NULL
+what n
+---- -
+leftover_dbs 0
+leftover_create_any_database_grants 0

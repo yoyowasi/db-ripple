@@ -1,0 +1,37 @@
+# spikes\sql\sp17_31_limited_probe_raw.sql service=sql-origin db=master at=2026-11-16T08:55:52.3538548+09:00 elapsedSec=1.19 exit=0
+Changed database context to 'master'.
+what v
+---- -
+as_login dbr_origin_user
+
+(1 rows affected)
+Msg 262, Level 14, State 1, Server e0d38f1440c1, Line 1
+CREATE DATABASE permission denied in database 'master'.
+Msg 3013, Level 16, State 1, Server e0d38f1440c1, Line 1
+RESTORE HEADERONLY is terminating abnormally.
+Msg 262, Level 14, State 1, Server e0d38f1440c1, Line 1
+CREATE DATABASE permission denied in database 'master'.
+Msg 3013, Level 16, State 1, Server e0d38f1440c1, Line 1
+RESTORE DATABASE is terminating abnormally.
+Msg 3110, Level 14, State 1, Server e0d38f1440c1, Line 1
+User does not have permission to RESTORE database 'CascadeLab'.
+Msg 3013, Level 16, State 1, Server e0d38f1440c1, Line 1
+RESTORE DATABASE is terminating abnormally.
+Msg 5011, Level 14, State 9, Server e0d38f1440c1, Line 1
+User does not have permission to alter database 'CascadeLab', the database does not exist, or the database is not in a state that allows access checks.
+Msg 5069, Level 16, State 1, Server e0d38f1440c1, Line 1
+ALTER DATABASE statement failed.
+Changed database context to 'CascadeLab'.
+Msg 1088, Level 16, State 13, Server e0d38f1440c1, Line 1
+Cannot find the object "A" because it does not exist or you do not have permissions.
+Changed database context to 'master'.
+what v
+---- -
+after_revert sa
+
+(1 rows affected)
+what n
+---- -
+cl01_A_has_probe_column 0
+
+(1 rows affected)

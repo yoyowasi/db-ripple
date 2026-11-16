@@ -1,0 +1,19 @@
+# spikes\sql\sp21_10_hash_detection.sql db=SpikeLab_SP21 part=2 at=2026-11-16T09:02:18.0647290+09:00 elapsedSec=0.92 exit=0
+Changed database context to 'SpikeLab_SP21'.
+
+(4 rows affected)
+
+(2 rows affected)
+scenario tbl cntBefore cntAfter csAggBefore csAggAfter sumBefore sumAfter by_checksum_agg by_sum
+-------- --- --------- -------- ----------- ---------- --------- -------- --------------- ------
+m1_value_plus_one B 4 4 3776 3792 103870 103886 DETECTED DETECTED
+m2_swap_two_rows B 4 4 3776 3776 103870 103678 not detected DETECTED
+m3_change_and_revert B 4 4 3776 3776 103870 103870 not detected not detected
+m4_case_only_change B 4 4 3776 11488 103870 95134 DETECTED DETECTED
+m5_xml_only_change D 2 2 6826 6826 56532 56532 not detected not detected
+m6_varchar_max_change D 2 2 6826 1709697153 56532 1709697705 DETECTED DETECTED
+hypothesis verdict detail
+---------- ------- ------
+H1_same_rowcount_value_changes_are_detected(m1,m2,m4,m6) FAIL m1_value_plus_one=1 ; m2_swap_two_rows=0 ; m4_case_only_change=1 ; m6_varchar_max_change=1
+H2_net_zero_change_is_not_reported(m3) PASS NULL
+H3_xml_only_change_is_a_blind_spot(m5) PASS NULL

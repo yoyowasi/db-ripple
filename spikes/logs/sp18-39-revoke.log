@@ -1,0 +1,7 @@
+# spikes\sql\sp18_39_repro_revoke.sql service=sql-origin db=master at=2026-11-16T09:01:00.9320660+09:00 elapsedSec=0.72 exit=0
+Changed database context to 'master'.
+what n
+---- -
+leftover_create_any_database_grants 0
+snapshot_dbs_on_origin 0
+user_dbs_on_origin 2

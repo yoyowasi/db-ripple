@@ -1,0 +1,11 @@
+# spikes\sql\sp20_10_origin_prep.sql service=sql-origin db=master at=2026-11-16T09:01:44.9895133+09:00 elapsedSec=0.92 exit=0
+Changed database context to 'master'.
+Changed database context to 'SpikeLab_SP20'.
+k v
+- -
+db_owner sp20_owner
+dbo_maps_to_login sp20_owner
+what step origLogin suser usr
+---- ---- --------- ----- ---
+origin_module_run proc sa sp20_owner dbo
+origin_module_run trigger sa sp20_owner dbo

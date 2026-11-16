@@ -14,7 +14,8 @@ UNION ALL SELECT 'ddl_audit_schema_exists', CAST(COUNT(*) AS varchar(20)) FROM C
 UNION ALL SELECT 'ddl_principals', CONCAT(COUNT(*), ' ', STRING_AGG(name, N',') WITHIN GROUP (ORDER BY name)) FROM CascadeLab.sys.database_principals WHERE type IN ('S', 'U', 'R') AND is_fixed_role = 0
 UNION ALL SELECT 'ddl_permissions', CAST(COUNT(*) AS varchar(20)) FROM CascadeLab.sys.database_permissions
 UNION ALL SELECT 'ddl_triggers_total', CAST(COUNT(*) AS varchar(20)) FROM CascadeLab.sys.triggers
-UNION ALL SELECT 'ddl_database_options', CONCAT(collation_name, ' compat=', compatibility_level, ' recursive=', is_recursive_triggers_on, ' trustworthy=', is_trustworthy_on, ' broker=', is_broker_enabled, ' state=', state_desc, ' owner=', ISNULL(SUSER_SNAME(owner_sid), N'(null)')) FROM sys.databases WHERE name = N'CascadeLab'
+-- 2026-11-16 실행 때 고침: sys.databases의 state_desc 등(Latin1_General_CI_AS_KS_WS)과 SUSER_SNAME()(서버 정렬)이 CONCAT 안에서 451 정렬 충돌 → 문자열 열에 COLLATE DATABASE_DEFAULT
+UNION ALL SELECT 'ddl_database_options', CONCAT(collation_name COLLATE DATABASE_DEFAULT, ' compat=', compatibility_level, ' recursive=', is_recursive_triggers_on, ' trustworthy=', is_trustworthy_on, ' broker=', is_broker_enabled, ' state=', state_desc COLLATE DATABASE_DEFAULT, ' owner=', ISNULL(SUSER_SNAME(owner_sid), N'(null)') COLLATE DATABASE_DEFAULT) FROM sys.databases WHERE name = N'CascadeLab'
 UNION ALL SELECT 'ddl_databases_on_server', CONCAT(COUNT(*), ' ', STRING_AGG(name, N',') WITHIN GROUP (ORDER BY name)) FROM sys.databases WHERE database_id > 4
 UNION ALL SELECT 'copy_only_backups_CascadeLab', CAST(COUNT(*) AS varchar(20)) FROM msdb.dbo.backupset WHERE database_name = N'CascadeLab' AND is_copy_only = 1 AND type = 'D'
 UNION ALL SELECT 'non_copy_only_backups_CascadeLab', CAST(COUNT(*) AS varchar(20)) FROM msdb.dbo.backupset WHERE database_name = N'CascadeLab' AND is_copy_only = 0

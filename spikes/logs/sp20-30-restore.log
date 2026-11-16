@@ -1,0 +1,59 @@
+# spikes\sql\sp20_30_sandbox_restore_check.sql service=sql db=master at=2026-11-16T09:01:51.9017528+09:00 elapsedSec=1.44 exit=0
+Changed database context to 'master'.
+LogicalName PhysicalName Type FileGroupName Size MaxSize FileId CreateLSN DropLSN UniqueId ReadOnlyLSN ReadWriteLSN BackupSizeInBytes SourceBlockSize FileGroupId LogGroupGUID DifferentialBaseLSN DifferentialBaseGUID IsReadOnly IsPresent TDEThumbprint SnapshotUrl
+----------- ------------ ---- ------------- ---- ------- ------ --------- ------- -------- ----------- ------------ ----------------- --------------- ----------- ------------ ------------------- -------------------- ---------- --------- ------------- -----------
+SpikeLab_SP20 /var/opt/mssql/data/SpikeLab_SP20.mdf D PRIMARY 8388608 35184372080640 1 0 0 18A51C0D-2FA8-48A2-9BA1-3858FFC102AB 0 0 3735552 4096 1 NULL 0 00000000-0000-0000-0000-000000000000 0 1 NULL NULL
+SpikeLab_SP20_log /var/opt/mssql/data/SpikeLab_SP20_log.ldf L NULL 8388608 2199023255552 2 0 0 144C5363-35A3-4629-BFC9-1DA537C0A0C5 0 0 0 4096 0 NULL 0 00000000-0000-0000-0000-000000000000 0 1 NULL NULL
+Processed 472 pages for database 'SpikeLab_SP20', file 'SpikeLab_SP20' on file 1.
+Processed 2 pages for database 'SpikeLab_SP20', file 'SpikeLab_SP20_log' on file 1.
+Converting database 'SpikeLab_SP20' from version 957 to the current version 998.
+Database 'SpikeLab_SP20' running the upgrade step from version 957 to version 958.
+Database 'SpikeLab_SP20' running the upgrade step from version 958 to version 963.
+Database 'SpikeLab_SP20' running the upgrade step from version 963 to version 964.
+Database 'SpikeLab_SP20' running the upgrade step from version 964 to version 965.
+Database 'SpikeLab_SP20' running the upgrade step from version 965 to version 966.
+Database 'SpikeLab_SP20' running the upgrade step from version 966 to version 967.
+Database 'SpikeLab_SP20' running the upgrade step from version 967 to version 968.
+Database 'SpikeLab_SP20' running the upgrade step from version 968 to version 969.
+Database 'SpikeLab_SP20' running the upgrade step from version 969 to version 970.
+Database 'SpikeLab_SP20' running the upgrade step from version 970 to version 971.
+Database 'SpikeLab_SP20' running the upgrade step from version 971 to version 972.
+Database 'SpikeLab_SP20' running the upgrade step from version 972 to version 973.
+Database 'SpikeLab_SP20' running the upgrade step from version 973 to version 974.
+Database 'SpikeLab_SP20' running the upgrade step from version 974 to version 975.
+Database 'SpikeLab_SP20' running the upgrade step from version 975 to version 976.
+Database 'SpikeLab_SP20' running the upgrade step from version 976 to version 977.
+Database 'SpikeLab_SP20' running the upgrade step from version 977 to version 978.
+Database 'SpikeLab_SP20' running the upgrade step from version 978 to version 979.
+Database 'SpikeLab_SP20' running the upgrade step from version 979 to version 980.
+Database 'SpikeLab_SP20' running the upgrade step from version 980 to version 981.
+Database 'SpikeLab_SP20' running the upgrade step from version 981 to version 982.
+Database 'SpikeLab_SP20' running the upgrade step from version 982 to version 983.
+Database 'SpikeLab_SP20' running the upgrade step from version 983 to version 984.
+Database 'SpikeLab_SP20' running the upgrade step from version 984 to version 985.
+Database 'SpikeLab_SP20' running the upgrade step from version 985 to version 986.
+Database 'SpikeLab_SP20' running the upgrade step from version 986 to version 987.
+Database 'SpikeLab_SP20' running the upgrade step from version 987 to version 988.
+Database 'SpikeLab_SP20' running the upgrade step from version 988 to version 989.
+Database 'SpikeLab_SP20' running the upgrade step from version 989 to version 990.
+Database 'SpikeLab_SP20' running the upgrade step from version 990 to version 991.
+Database 'SpikeLab_SP20' running the upgrade step from version 991 to version 992.
+Database 'SpikeLab_SP20' running the upgrade step from version 992 to version 993.
+Database 'SpikeLab_SP20' running the upgrade step from version 993 to version 994.
+Database 'SpikeLab_SP20' running the upgrade step from version 994 to version 995.
+Database 'SpikeLab_SP20' running the upgrade step from version 995 to version 996.
+Database 'SpikeLab_SP20' running the upgrade step from version 996 to version 997.
+Database 'SpikeLab_SP20' running the upgrade step from version 997 to version 998.
+RESTORE DATABASE successfully processed 474 pages in 0.037 seconds (99.978 MB/sec).
+k v
+- -
+before_fix_db_owner sa
+before_fix_owner_sid 0x01
+before_fix_dbo_maps_to_login (null: orphan)
+before_fix_sa_sid 0x01
+Changed database context to 'SpikeLab_SP20'.
+what errNo msg
+---- ----- ---
+before_fix_module_run 15517 Cannot execute as the database principal because the principal "dbo" does not exist, this type of principal cannot be impersonated, or you do not have permission.
+what step origLogin suser usr
+---- ---- --------- ----- ---

@@ -1,0 +1,7 @@
+# spikes\sql\sp21_22_outside_trigger_add.sql service=sql-origin db=CascadeLab at=2026-11-16T09:02:50.7151237+09:00 elapsedSec=0.91 exit=0
+Changed database context to 'CascadeLab'.
+what name schema_name table_name
+---- ---- ----------- ----------
+trigger_added trg_X_upd sp21 X
+
+(1 rows affected)

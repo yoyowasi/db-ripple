@@ -1,0 +1,13 @@
+# cascadelab\sql\00-create-databases.sql service=sql-origin db=master at=2026-11-16T08:54:37.2280724+09:00 elapsedSec=1.06 exit=0
+Changed database context to 'master'.
+name is_recursive_triggers_on
+---- ------------------------
+CascadeLab 0
+CascadeLab_RT 1
+
+(2 rows affected)
+name value_in_use
+---- ------------
+nested triggers 1
+
+(1 rows affected)

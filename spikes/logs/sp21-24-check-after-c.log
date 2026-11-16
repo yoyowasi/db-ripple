@@ -1,0 +1,16 @@
+# spikes\sql\sp21_24_outside_trigger_check.sql service=sql-origin db=CascadeLab at=2026-11-16T09:05:07.0712915+09:00 elapsedSec=0.71 exit=0
+Changed database context to 'CascadeLab'.
+t id v
+- -- -
+X 1 0
+X 2 0
+Y 1 0
+Y 2 0
+Z 1 0
+
+(5 rows affected)
+what n
+---- -
+trigger_exists 1
+
+(1 rows affected)

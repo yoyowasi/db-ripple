@@ -1,0 +1,20 @@
+# spikes\sql\sp17_25_sandbox_check.sql db=master part=0 at=2026-11-16T08:57:16.9826743+09:00 elapsedSec=0.95 exit=0
+name state_desc compatibility_level collation_name owner_login is_recursive_triggers_on is_trustworthy_on snapshot_of
+---- ---------- ------------------- -------------- ----------- ------------------------ ----------------- -----------
+CascadeLab_Sandbox ONLINE 160 SQL_Latin1_General_CP1_CI_AS sa 0 0 
+CascadeLab_Sandbox_base ONLINE 160 SQL_Latin1_General_CP1_CI_AS sa 0 0 CascadeLab_Sandbox
+server_option value_in_use
+------------- ------------
+disallow results from triggers 0
+nested triggers 1
+sandbox_version server_collation
+--------------- ----------------
+17.0.5035.5 SQL_Latin1_General_CP1_CI_AS
+Changed database context to 'CascadeLab_Sandbox'.
+what n
+---- -
+audit_schema 1
+audit_triggers 222
+dbr_preview_user 1
+user_tables 74
+cl25_schema 1

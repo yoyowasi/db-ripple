@@ -1,0 +1,682 @@
+# sp21-50-api — Host 개발 모드 API 응답 모음(2026-11-16, 원본 logs\home-test\2026-11-16\sp21\). 비밀값 없음 확인.
+
+## b-api-sandbox-refresh.json
+http=200 ms=6159
+{
+    "state":  "ready",
+    "baselineAt":  "2026-11-16T09:02:36.4159924+09:00",
+    "fingerprintMatch":  true,
+    "locked":  false,
+    "manifest":  {
+                     "coveredTables":  77,
+                     "excludedTables":  0,
+                     "auditNotLast":  1
+                 },
+    "mode":  "split",
+    "origin":  {
+                   "server":  "e0d38f1440c1",
+                   "database":  "CascadeLab",
+                   "login":  "dbr_origin_user",
+                   "isSysadmin":  false
+               },
+    "fingerprintWarnings":  [
+                                "ProductVersion: 원본 16.0.4325.4, 샌드박스 17.0.5035.5",
+                                "Edition: 원본 Developer Edition (64-bit), 샌드박스 Enterprise Developer Edition (64-bit)",
+                                "주버전: 원본 16, 샌드박스 17"
+                            ],
+    "fingerprintMismatches":  [
+
+                              ],
+    "baselineStale":  false,
+    "originReachable":  true,
+    "instanceWarnings":  [
+
+                         ]
+}
+
+## b-api-preview.json
+http=200 ms=444
+{
+    "previewId":  "pv_20261116_a7ac9fae",
+    "status":  "ok",
+    "createdAt":  "2026-11-16T00:02:42.6342259+00:00",
+    "sqlHash":  "sha256:5472713e40e653278ab5099d8f78f06016edea99a50162ec64c44f992d46d02a",
+    "baseline":  {
+                     "originDb":  "CascadeLab",
+                     "sandboxDb":  "CascadeLab_Sandbox",
+                     "snapshotDb":  "CascadeLab_Sandbox_base",
+                     "backupFinishedAt":  "2026-11-16T09:02:36.4159924+09:00",
+                     "fingerprint":  {
+                                         "productVersion":  "17.0.5035.5",
+                                         "edition":  "Enterprise Developer Edition (64-bit)",
+                                         "compatibilityLevel":  160,
+                                         "isRecursiveTriggersOn":  false,
+                                         "nestedTriggers":  1,
+                                         "disallowResultsFromTriggers":  0,
+                                         "sessionOptions":  5432,
+                                         "collation":  "SQL_Latin1_General_CP1_CI_AS",
+                                         "serverCollation":  "SQL_Latin1_General_CP1_CI_AS",
+                                         "hostPlatform":  "Linux",
+                                         "majorVersion":  17,
+                                         "language":  "us_english",
+                                         "dateFormat":  "mdy",
+                                         "dateFirst":  7,
+                                         "hasUserClrAssemblies":  false
+                                     },
+                     "fingerprintWarnings":  [
+                                                 "ProductVersion: 원본 16.0.4325.4, 샌드박스 17.0.5035.5",
+                                                 "Edition: 원본 Developer Edition (64-bit), 샌드박스 Enterprise Developer Edition (64-bit)",
+                                                 "주버전: 원본 16, 샌드박스 17"
+                                             ]
+                 },
+    "statements":  [
+                       {
+                           "index":  1,
+                           "batch":  1,
+                           "position":  1,
+                           "kind":  "UPDATE",
+                           "target":  "sp21.X",
+                           "span":  {
+                                        "startLine":  1,
+                                        "startColumn":  1,
+                                        "endLine":  1,
+                                        "endColumn":  41
+                                    },
+                           "status":  "ok",
+                           "rowsAffected":  1,
+                           "returnValue":  null,
+                           "resultSetCount":  null,
+                           "captureSeqRange":  [
+                                                   1,
+                                                   1
+                                               ],
+                           "error":  null
+                       }
+                   ],
+    "firings":  [
+                    {
+                        "id":  "f-1",
+                        "captureSeq":  1,
+                        "statementIndex":  1,
+                        "depth":  1,
+                        "table":  "sp21.X",
+                        "operation":  "UPDATE",
+                        "rowCount":  1,
+                        "imageMode":  "FULL",
+                        "auditOrder":  "LAST",
+                        "cause":  {
+                                      "kind":  "DIRECT",
+                                      "confidence":  "certain",
+                                      "parentFiringId":  null,
+                                      "foreignKey":  null,
+                                      "triggerCandidates":  [
+
+                                                            ],
+                                      "evidence":  [
+                                                       "depth"
+                                                   ]
+                                  },
+                        "orderGuarantee":  "guaranteed"
+                    }
+                ],
+    "residuals":  [
+
+                  ],
+    "residualCommitted":  [
+
+                          ],
+    "residualCheckFailed":  false,
+    "residualCheckMessage":  null,
+    "netSummary":  [
+                       {
+                           "table":  "sp21.X",
+                           "inserted":  0,
+                           "updated":  1,
+                           "deleted":  0,
+                           "multisetRemoved":  0,
+                           "multisetAdded":  0
+                       }
+                   ],
+    "graph":  {
+                  "nodes":  [
+                                {
+                                    "type":  "statement",
+                                    "statementIndex":  1,
+                                    "label":  "UPDATE sp21.X SET v = v + 1 WHERE id = 1",
+                                    "rowsAffected":  1,
+                                    "status":  "ok",
+                                    "id":  "st-1"
+                                },
+                                {
+                                    "type":  "firing",
+                                    "firingId":  "f-1",
+                                    "table":  "sp21.X",
+                                    "operation":  "UPDATE",
+                                    "rowCount":  1,
+                                    "depth":  1,
+                                    "captureSeq":  1,
+                                    "id":  "f-1"
+                                }
+                            ],
+                  "edges":  [
+                                {
+                                    "id":  "e1",
+                                    "source":  "st-1",
+                                    "target":  "f-1",
+                                    "kind":  "DIRECT",
+                                    "confidence":  "certain",
+                                    "orderGuarantee":  "guaranteed",
+                                    "evidence":  [
+                                                     "depth"
+                                                 ],
+                                    "fk":  null,
+                                    "action":  null,
+                                    "matchedRows":  null
+                                }
+                            ]
+              },
+    "warnings":  [
+
+                 ],
+    "capture":  {
+                    "imageCount":  2,
+                    "cap":  100000,
+                    "truncated":  false,
+                    "manifestVersion":  "m-20261116-0902"
+                },
+    "timingsMs":  {
+                      "analyze":  0,
+                      "execute":  73,
+                      "readLog":  4,
+                      "reread":  4,
+                      "netDiff":  18,
+                      "resolve":  2,
+                      "serialize":  0
+                  }
+}
+
+## b-api-apply-consent.json
+http=200 ms=182
+{
+    "previewId":  "pv_20261116_a7ac9fae",
+    "status":  "rolled_back_mismatch",
+    "finishedAt":  "2026-11-16T00:02:50.9895233+00:00",
+    "preconditionFailures":  [
+
+                             ],
+    "verification":  {
+                         "mode":  "KEYSET_HASH",
+                         "driftRows":  [
+
+                                       ],
+                         "statementRowCounts":  [
+                                                    {
+                                                        "index":  1,
+                                                        "preview":  1,
+                                                        "actual":  1
+                                                    }
+                                                ],
+                         "netSummaryMatch":  null,
+                         "actualNetSummary":  [
+
+                                              ],
+                         "mismatches":  [
+                                            {
+                                                "kind":  "OUTSIDE_TABLE_CHANGED",
+                                                "statementIndex":  null,
+                                                "table":  "sp21.Y",
+                                                "key":  null,
+                                                "column":  null,
+                                                "expected":  "count=2,checksum=48",
+                                                "actual":  "count=2,checksum=49",
+                                                "message":  "미리보기에 없던 sp21.Y의 값 해시가 실행 중 바뀜(행 수 2 그대로, 행 수가 그대로인 UPDATE)"
+                                            }
+                                        ],
+                         "volatileIgnored":  [
+
+                                             ],
+                         "identityPairs":  [
+
+                                           ],
+                         "residualCommitted":  [
+
+                                               ],
+                         "residualCheckFailed":  false,
+                         "tableCounts":  [
+
+                                         ],
+                         "limitations":  [
+                                             "실행 주체 불일치: 미리보기는 샌드박스의 dbr_preview_user로, [적용]은 원본에서 본인 로그인으로 실행함(권한 차이, 트리거의 USER_NAME·SUSER_SNAME 값이 다를 수 있음)",
+                                             "원본 DB에 Service Broker가 켜짐: 트리거·프로시저가 보낸 메시지는 커밋 뒤 다른 서비스로 전달될 수 있음(미리보기에서는 보이지 않음)",
+                                             "원본 스냅샷을 만들 수 없어 KEYSET_HASH로 검증함(요청 동의): 원본 로그인에 CREATE DATABASE 권한이 없음(데이터베이스 스냅샷 생성 불가)",
+                                             "KEYSET_HASH 검증: 미리보기에 있던 테이블은 행 수 변화와 미리보기 키 행 값으로만 확인하므로 키 밖 행의 UPDATE는 놓칠 수 있음. 새 IDENTITY 행과 그 자식 행은 건수로만 확인함",
+                                             "KEYSET_HASH 검증: 미리보기에 없던 테이블은 실행 전후 COUNT_BIG(*)와 CHECKSUM_AGG(BINARY_CHECKSUM(열))로만 비교함. 해시 충돌, 행끼리 값을 맞바꾸는 변경, 같은 행이 짝수 개 생기는 변경, 비교 불가 형식·계산 열의 변경은 놓칠 수 있음",
+                                             "KEYSET_HASH 검증: 원본의 모든 사용자 테이블을 실행 전후 두 번 전부 읽음(큰 DB는 느리고, 원본 LOCK_TIMEOUT을 넘으면 오류로 롤백)",
+                                             "KEYSET_HASH 검증: 실행 전후 읽기 사이에 다른 세션이 미리보기에 없던 테이블에 쓰면 거짓 불일치로 롤백함(커밋하지 않는 쪽으로 실패). 권한으로 보이지 않는 테이블은 비교하지 못함",
+                                             "KEYSET_HASH 해시에서 뺀 비교 불가 형식 열 4개(이 열만 바뀌는 변경은 놓침): cl19.Doc.body(xml), cl19.Doc.node(hierarchyid), cl19.Doc.loc(geography), cl19.Doc.legacy(text)"
+                                         ]
+                     },
+    "statements":  [
+                       {
+                           "index":  1,
+                           "batch":  1,
+                           "position":  1,
+                           "kind":  "UPDATE",
+                           "target":  "sp21.X",
+                           "span":  {
+                                        "startLine":  1,
+                                        "startColumn":  1,
+                                        "endLine":  1,
+                                        "endColumn":  41
+                                    },
+                           "status":  "ok",
+                           "rowsAffected":  1,
+                           "returnValue":  null,
+                           "resultSetCount":  null,
+                           "captureSeqRange":  null,
+                           "error":  null
+                       }
+                   ],
+    "message":  "원본 실행 결과가 미리보기와 1건 달라 롤백함",
+    "sandboxRefreshStarted":  false,
+    "timingsMs":  {
+                      "snapshot":  0,
+                      "drift":  6,
+                      "execute":  8,
+                      "netDiff":  9,
+                      "commit":  1
+                  }
+}
+
+## c-api-preview.json
+http=200 ms=200
+{
+    "previewId":  "pv_20261116_ba75c8a2",
+    "status":  "ok",
+    "createdAt":  "2026-11-16T00:03:08.1536178+00:00",
+    "sqlHash":  "sha256:5472713e40e653278ab5099d8f78f06016edea99a50162ec64c44f992d46d02a",
+    "baseline":  {
+                     "originDb":  "CascadeLab",
+                     "sandboxDb":  "CascadeLab_Sandbox",
+                     "snapshotDb":  "CascadeLab_Sandbox_base",
+                     "backupFinishedAt":  "2026-11-16T09:02:36.4159924+09:00",
+                     "fingerprint":  {
+                                         "productVersion":  "17.0.5035.5",
+                                         "edition":  "Enterprise Developer Edition (64-bit)",
+                                         "compatibilityLevel":  160,
+                                         "isRecursiveTriggersOn":  false,
+                                         "nestedTriggers":  1,
+                                         "disallowResultsFromTriggers":  0,
+                                         "sessionOptions":  5432,
+                                         "collation":  "SQL_Latin1_General_CP1_CI_AS",
+                                         "serverCollation":  "SQL_Latin1_General_CP1_CI_AS",
+                                         "hostPlatform":  "Linux",
+                                         "majorVersion":  17,
+                                         "language":  "us_english",
+                                         "dateFormat":  "mdy",
+                                         "dateFirst":  7,
+                                         "hasUserClrAssemblies":  false
+                                     },
+                     "fingerprintWarnings":  [
+                                                 "ProductVersion: 원본 16.0.4325.4, 샌드박스 17.0.5035.5",
+                                                 "Edition: 원본 Developer Edition (64-bit), 샌드박스 Enterprise Developer Edition (64-bit)",
+                                                 "주버전: 원본 16, 샌드박스 17"
+                                             ]
+                 },
+    "statements":  [
+                       {
+                           "index":  1,
+                           "batch":  1,
+                           "position":  1,
+                           "kind":  "UPDATE",
+                           "target":  "sp21.X",
+                           "span":  {
+                                        "startLine":  1,
+                                        "startColumn":  1,
+                                        "endLine":  1,
+                                        "endColumn":  41
+                                    },
+                           "status":  "ok",
+                           "rowsAffected":  1,
+                           "returnValue":  null,
+                           "resultSetCount":  null,
+                           "captureSeqRange":  [
+                                                   2,
+                                                   2
+                                               ],
+                           "error":  null
+                       }
+                   ],
+    "firings":  [
+                    {
+                        "id":  "f-2",
+                        "captureSeq":  2,
+                        "statementIndex":  1,
+                        "depth":  1,
+                        "table":  "sp21.X",
+                        "operation":  "UPDATE",
+                        "rowCount":  1,
+                        "imageMode":  "FULL",
+                        "auditOrder":  "LAST",
+                        "cause":  {
+                                      "kind":  "DIRECT",
+                                      "confidence":  "certain",
+                                      "parentFiringId":  null,
+                                      "foreignKey":  null,
+                                      "triggerCandidates":  [
+
+                                                            ],
+                                      "evidence":  [
+                                                       "depth"
+                                                   ]
+                                  },
+                        "orderGuarantee":  "guaranteed"
+                    }
+                ],
+    "residuals":  [
+
+                  ],
+    "residualCommitted":  [
+
+                          ],
+    "residualCheckFailed":  false,
+    "residualCheckMessage":  null,
+    "netSummary":  [
+                       {
+                           "table":  "sp21.X",
+                           "inserted":  0,
+                           "updated":  1,
+                           "deleted":  0,
+                           "multisetRemoved":  0,
+                           "multisetAdded":  0
+                       }
+                   ],
+    "graph":  {
+                  "nodes":  [
+                                {
+                                    "type":  "statement",
+                                    "statementIndex":  1,
+                                    "label":  "UPDATE sp21.X SET v = v + 1 WHERE id = 1",
+                                    "rowsAffected":  1,
+                                    "status":  "ok",
+                                    "id":  "st-1"
+                                },
+                                {
+                                    "type":  "firing",
+                                    "firingId":  "f-2",
+                                    "table":  "sp21.X",
+                                    "operation":  "UPDATE",
+                                    "rowCount":  1,
+                                    "depth":  1,
+                                    "captureSeq":  2,
+                                    "id":  "f-2"
+                                }
+                            ],
+                  "edges":  [
+                                {
+                                    "id":  "e1",
+                                    "source":  "st-1",
+                                    "target":  "f-2",
+                                    "kind":  "DIRECT",
+                                    "confidence":  "certain",
+                                    "orderGuarantee":  "guaranteed",
+                                    "evidence":  [
+                                                     "depth"
+                                                 ],
+                                    "fk":  null,
+                                    "action":  null,
+                                    "matchedRows":  null
+                                }
+                            ]
+              },
+    "warnings":  [
+
+                 ],
+    "capture":  {
+                    "imageCount":  2,
+                    "cap":  100000,
+                    "truncated":  false,
+                    "manifestVersion":  "m-20261116-0902"
+                },
+    "timingsMs":  {
+                      "analyze":  0,
+                      "execute":  10,
+                      "readLog":  1,
+                      "reread":  0,
+                      "netDiff":  1,
+                      "resolve":  1,
+                      "serialize":  0
+                  }
+}
+
+## c-locks-before-apply.log
+# (임시 조회 locks.sql: sys.dm_tran_locks에서 CascadeLab의 X·IX 잠금) service=sql-origin db=master at=2026-11-16T09:03:25.1720764+09:00 elapsedSec=0.66 exit=0
+what spid resource_type request_mode request_status
+---- ---- ------------- ------------ --------------
+locks_on_CascadeLab 55 KEY X GRANT
+locks_on_CascadeLab 55 KEY X GRANT
+locks_on_CascadeLab 55 OBJECT IX GRANT
+locks_on_CascadeLab 55 OBJECT IX GRANT
+locks_on_CascadeLab 55 PAGE IX GRANT
+locks_on_CascadeLab 55 PAGE IX GRANT
+
+## c-api-apply-consent-locked.json
+http=500 ms=10143
+{"type":"https://tools.ietf.org/html/rfc9110#section-15.6.1","title":"서버 내부 오류입니다","status":500,"instance":"/api/previews/pv_20261116_ba75c8a2/apply","traceId":"00-1f28fba00573fd32496ddb8f6568420e-3a1e3349933ca0d4-00"}
+
+## c-api-apply-consent-after-release.json
+http=200 ms=140
+{
+    "previewId":  "pv_20261116_ba75c8a2",
+    "status":  "rolled_back_mismatch",
+    "finishedAt":  "2026-11-16T00:05:07.2850165+00:00",
+    "preconditionFailures":  [
+
+                             ],
+    "verification":  {
+                         "mode":  "KEYSET_HASH",
+                         "driftRows":  [
+
+                                       ],
+                         "statementRowCounts":  [
+                                                    {
+                                                        "index":  1,
+                                                        "preview":  1,
+                                                        "actual":  1
+                                                    }
+                                                ],
+                         "netSummaryMatch":  null,
+                         "actualNetSummary":  [
+
+                                              ],
+                         "mismatches":  [
+                                            {
+                                                "kind":  "OUTSIDE_TABLE_CHANGED",
+                                                "statementIndex":  null,
+                                                "table":  "sp21.Y",
+                                                "key":  null,
+                                                "column":  null,
+                                                "expected":  "count=2,checksum=48",
+                                                "actual":  "count=2,checksum=49",
+                                                "message":  "미리보기에 없던 sp21.Y의 값 해시가 실행 중 바뀜(행 수 2 그대로, 행 수가 그대로인 UPDATE)"
+                                            }
+                                        ],
+                         "volatileIgnored":  [
+
+                                             ],
+                         "identityPairs":  [
+
+                                           ],
+                         "residualCommitted":  [
+
+                                               ],
+                         "residualCheckFailed":  false,
+                         "tableCounts":  [
+
+                                         ],
+                         "limitations":  [
+                                             "실행 주체 불일치: 미리보기는 샌드박스의 dbr_preview_user로, [적용]은 원본에서 본인 로그인으로 실행함(권한 차이, 트리거의 USER_NAME·SUSER_SNAME 값이 다를 수 있음)",
+                                             "원본 DB에 Service Broker가 켜짐: 트리거·프로시저가 보낸 메시지는 커밋 뒤 다른 서비스로 전달될 수 있음(미리보기에서는 보이지 않음)",
+                                             "원본 스냅샷을 만들 수 없어 KEYSET_HASH로 검증함(요청 동의): 원본 로그인에 CREATE DATABASE 권한이 없음(데이터베이스 스냅샷 생성 불가)",
+                                             "KEYSET_HASH 검증: 미리보기에 있던 테이블은 행 수 변화와 미리보기 키 행 값으로만 확인하므로 키 밖 행의 UPDATE는 놓칠 수 있음. 새 IDENTITY 행과 그 자식 행은 건수로만 확인함",
+                                             "KEYSET_HASH 검증: 미리보기에 없던 테이블은 실행 전후 COUNT_BIG(*)와 CHECKSUM_AGG(BINARY_CHECKSUM(열))로만 비교함. 해시 충돌, 행끼리 값을 맞바꾸는 변경, 같은 행이 짝수 개 생기는 변경, 비교 불가 형식·계산 열의 변경은 놓칠 수 있음",
+                                             "KEYSET_HASH 검증: 원본의 모든 사용자 테이블을 실행 전후 두 번 전부 읽음(큰 DB는 느리고, 원본 LOCK_TIMEOUT을 넘으면 오류로 롤백)",
+                                             "KEYSET_HASH 검증: 실행 전후 읽기 사이에 다른 세션이 미리보기에 없던 테이블에 쓰면 거짓 불일치로 롤백함(커밋하지 않는 쪽으로 실패). 권한으로 보이지 않는 테이블은 비교하지 못함",
+                                             "KEYSET_HASH 해시에서 뺀 비교 불가 형식 열 4개(이 열만 바뀌는 변경은 놓침): cl19.Doc.body(xml), cl19.Doc.node(hierarchyid), cl19.Doc.loc(geography), cl19.Doc.legacy(text)"
+                                         ]
+                     },
+    "statements":  [
+                       {
+                           "index":  1,
+                           "batch":  1,
+                           "position":  1,
+                           "kind":  "UPDATE",
+                           "target":  "sp21.X",
+                           "span":  {
+                                        "startLine":  1,
+                                        "startColumn":  1,
+                                        "endLine":  1,
+                                        "endColumn":  41
+                                    },
+                           "status":  "ok",
+                           "rowsAffected":  1,
+                           "returnValue":  null,
+                           "resultSetCount":  null,
+                           "captureSeqRange":  null,
+                           "error":  null
+                       }
+                   ],
+    "message":  "원본 실행 결과가 미리보기와 1건 달라 롤백함",
+    "sandboxRefreshStarted":  false,
+    "timingsMs":  {
+                      "snapshot":  0,
+                      "drift":  1,
+                      "execute":  2,
+                      "netDiff":  4,
+                      "commit":  0
+                  }
+}
+
+## c2-locks-before-apply.log
+# (임시 조회 locks.sql: sys.dm_tran_locks에서 CascadeLab의 X·IX 잠금) service=sql-origin db=master at=2026-11-16T09:05:33.3065782+09:00 elapsedSec=0.74 exit=0
+what spid resource_type request_mode request_status
+---- ---- ------------- ------------ --------------
+locks_on_CascadeLab 55 KEY X GRANT
+locks_on_CascadeLab 55 OBJECT IX GRANT
+locks_on_CascadeLab 55 PAGE IX GRANT
+
+## c2-api-apply-consent-outside-locked.json
+http=200 ms=10115
+{
+    "previewId":  "pv_20261116_ba75c8a2",
+    "status":  "error",
+    "finishedAt":  "2026-11-16T00:05:43.4983544+00:00",
+    "preconditionFailures":  [
+
+                             ],
+    "verification":  {
+                         "mode":  "KEYSET_HASH",
+                         "driftRows":  [
+
+                                       ],
+                         "statementRowCounts":  [
+
+                                                ],
+                         "netSummaryMatch":  null,
+                         "actualNetSummary":  [
+
+                                              ],
+                         "mismatches":  [
+
+                                        ],
+                         "volatileIgnored":  [
+
+                                             ],
+                         "identityPairs":  [
+
+                                           ],
+                         "residualCommitted":  [
+
+                                               ],
+                         "residualCheckFailed":  false,
+                         "tableCounts":  [
+
+                                         ],
+                         "limitations":  [
+                                             "실행 주체 불일치: 미리보기는 샌드박스의 dbr_preview_user로, [적용]은 원본에서 본인 로그인으로 실행함(권한 차이, 트리거의 USER_NAME·SUSER_SNAME 값이 다를 수 있음)",
+                                             "원본 DB에 Service Broker가 켜짐: 트리거·프로시저가 보낸 메시지는 커밋 뒤 다른 서비스로 전달될 수 있음(미리보기에서는 보이지 않음)",
+                                             "원본 스냅샷을 만들 수 없어 KEYSET_HASH로 검증함(요청 동의): 원본 로그인에 CREATE DATABASE 권한이 없음(데이터베이스 스냅샷 생성 불가)",
+                                             "KEYSET_HASH 검증: 미리보기에 있던 테이블은 행 수 변화와 미리보기 키 행 값으로만 확인하므로 키 밖 행의 UPDATE는 놓칠 수 있음. 새 IDENTITY 행과 그 자식 행은 건수로만 확인함",
+                                             "KEYSET_HASH 검증: 미리보기에 없던 테이블은 실행 전후 COUNT_BIG(*)와 CHECKSUM_AGG(BINARY_CHECKSUM(열))로만 비교함. 해시 충돌, 행끼리 값을 맞바꾸는 변경, 같은 행이 짝수 개 생기는 변경, 비교 불가 형식·계산 열의 변경은 놓칠 수 있음",
+                                             "KEYSET_HASH 검증: 원본의 모든 사용자 테이블을 실행 전후 두 번 전부 읽음(큰 DB는 느리고, 원본 LOCK_TIMEOUT을 넘으면 오류로 롤백)",
+                                             "KEYSET_HASH 검증: 실행 전후 읽기 사이에 다른 세션이 미리보기에 없던 테이블에 쓰면 거짓 불일치로 롤백함(커밋하지 않는 쪽으로 실패). 권한으로 보이지 않는 테이블은 비교하지 못함"
+                                         ]
+                     },
+    "statements":  [
+
+                   ],
+    "message":  "KEYSET_HASH 실행 전 상태를 읽지 못해 실행하지 않고 롤백함: Lock request time out period exceeded.",
+    "sandboxRefreshStarted":  false,
+    "timingsMs":  {
+                      "snapshot":  0,
+                      "drift":  1,
+                      "execute":  0,
+                      "netDiff":  0,
+                      "commit":  10017
+                  }
+}
+
+## cleanup-api-sandbox-refresh.json
+http=200 ms=10303
+{
+    "state":  "ready",
+    "baselineAt":  "2026-11-16T09:08:18.0514463+09:00",
+    "fingerprintMatch":  true,
+    "locked":  false,
+    "manifest":  {
+                     "coveredTables":  74,
+                     "excludedTables":  0,
+                     "auditNotLast":  1
+                 },
+    "mode":  "split",
+    "origin":  {
+                   "server":  "e0d38f1440c1",
+                   "database":  "CascadeLab",
+                   "login":  "dbr_origin_user",
+                   "isSysadmin":  false
+               },
+    "fingerprintWarnings":  [
+                                "ProductVersion: 원본 16.0.4325.4, 샌드박스 17.0.5035.5",
+                                "Edition: 원본 Developer Edition (64-bit), 샌드박스 Enterprise Developer Edition (64-bit)",
+                                "주버전: 원본 16, 샌드박스 17"
+                            ],
+    "fingerprintMismatches":  [
+
+                              ],
+    "baselineStale":  false,
+    "originReachable":  true,
+    "instanceWarnings":  [
+
+                         ]
+}
+
+## Host 콘솔(logs\home-test\2026-11-16\sp17\host.log)에서 C의 500 오류 부분
+fail: DbRipple.Api.Middleware.ApiExceptionHandler[0]
+      API 예외 처리: 서버 내부 오류입니다 SqlException(오류 1222, 서버 127.0.0.1,14334, 심각도 16)
+         at Microsoft.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+         at Microsoft.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, SqlCommand command, Boolean callerHasConnectionLock, Boolean asyncClose)
+         at Microsoft.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+         at Microsoft.Data.SqlClient.SqlDataReader.TryHasMoreRows(Boolean& moreRows)
+         at Microsoft.Data.SqlClient.SqlDataReader.TryReadInternal(Boolean setTimeout, Boolean& more)
+         at Microsoft.Data.SqlClient.SqlDataReader.ReadAsyncExecute(Task task, Object state)
+         at Microsoft.Data.SqlClient.SqlDataReader.InvokeAsyncCall[T](SqlDataReaderBaseAsyncCallContext`1 context)
+      --- End of stack trace from previous location ---
+         at DbRipple.Apply.KeyedRows.ReadAsync(SqlSession session, TableInfo t, IReadOnlyList`1 keyColumns, IReadOnlyList`1 keys, Boolean lockRows, Int32 timeoutSeconds, CancellationToken ct) in C:\dev\db-ripple\src\DbRipple.Apply\ApplySteps.cs:line 135
+         at DbRipple.Apply.KeyedRows.ReadAsync(SqlSession session, TableInfo t, IReadOnlyList`1 keyColumns, IReadOnlyList`1 keys, Boolean lockRows, Int32 timeoutSeconds, CancellationToken ct) in C:\dev\db-ripple\src\DbRipple.Apply\ApplySteps.cs:line 135
+         at DbRipple.Apply.KeyedRows.ReadAsync(SqlSession session, TableInfo t, IReadOnlyList`1 keyColumns, IReadOnlyList`1 keys, Boolean lockRows, Int32 timeoutSeconds, CancellationToken ct) in C:\dev\db-ripple\src\DbRipple.Apply\ApplySteps.cs:line 135
+         at DbRipple.Apply.DriftChecker.CheckAsync(SqlSession session, PreviewRecord preview, IReadOnlyList`1 tables, Int32 timeoutSeconds, CancellationToken ct) in C:\dev\db-ripple\src\DbRipple.Apply\ApplySteps.cs:line 253
+         at DbRipple.Apply.ApplyService.ExecuteAsync(IOriginConnection conn, PreviewRecord record, AnalysisResult analysis, BaselineContext context, IReadOnlyList`1 tables, VerificationMode mode, String snapshotDb, List`1 limitations, Run run, CancellationToken ct) in C:\dev\db-ripple\src\DbRipple.Apply\ApplyService.cs:line 290
+         at DbRipple.Apply.ApplyService.RunLockedAsync(PreviewRecord record, ApplyRequest request, Run run, CancellationToken ct) in C:\dev\db-ripple\src\DbRipple.Apply\ApplyService.cs:line 256
+         at DbRipple.Apply.ApplyService.RunLockedAsync(PreviewRecord record, ApplyRequest request, Run run, CancellationToken ct) in C:\dev\db-ripple\src\DbRipple.Apply\ApplyService.cs:line 265
+         at DbRipple.Apply.ApplyService.RunLockedAsync(PreviewRecord record, ApplyRequest request, Run run, CancellationToken ct) in C:\dev\db-ripple\src\DbRipple.Apply\ApplyService.cs:line 266
+         at DbRipple.Apply.ApplyService.RunLockedAsync(PreviewRecord record, ApplyRequest request, Run run, CancellationToken ct) in C:\dev\db-ripple\src\DbRipple.Apply\ApplyService.cs:line 278

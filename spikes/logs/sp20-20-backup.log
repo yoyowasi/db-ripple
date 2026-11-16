@@ -1,0 +1,5 @@
+# spikes\sql\sp20_20_origin_backup.sql service=sql-origin db=master at=2026-11-16T09:01:45.7733604+09:00 elapsedSec=0.77 exit=0
+Changed database context to 'master'.
+Processed 472 pages for database 'SpikeLab_SP20', file 'SpikeLab_SP20' on file 1.
+Processed 2 pages for database 'SpikeLab_SP20', file 'SpikeLab_SP20_log' on file 1.
+BACKUP DATABASE successfully processed 474 pages in 0.079 seconds (46.825 MB/sec).
