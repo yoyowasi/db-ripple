@@ -43,6 +43,8 @@ jobs:
         run: |
           & pwsh -NoProfile -File scripts/tests/sp19.Tests.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & pwsh -NoProfile -File scripts/tests/sp19-precheck.Tests.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: 빌드 (경고를 오류로)
         run: dotnet build DbRipple.slnx --no-restore -warnaserror
       - name: 테스트 (DB 연결 변수 없음, DB 테스트는 건너뜀)
