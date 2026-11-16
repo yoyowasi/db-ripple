@@ -1513,6 +1513,8 @@ dotnet run --project eval\DbRipple.Eval.Cli -- report --run logs\week4\eval\<실
 
 **진행 기록(2026-11-13):** 위 1~4주차 범위의 코드는 끝났고, DB 테스트와 평가 전체 실행은 2026-11-12에 했다([evaluation.md](evaluation.md)). 계획에 없던 일을 더했다: N4 실행 파일·보안, Split 배포 구성, N1 도달 폐포 거부, EXEC 미리보기 1차(미리보기 전용), [적용] 검증 보강(KEYSET_HASH). 이 가운데 DB로 확인한 것은 없다. 남은 일은 집에서 DB로 확인하는 것이다(SP11~SP21, Split, 실행 파일, 큰 DELETE 성능, [home-test-plan.md](home-test-plan.md)).
 
+**진행 기록(2026-11-16):** 남은 DB 확인을 모두 했다([home-test-plan.md](home-test-plan.md) 5절). GitHub Actions CI가 PR·main마다 실제 SQL Server 2025 CU10 컨테이너로 DB 테스트·기본 평가(M1~M4 기준선 비교)·N1을 돈다. Split 실측에서 [적용] 결함 2건(스냅샷 가능 판정의 원본 DB CONTROL 누락, 드리프트 확인 잠금 시간 초과의 HTTP 500)을 찾아 고쳤다. 큰 DELETE 성능은 이전과 같은 수준이고(10만 행 약 99초), SP9 브라우저 렌더 정식 측정은 남았다.
+
 ### 11.4 자를 목록
 
 일정이 밀리면 이 순서로 자른다.

@@ -1,0 +1,554 @@
+# sp18-40-api-repro — Host 개발 모드 API 응답 모음(2026-11-16, 원본 logs\home-test\2026-11-16\sp18\). 비밀값 없음 확인.
+
+## api-sandbox-refresh.json
+http=200 ms=6152
+{
+    "state":  "ready",
+    "baselineAt":  "2026-11-16T09:00:26.2971418+09:00",
+    "fingerprintMatch":  true,
+    "locked":  false,
+    "manifest":  {
+                     "coveredTables":  74,
+                     "excludedTables":  0,
+                     "auditNotLast":  1
+                 },
+    "mode":  "split",
+    "origin":  {
+                   "server":  "e0d38f1440c1",
+                   "database":  "CascadeLab",
+                   "login":  "dbr_origin_user",
+                   "isSysadmin":  false
+               },
+    "fingerprintWarnings":  [
+                                "ProductVersion: 원본 16.0.4325.4, 샌드박스 17.0.5035.5",
+                                "Edition: 원본 Developer Edition (64-bit), 샌드박스 Enterprise Developer Edition (64-bit)",
+                                "주버전: 원본 16, 샌드박스 17"
+                            ],
+    "fingerprintMismatches":  [
+
+                              ],
+    "baselineStale":  false,
+    "originReachable":  true,
+    "instanceWarnings":  [
+
+                         ]
+}
+
+## api-preview.json
+http=200 ms=431
+{
+    "previewId":  "pv_20261116_c66a028b",
+    "status":  "ok",
+    "createdAt":  "2026-11-16T00:00:32.4798129+00:00",
+    "sqlHash":  "sha256:55ea706b58eb137dcecb7c42526ff127a24acff136b3b09d69e8948494c03fe9",
+    "baseline":  {
+                     "originDb":  "CascadeLab",
+                     "sandboxDb":  "CascadeLab_Sandbox",
+                     "snapshotDb":  "CascadeLab_Sandbox_base",
+                     "backupFinishedAt":  "2026-11-16T09:00:26.2971418+09:00",
+                     "fingerprint":  {
+                                         "productVersion":  "17.0.5035.5",
+                                         "edition":  "Enterprise Developer Edition (64-bit)",
+                                         "compatibilityLevel":  160,
+                                         "isRecursiveTriggersOn":  false,
+                                         "nestedTriggers":  1,
+                                         "disallowResultsFromTriggers":  0,
+                                         "sessionOptions":  5432,
+                                         "collation":  "SQL_Latin1_General_CP1_CI_AS",
+                                         "serverCollation":  "SQL_Latin1_General_CP1_CI_AS",
+                                         "hostPlatform":  "Linux",
+                                         "majorVersion":  17,
+                                         "language":  "us_english",
+                                         "dateFormat":  "mdy",
+                                         "dateFirst":  7,
+                                         "hasUserClrAssemblies":  false
+                                     },
+                     "fingerprintWarnings":  [
+                                                 "ProductVersion: 원본 16.0.4325.4, 샌드박스 17.0.5035.5",
+                                                 "Edition: 원본 Developer Edition (64-bit), 샌드박스 Enterprise Developer Edition (64-bit)",
+                                                 "주버전: 원본 16, 샌드박스 17"
+                                             ]
+                 },
+    "statements":  [
+                       {
+                           "index":  1,
+                           "batch":  1,
+                           "position":  1,
+                           "kind":  "UPDATE",
+                           "target":  "cl07.A",
+                           "span":  {
+                                        "startLine":  1,
+                                        "startColumn":  1,
+                                        "endLine":  1,
+                                        "endColumn":  41
+                                    },
+                           "status":  "ok",
+                           "rowsAffected":  1,
+                           "returnValue":  null,
+                           "resultSetCount":  null,
+                           "captureSeqRange":  [
+                                                   1,
+                                                   4
+                                               ],
+                           "error":  null
+                       }
+                   ],
+    "firings":  [
+                    {
+                        "id":  "f-1",
+                        "captureSeq":  1,
+                        "statementIndex":  1,
+                        "depth":  4,
+                        "table":  "cl07.D",
+                        "operation":  "UPDATE",
+                        "rowCount":  1,
+                        "imageMode":  "FULL",
+                        "auditOrder":  "LAST",
+                        "cause":  {
+                                      "kind":  "TRIGGER",
+                                      "confidence":  "inferred",
+                                      "parentFiringId":  "f-2",
+                                      "foreignKey":  null,
+                                      "triggerCandidates":  [
+                                                                "cl07.trg_C_ins"
+                                                            ],
+                                      "evidence":  [
+                                                       "depth",
+                                                       "postorderBracket",
+                                                       "staticWriteSet"
+                                                   ]
+                                  },
+                        "orderGuarantee":  "guaranteed"
+                    },
+                    {
+                        "id":  "f-2",
+                        "captureSeq":  2,
+                        "statementIndex":  1,
+                        "depth":  3,
+                        "table":  "cl07.C",
+                        "operation":  "INSERT",
+                        "rowCount":  1,
+                        "imageMode":  "FULL",
+                        "auditOrder":  "LAST",
+                        "cause":  {
+                                      "kind":  "TRIGGER",
+                                      "confidence":  "inferred",
+                                      "parentFiringId":  "f-3",
+                                      "foreignKey":  null,
+                                      "triggerCandidates":  [
+                                                                "cl07.trg_B_upd"
+                                                            ],
+                                      "evidence":  [
+                                                       "depth",
+                                                       "postorderBracket",
+                                                       "staticWriteSet"
+                                                   ]
+                                  },
+                        "orderGuarantee":  "guaranteed"
+                    },
+                    {
+                        "id":  "f-3",
+                        "captureSeq":  3,
+                        "statementIndex":  1,
+                        "depth":  2,
+                        "table":  "cl07.B",
+                        "operation":  "UPDATE",
+                        "rowCount":  1,
+                        "imageMode":  "FULL",
+                        "auditOrder":  "LAST",
+                        "cause":  {
+                                      "kind":  "TRIGGER",
+                                      "confidence":  "inferred",
+                                      "parentFiringId":  "f-4",
+                                      "foreignKey":  null,
+                                      "triggerCandidates":  [
+                                                                "cl07.trg_A_upd"
+                                                            ],
+                                      "evidence":  [
+                                                       "depth",
+                                                       "postorderBracket",
+                                                       "staticWriteSet"
+                                                   ]
+                                  },
+                        "orderGuarantee":  "guaranteed"
+                    },
+                    {
+                        "id":  "f-4",
+                        "captureSeq":  4,
+                        "statementIndex":  1,
+                        "depth":  1,
+                        "table":  "cl07.A",
+                        "operation":  "UPDATE",
+                        "rowCount":  1,
+                        "imageMode":  "FULL",
+                        "auditOrder":  "LAST",
+                        "cause":  {
+                                      "kind":  "DIRECT",
+                                      "confidence":  "certain",
+                                      "parentFiringId":  null,
+                                      "foreignKey":  null,
+                                      "triggerCandidates":  [
+
+                                                            ],
+                                      "evidence":  [
+                                                       "depth"
+                                                   ]
+                                  },
+                        "orderGuarantee":  "guaranteed"
+                    }
+                ],
+    "residuals":  [
+
+                  ],
+    "residualCommitted":  [
+
+                          ],
+    "residualCheckFailed":  false,
+    "residualCheckMessage":  null,
+    "netSummary":  [
+                       {
+                           "table":  "cl07.A",
+                           "inserted":  0,
+                           "updated":  1,
+                           "deleted":  0,
+                           "multisetRemoved":  0,
+                           "multisetAdded":  0
+                       },
+                       {
+                           "table":  "cl07.B",
+                           "inserted":  0,
+                           "updated":  1,
+                           "deleted":  0,
+                           "multisetRemoved":  0,
+                           "multisetAdded":  0
+                       },
+                       {
+                           "table":  "cl07.C",
+                           "inserted":  1,
+                           "updated":  0,
+                           "deleted":  0,
+                           "multisetRemoved":  0,
+                           "multisetAdded":  0
+                       },
+                       {
+                           "table":  "cl07.D",
+                           "inserted":  0,
+                           "updated":  1,
+                           "deleted":  0,
+                           "multisetRemoved":  0,
+                           "multisetAdded":  0
+                       }
+                   ],
+    "graph":  {
+                  "nodes":  [
+                                {
+                                    "type":  "statement",
+                                    "statementIndex":  1,
+                                    "label":  "UPDATE cl07.A SET v = v + 1 WHERE id = 2",
+                                    "rowsAffected":  1,
+                                    "status":  "ok",
+                                    "id":  "st-1"
+                                },
+                                {
+                                    "type":  "firing",
+                                    "firingId":  "f-4",
+                                    "table":  "cl07.A",
+                                    "operation":  "UPDATE",
+                                    "rowCount":  1,
+                                    "depth":  1,
+                                    "captureSeq":  4,
+                                    "id":  "f-4"
+                                },
+                                {
+                                    "type":  "trigger",
+                                    "trigger":  "cl07.trg_A_upd",
+                                    "parentFiringId":  "f-4",
+                                    "statementIndex":  1,
+                                    "observed":  true,
+                                    "id":  "t-3"
+                                },
+                                {
+                                    "type":  "firing",
+                                    "firingId":  "f-3",
+                                    "table":  "cl07.B",
+                                    "operation":  "UPDATE",
+                                    "rowCount":  1,
+                                    "depth":  2,
+                                    "captureSeq":  3,
+                                    "id":  "f-3"
+                                },
+                                {
+                                    "type":  "trigger",
+                                    "trigger":  "cl07.trg_B_upd",
+                                    "parentFiringId":  "f-3",
+                                    "statementIndex":  1,
+                                    "observed":  true,
+                                    "id":  "t-2"
+                                },
+                                {
+                                    "type":  "firing",
+                                    "firingId":  "f-2",
+                                    "table":  "cl07.C",
+                                    "operation":  "INSERT",
+                                    "rowCount":  1,
+                                    "depth":  3,
+                                    "captureSeq":  2,
+                                    "id":  "f-2"
+                                },
+                                {
+                                    "type":  "trigger",
+                                    "trigger":  "cl07.trg_C_ins",
+                                    "parentFiringId":  "f-2",
+                                    "statementIndex":  1,
+                                    "observed":  true,
+                                    "id":  "t-1"
+                                },
+                                {
+                                    "type":  "firing",
+                                    "firingId":  "f-1",
+                                    "table":  "cl07.D",
+                                    "operation":  "UPDATE",
+                                    "rowCount":  1,
+                                    "depth":  4,
+                                    "captureSeq":  1,
+                                    "id":  "f-1"
+                                }
+                            ],
+                  "edges":  [
+                                {
+                                    "id":  "e1",
+                                    "source":  "st-1",
+                                    "target":  "f-4",
+                                    "kind":  "DIRECT",
+                                    "confidence":  "certain",
+                                    "orderGuarantee":  "guaranteed",
+                                    "evidence":  [
+                                                     "depth"
+                                                 ],
+                                    "fk":  null,
+                                    "action":  null,
+                                    "matchedRows":  null
+                                },
+                                {
+                                    "id":  "e2",
+                                    "source":  "f-4",
+                                    "target":  "t-3",
+                                    "kind":  "FIRES",
+                                    "confidence":  "inferred",
+                                    "orderGuarantee":  "guaranteed",
+                                    "evidence":  [
+
+                                                 ],
+                                    "fk":  null,
+                                    "action":  null,
+                                    "matchedRows":  null
+                                },
+                                {
+                                    "id":  "e3",
+                                    "source":  "t-3",
+                                    "target":  "f-3",
+                                    "kind":  "WRITES",
+                                    "confidence":  "inferred",
+                                    "orderGuarantee":  "guaranteed",
+                                    "evidence":  [
+                                                     "depth",
+                                                     "postorderBracket",
+                                                     "staticWriteSet"
+                                                 ],
+                                    "fk":  null,
+                                    "action":  null,
+                                    "matchedRows":  null
+                                },
+                                {
+                                    "id":  "e4",
+                                    "source":  "f-3",
+                                    "target":  "t-2",
+                                    "kind":  "FIRES",
+                                    "confidence":  "inferred",
+                                    "orderGuarantee":  "guaranteed",
+                                    "evidence":  [
+
+                                                 ],
+                                    "fk":  null,
+                                    "action":  null,
+                                    "matchedRows":  null
+                                },
+                                {
+                                    "id":  "e5",
+                                    "source":  "t-2",
+                                    "target":  "f-2",
+                                    "kind":  "WRITES",
+                                    "confidence":  "inferred",
+                                    "orderGuarantee":  "guaranteed",
+                                    "evidence":  [
+                                                     "depth",
+                                                     "postorderBracket",
+                                                     "staticWriteSet"
+                                                 ],
+                                    "fk":  null,
+                                    "action":  null,
+                                    "matchedRows":  null
+                                },
+                                {
+                                    "id":  "e6",
+                                    "source":  "f-2",
+                                    "target":  "t-1",
+                                    "kind":  "FIRES",
+                                    "confidence":  "inferred",
+                                    "orderGuarantee":  "guaranteed",
+                                    "evidence":  [
+
+                                                 ],
+                                    "fk":  null,
+                                    "action":  null,
+                                    "matchedRows":  null
+                                },
+                                {
+                                    "id":  "e7",
+                                    "source":  "t-1",
+                                    "target":  "f-1",
+                                    "kind":  "WRITES",
+                                    "confidence":  "inferred",
+                                    "orderGuarantee":  "guaranteed",
+                                    "evidence":  [
+                                                     "depth",
+                                                     "postorderBracket",
+                                                     "staticWriteSet"
+                                                 ],
+                                    "fk":  null,
+                                    "action":  null,
+                                    "matchedRows":  null
+                                }
+                            ]
+              },
+    "warnings":  [
+
+                 ],
+    "capture":  {
+                    "imageCount":  7,
+                    "cap":  100000,
+                    "truncated":  false,
+                    "manifestVersion":  "m-20261116-0900"
+                },
+    "timingsMs":  {
+                      "analyze":  0,
+                      "execute":  84,
+                      "readLog":  3,
+                      "reread":  13,
+                      "netDiff":  35,
+                      "resolve":  2,
+                      "serialize":  0
+                  }
+}
+
+## api-apply-1-no-consent-create-any-db.json
+http=200 ms=107
+{
+    "previewId":  "pv_20261116_c66a028b",
+    "status":  "error",
+    "finishedAt":  "2026-11-16T00:00:39.8746702+00:00",
+    "preconditionFailures":  [
+
+                             ],
+    "verification":  {
+                         "mode":  "SNAPSHOT_NETDIFF",
+                         "driftRows":  [
+
+                                       ],
+                         "statementRowCounts":  [
+
+                                                ],
+                         "netSummaryMatch":  null,
+                         "actualNetSummary":  [
+
+                                              ],
+                         "mismatches":  [
+
+                                        ],
+                         "volatileIgnored":  [
+
+                                             ],
+                         "identityPairs":  [
+
+                                           ],
+                         "residualCommitted":  [
+
+                                               ],
+                         "residualCheckFailed":  false,
+                         "tableCounts":  [
+
+                                         ],
+                         "limitations":  [
+                                             "실행 주체 불일치: 미리보기는 샌드박스의 dbr_preview_user로, [적용]은 원본에서 본인 로그인으로 실행함(권한 차이, 트리거의 USER_NAME·SUSER_SNAME 값이 다를 수 있음)",
+                                             "원본 DB에 Service Broker가 켜짐: 트리거·프로시저가 보낸 메시지는 커밋 뒤 다른 서비스로 전달될 수 있음(미리보기에서는 보이지 않음)"
+                                         ]
+                     },
+    "statements":  [
+
+                   ],
+    "message":  "원본 스냅샷을 준비하지 못해 실행하지 않음: 원본 스냅샷 생성 실패(오류 1817): Only the owner of database \"CascadeLab\" or the system administrator can create a database snapshot on it.",
+    "sandboxRefreshStarted":  false,
+    "timingsMs":  {
+                      "snapshot":  35,
+                      "drift":  0,
+                      "execute":  0,
+                      "netDiff":  0,
+                      "commit":  0
+                  }
+}
+
+## api-apply-2-consent-create-any-db.json
+http=200 ms=64
+{
+    "previewId":  "pv_20261116_c66a028b",
+    "status":  "error",
+    "finishedAt":  "2026-11-16T00:00:39.9638525+00:00",
+    "preconditionFailures":  [
+
+                             ],
+    "verification":  {
+                         "mode":  "SNAPSHOT_NETDIFF",
+                         "driftRows":  [
+
+                                       ],
+                         "statementRowCounts":  [
+
+                                                ],
+                         "netSummaryMatch":  null,
+                         "actualNetSummary":  [
+
+                                              ],
+                         "mismatches":  [
+
+                                        ],
+                         "volatileIgnored":  [
+
+                                             ],
+                         "identityPairs":  [
+
+                                           ],
+                         "residualCommitted":  [
+
+                                               ],
+                         "residualCheckFailed":  false,
+                         "tableCounts":  [
+
+                                         ],
+                         "limitations":  [
+                                             "실행 주체 불일치: 미리보기는 샌드박스의 dbr_preview_user로, [적용]은 원본에서 본인 로그인으로 실행함(권한 차이, 트리거의 USER_NAME·SUSER_SNAME 값이 다를 수 있음)",
+                                             "원본 DB에 Service Broker가 켜짐: 트리거·프로시저가 보낸 메시지는 커밋 뒤 다른 서비스로 전달될 수 있음(미리보기에서는 보이지 않음)"
+                                         ]
+                     },
+    "statements":  [
+
+                   ],
+    "message":  "원본 스냅샷을 준비하지 못해 실행하지 않음: 원본 스냅샷 생성 실패(오류 1817): Only the owner of database \"CascadeLab\" or the system administrator can create a database snapshot on it.",
+    "sandboxRefreshStarted":  false,
+    "timingsMs":  {
+                      "snapshot":  21,
+                      "drift":  0,
+                      "execute":  0,
+                      "netDiff":  0,
+                      "commit":  0
+                  }
+}

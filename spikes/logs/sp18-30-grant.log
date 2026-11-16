@@ -1,0 +1,8 @@
+# spikes\sql\sp18_30_repro_grant.sql service=sql-origin db=master at=2026-11-16T09:00:25.8161892+09:00 elapsedSec=0.75 exit=0
+Changed database context to 'master'.
+what can_create_database db_owner_in_master
+---- ------------------- ------------------
+capability_as_limited_login 1 0
+what n
+---- -
+cascadelab_db_owner_member 0

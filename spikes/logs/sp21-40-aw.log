@@ -1,0 +1,24 @@
+# spikes\sql\sp21_40_hash_time.sql db=AW_Origin part=0 at=2026-11-16T09:07:51.1430260+09:00 elapsedSec=3.58 exit=0
+what n
+---- -
+tables 71
+round tables_hashed total_rows total_ms slowest_table_ms round_wall_ms
+----- ------------- ---------- -------- ---------------- -------------
+1 71 760167 930.9 150.4 943.3
+2 71 760167 462.5 100.2 462.5
+3 71 760167 439.9 86.9 448.1
+fullname cnt round3_ms
+-------- --- ---------
+[Sales].[Customer] 19820 86.9
+[Sales].[SalesOrderDetail] 121317 78.8
+[Production].[TransactionHistory] 113443 41.6
+[Production].[TransactionHistoryArchive] 89253 33.3
+[Production].[WorkOrder] 72591 29.2
+[Production].[WorkOrderRouting] 67131 29.0
+[Sales].[SalesOrderHeader] 31465 28.9
+[Person].[Person] 19972 16.6
+[Person].[BusinessEntityAddress] 19614 12.5
+[Person].[Password] 19972 12.5
+what n
+---- -
+tables_not_hashed 0

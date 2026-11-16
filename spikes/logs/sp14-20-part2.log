@@ -1,0 +1,23 @@
+# spikes/sql/sp14_20_mini.sql db=SpikeLab_SP14 part=2 at=2026-11-16T08:45:23.3930319+09:00 elapsedSec=1.69 exit=0
+Changed database context to 'SpikeLab_SP14'.
+
+(2 rows affected)
+
+(1 rows affected)
+n
+-
+2
+proc_name ok errNo xstate userDuring msg
+--------- -- ----- ------ ---------- ---
+usp_static_secret 1 NULL 1 dbr_preview_user NULL
+usp_dynamic_secret 0 229 1 dbr_preview_user The SELECT permission was denied on the object 'S', database 'SpikeLab_SP14', schema 'secret'.
+usp_dynamic_dbo_table 1 NULL 1 dbr_preview_user NULL
+usp_crossdb_read 0 916 -1 dbr_preview_user The server principal "S-1-9-3-1528007740-1322329665-718628531-1788522399" is not able to access the database "SpikeLab_SP14_Other" under the current security context.
+usp_crossdb_write 0 916 -1 dbr_preview_user The server principal "S-1-9-3-1528007740-1322329665-718628531-1788522399" is not able to access the database "SpikeLab_SP14_Other" under the current security context.
+hypothesis verdict
+---------- -------
+H1_static_reference_passes_via_ownership_chain PASS
+H2_dynamic_sql_on_unauthorized_table_gives_229 PASS
+H3_dynamic_sql_on_granted_table_succeeds PASS
+H4_three_part_name_gives_916 PASS
+H5_three_part_name_dooms_transaction PASS

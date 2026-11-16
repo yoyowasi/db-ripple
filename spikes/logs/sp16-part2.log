@@ -1,0 +1,18 @@
+# spikes/sql/sp16_10_run.sql db=SpikeLab_SP16 part=2 at=2026-11-16T08:43:48.2147910+09:00 elapsedSec=2.36 exit=0
+Changed database context to 'SpikeLab_SP16'.
+scenario depth errNo tcAfter t_after_exec t_after_final
+-------- ----- ----- ------- ------------ -------------
+p_own_tran_if_none 0 NULL 0 1:11,2:20 1:11,2:20
+p_own_tran_if_none 1 NULL 1 1:11,2:20 1:10,2:20
+p_own_tran_if_none 2 NULL 2 1:11,2:20 1:10,2:20
+p_branch_data 0 NULL 0 1:12,2:20 1:12,2:20
+p_branch_data 1 NULL 1 1:11,2:20 1:10,2:20
+p_branch_data 2 NULL 2 1:11,2:20 1:10,2:20
+p_requires_tran 0 NULL 0 1:10,2:20 1:10,2:20
+p_requires_tran 1 NULL 1 1:11,2:20 1:10,2:20
+p_requires_tran 2 NULL 2 1:11,2:20 1:10,2:20
+scenario autocommit_alone envelope_1 envelope_2 preview_matches_real expectation
+-------- ---------------- ---------- ---------- -------------------- -----------
+p_branch_data 1:12,2:20 1:11,2:20 1:11,2:20 DIFF DIFF ??(+2 ? +1)
+p_own_tran_if_none 1:11,2:20 1:11,2:20 1:11,2:20 SAME SAME ??
+p_requires_tran 1:10,2:20 1:11,2:20 1:11,2:20 DIFF DIFF ??(??? ?? ??)

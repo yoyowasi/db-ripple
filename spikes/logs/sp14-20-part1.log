@@ -1,0 +1,5 @@
+# spikes/sql/sp14_20_mini.sql db=master part=1 at=2026-11-16T08:45:21.0390261+09:00 elapsedSec=2.49 exit=0
+Changed database context to 'master'.
+Changed database context to 'SpikeLab_SP14_Other'.
+
+(1 rows affected)

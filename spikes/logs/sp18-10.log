@@ -1,0 +1,24 @@
+# spikes\sql\sp18_10_snapshot_errors.sql service=sql-origin db=master at=2026-11-16T08:58:35.1546009+09:00 elapsedSec=1.3 exit=0
+Changed database context to 'master'.
+n scenario asWho ok errNo sev st msg
+- -------- ----- -- ----- --- -- ---
+1 s1_limited_login_good_path limited 0 262 14 1 CREATE DATABASE permission denied in database 'master'.
+2 s2_sa_bad_directory sa 0 5123 16 1 CREATE FILE encountered operating system error 5(Access is denied.) while attempting to open or create the physical file '/no/such/dir/CascadeLab_sp18.ss'.
+3 s3_sa_good_path_baseline sa 1 NULL NULL NULL NULL
+4 s4_sa_name_collision_existing_db sa 0 1801 16 3 Database 'CascadeLab_RT' already exists. Choose a different database name.
+5 s5_sa_source_does_not_exist sa 0 911 16 1 Database 'NoSuchDb_sp18' does not exist. Make sure that the name is entered correctly.
+6 s6_sa_extra_bogus_file sa 0 5014 16 3 The file 'bogus_sp18' does not exist in database 'CascadeLab'.
+7 s7_sa_root_dir_not_writable sa 0 5123 16 1 CREATE FILE encountered operating system error 5(Access is denied.) while attempting to open or create the physical file '/CascadeLab_sp18.ss'.
+9 s9_limited_with_create_any_database limited 0 1817 14 1 Only the owner of database "CascadeLab" or the system administrator can create a database snapshot on it.
+hypothesis verdict
+---------- -------
+H1_good_path_by_sa_succeeds PASS
+H2_limited_login_fails_with_permission_error_262 PASS
+H3_bad_directory_fails_with_file_system_error_5133 FAIL
+H4_name_collision_fails_with_1801 PASS
+H5_missing_source_fails_with_911 PASS
+H6_create_any_database_lets_limited_login_succeed FAIL
+what n
+---- -
+leftover_snapshot_dbs 0
+leftover_create_any_database_grants 0

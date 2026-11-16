@@ -1,0 +1,5 @@
+# cascadelab\sql\cl20.sql service=sql-origin db=master at=2026-11-16T08:54:52.9858975+09:00 elapsedSec=0.84 exit=0
+Changed database context to 'CascadeLab'.
+parents children childLogs
+------- -------- ---------
+3 6 0

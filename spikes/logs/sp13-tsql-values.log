@@ -1,0 +1,10 @@
+# C:\Users\CUBECORE\AppData\Local\Temp\claude\5ec6e518af7e85eb\964abed9-f17c-4b9d-b47d-284ebc41c490\scratchpad\sp13_tsql.sql db=SpikeLab_SP13 part=0 at=2026-11-16T08:44:23.5555815+09:00 elapsedSec=5.06 exit=0
+Msg 50000, Level 16, State 1, Server 31e30d944dca, Procedure dbo.p_raiserror_continue, Line 5
+sp13 statement error
+raiserror_continue rc=3 rowcount=1
+proc_name rc rowcount_after errNo
+--------- -- -------------- -----
+p_ret5 5 1 NULL
+p_noret 0 2 NULL
+p_nocount_on 9 1 NULL
+p_throw NULL NULL 50000

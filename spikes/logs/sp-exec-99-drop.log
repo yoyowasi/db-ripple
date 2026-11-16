@@ -1,0 +1,10 @@
+# spikes/sql/sp_exec_99_drop.sql db=master part=0 at=2026-11-16T08:45:31.4720158+09:00 elapsedSec=1.84 exit=0
+Changed database context to 'master'.
+
+(6 rows affected)
+dropped SpikeLab_SP11
+dropped SpikeLab_SP12
+dropped SpikeLab_SP13
+dropped SpikeLab_SP14
+dropped SpikeLab_SP14_Other
+dropped SpikeLab_SP16

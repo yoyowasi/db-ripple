@@ -1,0 +1,4 @@
+# cascadelab\sql\cl19.sql service=sql-origin db=master at=2026-11-16T08:54:52.1440131+09:00 elapsedSec=1.94 exit=0
+Changed database context to 'CascadeLab'.
+
+(2 rows affected)

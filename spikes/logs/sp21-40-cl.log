@@ -1,0 +1,24 @@
+# spikes\sql\sp21_40_hash_time.sql db=CascadeLab part=0 at=2026-11-16T09:07:53.7731424+09:00 elapsedSec=1.35 exit=0
+what n
+---- -
+tables 25
+round tables_hashed total_rows total_ms slowest_table_ms round_wall_ms
+----- ------------- ---------- -------- ---------------- -------------
+1 25 61 24.7 4.1 28.9
+2 25 61 4.2 4.2 4.2
+3 25 61 .0 .0 .0
+fullname cnt round3_ms
+-------- --- ---------
+[cl02].[Emp] 4 .0
+[cl01].[D] 4 .0
+[cl01].[C] 4 .0
+[cl04].[Ch] 4 .0
+[cl01].[B] 3 .0
+[cl03].[Product] 3 .0
+[cl03].[Category] 3 .0
+[cl04].[P] 3 .0
+[cl05].[X] 3 .0
+[cl05].[X2] 3 .0
+what n
+---- -
+tables_not_hashed 0

@@ -1,0 +1,2 @@
+# spikes\sql\sp20_99_drop.sql service=sql-origin db=master at=2026-11-16T09:02:09.6470475+09:00 elapsedSec=0.93 exit=0
+Changed database context to 'master'.

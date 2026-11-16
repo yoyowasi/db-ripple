@@ -1,0 +1,16 @@
+# spikes\sql\sp17_20_origin_fingerprint.sql service=sql-origin db=master at=2026-11-16T08:58:17.2281542+09:00 elapsedSec=0.82 exit=0
+Changed database context to 'master'.
+k v
+- -
+ddl_objects 215 max_modify=2026-11-15T23:54:56.050
+ddl_modules_checksum -1158455857
+ddl_schemas 38
+ddl_audit_schema_exists 0
+ddl_principals 6 dbo,dbr_origin_user,guest,INFORMATION_SCHEMA,public,sys
+ddl_permissions 230
+ddl_triggers_total 20
+ddl_database_options SQL_Latin1_General_CP1_CI_AS compat=160 recursive=0 trustworthy=0 broker=1 state=ONLINE owner=sa
+ddl_databases_on_server 2 CascadeLab,CascadeLab_RT
+copy_only_backups_CascadeLab 2
+non_copy_only_backups_CascadeLab 0
+rows_total 157

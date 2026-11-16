@@ -1,0 +1,7 @@
+# spikes/sql/sp13_10_setup.sql db=SpikeLab_SP13 part=2 at=2026-11-16T08:43:55.5073089+09:00 elapsedSec=0.95 exit=0
+Changed database context to 'SpikeLab_SP13'.
+
+(3 rows affected)
+Msg 50000, Level 16, State 1, Server 31e30d944dca, Procedure dbo.p_raiserror_continue, Line 5
+sp13 statement error
+SqlState 24000, Invalid cursor state

@@ -1,0 +1,17 @@
+# spikes\sql\sp20_40_alter_authorization_check.sql service=sql db=master at=2026-11-16T09:01:52.6640472+09:00 elapsedSec=0.75 exit=0
+Changed database context to 'master'.
+k v
+- -
+after_fix_db_owner sa
+after_fix_dbo_maps_to_login sa
+Changed database context to 'SpikeLab_SP20'.
+what errNo msg
+---- ----- ---
+after_fix_module_run NULL NULL
+what step origLogin suser usr
+---- ---- --------- ----- ---
+after_fix_whoami proc sa sa dbo
+after_fix_whoami trigger sa sa dbo
+hypothesis verdict detail
+---------- ------- ------
+H1_after_alter_authorization_modules_run_without_error PASS errNo=none rows=2

@@ -1,0 +1,2 @@
+# spikes/sql/sp13_10_setup.sql db=master part=1 at=2026-11-16T08:43:54.1556158+09:00 elapsedSec=1.09 exit=0
+Changed database context to 'master'.

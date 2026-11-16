@@ -1,0 +1,55 @@
+# spikes\sql\sp17_30_limited_probe.sql service=sql-origin db=master at=2026-11-16T08:55:29.0389425+09:00 elapsedSec=0.89 exit=0
+Changed database context to 'master'.
+s m
+- -
+e0d38f1440c1 e0d38f1440c1
+v
+-
+id st
+-- --
+5 ONLINE
+v nested
+- ------
+16.0.4325.4 1
+collation_name compatibility_level is_trustworthy_on is_broker_enabled is_cdc_enabled is_published
+-------------- ------------------- ----------------- ----------------- -------------- ------------
+SQL_Latin1_General_CP1_CI_AS 160 0 1 0 0
+df
+--
+mdy
+name type
+---- ----
+n
+-
+0
+n
+-
+2
+Processed 1152 pages for database 'CascadeLab', file 'CascadeLab' on file 1.
+Processed 2 pages for database 'CascadeLab', file 'CascadeLab_log' on file 1.
+BACKUP DATABASE successfully processed 1154 pages in 0.083 seconds (108.574 MB/sec).
+label expectation ok errNo msg
+----- ----------- -- ----- ---
+identity ok 1 NULL NULL
+instance_marker ok(? ??? ??) 1 NULL NULL
+source_precheck ok 1 NULL NULL
+fingerprint_server ok 1 NULL NULL
+fingerprint_db ok 1 NULL NULL
+fingerprint_session ok 1 NULL NULL
+special_filegroups ok 1 NULL NULL
+assemblies ok 1 NULL NULL
+read_table ok 1 NULL NULL
+dml_zero_rows ok 1 NULL NULL
+ddl_create_table ??(262 ??) 0 262 CREATE TABLE permission denied in database 'CascadeLab'.
+ddl_alter_table ??(?? ?? ??) 0 1088 Cannot find the object "A" because it does not exist or you do not have permissions.
+ddl_create_trigger ??(?? ?? ??) 0 2104 Cannot create the trigger 'cl01.sp17_probe_trg', because you do not have permission.
+create_user ??(?? ?? ??) 0 15247 User does not have permission to perform this action.
+backup_copy_only ok(??? ?? ?? ?? ???) 1 NULL NULL
+restore_headeronly ??(?? ?? ??) 0 3013 RESTORE HEADERONLY is terminating abnormally.
+restore_new_name ??(3110 ?? 262 ??) 0 3013 RESTORE DATABASE is terminating abnormally.
+alter_database ??(?? ?? ??) 0 5069 ALTER DATABASE statement failed.
+create_database ??(262 ??) 0 262 CREATE DATABASE permission denied in database 'master'.
+hypothesis verdict detail
+---------- ------- ------
+H1_reads_dml_and_copy_only_backup_succeed PASS NULL
+H2_ddl_restore_alterdb_createdb_are_denied PASS NULL

@@ -1,0 +1,14 @@
+# spikes\sql\sp21_30_concurrent_writer.sql service=sql-origin db=CascadeLab at=2026-11-16T09:04:43.6224439+09:00 elapsedSec=90.68 exit=0
+Changed database context to 'CascadeLab'.
+
+(1 rows affected)
+what t
+---- -
+locked_at 2026-11-16T00:03:13.3613648
+
+(1 rows affected)
+what t
+---- -
+released_at 2026-11-16T00:04:43.3492357
+
+(1 rows affected)

@@ -13,11 +13,14 @@ FROM sys.tables AS t INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
 WHERE t.is_ms_shipped = 0;
 DELETE @tables WHERE skip = 1;
 
-DECLARE @res TABLE (round int, fullname nvarchar(300), cnt bigint, cs int, ms int);
-DECLARE @round int = 1, @i int, @cnt int = (SELECT COUNT(*) FROM @tables), @name nvarchar(300), @sql nvarchar(max), @t0 datetime2(3), @c bigint, @h int;
+-- 2026-11-16 실행 때 고침: @t0를 datetime2(3)로 두면 SYSDATETIME()이 반올림돼 빠른 테이블의 ms가 음수(-1)로 나와 합계가 음수가 됐다 → datetime2(7) + 마이크로초, 회차 전체 벽시계 시간(round_wall_ms)도 따로 잰다
+DECLARE @res TABLE (round int, fullname nvarchar(300), cnt bigint, cs int, us bigint);
+DECLARE @rounds TABLE (round int, wall_us bigint);
+DECLARE @round int = 1, @i int, @cnt int = (SELECT COUNT(*) FROM @tables), @name nvarchar(300), @sql nvarchar(max), @t0 datetime2(7), @r0 datetime2(7), @c bigint, @h int;
 WHILE @round <= 3
 BEGIN
     SET @i = 1;
+    SET @r0 = SYSDATETIME();
     WHILE @i <= @cnt
     BEGIN
         SELECT @name = fullname FROM @tables WHERE n = @i;
@@ -29,13 +32,16 @@ BEGIN
         BEGIN CATCH
             SELECT @c = NULL, @h = NULL;   -- 해시를 못 구하는 테이블(권한·형식 문제)은 기록만 하고 건너뛴다
         END CATCH;
-        INSERT @res VALUES (@round, @name, @c, @h, DATEDIFF(MILLISECOND, @t0, SYSDATETIME()));
+        INSERT @res VALUES (@round, @name, @c, @h, DATEDIFF_BIG(MICROSECOND, @t0, SYSDATETIME()));
         SET @i += 1;
     END;
+    INSERT @rounds VALUES (@round, DATEDIFF_BIG(MICROSECOND, @r0, SYSDATETIME()));
     SET @round += 1;
 END;
 SELECT 'tables' AS what, @cnt AS n;
-SELECT round, COUNT(*) AS tables_hashed, SUM(cnt) AS total_rows, SUM(ms) AS total_ms, MAX(ms) AS slowest_table_ms FROM @res WHERE cnt IS NOT NULL GROUP BY round ORDER BY round;
-SELECT TOP (10) fullname, cnt, ms AS round3_ms FROM @res WHERE round = 3 AND cnt IS NOT NULL ORDER BY ms DESC, cnt DESC;
+SELECT r.round, COUNT(*) AS tables_hashed, SUM(r.cnt) AS total_rows, CAST(SUM(r.us) / 1000.0 AS decimal(12, 1)) AS total_ms, CAST(MAX(r.us) / 1000.0 AS decimal(12, 1)) AS slowest_table_ms,
+       CAST(MAX(w.wall_us) / 1000.0 AS decimal(12, 1)) AS round_wall_ms
+FROM @res AS r INNER JOIN @rounds AS w ON w.round = r.round WHERE r.cnt IS NOT NULL GROUP BY r.round ORDER BY r.round;
+SELECT TOP (10) fullname, cnt, CAST(us / 1000.0 AS decimal(12, 1)) AS round3_ms FROM @res WHERE round = 3 AND cnt IS NOT NULL ORDER BY us DESC, cnt DESC;
 SELECT 'tables_not_hashed' AS what, COUNT(*) AS n FROM @res WHERE round = 1 AND cnt IS NULL;
 GO
