@@ -268,6 +268,24 @@ public sealed class ApplyMatcherTests
     }
 
     [Fact]
+    public void Exec_nondeterministic_return_value_compares_only_null_ness()
+    {
+        // 반환 값이 SCOPE_IDENTITY 등에 기대면(분석기 판정) 샌드박스와 원본 값이 달라도 일치, NULL 여부가 다르면 불일치(2026-11-17).
+        var plan = ExecAnalyzed(returnNondeterministic: true).Plan;
+        var preview = ExecStatement(returnValue: 7);   // 저장된 미리보기에는 Plan이 없다(JSON에 저장 안 됨) → 실제 쪽 Plan으로 판정
+
+        var (_, same) = ApplyMatcher.CompareStatements([preview], [ExecStatement(returnValue: 1042) with { Plan = plan }]);
+        var (_, nullDiff) = ApplyMatcher.CompareStatements([preview], [ExecStatement(returnValue: null) with { Plan = plan }]);
+        var (_, strict) = ApplyMatcher.CompareStatements([preview], [ExecStatement(returnValue: 1042) with { Plan = ExecAnalyzed().Plan }]);
+
+        Assert.Empty(same);
+        var m = Assert.Single(nullDiff);
+        Assert.Equal((MismatchKind.ProcReturnValue, "7", (string?)null), (m.Kind, m.Expected, m.Actual));
+        Assert.Contains("NULL 여부", m.Message);
+        Assert.Equal(MismatchKind.ProcReturnValue, Assert.Single(strict).Kind);
+    }
+
+    [Fact]
     public void Dml_statement_does_not_compare_return_value()
     {
         var (_, mismatches) = ApplyMatcher.CompareStatements([Statement(1, 1)], [Statement(1, 1) with { ReturnValue = 9, ResultSetCount = 4 }]);

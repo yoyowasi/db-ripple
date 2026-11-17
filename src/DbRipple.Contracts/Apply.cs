@@ -69,6 +69,11 @@ public enum ApplyPrecondition
     /// 바뀐 본문은 거부 규칙 검사를 거치지 않았으므로 실행하지 않는다.
     /// </summary>
     [JsonStringEnumMemberName("PROC_DEFINITION_CHANGED")] ProcDefinitionChanged,
+    /// <summary>
+    /// 미리보기 EXEC가 부르는 프로시저(최상위·펼친 중첩) 가운데 모듈 서명(ADD SIGNATURE, sys.crypt_properties)이 있음(2026-11-17).
+    /// 서명은 인증서·비대칭 키 사용자의 권한을 더해 실행 사용자의 DML 전용 권한 경계를 넘을 수 있으므로 원본에서 실행하지 않는다.
+    /// </summary>
+    [JsonStringEnumMemberName("PROC_SIGNED_NOT_SUPPORTED")] ProcSignedNotSupported,
 }
 
 /// <summary>드리프트 종류(§5.3 드리프트 검사). 설계는 driftRows 원소를 정하지 않았다(설계 외, Q24).</summary>
@@ -107,10 +112,18 @@ public enum MismatchKind
     [JsonStringEnumMemberName("KEYSET_TABLE_COUNT")] KeysetTableCount,
     /// <summary>KEYSET_HASH: 미리보기에 없던 테이블의 COUNT_BIG(*)·CHECKSUM_AGG(BINARY_CHECKSUM)가 실행 전후로 다름(Expected/Actual은 "count=…,checksum=…").</summary>
     [JsonStringEnumMemberName("OUTSIDE_TABLE_CHANGED")] OutsideTableChanged,
-    /// <summary>EXEC(2026-11-17): 프로시저 반환 값(StatementResult.ReturnValue)이 미리보기와 다름. Expected/Actual은 10진 문자열(없으면 null).</summary>
+    /// <summary>
+    /// EXEC(2026-11-17): 프로시저 반환 값(StatementResult.ReturnValue)이 미리보기와 다름. Expected/Actual은 10진 문자열(없으면 null).
+    /// 분석기가 반환 값을 비결정으로 본 문장(ProcedurePlan.ReturnValueNondeterministic)은 NULL 여부만 비교한다.
+    /// </summary>
     [JsonStringEnumMemberName("PROC_RETURN_VALUE")] ProcReturnValue,
     /// <summary>EXEC(2026-11-17): 프로시저가 낸 결과 집합 수(StatementResult.ResultSetCount)가 미리보기와 다름. 결과 집합 내용은 비교하지 않는다.</summary>
     [JsonStringEnumMemberName("PROC_RESULT_SET_COUNT")] ProcResultSetCount,
+    /// <summary>
+    /// EXEC(2026-11-17): 실행 트랜잭션 안에서 다시 읽은 원본 프로시저 정의·서명이 기준선과 다름(선행 조건 뒤 실행 전후에 ALTER·ADD SIGNATURE).
+    /// 실행 뒤에 알았으면 롤백한다. Table은 null, Expected/Actual은 null, 프로시저 이름은 Message에 있다.
+    /// </summary>
+    [JsonStringEnumMemberName("PROC_DEFINITION_CHANGED")] ProcDefinitionChanged,
 }
 
 /// <summary>
@@ -162,9 +175,9 @@ public sealed record ApplyMismatch
 {
     /// <summary>위반 종류.</summary>
     public required MismatchKind Kind { get; init; }
-    /// <summary>STATEMENT_ROW_COUNT·PROC_RETURN_VALUE·PROC_RESULT_SET_COUNT의 문장 번호. 그 밖은 null.</summary>
+    /// <summary>STATEMENT_ROW_COUNT·PROC_RETURN_VALUE·PROC_RESULT_SET_COUNT의 문장 번호(PROC_DEFINITION_CHANGED는 실행 전에 알았을 때 그 EXEC 문장). 그 밖은 null.</summary>
     public int? StatementIndex { get; init; }
-    /// <summary>"스키마.테이블". STATEMENT_ROW_COUNT·PROC_RETURN_VALUE·PROC_RESULT_SET_COUNT면 null.</summary>
+    /// <summary>"스키마.테이블". STATEMENT_ROW_COUNT·PROC_*면 null.</summary>
     public string? Table { get; init; }
     /// <summary>행 키(ROW_*, IDENTITY_UNPAIRED, VOLATILE_FORMAT). 그 밖은 null. IDENTITY 열은 짝 매핑 뒤의 미리보기 쪽 키.</summary>
     public RowKey? Key { get; init; }

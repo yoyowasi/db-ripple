@@ -53,6 +53,11 @@ internal interface IOriginConnection : IAsyncDisposable
     Task<IReadOnlyDictionary<string, TableState>> ReadTableStatesAsync(IReadOnlyList<HashTarget> targets, IReadOnlySet<string> previewTables, CancellationToken ct);
     /// <summary>KEYSET_HASH: 미리보기 키 집합 after 대조.</summary>
     Task<IReadOnlyList<ApplyMismatch>> VerifyKeyRowsAsync(PreviewRecord preview, IReadOnlyList<TableInfo> tables, BaselineContext baseline, CancellationToken ct);
+    /// <summary>
+    /// EXEC(2026-11-17): 실행 트랜잭션 안에서 프로시저 정의·서명을 다시 읽는다(권한은 읽지 않아 CanExecute = false). 실행기가 REVERT한 뒤에만 불러
+    /// 가장 없이 도구 로그인으로 읽는다. 세션 옵션을 바꾸지 않는다.
+    /// </summary>
+    Task<IReadOnlyList<OriginProcedure>> ReadProceduresAsync(IReadOnlyList<(string Schema, string Name)> procedures, CancellationToken ct);
 }
 
 /// <summary>연결 열기(연결 실패 → SandboxUnavailableException, 메시지에 연결 문자열을 넣지 않는다).</summary>
@@ -130,21 +135,7 @@ internal sealed class SqlOriginDatabase(string connectionString, ApplySettings s
         // 풀링 없는 전용 연결: EXECUTE AS 뒤 오류로 REVERT를 못 해도 연결을 닫으면 가장이 끝난다.
         await using var conn = await OriginConnections.OpenAsync(connectionString, originDb, ct);
         await using var cmd = new SqlCommand(OriginProcedures.Sql(procedures.Count, executeAsUser), conn) { CommandTimeout = settings.ToolCommandTimeoutSeconds };
-        for (var i = 0; i < procedures.Count; i++)
-        {
-            cmd.Parameters.Add(new SqlParameter($"@s{i}", SqlDbType.NVarChar, 128) { Value = procedures[i].Schema });
-            cmd.Parameters.Add(new SqlParameter($"@n{i}", SqlDbType.NVarChar, 128) { Value = procedures[i].Name });
-        }
-        var definitions = new string?[procedures.Count];
-        var canExecute = new bool[procedures.Count];
-        await using (var r = await cmd.ExecuteReaderAsync(ct))
-        {
-            while (await r.ReadAsync(ct)) definitions[r.GetInt32(0)] = r.IsDBNull(1) ? null : r.GetString(1);
-            if (!await r.NextResultAsync(ct)) throw new InvalidOperationException("원본 프로시저의 EXECUTE 권한을 읽지 못함");
-            while (await r.ReadAsync(ct)) canExecute[r.GetInt32(0)] = r.GetInt32(1) == 1;
-            while (await r.NextResultAsync(ct)) { } // REVERT 오류까지 드러낸다
-        }
-        return procedures.Select((p, i) => new OriginProcedure(p.Schema, p.Name, definitions[i], canExecute[i])).ToList();
+        return await OriginProcedures.ReadAsync(cmd, procedures, permissions: true, ct);
     }
 
     public Task<(SnapshotOutcome Outcome, string? Reason)> CreateSnapshotAsync(string originDb, string snapshotDb, CancellationToken ct) =>
@@ -205,6 +196,13 @@ internal sealed class SqlOriginConnection(SqlConnection connection, int toolTime
 
     public Task<IReadOnlyList<ApplyMismatch>> VerifyKeyRowsAsync(PreviewRecord preview, IReadOnlyList<TableInfo> tables, BaselineContext baseline, CancellationToken ct) =>
         KeysetVerifier.VerifyKeyRowsAsync(Session, preview, tables, baseline, toolTimeoutSeconds, ct);
+
+    public async Task<IReadOnlyList<OriginProcedure>> ReadProceduresAsync(IReadOnlyList<(string Schema, string Name)> procedures, CancellationToken ct)
+    {
+        if (procedures.Count == 0) return [];
+        await using var cmd = Session.CreateCommand(OriginProcedures.DefinitionSql(procedures.Count), toolTimeoutSeconds);
+        return await OriginProcedures.ReadAsync(cmd, procedures, permissions: false, ct);
+    }
 
     async Task ExecAsync(string sql, CancellationToken ct)
     {

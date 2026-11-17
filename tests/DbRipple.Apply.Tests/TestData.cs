@@ -116,17 +116,23 @@ internal static class TestData
         Status = StatementStatus.Ok, RowsAffected = null, ReturnValue = returnValue, ResultSetCount = resultSets,
     };
 
+    /// <summary>분석기가 만든 EXEC 실행 SQL(모양만 흉내, 미리보기 기록과 재분석이 같다).</summary>
+    public const string ExecRunSql = "EXEC @dbr_rc = [dbo].[usp_T] @id = 1;";
+
     /// <summary>재분석한 EXEC 문장(분석기가 채우는 실행 계획 포함).</summary>
-    public static AnalyzedStatement ExecAnalyzed(int index = 1, string procedure = "dbo.usp_T", string execSql = "EXEC @dbr_rc = [dbo].[usp_T] @id = 1;") => new()
+    public static AnalyzedStatement ExecAnalyzed(int index = 1, string procedure = "dbo.usp_T", string execSql = ExecRunSql, bool returnNondeterministic = false) => new()
     {
         Index = index, Batch = 1, Position = index, Kind = ChangeOperation.Exec, Target = null, Procedure = procedure, Span = Span(index), Sql = ExecSqlText,
         Parameters = ["@id = 1"],
-        Plan = new ProcedurePlan { Procedure = procedure, ExecSql = execSql, WriteTargets = ["dbo.T"], ExpandedCalls = ["dbo.usp_Inner"] },
+        Plan = new ProcedurePlan
+        {
+            Procedure = procedure, ExecSql = execSql, WriteTargets = ["dbo.T"], ExpandedCalls = ["dbo.usp_Inner"], ReturnValueNondeterministic = returnNondeterministic,
+        },
     };
 
-    /// <summary>EXEC 미리보기 한 건(최종 차이는 기본 미리보기와 같은 dbo.T id=1).</summary>
-    public static PreviewRecord ExecRecord(StatementResult? statement = null) =>
-        Record(statements: [statement ?? ExecStatement()], sql: ExecSqlText);
+    /// <summary>EXEC 미리보기 한 건(최종 차이는 기본 미리보기와 같은 dbo.T id=1). 미리보기가 실행한 SQL도 저장해 둔다(PreviewRecord.ExecSql).</summary>
+    public static PreviewRecord ExecRecord(StatementResult? statement = null, string execSql = ExecRunSql) =>
+        Record(statements: [statement ?? ExecStatement()], sql: ExecSqlText) with { ExecSql = [new ExecSqlRecord((statement ?? ExecStatement()).Index, execSql)] };
 
     public static Dictionary<string, string?> Row(params (string Column, string? Value)[] cells) =>
         cells.ToDictionary(c => c.Column, c => c.Value, StringComparer.Ordinal);

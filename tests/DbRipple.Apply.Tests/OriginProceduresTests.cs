@@ -18,12 +18,26 @@ public sealed class OriginProceduresTests
         var sql = OriginProcedures.Sql(2, PreviewUserSql.UserName);
 
         var definitions = sql.IndexOf("m.definition", StringComparison.Ordinal);
+        var signature = sql.IndexOf("sys.crypt_properties", StringComparison.Ordinal);
         var executeAs = sql.IndexOf("EXECUTE AS USER = N'dbr_preview_user';", StringComparison.Ordinal);
         var perms = sql.IndexOf("HAS_PERMS_BY_NAME", StringComparison.Ordinal);
         var revert = sql.IndexOf("REVERT;", StringComparison.Ordinal);
-        Assert.True(definitions >= 0 && definitions < executeAs && executeAs < perms && perms < revert, sql);
+        Assert.True(definitions >= 0 && signature > 0 && signature < executeAs && definitions < executeAs && executeAs < perms && perms < revert, sql);
         Assert.Contains("(0, @s0, @n0), (1, @s1, @n1)", sql);
         Assert.DoesNotContain("GRANT", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Definition_sql_for_transaction_connection_does_not_change_session_or_impersonate()
+    {
+        var sql = OriginProcedures.DefinitionSql(2);
+
+        Assert.Contains("m.definition", sql);
+        Assert.Contains("sys.crypt_properties AS c WHERE c.class = 1 AND c.major_id = p.object_id", sql);
+        Assert.DoesNotContain("SET ", sql, StringComparison.Ordinal);       // 실행 트랜잭션 세션 옵션을 바꾸지 않는다
+        Assert.DoesNotContain("EXECUTE AS", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("HAS_PERMS_BY_NAME", sql, StringComparison.Ordinal);
+        Assert.StartsWith("SET NOCOUNT ON;\n" + sql, OriginProcedures.Sql(2, null), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -91,31 +105,48 @@ public sealed class OriginProceduresTests
     [Fact]
     public void Judge_reports_every_failure_kind()
     {
-        var baseline = new Dictionary<string, CatalogModule>(Baseline) { ["dbo.enc"] = new(12, "dbo", "enc", null) };
+        var baseline = new Dictionary<string, CatalogModule>(Baseline) { ["dbo.enc"] = new(12, "dbo", "enc", null), ["dbo.sig"] = new(13, "dbo", "sig", "S") };
         var origin = new[]
         {
             new OriginProcedure("dbo", "usp_T", ProcDefinition, false),        // 권한 없음
             new OriginProcedure("dbo", "usp_Inner", null, true),               // 정의 못 읽음
             new OriginProcedure("dbo", "enc", "x", true),                      // 기준선 정의가 없음(암호화) → 같다고 볼 수 없음
+            new OriginProcedure("dbo", "sig", "S", true, Signed: true),        // 정의는 같고 서명됨
         };
 
-        var list = OriginProcedures.Judge(["dbo.usp_T", "dbo.gone"], ["dbo.usp_T", "dbo.gone", "dbo.usp_Inner", "dbo.enc"], baseline, origin, "원본 실행 사용자 u");
+        var list = OriginProcedures.Judge(["dbo.usp_T", "dbo.gone"], ["dbo.usp_T", "dbo.gone", "dbo.usp_Inner", "dbo.enc", "dbo.sig"], baseline, origin, "원본 실행 사용자 u");
 
         Assert.Equal(
-            [ApplyPrecondition.ProcDefinitionChanged, ApplyPrecondition.ProcDefinitionChanged, ApplyPrecondition.ProcDefinitionChanged, ApplyPrecondition.ProcExecutePermissionMissing],
+            [ApplyPrecondition.ProcDefinitionChanged, ApplyPrecondition.ProcDefinitionChanged, ApplyPrecondition.ProcDefinitionChanged,
+             ApplyPrecondition.ProcSignedNotSupported, ApplyPrecondition.ProcExecutePermissionMissing],
             list.Select(x => x.Code));
         Assert.Contains("dbo.enc", list[0].Reason);
         Assert.Contains("dbo.usp_Inner", list[1].Reason);
         Assert.Contains("dbo.gone", list[2].Reason);
-        Assert.Contains("원본 실행 사용자 u에게", list[3].Reason);
-        Assert.Contains("dbo.usp_T", list[3].Reason);
-        Assert.DoesNotContain("dbo.gone", list[3].Reason);   // 기준선에 없는 최상위는 정의 실패로만 보인다
+        Assert.Contains("dbo.sig", list[3].Reason);
+        Assert.Contains("원본 실행 사용자 u에게", list[4].Reason);
+        Assert.Contains("dbo.usp_T", list[4].Reason);
+        Assert.DoesNotContain("dbo.gone", list[4].Reason);   // 기준선에 없는 최상위는 정의 실패로만 보인다
+    }
+
+    [Fact]
+    public void Drift_is_null_when_definitions_match_and_unsigned_and_names_each_change()
+    {
+        var same = new[] { new OriginProcedure("dbo", "usp_T", ProcDefinition, false), new OriginProcedure("dbo", "usp_Inner", InnerDefinition, false) };
+        Assert.Null(OriginProcedures.Drift(OriginProcedures.Compare(["dbo.usp_T", "dbo.usp_Inner"], Baseline, same)));
+
+        var changed = new[] { new OriginProcedure("dbo", "usp_T", ProcDefinition, false, Signed: true), new OriginProcedure("dbo", "usp_Inner", "ALTERED", false) };
+        var text = OriginProcedures.Drift(OriginProcedures.Compare(["dbo.usp_T", "dbo.usp_Inner"], Baseline, changed));
+
+        Assert.Equal("원본 프로시저가 기준선과 다름(정의가 바뀜: dbo.usp_Inner; 모듈 서명이 있음: dbo.usp_T)", text);
+        Assert.Equal([("dbo", "usp_T"), ("dbo", "usp_Inner")], OriginProcedures.Query(["dbo.usp_T", "dbo.gone", "dbo.usp_Inner"], Baseline));
     }
 
     [SqlFact]
-    public async Task Reads_definitions_and_execute_permission_of_impersonated_user_or_own_login()
+    public async Task Reads_definitions_signature_and_execute_permission_on_origin()
     {
         var db = TestDb.NewName("apl", "prc");
+        var password = "Pw!" + Guid.NewGuid().ToString("N") + "aA1";
         await using var cleanup = new TestDatabases(db);
         await TestDb.ExecAsync("master", $"CREATE DATABASE [{db}];");
         await TestDb.ExecAsync(db,
@@ -123,7 +154,9 @@ public sealed class OriginProceduresTests
             "CREATE PROCEDURE dbo.p_ok AS UPDATE dbo.T SET v = v + 1 WHERE id = 1;",
             "CREATE PROCEDURE dbo.p_denied AS UPDATE dbo.T SET v = v - 1 WHERE id = 1;",
             "CREATE USER [dbr_preview_user] WITHOUT LOGIN WITH DEFAULT_SCHEMA = [dbo];",
-            "GRANT EXECUTE ON OBJECT::[dbo].[p_ok] TO [dbr_preview_user];");
+            "GRANT EXECUTE ON OBJECT::[dbo].[p_ok] TO [dbr_preview_user];",
+            $"CREATE CERTIFICATE dbr_apl_cert ENCRYPTION BY PASSWORD = N'{password}' WITH SUBJECT = N'dbr apl test';",
+            $"ADD SIGNATURE TO dbo.p_denied BY CERTIFICATE dbr_apl_cert WITH PASSWORD = N'{password}';");
         var origin = new SqlOriginDatabase(TestDb.ConnectionString(), new ApplySettings());
         (string, string)[] names = [("dbo", "p_ok"), ("dbo", "p_denied"), ("dbo", "p_missing")];
 
@@ -134,7 +167,17 @@ public sealed class OriginProceduresTests
         Assert.Contains("p_ok", asUser[0].Definition);                       // 정의는 가장 전에 도구 로그인으로 읽는다
         Assert.Contains("p_denied", asUser[1].Definition);
         Assert.Null(asUser[2].Definition);
+        Assert.Equal([false, true, false], asUser.Select(p => p.Signed));    // ADD SIGNATURE(sys.crypt_properties)
         Assert.Equal([true, true, false], asLogin.Select(p => p.CanExecute)); // 테스트 로그인(sysadmin)은 모두 실행할 수 있고, 없는 프로시저는 false
         Assert.Equal(asUser.Select(p => p.Definition), asLogin.Select(p => p.Definition));
+
+        // 실행 트랜잭션 연결에서 다시 읽기(정의·서명만, 세션 옵션을 바꾸지 않음)
+        await using var conn = await origin.OpenAsync(db, default);
+        await conn.BeginTransactionAsync(default);
+        var again = await conn.ReadProceduresAsync(names, default);
+        Assert.Equal(asUser.Select(p => (p.Definition, p.Signed)), again.Select(p => (p.Definition, p.Signed)));
+        Assert.All(again, p => Assert.False(p.CanExecute));
+        Assert.Equal(1, await TestDb.ScalarAsync<int>(conn.Session.Connection, "SELECT @@TRANCOUNT;"));
+        await conn.RollbackAsync(default);
     }
 }

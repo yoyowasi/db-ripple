@@ -108,7 +108,17 @@ public sealed record PreviewRecord
     public IReadOnlyList<NetChange> NetChanges { get; init; } = [];
     /// <summary>원문 SQL([적용] 재실행용, C15). API 응답에는 나가지 않는다.</summary>
     public required string Sql { get; init; }
+    /// <summary>
+    /// EXEC 문장마다 미리보기가 실제로 실행한 SQL(ProcedurePlan.ExecSql, 2026-11-17). Plan은 JSON에 저장되지 않으므로 따로 남겨,
+    /// [적용] 재분석의 실행 SQL이 글자 그대로 같은지 본다. 없으면(이전 미리보기) EXEC [적용]은 SQL_HASH_MISMATCH로 막힌다.
+    /// </summary>
+    public IReadOnlyList<ExecSqlRecord> ExecSql { get; init; } = [];
 }
+
+/// <summary>EXEC 문장 하나의 실행 SQL(PreviewRecord.ExecSql 원소).</summary>
+/// <param name="StatementIndex">문장 번호.</param>
+/// <param name="Sql">분석기가 만든 실행 SQL(ProcedurePlan.ExecSql).</param>
+public sealed record ExecSqlRecord(int StatementIndex, string Sql);
 
 /// <summary>미리보기 파이프라인 결과. 거부면 Rejected만, 아니면 Record만 채워진다.</summary>
 public sealed record PreviewOutcome

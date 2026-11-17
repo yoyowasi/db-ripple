@@ -583,46 +583,91 @@ internal static class OriginWarnings
     }
 }
 
-/// <summary>원본 프로시저 하나의 EXEC [적용] 선행 조건 읽기 결과(2026-11-17). Definition은 없거나 볼 수 없으면(VIEW DEFINITION 없음) null.</summary>
-internal sealed record OriginProcedure(string Schema, string Name, string? Definition, bool CanExecute);
+/// <summary>
+/// 원본 프로시저 하나의 EXEC [적용] 확인 읽기 결과(2026-11-17). Definition은 없거나 볼 수 없으면(VIEW DEFINITION 없음) null.
+/// Signed는 모듈 서명(sys.crypt_properties)이 있는지, CanExecute는 실행 주체의 EXECUTE(권한을 읽지 않은 읽기면 false).
+/// </summary>
+internal sealed record OriginProcedure(string Schema, string Name, string? Definition, bool CanExecute, bool Signed = false);
 
 /// <summary>
-/// EXEC [적용] 선행 조건(2026-11-17, 읽기만). 환경 지문(Core Fingerprint)에는 모듈 정의가 없으므로 따로 본다.
+/// EXEC [적용] 확인(2026-11-17, 읽기만). 환경 지문(Core Fingerprint)에는 모듈 정의가 없으므로 따로 본다.
 /// <list type="bullet">
 /// <item>권한: 원본 실행 주체(SingleServer는 실행 사용자, Split은 본인 로그인)가 최상위 프로시저마다 EXECUTE를 가졌는지. 도구는 GRANT하지 않는다.</item>
 /// <item>정의: 최상위와 분석기가 펼친 중첩 프로시저(ProcedurePlan.ExpandedCalls)의 원본 정의가 기준선 카탈로그(샌드박스, 분석기가 거부 규칙을 본 본문)와 글자 그대로 같은지.
-///   함수·뷰·트리거 정의는 대조하지 않는다(DML [적용]과 같은 한계, 결과 limitations에 적는다).</item>
+///   함수·뷰·트리거(와 트리거가 부르는 프로시저) 정의는 대조하지 않는다(DML [적용]과 같은 한계, 결과 limitations에 적는다).</item>
+/// <item>서명: 같은 프로시저에 모듈 서명이 있으면 막는다. 서명은 인증서·비대칭 키 사용자의 권한을 더해 DML 전용 실행 사용자의 권한 경계를 넘을 수 있다.</item>
 /// </list>
+/// 선행 조건(별도 연결)에서 한 번, 실행 트랜잭션 연결에서 EXEC 실행 직전과 커밋 전에 다시(정의·서명만, 가장 없이 도구 로그인) 읽는다.
 /// </summary>
 internal static class OriginProcedures
 {
     /// <summary>EXEC를 [적용]할 때 결과 limitations에 싣는 한계.</summary>
     public const string Limitation =
-        "EXEC: 프로시저는 반환 값과 결과 집합 수만 미리보기와 대조하고 결과 집합 내용은 비교하지 않음. 원본 정의는 호출 대상과 펼친 중첩 프로시저만 기준선과 대조함(함수·뷰·트리거 정의는 대조하지 않음)";
+        "EXEC: 프로시저는 반환 값과 결과 집합 수만 미리보기와 대조하고 결과 집합 내용은 비교하지 않음. 원본 정의는 호출 대상과 펼친 중첩 프로시저만 기준선과 대조함(함수·뷰·트리거 정의와 트리거가 부르는 프로시저 정의는 대조하지 않음)";
 
     /// <summary>
-    /// 원본 DB 문맥의 읽기 SQL. 매개변수 @s{i}·@n{i}(스키마·이름). 결과 집합 둘: (i, definition), (i, 0/1 EXECUTE).
-    /// 정의는 가장 전에 도구 로그인으로 읽는다(가장한 사용자는 VIEW DEFINITION이 없어 NULL로 보인다). 권한은 executeAsUser가 있으면 EXECUTE AS USER 뒤 읽고 REVERT한다.
+    /// 정의·서명 읽기(원본 DB 문맥). 세션 옵션을 바꾸지 않으므로 실행 트랜잭션 연결에서도 쓴다. 매개변수 @s{i}·@n{i}(스키마·이름).
+    /// 결과 집합: (i, definition, 서명 0/1). 없는 프로시저는 정의 NULL·서명 0이다.
+    /// </summary>
+    public static string DefinitionSql(int count)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
+        return "SELECT v.i, m.definition, CASE WHEN EXISTS (SELECT 1 FROM sys.crypt_properties AS c WHERE c.class = 1 AND c.major_id = p.object_id) THEN 1 ELSE 0 END\n"
+            + $"FROM (VALUES {Values(count)}) AS v (i, s, n)\n"
+            + "LEFT JOIN sys.procedures AS p ON p.schema_id = SCHEMA_ID(v.s) AND p.name = v.n\n"
+            + "LEFT JOIN sys.sql_modules AS m ON m.object_id = p.object_id\n"
+            + "ORDER BY v.i;\n";
+    }
+
+    /// <summary>
+    /// 선행 조건 읽기 SQL(전용 연결). 결과 집합 둘: <see cref="DefinitionSql"/>, (i, 0/1 EXECUTE).
+    /// 정의·서명은 가장 전에 도구 로그인으로 읽는다(가장한 사용자는 VIEW DEFINITION이 없어 NULL로 보인다). 권한은 executeAsUser가 있으면 EXECUTE AS USER 뒤 읽고 REVERT한다.
     /// </summary>
     public static string Sql(int count, string? executeAsUser)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
-        var values = string.Join(", ", Enumerable.Range(0, count).Select(i => string.Create(CultureInfo.InvariantCulture, $"({i}, @s{i}, @n{i})")));
         var sb = new StringBuilder();
-        sb.Append("SET NOCOUNT ON;\n");
-        sb.Append($"SELECT v.i, m.definition FROM (VALUES {values}) AS v (i, s, n)\n")
-          .Append("LEFT JOIN sys.procedures AS p ON p.schema_id = SCHEMA_ID(v.s) AND p.name = v.n\n")
-          .Append("LEFT JOIN sys.sql_modules AS m ON m.object_id = p.object_id\n")
-          .Append("ORDER BY v.i;\n");
+        sb.Append("SET NOCOUNT ON;\n").Append(DefinitionSql(count));
         if (executeAsUser is not null) sb.Append($"EXECUTE AS USER = {SqlText.NLiteral(executeAsUser)};\n");
         sb.Append("SELECT v.i, CASE WHEN HAS_PERMS_BY_NAME(QUOTENAME(v.s) + N'.' + QUOTENAME(v.n), N'OBJECT', N'EXECUTE') = 1 THEN 1 ELSE 0 END\n")
-          .Append($"FROM (VALUES {values}) AS v (i, s, n)\n")
+          .Append($"FROM (VALUES {Values(count)}) AS v (i, s, n)\n")
           .Append("ORDER BY v.i;\n");
         if (executeAsUser is not null) sb.Append("REVERT;\n");
         return sb.ToString();
     }
 
-    /// <summary>EXEC 문장에서 확인할 프로시저 "스키마.이름"(카탈로그 철자, 처음 나온 순서, 중복 없음). TopLevel은 권한·정의, All은 정의를 본다.</summary>
+    static string Values(int count) =>
+        string.Join(", ", Enumerable.Range(0, count).Select(i => string.Create(CultureInfo.InvariantCulture, $"({i}, @s{i}, @n{i})")));
+
+    /// <summary>cmd(<see cref="DefinitionSql"/> 또는 <see cref="Sql"/>)에 매개변수를 넣고 읽는다. permissions면 두 번째 결과 집합(EXECUTE)도 읽는다. 결과는 입력 순서.</summary>
+    public static async Task<IReadOnlyList<OriginProcedure>> ReadAsync(SqlCommand cmd, IReadOnlyList<(string Schema, string Name)> procedures, bool permissions, CancellationToken ct)
+    {
+        for (var i = 0; i < procedures.Count; i++)
+        {
+            cmd.Parameters.Add(new SqlParameter($"@s{i}", SqlDbType.NVarChar, 128) { Value = procedures[i].Schema });
+            cmd.Parameters.Add(new SqlParameter($"@n{i}", SqlDbType.NVarChar, 128) { Value = procedures[i].Name });
+        }
+        var definitions = new string?[procedures.Count];
+        var signed = new bool[procedures.Count];
+        var canExecute = new bool[procedures.Count];
+        await using (var r = await cmd.ExecuteReaderAsync(ct))
+        {
+            while (await r.ReadAsync(ct))
+            {
+                var i = r.GetInt32(0);
+                definitions[i] = r.IsDBNull(1) ? null : r.GetString(1);
+                signed[i] = r.GetInt32(2) == 1;
+            }
+            if (permissions)
+            {
+                if (!await r.NextResultAsync(ct)) throw new InvalidOperationException("원본 프로시저의 EXECUTE 권한을 읽지 못함");
+                while (await r.ReadAsync(ct)) canExecute[r.GetInt32(0)] = r.GetInt32(1) == 1;
+            }
+            while (await r.NextResultAsync(ct)) { } // EXECUTE AS·REVERT 오류까지 드러낸다
+        }
+        return procedures.Select((p, i) => new OriginProcedure(p.Schema, p.Name, definitions[i], canExecute[i], signed[i])).ToList();
+    }
+
+    /// <summary>EXEC 문장에서 확인할 프로시저 "스키마.이름"(카탈로그 철자, 처음 나온 순서, 중복 없음). TopLevel은 권한·정의·서명, All은 정의·서명을 본다.</summary>
     public static (IReadOnlyList<string> TopLevel, IReadOnlyList<string> All) Targets(IEnumerable<AnalyzedStatement> statements)
     {
         var top = new List<string>();
@@ -650,41 +695,77 @@ internal static class OriginProcedures
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
     }
 
-    /// <summary>
-    /// 판정(순수). origin은 baseline에서 찾은 프로시저를 읽은 결과다. 실패마다 (코드, 이유). principal은 메시지용 실행 주체 이름이다.
-    /// 정의는 기준선에 없음·원본에서 못 읽음·다름을, 권한은 최상위만 본다(중첩은 소유권 체인을 타거나, 아니면 실행 중 229로 롤백된다).
-    /// </summary>
-    public static IReadOnlyList<(ApplyPrecondition Code, string Reason)> Judge(
-        IReadOnlyList<string> topLevel, IReadOnlyList<string> all, IReadOnlyDictionary<string, CatalogModule> baseline, IReadOnlyList<OriginProcedure> origin, string principal)
+    /// <summary>원본에 물을 (스키마, 이름): 기준선에서 찾은 것만(names 순서).</summary>
+    public static IReadOnlyList<(string Schema, string Name)> Query(IEnumerable<string> names, IReadOnlyDictionary<string, CatalogModule> baseline) =>
+        names.Where(baseline.ContainsKey).Select(n => (baseline[n].Schema, baseline[n].Name)).ToList();
+
+    /// <summary>정의·서명 대조 결과(이름 목록): 기준선에 없음, 원본에서 못 읽음, 정의가 다름, 서명됨.</summary>
+    public sealed record Comparison(IReadOnlyList<string> Missing, IReadOnlyList<string> Unreadable, IReadOnlyList<string> Changed, IReadOnlyList<string> Signed)
     {
-        var read = origin.GroupBy(o => o.Schema + "." + o.Name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
-        List<string> missing = [], unreadable = [], changed = [], denied = [];
+        public bool Clean => Missing.Count == 0 && Unreadable.Count == 0 && Changed.Count == 0 && Signed.Count == 0;
+    }
+
+    /// <summary>정의·서명 대조(순수). 정의가 다르거나 못 읽으면 서명은 따로 세지 않는다.</summary>
+    public static Comparison Compare(IReadOnlyList<string> all, IReadOnlyDictionary<string, CatalogModule> baseline, IReadOnlyList<OriginProcedure> origin)
+    {
+        var read = ByName(origin);
+        List<string> missing = [], unreadable = [], changed = [], signed = [];
         foreach (var name in all)
         {
             if (!baseline.TryGetValue(name, out var module)) missing.Add(name);
             else if (!read.TryGetValue(name, out var o) || o.Definition is null) unreadable.Add(name);
             else if (module.Definition is null || !string.Equals(module.Definition, o.Definition, StringComparison.Ordinal)) changed.Add(name);
+            else if (o.Signed) signed.Add(name);
         }
-        foreach (var name in topLevel)
-            if (baseline.ContainsKey(name) && !(read.TryGetValue(name, out var o) && o.CanExecute)) denied.Add(name);
+        return new Comparison(missing, unreadable, changed, signed);
+    }
+
+    /// <summary>실행 트랜잭션 안 재확인의 이유 문구(대조가 깨끗하면 null).</summary>
+    public static string? Drift(Comparison c)
+    {
+        if (c.Clean) return null;
+        var parts = new List<string>();
+        if (c.Changed.Count > 0) parts.Add("정의가 바뀜: " + string.Join(", ", c.Changed));
+        if (c.Signed.Count > 0) parts.Add("모듈 서명이 있음: " + string.Join(", ", c.Signed));
+        if (c.Unreadable.Count > 0) parts.Add("정의를 읽지 못함: " + string.Join(", ", c.Unreadable));
+        if (c.Missing.Count > 0) parts.Add("기준선에 없음: " + string.Join(", ", c.Missing));
+        return "원본 프로시저가 기준선과 다름(" + string.Join("; ", parts) + ")";
+    }
+
+    /// <summary>
+    /// 선행 조건 판정(순수). origin은 baseline에서 찾은 프로시저를 읽은 결과다. 실패마다 (코드, 이유). principal은 메시지용 실행 주체 이름이다.
+    /// 정의는 기준선에 없음·원본에서 못 읽음·다름을, 서명은 최상위·중첩 모두, 권한은 최상위만 본다(중첩은 소유권 체인을 타거나, 아니면 실행 중 229로 롤백된다).
+    /// </summary>
+    public static IReadOnlyList<(ApplyPrecondition Code, string Reason)> Judge(
+        IReadOnlyList<string> topLevel, IReadOnlyList<string> all, IReadOnlyDictionary<string, CatalogModule> baseline, IReadOnlyList<OriginProcedure> origin, string principal)
+    {
+        var c = Compare(all, baseline, origin);
+        var read = ByName(origin);
+        var denied = topLevel.Where(name => baseline.ContainsKey(name) && !(read.TryGetValue(name, out var o) && o.CanExecute)).ToList();
 
         var list = new List<(ApplyPrecondition, string)>();
-        if (changed.Count > 0)
+        if (c.Changed.Count > 0)
             list.Add((ApplyPrecondition.ProcDefinitionChanged,
-                $"기준선 이후 원본에서 프로시저 정의가 바뀜: {string.Join(", ", changed)}. 바뀐 본문은 거부 규칙 검사를 거치지 않았으므로 실행하지 않음(샌드박스를 새로 고친 뒤 다시 미리보기 할 것)."));
-        if (unreadable.Count > 0)
+                $"기준선 이후 원본에서 프로시저 정의가 바뀜: {string.Join(", ", c.Changed)}. 바뀐 본문은 거부 규칙 검사를 거치지 않았으므로 실행하지 않음(샌드박스를 새로 고친 뒤 다시 미리보기 할 것)."));
+        if (c.Unreadable.Count > 0)
             list.Add((ApplyPrecondition.ProcDefinitionChanged,
-                $"원본에서 프로시저 정의를 읽지 못해 기준선과 같은지 확인할 수 없음: {string.Join(", ", unreadable)}(없거나 암호화됐거나 도구 로그인에 VIEW DEFINITION 권한이 없음)."));
-        if (missing.Count > 0)
-            list.Add((ApplyPrecondition.ProcDefinitionChanged, $"기준선 카탈로그에 프로시저 정의가 없음: {string.Join(", ", missing)}."));
+                $"원본에서 프로시저 정의를 읽지 못해 기준선과 같은지 확인할 수 없음: {string.Join(", ", c.Unreadable)}(없거나 암호화됐거나 도구 로그인에 VIEW DEFINITION 권한이 없음)."));
+        if (c.Missing.Count > 0)
+            list.Add((ApplyPrecondition.ProcDefinitionChanged, $"기준선 카탈로그에 프로시저 정의가 없음: {string.Join(", ", c.Missing)}."));
+        if (c.Signed.Count > 0)
+            list.Add((ApplyPrecondition.ProcSignedNotSupported,
+                $"모듈 서명(ADD SIGNATURE)이 있는 프로시저: {string.Join(", ", c.Signed)}. 서명은 실행 사용자의 DML 전용 권한 경계를 넘을 수 있어 원본에서 실행하지 않음."));
         if (denied.Count > 0)
             list.Add((ApplyPrecondition.ProcExecutePermissionMissing,
                 $"{principal}에게 프로시저 EXECUTE 권한이 없음: {string.Join(", ", denied)}. 도구는 원본에 GRANT하지 않으므로 권한을 받은 뒤 다시 적용할 것."));
         return list;
     }
+
+    static Dictionary<string, OriginProcedure> ByName(IReadOnlyList<OriginProcedure> origin) =>
+        origin.GroupBy(o => o.Schema + "." + o.Name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
 }
 
-/// <summary>원본 스냅샷 생성 결과. 2026-11-13: 생성 실패는 모두 Failed(error)다. KEYSET_HASH는 실행 전 CheckSnapshotCapability로만 정한다(조용한 강등 없음).</summary>
+// <summary>원본 스냅샷 생성 결과. 2026-11-13: 생성 실패는 모두 Failed(error)다. KEYSET_HASH는 실행 전 CheckSnapshotCapability로만 정한다(조용한 강등 없음).</summary>
 internal enum SnapshotOutcome
 {
     /// <summary>만들었다(SNAPSHOT_NETDIFF).</summary>

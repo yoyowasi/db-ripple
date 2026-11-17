@@ -116,6 +116,7 @@ public static class ApplyMatcher
     /// <summary>
     /// D7 1: 문장별 직접 대상 행 수. 실제가 ok가 아니면 실제 값은 null이다.
     /// EXEC(2026-11-17)는 행 수가 양쪽 다 null이므로 반환 값(PROC_RETURN_VALUE)과 결과 집합 수(PROC_RESULT_SET_COUNT)도 대조한다. 결과 집합 내용은 비교하지 않는다.
+    /// 분석기가 반환 값을 비결정으로 본 문장(ProcedurePlan.ReturnValueNondeterministic)은 반환 값의 NULL 여부만 비교한다.
     /// </summary>
     public static (IReadOnlyList<StatementRowCount> Rows, IReadOnlyList<ApplyMismatch> Mismatches) CompareStatements(
         IReadOnlyList<StatementResult> preview, IReadOnlyList<StatementResult> actual)
@@ -139,12 +140,14 @@ public static class ApplyMatcher
                 });
             if (p.Kind != ChangeOperation.Exec) continue;
             int? returnValue = ok ? a!.ReturnValue : null, resultSets = ok ? a!.ResultSetCount : null;
-            if (p.ReturnValue != returnValue)
+            // 반환 값이 IDENTITY·비결정 함수에 기대면(분석기 판정, 재분석한 실제 쪽 Plan 우선) NULL 여부만 비교한다(2026-11-17).
+            var loose = (a?.Plan ?? p.Plan)?.ReturnValueNondeterministic == true;
+            if (loose ? p.ReturnValue.HasValue != returnValue.HasValue : p.ReturnValue != returnValue)
                 mismatches.Add(new ApplyMismatch
                 {
                     Kind = MismatchKind.ProcReturnValue, StatementIndex = p.Index,
                     Expected = p.ReturnValue?.ToString(CultureInfo.InvariantCulture), Actual = returnValue?.ToString(CultureInfo.InvariantCulture),
-                    Message = $"문장 {p.Index}의 프로시저 반환 값이 미리보기와 다름",
+                    Message = loose ? $"문장 {p.Index}의 프로시저 반환 값 유무(NULL 여부)가 미리보기와 다름" : $"문장 {p.Index}의 프로시저 반환 값이 미리보기와 다름",
                 });
             if (p.ResultSetCount != resultSets)
                 mismatches.Add(new ApplyMismatch

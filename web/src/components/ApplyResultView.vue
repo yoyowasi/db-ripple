@@ -53,6 +53,7 @@ const MISMATCH_LABEL: Record<MismatchKind, string> = {
   OUTSIDE_TABLE_CHANGED: '미리보기에 없던 테이블이 바뀜',
   PROC_RETURN_VALUE: '프로시저 반환 값',
   PROC_RESULT_SET_COUNT: '프로시저 결과 집합 수',
+  PROC_DEFINITION_CHANGED: '실행 중 프로시저 정의가 바뀜',
 }
 const DRIFT_LABEL: Record<DriftRow['kind'], string> = {
   CHANGED: '값이 바뀜',

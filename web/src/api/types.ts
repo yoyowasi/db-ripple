@@ -418,6 +418,8 @@ export type ApplyPrecondition =
   | 'PROC_EXECUTE_PERMISSION_MISSING'
   /** 기준선 이후 원본의 프로시저(호출 대상·펼친 중첩) 정의가 바뀌었거나 읽을 수 없다(2026-11-17) */
   | 'PROC_DEFINITION_CHANGED'
+  /** 부르는 프로시저(호출 대상·펼친 중첩)에 모듈 서명(ADD SIGNATURE)이 있다(2026-11-17) */
+  | 'PROC_SIGNED_NOT_SUPPORTED'
 export type ApplyStatus = 'committed' | 'rolled_back_mismatch' | 'drift_detected' | 'precondition_failed' | 'error'
 export interface ApplyRequest {
   sqlHash: string | null
@@ -450,6 +452,8 @@ export type MismatchKind =
   | 'PROC_RETURN_VALUE'
   /** EXEC: 프로시저 결과 집합 수가 미리보기와 다름(내용은 비교하지 않음, 2026-11-17) */
   | 'PROC_RESULT_SET_COUNT'
+  /** EXEC: 실행 트랜잭션 안에서 다시 읽은 프로시저 정의·서명이 기준선과 다름(실행 직전·커밋 전, 2026-11-17) */
+  | 'PROC_DEFINITION_CHANGED'
 export interface ApplyMismatch {
   kind: MismatchKind
   statementIndex: number | null

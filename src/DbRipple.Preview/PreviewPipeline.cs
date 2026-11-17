@@ -121,7 +121,13 @@ public sealed class PreviewPipeline(
                 Resolve = resolveMs,
             },
         };
-        var record = new PreviewRecord { Result = result, RowChanges = model.RowChanges, NetChanges = model.NetChanges, Sql = sql };
+        var record = new PreviewRecord
+        {
+            Result = result, RowChanges = model.RowChanges, NetChanges = model.NetChanges, Sql = sql,
+            // EXEC [적용]이 재분석한 실행 SQL과 글자 그대로 대조한다(Plan은 JSON에 저장되지 않음, 2026-11-17).
+            ExecSql = analysis.Statements.Where(s => s.Kind == ChangeOperation.Exec && s.Plan is { ExecSql.Length: > 0 })
+                .Select(s => new ExecSqlRecord(s.Index, s.Plan!.ExecSql)).ToList(),
+        };
 
         sw.Restart();
         JsonSerializer.SerializeToUtf8Bytes(record, ContractJson.Options);
