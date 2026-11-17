@@ -179,7 +179,7 @@ public sealed class CaseScorer(MetricsCalculator calculator)
             edgeDiff.AddRange(missing.Select(k => "정답에만: " + k));
         }
 
-        var transient = isPreview ? TransientChanges.Compute(record, folding) : null;
+        var transient = isPreview ? TransientChanges.Compute(record, folding, vol) : null;
         if (transient is not null) suite.AddTransient(system, hand.Id, transient);
 
         return new CaseScore(caseRow, m1Rows, m2Rows, handDiff, rawDiff)

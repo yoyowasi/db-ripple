@@ -38,7 +38,9 @@ public class TransientChangesTests
         },
     };
 
-    static TransientCounts Run(PreviewRecord r) => TransientChanges.Compute(r, KeyFolding.None)!;
+    static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> NoVol = new Dictionary<string, IReadOnlySet<string>>();
+
+    static TransientCounts Run(PreviewRecord r) => TransientChanges.Compute(r, KeyFolding.None, NoVol)!;
 
     [Fact]
     public void Update_then_trigger_delete_leaves_update_as_transient()
@@ -59,7 +61,7 @@ public class TransientChangesTests
             [RC(1, ChangeOperation.Update, "1", V(("id", "1"), ("v", "0")), V(("id", "1"), ("v", "5"))), RC(2, ChangeOperation.Update, "1", V(("id", "1"), ("v", "5")), V(("id", "1"), ("v", "0")))],
             []);
         var c = Run(rec);
-        Assert.Equal((2L, 2L), (c.Measured, c.Transient));
+        Assert.Equal((2L, 1L), (c.Measured, c.Transient)); // 최종 = 원래 값(v0)이라 v5로 간 이벤트만 중간
     }
 
     [Fact]
@@ -87,11 +89,11 @@ public class TransientChangesTests
     public void Failed_status_and_keys_mode_are_not_measured()
     {
         var failed = Rec([F(1, "t.a", ChangeOperation.Update)], [RC(1, ChangeOperation.Update, "1", V(("id", "1")), V(("id", "1")))], [], PreviewStatus.Failed);
-        Assert.Null(TransientChanges.Compute(failed, KeyFolding.None));
+        Assert.Null(TransientChanges.Compute(failed, KeyFolding.None, NoVol));
         var keys = Rec([F(1, "t.a", ChangeOperation.Update, ImageMode.Keys)], [RC(1, ChangeOperation.Update, "1", null, null)], []);
         var c = Run(keys);
         Assert.Equal((1L, 0L, 0L), (c.Events, c.Measured, c.Transient));
-        Assert.Null(TransientChanges.Compute(null, KeyFolding.None));
+        Assert.Null(TransientChanges.Compute(null, KeyFolding.None, NoVol));
     }
 
     [Fact]
@@ -105,5 +107,68 @@ public class TransientChangesTests
         var row = suite.Rows("r").Single(r => r[2] == "M6.transient_changes");
         Assert.Equal(["r", "preview", "M6.transient_changes", "all", "1", "2", "0.5000", "1"], row);
         Assert.Equal(MetricsCsv.M6Columns.Count, 4 + Run(rec).CsvCells().Count);
+    }
+
+    [Fact]
+    public void Insert_then_trigger_update_counts_only_the_insert()
+    {
+        var rec = Rec([F(1, "t.a", ChangeOperation.Insert), F(2, "t.a", ChangeOperation.Update)],
+            [RC(1, ChangeOperation.Insert, "1", null, V(("id", "1"), ("v", "1"))), RC(2, ChangeOperation.Update, "1", V(("id", "1"), ("v", "1")), V(("id", "1"), ("v", "2")))],
+            [Net("t.a", "1", NetChangeKind.Inserted, V(("id", "1"), ("v", "2")))]);
+        var c = Run(rec);
+        Assert.Equal((2L, 1L), (c.Measured, c.Transient));
+        Assert.StartsWith("INSERT t.a", c.TransientKeys.Single());
+    }
+
+    [Fact]
+    public void Delete_then_reinsert_same_values_counts_only_the_delete()
+    {
+        var rec = Rec([F(1, "t.a", ChangeOperation.Delete), F(2, "t.a", ChangeOperation.Insert)],
+            [RC(1, ChangeOperation.Delete, "1", V(("id", "1"), ("v", "1")), null), RC(2, ChangeOperation.Insert, "1", null, V(("id", "1"), ("v", "1")))],
+            []);
+        var c = Run(rec);
+        Assert.Equal((2L, 1L), (c.Measured, c.Transient));
+        Assert.StartsWith("DELETE t.a", c.TransientKeys.Single());
+    }
+
+    [Fact]
+    public void Columns_missing_from_event_images_are_not_compared()
+    {
+        // text 열은 발동 보기 이미지에 없고 최종 차이에는 있다: 정상 변경은 0
+        var rec = Rec([F(1, "t.a", ChangeOperation.Update)],
+            [RC(1, ChangeOperation.Update, "1", V(("id", "1"), ("v", "0")), V(("id", "1"), ("v", "1")))],
+            [Net("t.a", "1", NetChangeKind.Updated, V(("id", "1"), ("v", "1"), ("body", "긴 글")))]);
+        Assert.Equal((1L, 0L), (Run(rec).Measured, Run(rec).Transient));
+    }
+
+    [Fact]
+    public void Keyless_table_rows_use_the_shared_columns_for_identity()
+    {
+        RowChange Row(long seq, ChangeOperation op, Dictionary<string, string?>? b, Dictionary<string, string?>? a) =>
+            RC(seq, op, "", b, a) with { Key = new RowKey { Kind = KeyKind.ROW } };
+        var rec = Rec([F(1, "t.k", ChangeOperation.Insert)],
+            [Row(1, ChangeOperation.Insert, null, V(("x", "1")))],
+            [new NetChange { Table = "t.k", Key = new RowKey { Kind = KeyKind.ROW }, Change = NetChangeKind.MultisetAdded, Multiplicity = 1, After = V(("x", "1"), ("body", "b")) }]);
+        Assert.Equal(0L, Run(rec).Transient);
+    }
+
+    [Fact]
+    public void Volatile_columns_from_the_map_are_ignored()
+    {
+        var map = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase) { ["t.a"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ts" } };
+        var rec = Rec([F(1, "t.a", ChangeOperation.Update)],
+            [RC(1, ChangeOperation.Update, "1", V(("id", "1"), ("v", "0"), ("ts", "a")), V(("id", "1"), ("v", "1"), ("ts", "a")))],
+            [Net("t.a", "1", NetChangeKind.Updated, V(("id", "1"), ("v", "1"), ("ts", "b")))]);
+        Assert.Equal(0L, TransientChanges.Compute(rec, KeyFolding.None, map)!.Transient);
+    }
+
+    [Fact]
+    public void Unpaired_pk_change_halves_are_excluded()
+    {
+        var rec = Rec([F(1, "t.a", ChangeOperation.Update)],
+            [RC(1, ChangeOperation.Update, "1", V(("id", "1")), null) with { Pairing = Pairing.Unpaired }, RC(1, ChangeOperation.Update, "2", null, V(("id", "2"))) with { Pairing = Pairing.Unpaired }],
+            [Net("t.a", "1", NetChangeKind.Deleted, null), Net("t.a", "2", NetChangeKind.Inserted, V(("id", "2")))]);
+        var c = Run(rec);
+        Assert.Equal((2L, 0L, 0L), (c.Events, c.Measured, c.Transient));
     }
 }

@@ -18,70 +18,93 @@ public sealed record TransientCounts(long Events, long Measured, long Transient,
 /// M6 중간 변경(2026-11-17): 제품의 "발동 보기"(PreviewRecord.RowChanges, 묶음마다 일어난 그대로)에는 보이지만 "최종 차이"(실행 끝의 순 변경)에서는 사라지는 행 변경의 수.
 /// "사본 + Data Compare"(B2)는 최종 상태만 비교하므로 이 정보를 원리상 볼 수 없다.
 /// <list type="bullet">
-/// <item>정의: 행 서명 = (테이블, 키, 연산, after 값). 발동 보기의 서로 다른 행 서명 가운데, 최종 차이에 같은 (테이블, 키, 연산 종류, after 값)이 없는 것의 수가 중간 변경이다.
-/// 연산 종류는 INSERT=INSERTED·MULTISET_ADDED, UPDATE=UPDATED, DELETE=DELETED·MULTISET_REMOVED로 맞춘다. DELETE의 after는 없음이다.</item>
-/// <item>예: 같은 행을 UPDATE한 뒤 다른 트리거가 DELETE(UPDATE 서명이 사라진다), 값이 바뀌었다가 원래 값으로 돌아옴(UPDATE 둘 다 사라진다), 중간 값을 거친 UPDATE(첫 UPDATE의 after가 최종 after와 다르다).</item>
-/// <item>같은 서명이 여러 번 나오면 한 번만 센다. 최종 차이는 NetChanges ∪ ResidualCommitted다(CaseScorer의 total과 같다).</item>
-/// <item>제외: 미리보기 상태가 ok가 아니면 계산하지 않는다(실패·거부·truncated는 롤백된 변경과 중간 변경이 섞인다). ImageMode가 KEYS인 묶음의 행 변경과 PK가 바뀌어 짝을 못 지은(UNPAIRED) UPDATE 반쪽은 after가 없거나 한쪽뿐이라 비교할 수 없으므로 뺀다.
-/// 발동 보기가 비결정 열(RowChange.Volatile)로 보고한 열은 양쪽 after에서 뺀다(같은 실행이라도 감사 기록 값과 재조회 값이 다를 수 있다). 키는 오라클 테이블의 정렬 규칙으로 접는다(KeyFolding).</item>
+/// <item>정의: 행 (테이블, 키)마다 최종 상태를 정한다. 최종 차이(NetChanges ∪ ResidualCommitted)에 그 행이 있으면 그 after(DELETED면 "없음"), 없으면 그 행의 처음 before(실행 전 상태, 원래 값으로 돌아온 경우.
+/// 처음 이벤트가 INSERT면 "없음"). 발동 보기 이벤트 가운데 after(DELETE면 "없음")가 그 행의 최종 상태와 다른 것이 중간 변경이다. 연산 종류는 비교하지 않는다. 같은 (행, after) 이벤트는 한 번만 센다.</item>
+/// <item>예: 같은 행을 UPDATE한 뒤 다른 트리거가 DELETE(UPDATE가 중간), 값이 바뀌었다가 원래 값으로 돌아옴(바뀐 값으로 간 이벤트만 중간), INSERT 뒤 트리거가 같은 행 UPDATE(INSERT가 중간), DELETE 뒤 같은 값 재INSERT(DELETE가 중간).</item>
+/// <item>비교 열: 테이블마다 발동 보기 행 이미지와 최종 차이 이미지에 모두 있는 열만 비교한다(text·ntext·image처럼 발동 보기가 못 보는 열은 빠진다). 비결정 열은 뺀다(CaseScorer.VolatileMap 카탈로그 + 손 정답, 그리고 RowChange.Volatile).
+/// 키 없는 테이블(ROW 키)의 키도 같은 비교 열 값으로 만든다. 키는 오라클 테이블의 정렬 규칙으로 접는다(KeyFolding).</item>
+/// <item>분모 = 비교한 이벤트 서명 수(서로 다른 (행, after)). 계산 대상이 아닌 것: 미리보기 상태가 ok가 아닌 사례(롤백된 변경이 섞임), ImageMode가 KEYS인 묶음, PK가 바뀌어 짝을 못 지은(UNPAIRED) UPDATE 반쪽
+/// (최종 차이는 옛 키 DELETED + 새 키 INSERTED라 행을 이을 수 없어 제외한다. 그 행의 변경은 이 지표에 들어가지 않는다).</item>
 /// <item>B0·B2는 최종 상태(순 변경)만 보는 시스템이라 정의상 0이고 행도 내지 않는다(해당 없음). 값은 preview 행에만 있다.</item>
 /// </list>
 /// </summary>
 public static class TransientChanges
 {
-    /// <summary>계산한다. 계산 대상이 아니면(기록 없음, 상태가 ok 아님) null.</summary>
-    public static TransientCounts? Compute(PreviewRecord? record, KeyFolding folding)
+    const string None = "\u0001NONE";
+
+    /// <summary>계산한다. 계산 대상이 아니면(기록 없음, 상태가 ok 아님) null. volatileMap: 테이블 → 비결정 열(대소문자 무시).</summary>
+    public static TransientCounts? Compute(PreviewRecord? record, KeyFolding folding, IReadOnlyDictionary<string, IReadOnlySet<string>> volatileMap)
     {
         if (record is null || record.Result.Status != PreviewStatus.Ok) return null;
         var firings = record.Result.Firings.ToDictionary(f => f.Id, StringComparer.Ordinal);
+        var order = Reconstruction.PreorderIndex(record.Result.Firings);
 
-        // 테이블별 비결정 열(발동 보기가 알려 준 것)
-        var vol = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var rc in record.RowChanges)
-            if (rc.Volatile.Count > 0 && firings.TryGetValue(rc.FiringId, out var f))
-            {
-                if (!vol.TryGetValue(f.Table, out var s)) vol[f.Table] = s = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var v in rc.Volatile) s.Add(v.Column);
-            }
-
-        string Sig(string table, string key, string op, IReadOnlyDictionary<string, string?>? after)
-        {
-            var v = vol.GetValueOrDefault(table);
-            var cols = after is null ? "-" : string.Join(",", after.Where(p => v is null || !v.Contains(p.Key))
-                .OrderBy(p => p.Key.ToUpperInvariant(), StringComparer.Ordinal).Select(p => p.Key.ToUpperInvariant() + "=" + (p.Value ?? "\u0000")));
-            return table.ToUpperInvariant() + "|" + folding.Key(table, key) + "|" + op + "|" + cols;
-        }
-
-        static string KeyOf(RowKey k, IReadOnlyDictionary<string, string?>? after, IReadOnlyDictionary<string, string?>? before) =>
-            k.Kind.ToString() == "ROW"
-                ? RowKeys.Canonical(after ?? before ?? new Dictionary<string, string?>())
-                : RowKeys.Canonical(k.Columns, k.Values);
-
-        var events = new Dictionary<string, string>(StringComparer.Ordinal); // 서명 → 표시
+        var net = record.NetChanges.Concat(record.Result.ResidualCommitted ?? []).ToList();
+        var events = new List<(Firing F, RowChange Rc)>();
         long eventRows = 0;
         foreach (var rc in record.RowChanges)
         {
             if (!firings.TryGetValue(rc.FiringId, out var f)) continue;
             eventRows++;
-            if (f.ImageMode == ImageMode.Keys || rc.Pairing == Pairing.Unpaired) continue; // after가 없거나 한쪽뿐이라 비교 못 함
-            var op = rc.Operation switch { ChangeOperation.Insert => "INSERT", ChangeOperation.Update => "UPDATE", ChangeOperation.Delete => "DELETE", _ => rc.Operation.ToString() };
-            var key = KeyOf(rc.Key, rc.After, rc.Before);
-            events.TryAdd(Sig(f.Table, key, op, op == "DELETE" ? null : rc.After), op + " " + f.Table + RowKeys.Display(folding.Key(f.Table, key)));
+            if (f.ImageMode == ImageMode.Keys || rc.Pairing == Pairing.Unpaired) continue;
+            events.Add((f, rc));
         }
+        events = events.OrderBy(e => order.TryGetValue(e.F.Id, out var o) ? (o.Statement, o.Preorder) : (e.F.StatementIndex, int.MaxValue)).ToList();
 
-        var finals = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var n in record.NetChanges.Concat(record.Result.ResidualCommitted ?? []))
+        // 테이블별 비교 열 = 발동 보기 이미지 열 ∩ 최종 차이 이미지 열 − 비결정 열
+        var cols = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        void Narrow(string table, IReadOnlyDictionary<string, string?>? image, bool first)
         {
-            var op = n.Change switch
-            {
-                NetChangeKind.Inserted or NetChangeKind.MultisetAdded => "INSERT",
-                NetChangeKind.Updated => "UPDATE",
-                _ => "DELETE",
-            };
-            finals.Add(Sig(n.Table, KeyOf(n.Key, n.After, n.Before), op, op == "DELETE" ? null : n.After));
+            if (image is null) return;
+            if (!cols.TryGetValue(table, out var set)) cols[table] = new HashSet<string>(image.Keys, StringComparer.OrdinalIgnoreCase);
+            else set.IntersectWith(image.Keys);
+        }
+        foreach (var (f, rc) in events) { Narrow(f.Table, rc.After, true); Narrow(f.Table, rc.Before, true); }
+        foreach (var n in net) { Narrow(n.Table, n.After, false); Narrow(n.Table, n.Before, false); }
+        foreach (var (table, set) in cols)
+        {
+            if (volatileMap.GetValueOrDefault(table) is { } v) set.ExceptWith(v);
+        }
+        foreach (var (f, rc) in events)
+            if (rc.Volatile.Count > 0 && cols.TryGetValue(f.Table, out var set)) foreach (var v in rc.Volatile) set.Remove(v.Column);
+
+        string Project(string table, IReadOnlyDictionary<string, string?>? image)
+        {
+            if (image is null) return None;
+            var c = cols.GetValueOrDefault(table) ?? [];
+            return string.Join(",", image.Where(p => c.Contains(p.Key)).OrderBy(p => p.Key.ToUpperInvariant(), StringComparer.Ordinal)
+                .Select(p => p.Key.ToUpperInvariant() + "=" + (p.Value ?? "\u0000")));
         }
 
-        var transient = events.Where(e => !finals.Contains(e.Key)).Select(e => e.Value).Order(StringComparer.Ordinal).ToList();
-        return new TransientCounts(eventRows, events.Count, transient.Count, transient);
+        // 행 id = 테이블 + 키. 키 없는 테이블은 비교 열 값으로 만든다.
+        string RowId(string table, RowKey k, IReadOnlyDictionary<string, string?>? after, IReadOnlyDictionary<string, string?>? before)
+        {
+            var key = k.Kind.ToString() == "ROW" ? Project(table, after ?? before) : folding.Key(table, RowKeys.Canonical(k.Columns, k.Values));
+            return table.ToUpperInvariant() + "|" + key;
+        }
+
+        // 최종 상태: 최종 차이에 있으면 그 after, 없으면 처음 이벤트의 before
+        var finals = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var n in net)
+            finals[RowId(n.Table, n.Key, n.After, n.Before)] =
+                n.Change is NetChangeKind.Deleted or NetChangeKind.MultisetRemoved ? None : Project(n.Table, n.After);
+        foreach (var (f, rc) in events)
+        {
+            var id = RowId(f.Table, rc.Key, rc.After, rc.Before);
+            if (!finals.ContainsKey(id)) finals[id] = rc.Operation == ChangeOperation.Insert ? None : Project(f.Table, rc.Before);
+        }
+
+        var seen = new Dictionary<string, (string Label, bool Transient)>(StringComparer.Ordinal);
+        foreach (var (f, rc) in events)
+        {
+            var id = RowId(f.Table, rc.Key, rc.After, rc.Before);
+            var state = rc.Operation == ChangeOperation.Delete ? None : Project(f.Table, rc.After);
+            var sig = id + "#" + state;
+            if (seen.ContainsKey(sig)) continue;
+            var op = rc.Operation.ToString().ToUpperInvariant();
+            seen[sig] = (op + " " + f.Table + RowKeys.Display(id[(id.IndexOf('|') + 1)..]), state != finals[id]);
+        }
+        var transient = seen.Values.Where(v => v.Transient).Select(v => v.Label).Order(StringComparer.Ordinal).ToList();
+        return new TransientCounts(eventRows, seen.Count, transient.Count, transient);
     }
 }

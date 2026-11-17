@@ -105,7 +105,7 @@ public static class MetricsCsv
 
     /// <summary>
     /// m6.csv(2026-11-17): (실행, 시스템, 사례, 반복)당 1행, preview만, 미리보기 상태가 ok인 사례만(TransientChanges). 중간 변경 = 발동 보기에는 있고 최종 차이에는 없는 행 변경.
-    /// event_rows: 발동 보기 행 변경 수. measured_rows: 비교한 서로 다른 행 서명 (테이블, 키, 연산, after) 수(KEYS 묶음 제외). transient_rows: 그 가운데 최종 차이에 없는 수.
+    /// event_rows: 발동 보기 행 변경 수. measured_rows: 비교한 이벤트 서명 = 서로 다른 (행, after) 수(KEYS 묶음·UNPAIRED 반쪽 제외). transient_rows: 그 가운데 최종 차이에 없는 수.
     /// transient_rate = transient_rows ÷ measured_rows. transient_keys: 그 행 서명의 표시(; 구분). B0·B2는 최종 상태만 봐서 정의상 0이라 행이 없다.
     /// </summary>
     public static readonly IReadOnlyList<string> M6Columns =
