@@ -1,0 +1,4 @@
+# spikes/sql/sp19_99_drop.sql container=dbripple-sql db=master vars=DbName=SP19_AW_Sandbox at=2026-11-16T19:33:16.1115447+09:00 elapsedSec=0.29 exit=0
+what value
+---- -----
+left 0

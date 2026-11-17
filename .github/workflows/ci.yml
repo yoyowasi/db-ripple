@@ -38,6 +38,13 @@ jobs:
           restore-keys: nuget-${{ runner.os }}-
       - name: 복원
         run: dotnet restore DbRipple.slnx
+      - name: SP19 스크립트 회귀 (Linux PowerShell 7, DB 불필요)
+        shell: pwsh
+        run: |
+          & pwsh -NoProfile -File scripts/tests/sp19.Tests.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & pwsh -NoProfile -File scripts/tests/sp19-precheck.Tests.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: 빌드 (경고를 오류로)
         run: dotnet build DbRipple.slnx --no-restore -warnaserror
       - name: 테스트 (DB 연결 변수 없음, DB 테스트는 건너뜀)
@@ -80,6 +87,11 @@ jobs:
         run: |
           $PSVersionTable.PSVersion
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/tests/home-test.Tests.ps1 -OutputDirectory "$env:RUNNER_TEMP\home-test-tests"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: SP19 스크립트 회귀 (Windows PowerShell 5.1, DB 불필요)
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/tests/sp19.Tests.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: 결과 올리기
         if: always()

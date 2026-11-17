@@ -1,0 +1,7 @@
+# spikes/sql/sp19_45_revert.sql container=dbripple-sql db=master vars=Col=RefNo,Key=LedgerId,Rounds=1,Rows=240000,SandboxDb=SP19_1G_Sandbox,SnapshotDb=SP19_1G_Sandbox_base,Table=dbo.StockLedger at=2026-11-16T19:30:44.7374337+09:00 elapsedSec=6.42 exit=0
+round rows_ change_ms sparse_before_mb sparse_after_change_mb diff_before single_user_ms revert_ms multi_user_ms diff_after triggers_on_before triggers_on_after log_mb_before log_mb_after
+----- ----- --------- ---------------- ---------------------- ----------- -------------- --------- ------------- ---------- ------------------ ----------------- ------------- ------------
+1 240000 3479.2 .0 .0 240000 12.2 823.5 .0 0 105 105 0 0
+what state_desc user_access_desc
+---- ---------- ----------------
+state_after ONLINE MULTI_USER

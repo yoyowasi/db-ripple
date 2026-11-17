@@ -1,0 +1,40 @@
+# spikes/sql/sp19_50_hash_time.sql container=dbripple-sql-origin db=CascadeLab vars= at=2026-11-16T19:25:38.7675130+09:00 elapsedSec=0.77 exit=0
+what value
+---- -----
+db CascadeLab
+tables 74
+chunks_of_50 2
+data_used_mb 8.9
+buffer_pool_target_mb 1579
+what login_ lock_timeout_ms isolation_level
+---- ------ --------------- ---------------
+session dbr_origin_user 10000 2
+round chunk tables_ rows_ ms err errmsg
+----- ----- ------- ----- -- --- ------
+1 1 50 112 61.5 NULL NULL
+1 2 24 43 16.3 NULL NULL
+2 1 50 112 .0 NULL NULL
+2 2 24 43 .0 NULL NULL
+3 1 50 112 .0 NULL NULL
+3 2 24 43 .0 NULL NULL
+round round_ms rows_ slowest_chunk_ms
+----- -------- ----- ----------------
+1 77.8 155 61.5
+2 .0 155 .0
+3 .0 155 .0
+label rows_ round4_ms
+----- ----- ---------
+cl02.Emp 4 4.1
+cl01.A 2 4.1
+cl04.Ch 4 4.1
+cl05.X2 3 4.1
+cl06.LineLog 0 4.1
+cl07.C 0 4.1
+cl09.M 2 4.1
+cl10.Counter 1 4.1
+what value
+---- -----
+round4_total_ms 77.9
+what value login_after_revert
+---- ----- ------------------
+tran_left 0 sa

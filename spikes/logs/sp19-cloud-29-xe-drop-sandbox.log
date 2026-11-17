@@ -1,0 +1,4 @@
+# spikes/sql/sp19_29_xe_drop.sql container=dbripple-sql db=master vars= at=2026-11-16T19:33:16.9233493+09:00 elapsedSec=0.23 exit=0
+what value
+---- -----
+xe_sessions_left 0

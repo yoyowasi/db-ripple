@@ -1,0 +1,4 @@
+label,shape,id,cpu_pct,state_before,preview_ms,preview_status,analyze,execute,readLog,reread,netDiff,resolve,serialize,state_after,net,apply_ms,apply_status,mode,a_snapshot,a_drift,a_execute,a_netDiff,a_commit,mismatches,message
+cl,cl02dept,101,load0.28/2,ready,638,ok,12,53,5,7,15,62,107,ready,,,,,,,,,,,
+cl,cl02dept,102,load0.26/2,ready,154,ok,0,4,0,0,6,2,0,ready,,,,,,,,,,,
+cl,cl02dept,103,load0.26/2,ready,273,ok,1,10,1,1,1,2,0,ready,,,,,,,,,,,

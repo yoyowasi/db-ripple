@@ -1,0 +1,13 @@
+# spikes/sql/sp17_10_create_limited_login.sql container=dbripple-sql-origin db=master vars= at=2026-11-16T19:22:40.0284745+09:00 elapsedSec=0.31 exit=0
+Changed database context to 'master'.
+Changed database context to 'CascadeLab'.
+what value
+---- -----
+server_roles (none)
+
+(1 rows affected)
+what value
+---- -----
+db_roles db_backupoperator,db_datareader,db_datawriter
+
+(1 rows affected)

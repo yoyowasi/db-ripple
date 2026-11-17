@@ -1,0 +1,34 @@
+container dbripple-sql-origin
+- -
+sp19_dbs 0
+
+- -
+snapshots 0
+
+- -
+xe_sp19_trace 0
+  name
+- ----
+remaining_db CascadeLab
+remaining_db CascadeLab_RT
+sp19_xel_files 0
+container dbripple-sql
+- -
+sp19_dbs 0
+
+- -
+snapshots 0
+
+- -
+xe_sp19_trace 0
+  name
+- ----
+sp19_xel_files 0
+.data/import files 0
+.data/origin-backup files 0
+temporary_host_dir absent
+new_public_aw_download removed
+checkout_backup_files 0
+port_5080 bind PASS
+dbripple-sql-origin OOMKilled false
+dbripple-sql OOMKilled false

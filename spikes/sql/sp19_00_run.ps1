@@ -73,7 +73,7 @@ function Median([object[]]$xs) {
 # sqlcmd -W 결과 표에서 머리글이 $header로 시작하는 표의 행(공백으로 나눈 칸 배열)들
 function Read-Table([string]$path, [string]$header) {
     $rows = @()
-    if (-not (Test-Path $path)) { return $rows }
+    if (-not (Test-Path $path)) { return , $rows }
     $lines = [IO.File]::ReadAllLines($path, $utf8)
     for ($i = 0; $i -lt $lines.Length; $i++) {
         if ($lines[$i].StartsWith($header)) {
@@ -83,14 +83,14 @@ function Read-Table([string]$path, [string]$header) {
     }
     return , $rows   # 행이 하나여도 배열의 배열로 돌려준다(풀리지 않게)
 }
-function Get-FreeGb([string]$path) {
+function Get-FreeGb([string]$path, [string]$container = '') {
     # Linux: df -Pk(사용 가능 KB, 파일 시스템 이름) / Windows: 드라이브 여유
     if ($isWin) {
         $d = Get-PSDrive -Name ((Resolve-Path $path).Path.Substring(0, 1))
         return @{ Gb = [math]::Round($d.Free / 1GB, 2); Fs = $d.Name }
     }
-    $o = @(& df -Pk $path 2>$null)
-    if ($o.Count -lt 2) { return $null }
+    $o = if ($container) { @(& docker exec $container df -Pk $path 2>$null) } else { @(& df -Pk $path 2>$null) }
+    if ($LASTEXITCODE -ne 0 -or $o.Count -lt 2) { throw "디스크 여유 확인 실패: $container $path" }
     $f = ($o[-1] -split '\s+')
     return @{ Gb = [math]::Round([double]$f[3] / 1MB, 2); Fs = $f[0] }
 }
@@ -172,7 +172,18 @@ $needRepo = ($Sizes | ForEach-Object { $sizeTable[$_].RepoGb } | Measure-Object 
 $repoFree = Get-FreeGb $root
 $dockerRoot = ''
 $ErrorActionPreference = 'Continue'; $dockerRoot = ("" + (& docker info -f '{{.DockerRootDir}}' 2>$null)).Trim(); $ErrorActionPreference = $saved
-$dockerFree = if (-not $isWin -and $dockerRoot -and (Test-Path $dockerRoot)) { Get-FreeGb $dockerRoot } else { $null }
+$dockerFree = $null
+if (-not $isWin) {
+    if ($dockerRoot -and (Test-Path $dockerRoot -ErrorAction SilentlyContinue)) {
+        $dockerFree = Get-FreeGb $dockerRoot
+    } else {
+        # rootless DockerRootDir는 호스트 사용자에게 접근 불가할 수 있다.
+        # 경고만 내고 건너뛰지 않고 실제 SQL 데이터 볼륨에서 같은 기준을 검사한다.
+        $dockerFree = Get-FreeGb '/var/opt/mssql' $SandboxContainer
+        $dockerRoot = '샌드박스 볼륨 /var/opt/mssql'
+        Say 'Docker 루트 접근 불가: 샌드박스 /var/opt/mssql 볼륨에서 디스크 여유 확인'
+    }
+}
 if ($null -ne $repoFree) {
     if ($null -ne $dockerFree -and $dockerFree.Fs -eq $repoFree.Fs) {
         $need = $needDocker + $needRepo + $DiskMarginGb

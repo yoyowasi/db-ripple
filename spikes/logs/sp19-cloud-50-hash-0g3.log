@@ -1,0 +1,37 @@
+# spikes/sql/sp19_50_hash_time.sql container=dbripple-sql-origin db=SP19_0G3 vars= at=2026-11-16T19:27:06.1111001+09:00 elapsedSec=2.43 exit=0
+what value
+---- -----
+db SP19_0G3
+tables 35
+chunks_of_50 1
+data_used_mb 225.0
+buffer_pool_target_mb 1571
+what login_ lock_timeout_ms isolation_level
+---- ------ --------------- ---------------
+session dbr_origin_user 10000 2
+round chunk tables_ rows_ ms err errmsg
+----- ----- ------- ----- -- --- ------
+1 1 35 1376750 536.9 NULL NULL
+2 1 35 1376750 382.5 NULL NULL
+3 1 35 1376750 503.1 NULL NULL
+round round_ms rows_ slowest_chunk_ms
+----- -------- ----- ----------------
+1 536.9 1376750 536.9
+2 382.5 1376750 382.5
+3 503.1 1376750 503.1
+label rows_ round4_ms
+----- ----- ---------
+dbo.SalesOrderLine 700000 263.0
+dbo.StockLedger 525000 158.8
+dbo.SalesOrder 140000 51.5
+dbo.Code26 100 32.2
+dbo.Customer 7000 8.8
+dbo.Code09 100 .0
+dbo.Code08 100 .0
+dbo.Code07 100 .0
+what value
+---- -----
+round4_total_ms 514.3
+what value login_after_revert
+---- ----- ------------------
+tran_left 0 sa
