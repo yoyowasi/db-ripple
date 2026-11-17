@@ -15,7 +15,7 @@ namespace DbRipple.Execution;
 /// INSERT·DELETE의 pairing은 테이블 키 종류(BY_PK/BY_UNIQUE)이고, 키 없는 테이블이면 한 행일 때 SINGLE_ROW, 아니면 UNPAIRED다.</item>
 /// <item><b>값</b>(§6.1): 감사 JSON의 숫자는 원문 그대로, 문자열은 그 값, true/false는 "true"/"false", 객체·배열은 원문, null은 null. 생성 속성(열@srid, 열@type)도 별도 키로 둔다.
 /// 바뀐 열은 값 비교로 계산하고 생성 속성은 기본 열로 접는다.</item>
-/// <item><b>volatile</b>: IDENTITY(INSERT), ROWVERSION(INSERT·UPDATE), NONDETERMINISTIC_DEFAULT(INSERT, 매니페스트), STATEMENT_FUNCTION(그 문장의 직접 대상 묶음, INSERT·UPDATE),
+/// <item><b>volatile</b>: IDENTITY(INSERT), ROWVERSION(INSERT·UPDATE), NONDETERMINISTIC_DEFAULT(INSERT, 매니페스트), STATEMENT_FUNCTION(그 문장의 직접 대상 묶음, INSERT·UPDATE. EXEC는 프로시저 본문 비결정 쓰기의 깊이 1 묶음),
 /// TRIGGER_GETDATE(깊이 2 이상 묶음, INSERT·UPDATE, 활성 사용자 트리거의 비결정 쓰기). UPDATE는 바뀐 열이거나 값이 없을 때만. 열당 1개(이 순서가 우선).
 /// derived: 계산 열. INSERT·DELETE는 행 이미지에 있는 계산 열 전부, UPDATE는 바뀐 계산 열.</item>
 /// <item><b>최종 after</b>(§7.2 6단계 v1.3): 트리거 문맥 트리(ContextLinks 첫 후보)를 문장 순 → 묶음 전위 순(형제는 captureSeq 순)으로 훑어 그 행을 마지막으로 바꾼 묶음의 after를 재조회와 비교한다.
@@ -75,7 +75,7 @@ public sealed class ChangeCollector : IChangeCollector
             var images = imagesBySeq.GetValueOrDefault(h.CaptureSeq) ?? [];
             var ctx = new RowContext(
                 t, mt, computed.GetValueOrDefault(h.TableObjectId) ?? [],
-                firing.Depth == 1 && statementFunctions.TryGetValue(range.Index, out var st) && st.Target == display && st.Kind == h.Operation ? st.NondeterministicColumns : [],
+                firing.Depth == 1 && statementFunctions.TryGetValue(range.Index, out var st) ? StatementFunctionColumns(st, display, h.Operation) : [],
                 firing.Depth >= 2 ? triggerGetdate.GetValueOrDefault(display) : null);
             node.Rows.AddRange(BuildRows(firing, images, ctx));
             nodes.Add(node);
@@ -335,6 +335,17 @@ public sealed class ChangeCollector : IChangeCollector
         var cols = key is not null && key.Kind != KeyKind.ROW ? key.Columns : values.Keys.ToList();
         return new RowKey { Kind = key?.Kind is KeyKind.UNIQUE ? KeyKind.UNIQUE : KeyKind.PK, Columns = cols, Values = cols.Select(c => values.GetValueOrDefault(c)).ToList() };
     }
+
+    /// <summary>
+    /// 깊이 1 묶음의 STATEMENT_FUNCTION 열. DML은 그 문장의 직접 대상·같은 연산일 때 문장 안 비결정 함수 열.
+    /// EXEC(2026-11-17)는 프로시저 본문(안쪽 호출 포함)의 직접 DML이 깊이 1이므로, 분석기가 본 비결정 쓰기 가운데 그 테이블의 열(연산은 가리지 않음, DELETE는 VolatileCells가 뺀다).
+    /// </summary>
+    internal static IReadOnlyList<string> StatementFunctionColumns(AnalyzedStatement st, string table, ChangeOperation operation) => st.Kind switch
+    {
+        ChangeOperation.Exec => st.Plan?.NondeterministicWrites.Where(w => string.Equals(w.Table, table, StringComparison.OrdinalIgnoreCase))
+            .Select(w => w.Column).Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? [],
+        _ => st.Target == table && st.Kind == operation ? st.NondeterministicColumns : [],
+    };
 
     static IReadOnlyList<VolatileCell> VolatileCells(Firing f, RowContext ctx, IReadOnlyList<string> changed, IReadOnlyDictionary<string, string?>? values)
     {

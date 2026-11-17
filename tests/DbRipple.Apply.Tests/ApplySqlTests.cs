@@ -298,5 +298,174 @@ public sealed class ApplySqlTests
         Assert.Empty(result.Verification.Mismatches);
         Assert.Equal(2, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
     }
+
+    // EXEC [적용](2026-11-17): usp_bump가 usp_inner를 부르고 T를 바꾼 뒤 결과 집합 1개를 내고, Flag가 켜져 있으면 5를 돌려준다.
+    // 원본 실행 사용자 권한은 ApplyLab이 PreviewUserSql.EnsureBatch로 준다(프로시저마다 GRANT EXECUTE).
+    static readonly string[] Proc =
+    [
+        "CREATE TABLE dbo.T (id int NOT NULL PRIMARY KEY, v int NOT NULL);",
+        "INSERT INTO dbo.T (id, v) VALUES (1, 1), (2, 5);",
+        "CREATE TABLE dbo.Flag (id int NOT NULL PRIMARY KEY, active bit NOT NULL);",
+        "INSERT INTO dbo.Flag (id, active) VALUES (1, 0);",
+        "CREATE PROCEDURE dbo.usp_inner AS BEGIN SET NOCOUNT ON; RETURN 0; END;",
+        """
+        CREATE PROCEDURE dbo.usp_bump @id int AS
+        BEGIN
+            SET NOCOUNT ON;
+            EXEC dbo.usp_inner;
+            UPDATE dbo.T SET v = v + 1 WHERE id = @id;
+            SELECT v FROM dbo.T WHERE id = @id;
+            IF EXISTS (SELECT 1 FROM dbo.Flag WHERE id = 1 AND active = 1) RETURN 5;
+            RETURN 0;
+        END;
+        """,
+    ];
+
+    const string ExecBump = "EXEC dbo.usp_bump @id = 1;";
+
+    [SqlFact]
+    public async Task Exec_commits_to_origin_after_procedure_checks()
+    {
+        await using var lab = await ApplyLab.CustomAsync("exec", Proc);
+        var record = await lab.PreviewAsync(ExecBump);
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal(ApplyStatus.Committed, result!.Status);
+        Assert.Empty(result.Verification.Mismatches);
+        var st = Assert.Single(result.Statements);
+        Assert.Equal((ChangeOperation.Exec, (int?)0, (int?)1), (st.Kind, st.ReturnValue, st.ResultSetCount));
+        Assert.Contains(OriginProcedures.Limitation, result.Verification.Limitations);
+        Assert.Equal(2, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
+    }
+
+    [SqlFact]
+    public async Task Exec_without_execute_permission_on_origin_is_precondition_failed()
+    {
+        await using var lab = await ApplyLab.CustomAsync("exnp", Proc);
+        var record = await lab.PreviewAsync(ExecBump);
+        await lab.ExecOnOriginAsync($"REVOKE EXECUTE ON OBJECT::[dbo].[usp_bump] FROM [{PreviewUserSql.UserName}];");
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal(ApplyStatus.PreconditionFailed, result!.Status);
+        Assert.Equal([ApplyPrecondition.ProcExecutePermissionMissing], result.PreconditionFailures);
+        Assert.Empty(result.Statements);
+        Assert.False(result.SandboxRefreshStarted);
+        Assert.Equal(1, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
+    }
+
+    [SqlFact]
+    public async Task Exec_with_nested_procedure_altered_after_baseline_is_precondition_failed()
+    {
+        await using var lab = await ApplyLab.CustomAsync("exdef", Proc);
+        var record = await lab.PreviewAsync(ExecBump);
+        await lab.ExecOnOriginAsync("ALTER PROCEDURE dbo.usp_inner AS BEGIN SET NOCOUNT ON; UPDATE dbo.T SET v = 100 WHERE id = 2; RETURN 0; END;");
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal([ApplyPrecondition.ProcDefinitionChanged], result!.PreconditionFailures);
+        Assert.Contains("dbo.usp_inner", result.Message);
+        Assert.Empty(result.Statements);
+        Assert.Equal(5, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 2;"));
+        Assert.Equal(1, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
+    }
+
+    [SqlFact]
+    public async Task Exec_return_value_different_on_origin_is_rolled_back_mismatch()
+    {
+        await using var lab = await ApplyLab.CustomAsync("exrv", Proc);
+        var record = await lab.PreviewAsync(ExecBump);
+        await lab.ExecOnOriginAsync("UPDATE dbo.Flag SET active = 1 WHERE id = 1;");   // 행 변경은 같고 반환 값만 0 → 5
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal(ApplyStatus.RolledBackMismatch, result!.Status);
+        var m = Assert.Single(result.Verification.Mismatches);
+        Assert.Equal((MismatchKind.ProcReturnValue, "0", "5"), (m.Kind, m.Expected, m.Actual));
+        Assert.False(result.SandboxRefreshStarted);
+        Assert.Equal(1, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
+    }
+
+    [SqlFact]
+    public async Task Exec_signed_after_preview_is_precondition_failed()
+    {
+        // 모듈 서명은 실행 사용자의 DML 전용 권한 경계를 넘을 수 있다(PR #11 보안 검토).
+        await using var lab = await ApplyLab.CustomAsync("exsig", Proc);
+        var record = await lab.PreviewAsync(ExecBump);
+        var password = "Pw!" + Guid.NewGuid().ToString("N") + "aA1";
+        await lab.ExecOnOriginAsync(
+            $"CREATE CERTIFICATE dbr_apl_sig ENCRYPTION BY PASSWORD = N'{password}' WITH SUBJECT = N'dbr apl sig';",
+            $"ADD SIGNATURE TO dbo.usp_inner BY CERTIFICATE dbr_apl_sig WITH PASSWORD = N'{password}';");
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal([ApplyPrecondition.ProcSignedNotSupported], result!.PreconditionFailures);
+        Assert.Contains("dbo.usp_inner", result.Message);
+        Assert.Empty(result.Statements);
+        Assert.Equal(1, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
+    }
+
+    // PR #11 검토: 프로시저 본문의 비결정 쓰기(DEFAULT 없는 열에 SYSDATETIME·NEWID)와 SCOPE_IDENTITY 반환 값은 [적용] 대조에서 값을 비교하지 않는다.
+    static readonly string[] ProcVolatile =
+    [
+        "CREATE TABLE dbo.T (id int NOT NULL PRIMARY KEY, v int NOT NULL, modified datetime2 NULL);",
+        "INSERT INTO dbo.T (id, v) VALUES (1, 1), (2, 5);",
+        "CREATE TABLE dbo.Note (id int NOT NULL PRIMARY KEY, tag uniqueidentifier NOT NULL);",
+        "CREATE TABLE dbo.Item (id int IDENTITY(1,1) NOT NULL PRIMARY KEY, name nvarchar(20) NOT NULL);",
+        "INSERT INTO dbo.Item (name) VALUES (N'a');",
+        """
+        CREATE PROCEDURE dbo.usp_touch @id int AS
+        BEGIN
+            SET NOCOUNT ON;
+            UPDATE dbo.T SET v = v + 1, modified = SYSDATETIME() WHERE id = @id;
+            INSERT INTO dbo.Note (id, tag) VALUES (@id, NEWID());
+            RETURN 0;
+        END;
+        """,
+        """
+        CREATE PROCEDURE dbo.usp_add @name nvarchar(20) AS
+        BEGIN
+            SET NOCOUNT ON;
+            INSERT INTO dbo.Item (name) VALUES (@name);
+            RETURN CAST(SCOPE_IDENTITY() AS int);
+        END;
+        """,
+    ];
+
+    [SqlFact]
+    public async Task Exec_with_nondeterministic_writes_commits()
+    {
+        await using var lab = await ApplyLab.CustomAsync("exnd", ProcVolatile);
+        var record = await lab.PreviewAsync("EXEC dbo.usp_touch @id = 1;");
+        Assert.Contains(record.RowChanges, rc => rc.Volatile.Any(v => v is { Column: "modified", Reason: VolatileReason.StatementFunction }));
+        Assert.Contains(record.RowChanges, rc => rc.Volatile.Any(v => v is { Column: "tag", Reason: VolatileReason.StatementFunction }));
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal(ApplyStatus.Committed, result!.Status);
+        Assert.Empty(result.Verification.Mismatches);
+        Assert.Contains("dbo.T.modified", result.Verification.VolatileIgnored);
+        Assert.Contains("dbo.Note.tag", result.Verification.VolatileIgnored);
+        Assert.Equal(2, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
+        Assert.Equal(1, await lab.ScalarAsync<int>("SELECT COUNT(*) FROM dbo.Note WHERE id = 1;"));
+    }
+
+    [SqlFact]
+    public async Task Exec_returning_scope_identity_commits_although_sandbox_identity_differs()
+    {
+        await using var lab = await ApplyLab.CustomAsync("exid", ProcVolatile);
+        await lab.PreviewAsync("EXEC dbo.usp_add @name = N'b';");                 // 샌드박스 IDENTITY 2를 소비(롤백해도 돌아오지 않음)
+        var record = await lab.PreviewAsync("EXEC dbo.usp_add @name = N'b';");    // 미리보기 반환 값 3
+        Assert.Equal(3, Assert.Single(record.Result.Statements).ReturnValue);
+        Assert.Contains(record.Result.Warnings, w => w.RuleId == AnalysisRules.WarnProcNondeterministicReturn);
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal(ApplyStatus.Committed, result!.Status);                     // 원본 반환 값 2: NULL 여부만 대조
+        Assert.Equal(2, Assert.Single(result.Statements).ReturnValue);
+        Assert.Empty(result.Verification.Mismatches);
+        Assert.Equal(1, await lab.ScalarAsync<int>("SELECT COUNT(*) FROM dbo.Item WHERE name = N'b';"));
+    }
 }
 #endif

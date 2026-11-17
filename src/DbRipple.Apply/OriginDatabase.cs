@@ -21,6 +21,11 @@ internal interface IOriginDatabase
     Task<SnapshotCapability> CheckSnapshotCapabilityAsync(string originDb, CancellationToken ct);
     /// <summary>[적용] 원본 사전 경고(TRUSTWORTHY·복제·CDC·Service Broker, 읽기만). 읽지 못하면 "확인 못 함" 문구. 던지지 않는다.</summary>
     Task<IReadOnlyList<string>> ReadOriginWarningsAsync(string originDb, CancellationToken ct);
+    /// <summary>
+    /// EXEC [적용] 선행 조건(2026-11-17, 읽기만): 프로시저마다 원본 정의(도구 로그인으로 sys.sql_modules)와 EXECUTE 권한(executeAsUser면 EXECUTE AS USER 뒤 HAS_PERMS_BY_NAME, null이면 본인 로그인).
+    /// 결과는 입력 순서다. 원본에 GRANT·DDL을 하지 않는다. 연결 실패는 SandboxUnavailableException.
+    /// </summary>
+    Task<IReadOnlyList<OriginProcedure>> ReadProceduresAsync(string originDb, IReadOnlyList<(string Schema, string Name)> procedures, string? executeAsUser, CancellationToken ct);
     /// <summary>원본 스냅샷 생성. 실패하면 Failed(error로 끝낸다, KEYSET_HASH로 조용히 낮추지 않는다).</summary>
     Task<(SnapshotOutcome Outcome, string? Reason)> CreateSnapshotAsync(string originDb, string snapshotDb, CancellationToken ct);
     /// <summary>원본 스냅샷 삭제.</summary>
@@ -48,6 +53,11 @@ internal interface IOriginConnection : IAsyncDisposable
     Task<IReadOnlyDictionary<string, TableState>> ReadTableStatesAsync(IReadOnlyList<HashTarget> targets, IReadOnlySet<string> previewTables, CancellationToken ct);
     /// <summary>KEYSET_HASH: 미리보기 키 집합 after 대조.</summary>
     Task<IReadOnlyList<ApplyMismatch>> VerifyKeyRowsAsync(PreviewRecord preview, IReadOnlyList<TableInfo> tables, BaselineContext baseline, CancellationToken ct);
+    /// <summary>
+    /// EXEC(2026-11-17): 실행 트랜잭션 안에서 프로시저 정의·서명을 다시 읽는다(권한은 읽지 않아 CanExecute = false). 실행기가 REVERT한 뒤에만 불러
+    /// 가장 없이 도구 로그인으로 읽는다. 세션 옵션을 바꾸지 않는다.
+    /// </summary>
+    Task<IReadOnlyList<OriginProcedure>> ReadProceduresAsync(IReadOnlyList<(string Schema, string Name)> procedures, CancellationToken ct);
 }
 
 /// <summary>연결 열기(연결 실패 → SandboxUnavailableException, 메시지에 연결 문자열을 넣지 않는다).</summary>
@@ -118,6 +128,16 @@ internal sealed class SqlOriginDatabase(string connectionString, ApplySettings s
         }
     }
 
+    public async Task<IReadOnlyList<OriginProcedure>> ReadProceduresAsync(string originDb, IReadOnlyList<(string Schema, string Name)> procedures, string? executeAsUser, CancellationToken ct)
+    {
+        OriginNames.Validate(originDb, "원본");
+        if (procedures.Count == 0) return [];
+        // 풀링 없는 전용 연결: EXECUTE AS 뒤 오류로 REVERT를 못 해도 연결을 닫으면 가장이 끝난다.
+        await using var conn = await OriginConnections.OpenAsync(connectionString, originDb, ct);
+        await using var cmd = new SqlCommand(OriginProcedures.Sql(procedures.Count, executeAsUser), conn) { CommandTimeout = settings.ToolCommandTimeoutSeconds };
+        return await OriginProcedures.ReadAsync(cmd, procedures, permissions: true, ct);
+    }
+
     public Task<(SnapshotOutcome Outcome, string? Reason)> CreateSnapshotAsync(string originDb, string snapshotDb, CancellationToken ct) =>
         OriginSnapshot.CreateAsync(connectionString, originDb, snapshotDb, settings.ToolCommandTimeoutSeconds, ct);
 
@@ -176,6 +196,13 @@ internal sealed class SqlOriginConnection(SqlConnection connection, int toolTime
 
     public Task<IReadOnlyList<ApplyMismatch>> VerifyKeyRowsAsync(PreviewRecord preview, IReadOnlyList<TableInfo> tables, BaselineContext baseline, CancellationToken ct) =>
         KeysetVerifier.VerifyKeyRowsAsync(Session, preview, tables, baseline, toolTimeoutSeconds, ct);
+
+    public async Task<IReadOnlyList<OriginProcedure>> ReadProceduresAsync(IReadOnlyList<(string Schema, string Name)> procedures, CancellationToken ct)
+    {
+        if (procedures.Count == 0) return [];
+        await using var cmd = Session.CreateCommand(OriginProcedures.DefinitionSql(procedures.Count), toolTimeoutSeconds);
+        return await OriginProcedures.ReadAsync(cmd, procedures, permissions: false, ct);
+    }
 
     async Task ExecAsync(string sql, CancellationToken ct)
     {

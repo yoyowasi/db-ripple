@@ -178,6 +178,24 @@ public sealed class PreviewPipelineTests : IDisposable
     }
 
     [Fact]
+    public async Task Stored_record_keeps_exec_sql_of_exec_statements_only()
+    {
+        // ProcedurePlan은 JSON에 저장되지 않으므로 [적용]이 대조할 실행 SQL을 PreviewRecord.ExecSql로 따로 남긴다(2026-11-17).
+        var exec = TestData.Statement(2, "EXEC dbo.p @id = 1;") with
+        {
+            Kind = ChangeOperation.Exec, Target = null, Procedure = "dbo.p",
+            Plan = new ProcedurePlan { Procedure = "dbo.p", ExecSql = "EXEC @dbr_rc = [dbo].[p] @id = 1;" },
+        };
+        var rig = NewRig(new AnalysisResult { Statements = [TestData.Statement(1), exec] });
+
+        var outcome = await rig.Pipeline.RunAsync("DELETE FROM dbo.T;\nEXEC dbo.p @id = 1;", new PreviewOptions(), null, default);
+
+        Assert.Equal([new ExecSqlRecord(2, "EXEC @dbr_rc = [dbo].[p] @id = 1;")], outcome.Record!.ExecSql);
+        var stored = await rig.Store.GetAsync(outcome.Record.Result.PreviewId, default);
+        Assert.Equal(outcome.Record.ExecSql, stored!.ExecSql);   // 파일 저장소를 거쳐도 남는다
+    }
+
+    [Fact]
     public async Task Resolver_gets_statements_collected_net_and_baseline()
     {
         var net = new[] { TestData.Net("dbo.T", NetChangeKind.Deleted) };

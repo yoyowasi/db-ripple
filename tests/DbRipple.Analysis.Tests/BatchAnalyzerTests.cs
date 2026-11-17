@@ -383,7 +383,7 @@ public class BatchAnalyzerTests
         Assert.Equal(AnalysisRules.AllRejects.Count, AnalysisRules.AllRejects.Distinct().Count());
         Assert.All(AnalysisRules.AllRejects, r => Assert.StartsWith("REJECT_", r));
         Assert.Equal(AnalysisRules.AllWarnings.Count, AnalysisRules.AllWarnings.Distinct().Count());
-        Assert.Equal(13, AnalysisRules.AllWarnings.Count);
+        Assert.Equal(14, AnalysisRules.AllWarnings.Count);
         Assert.All(AnalysisRules.AllWarnings, r => Assert.StartsWith("WARN_", r));
     }
 

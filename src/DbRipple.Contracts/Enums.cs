@@ -170,7 +170,7 @@ public enum VolatileReason
     [JsonStringEnumMemberName("SEQUENCE_DEFAULT")] SequenceDefault,
     /// <summary>GETDATE·NEWID 류 기본값(E1).</summary>
     [JsonStringEnumMemberName("NONDETERMINISTIC_DEFAULT")] NondeterministicDefault,
-    /// <summary>사용자 문장 안의 비결정 함수(E1, 배치 분석).</summary>
+    /// <summary>사용자 문장 안의 비결정 함수(E1, 배치 분석). EXEC는 펼친 프로시저 본문이 비결정 함수로 쓰는 열(깊이 1 묶음, 2026-11-17).</summary>
     [JsonStringEnumMemberName("STATEMENT_FUNCTION")] StatementFunction,
     /// <summary>트리거 본문의 비결정 함수(E1, 트리거 정적 분석).</summary>
     [JsonStringEnumMemberName("TRIGGER_GETDATE")] TriggerGetdate,

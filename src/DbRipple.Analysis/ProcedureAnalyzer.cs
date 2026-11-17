@@ -26,6 +26,8 @@ public sealed record ProcedureStaticInfo
     public IReadOnlyList<string> UnresolvedCalls { get; init; } = [];
     public IReadOnlyList<string> External { get; init; } = [];
     public IReadOnlyList<TableColumn> NondeterministicWrites { get; init; } = [];
+    /// <summary>반환 값이 실행마다 달라질 수 있음(2026-11-17): 대상의 RETURN 식에 리터럴이 아닌 것이 있고 펼친 본문이 IDENTITY·비결정 함수를 쓴다.</summary>
+    public bool ReturnValueNondeterministic { get; init; }
     /// <summary>거부 사실(규칙 ID별로 묶는 것은 호출자).</summary>
     public IReadOnlyList<ProcedureFinding> Rejects { get; init; } = [];
     /// <summary>경고 사실.</summary>
@@ -77,6 +79,7 @@ public sealed class ProcedureAnalyzer
             UnresolvedCalls = a.UnresolvedNames.ToList(),
             External = a.External.ToList(),
             NondeterministicWrites = a.NondeterministicWrites.OrderBy(w => w.Table, StringComparer.OrdinalIgnoreCase).ThenBy(w => w.Column, StringComparer.OrdinalIgnoreCase).ToList(),
+            ReturnValueNondeterministic = a.ValueFunction && ReturnValues.HasNonLiteralReturn(body.StatementList),
             Rejects = a.ExecRejects.ToList(),
             Warnings = a.ExecWarnings.ToList(),
         };
@@ -173,6 +176,7 @@ internal sealed class ProcedureExpander(DbCatalog catalog, TableResolver resolve
         var rules = new ExecRulesVisitor(a, name, Functions);
         body.Accept(rules);
         rules.Finish(body);
+        a.ValueFunction = ReturnValues.UsesValueFunction(body);
 
         // (d) WITH EXECUTE AS OWNER·SELF·사용자: 실행 사용자 권한 밖에서 돈다(CALLER만 허용).
         foreach (var o in proc.Options.OfType<ExecuteAsProcedureOption>())
@@ -501,6 +505,8 @@ internal sealed class Accumulator(string moduleSchema, TableResolver resolver, D
     public readonly SortedSet<string> UnresolvedNames = new(StringComparer.OrdinalIgnoreCase);
     public readonly List<ProcedureFinding> ExecRejects = [];
     public readonly List<ProcedureFinding> ExecWarnings = [];
+    /// <summary>본문(안쪽 호출 포함)이 IDENTITY 함수나 비결정 함수를 쓴다(반환 값 비결정 판정 재료, 2026-11-17).</summary>
+    public bool ValueFunction;
 
     /// <summary>
     /// 펼친(또는 본문만 읽은) 프로시저 결과를 합친다: 쓰기 대상, 비결정 쓰기, 외부 부작용, ROLLBACK, 트랜잭션 제어(+ EXEC 전용 사실).
@@ -513,10 +519,67 @@ internal sealed class Accumulator(string moduleSchema, TableResolver resolver, D
         External.UnionWith(p.External);
         Rollback |= p.Rollback;
         TransactionControl |= p.TransactionControl;
+        ValueFunction |= p.ValueFunction;
         Modules.UnionWith(p.Modules);
         UnresolvedNames.UnionWith(p.UnresolvedNames);
         foreach (var f in p.ExecRejects) if (!ExecRejects.Contains(f)) ExecRejects.Add(f);
         foreach (var f in p.ExecWarnings) if (!ExecWarnings.Contains(f)) ExecWarnings.Add(f);
+    }
+}
+
+/// <summary>
+/// 반환 값 비결정 판정(2026-11-17, 보수적): RETURN 식이 리터럴이 아니고(변수·식), 본문 어딘가에서 IDENTITY 함수나 비결정 함수를 쓰면 반환 값이 실행마다 달라질 수 있다고 본다.
+/// 샌드박스 IDENTITY는 미리보기마다 소비되어 원본과 다르다(A13). 데이터 흐름은 따지지 않으므로 거짓 양성이 있다([적용]이 반환 값을 NULL 여부만 대조할 뿐이다).
+/// </summary>
+internal static class ReturnValues
+{
+    static readonly HashSet<string> IdentityFunctions = new(["SCOPE_IDENTITY", "IDENT_CURRENT"], StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>IDENTITY 함수(SCOPE_IDENTITY·IDENT_CURRENT·@@IDENTITY)나 비결정 함수(SqlSyntax.FindNondeterminism)를 쓰는가.</summary>
+    public static bool UsesValueFunction(TSqlFragment body)
+    {
+        if (SqlSyntax.FindNondeterminism(body).Count > 0) return true;
+        var v = new IdentityFinder();
+        body.Accept(v);
+        return v.Found;
+    }
+
+    /// <summary>값이 있는 RETURN 가운데 리터럴(괄호·음수 포함)이 아닌 것이 있는가. RETURN만 있으면 0을 돌려주므로 리터럴로 본다.</summary>
+    public static bool HasNonLiteralReturn(TSqlFragment body)
+    {
+        var v = new ReturnFinder();
+        body.Accept(v);
+        return v.NonLiteral;
+    }
+
+    static bool IsLiteral(ScalarExpression e) => e switch
+    {
+        ParenthesisExpression p => IsLiteral(p.Expression),
+        UnaryExpression { Expression: { } inner } => IsLiteral(inner),
+        Literal => true,
+        _ => false,
+    };
+
+    sealed class ReturnFinder : TSqlFragmentVisitor
+    {
+        public bool NonLiteral;
+        public override void Visit(ReturnStatement n)
+        {
+            if (n.Expression is { } e && !IsLiteral(e)) NonLiteral = true;
+        }
+    }
+
+    sealed class IdentityFinder : TSqlFragmentVisitor
+    {
+        public bool Found;
+        public override void Visit(FunctionCall n)
+        {
+            if (IdentityFunctions.Contains(n.FunctionName.Value)) Found = true;
+        }
+        public override void Visit(GlobalVariableExpression n)
+        {
+            if (string.Equals(n.Name, "@@IDENTITY", StringComparison.OrdinalIgnoreCase)) Found = true;
+        }
     }
 }
 

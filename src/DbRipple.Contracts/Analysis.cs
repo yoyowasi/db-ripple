@@ -70,6 +70,16 @@ public sealed record ProcedurePlan
     public IReadOnlyList<string> WriteTargets { get; init; } = [];
     /// <summary>펼친 안쪽 프로시저 "스키마.이름"(대상 자신 제외).</summary>
     public IReadOnlyList<string> ExpandedCalls { get; init; } = [];
+    /// <summary>
+    /// 펼친 본문(안쪽 호출 포함)이 비결정 함수(GETDATE·NEWID 등)로 값을 정하는 (테이블, 열)(2026-11-17, E1). C11이 이 문장의 깊이 1 묶음에서 STATEMENT_FUNCTION volatile로 표시한다.
+    /// 변수를 거쳐 대입하는 값(<c>SET @t = GETDATE(); UPDATE … SET c = @t</c>)은 잡지 못한다(트리거 분석과 같은 한계).
+    /// </summary>
+    public IReadOnlyList<TableColumn> NondeterministicWrites { get; init; } = [];
+    /// <summary>
+    /// 반환 값이 실행마다 달라질 수 있음(2026-11-17, 보수적 판정): 대상 프로시저의 RETURN 식에 리터럴이 아닌 것이 있고, 펼친 본문 어딘가에서
+    /// IDENTITY 함수(SCOPE_IDENTITY·IDENT_CURRENT·@@IDENTITY)나 비결정 함수(GETDATE 계열·NEWID·RAND 등)를 쓴다. [적용] 대조는 반환 값의 NULL 여부만 본다.
+    /// </summary>
+    public bool ReturnValueNondeterministic { get; init; }
     /// <summary>직선형 루트 본문이 처음 실행하는 독립 DELETE. 정적 정보만으로 발동을 확정하지 않는다.</summary>
     public IndependentDelete? FirstIndependentDelete { get; init; }
 }

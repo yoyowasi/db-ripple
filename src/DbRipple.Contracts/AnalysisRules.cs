@@ -123,6 +123,11 @@ public static class AnalysisRules
     public const string WarnProcResultSet = "WARN_PROC_RESULT_SET";
     /// <summary>비결정 값(GETDATE·NEWID 등)으로 쓰는 열.</summary>
     public const string WarnProcNondeterministicWrite = "WARN_PROC_NONDETERMINISTIC_WRITE";
+    /// <summary>
+    /// 반환 값이 실행마다 달라질 수 있음(2026-11-17): RETURN 식이 리터럴이 아니고 본문이 IDENTITY 함수(SCOPE_IDENTITY 등)나 비결정 함수를 쓴다.
+    /// [적용]은 반환 값의 NULL 여부만 대조한다(ProcedurePlan.ReturnValueNondeterministic).
+    /// </summary>
+    public const string WarnProcNondeterministicReturn = "WARN_PROC_NONDETERMINISTIC_RETURN";
 
     /// <summary>거부 규칙 전체.</summary>
     public static IReadOnlyList<string> AllRejects { get; } =
@@ -140,6 +145,6 @@ public static class AnalysisRules
     [
         WarnTopWithoutOrder, WarnNondeterministicFunction, WarnAuditNotLast, WarnTriggerDynamicSql,
         WarnProcNestedTransaction, WarnProcRollback, WarnProcCatchSwallows, WarnProcXactStateCheck, WarnProcCursor, WarnProcTempTable,
-        WarnProcTableVariable, WarnProcResultSet, WarnProcNondeterministicWrite,
+        WarnProcTableVariable, WarnProcResultSet, WarnProcNondeterministicWrite, WarnProcNondeterministicReturn,
     ];
 }

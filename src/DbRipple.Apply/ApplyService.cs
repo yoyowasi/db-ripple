@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using DbRipple.Contracts;
 using DbRipple.Core.Baseline;
 using DbRipple.Core.Capture;
+using DbRipple.Core.Catalog;
 using Microsoft.Data.SqlClient;
 
 namespace DbRipple.Apply;
@@ -16,7 +17,8 @@ namespace DbRipple.Apply;
 /// <item>sandbox.AcquirePreviewLockAsync(잠금 충돌은 PreviewConflictException 그대로 409) → 잠금 안에서 store.GetAsync를 다시(동시 적용이 지운 건을 다시 적용하지 않게) → sandbox.GetContextAsync.</item>
 /// <item>선행 조건(ApplyPrecondition): 상태 ok(D8 truncated 차단 포함), ContractFormulas.SqlHash(record.Sql) == result.SqlHash == request.SqlHash(있으면), CreatedAt + PreviewExpiry 안이고 미리보기의 기준선이 현재 기준선과 같음(아니면 PREVIEW_EXPIRED),
 ///   원본 지문(Core Fingerprint.ReadAsync(원본)) == baseline.Fingerprint == 미리보기 지문, 원본에 ExecuteAsUser 있음(Q30, 만들지 않는다). 어기면 precondition_failed(원본에 아무것도 안 함).</item>
-/// <item>analyzer.Analyze(record.Sql, baseline) 재분석(문장 원문 얻기). 거부·문장 수·번호·종류·대상이 미리보기와 다르면 precondition_failed(SQL_HASH_MISMATCH와 같은 취급, 메시지로 구분).</item>
+/// <item>analyzer.Analyze(record.Sql, baseline) 재분석(문장 원문 얻기). 거부·문장 수·번호·종류·대상·프로시저가 미리보기와 다르면 precondition_failed(SQL_HASH_MISMATCH와 같은 취급, 메시지로 구분).
+///   EXEC(2026-11-17)는 원본을 읽어 최상위 프로시저의 EXECUTE 권한(PROC_EXECUTE_PERMISSION_MISSING)과 최상위·펼친 중첩 프로시저 정의의 기준선 일치(PROC_DEFINITION_CHANGED)를 본다.</item>
 /// <item>검증 모드(2026-11-13): 선행 조건 단계에서 원본 CREATE DATABASE 권한·원본 DB의 CONTROL과 FILESTREAM·메모리 최적화 유무로 정한다. 스냅샷을 만들 수 없으면 KEYSET_HASH이고,
 ///   요청에 allowKeysetVerification=true가 없으면 precondition_failed(WEAK_VERIFICATION_NOT_ACCEPTED). ForceKeyset은 설정 동의로 본다.</item>
 /// <item>원본 스냅샷: Core BaselineSql.DropSnapshot·CreateSnapshot(SingleServer = OriginDb + 접미사, Split = 거기에 _PC_적용id, 스파스 파일은 원본 데이터 파일 폴더).
@@ -24,6 +26,8 @@ namespace DbRipple.Apply;
 /// <item>전용 연결(풀링 끔, InitialCatalog = OriginDb) → runner.PrepareAsync → "BEGIN TRAN;" → CURRENT_TRANSACTION_ID().</item>
 /// <item>드리프트: DriftChecker로 미리보기 NetChanges의 before 행(UPDATED·DELETED·MULTISET_REMOVED)을 UPDLOCK, HOLDLOCK으로 읽어 비교. 있으면 ROLLBACK, drift_detected.</item>
 /// <item>KEYSET_HASH면 KeysetVerifier로 원본 카탈로그 사용자 테이블의 COUNT_BIG·CHECKSUM_AGG(실행 직전).</item>
+/// <item>EXEC 문장은 실행 직전에, 모든 EXEC는 커밋 전 대조 단계에서 이 트랜잭션 연결로 프로시저 정의·서명을 다시 읽어 기준선과 비교한다(2026-11-17, TOCTOU).
+///   실행 직전에 다르면 실행하지 않고 롤백(아무것도 실행 전이면 precondition_failed, 아니면 rolled_back_mismatch), 커밋 전에 다르면 불일치 PROC_DEFINITION_CHANGED로 롤백.</item>
 /// <item>문장마다 runner.RunAsync. 실패(ok 아님, 트랜잭션이 끝남, 트랜잭션이 바뀜)면 ROLLBACK(남아 있으면) → 롤백 뒤 남은 변경(원본 대 원본 스냅샷, 전체 사용자 테이블) → status error.
 ///   검사 자체가 예외면 Verification.ResidualCheckFailed = true(인계 7과 같은 표시). KEYSET_HASH면 원본 스냅샷이 없어 검사할 수 없으므로 ResidualCheckFailed = true.
 ///   3609 보정: 남은 변경이 있고 실패 문장이 trigger_blocked인데 StatementRunOutcome.TriggerRollbackConfirmed = false면 그 문장을 failed로 바꾼다.</item>
@@ -198,18 +202,14 @@ public sealed class ApplyService : IApplyService
         {
             // 4. 재분석: 문장 원문을 얻고, 분석 결과가 미리보기와 같은지 본다.
             analysis = Analyzer.Analyze(record.Sql, context);
-            if (analysis.Statements.Any(s => s.Kind == ChangeOperation.Exec))
-            {
-                // 방어 심화: 저장된 미리보기 결과가 아니라 지금 재분석한 문장으로도 EXEC를 막는다(2026-11-13).
-                failures.Add(ApplyPrecondition.ProcApplyNotSupported);
-                reasons.Add("저장 프로시저 호출(EXEC)이 있는 미리보기는 아직 적용할 수 없음(미리보기 전용).");
-            }
-            var why = SameStatements(analysis, record.Result.Statements);
+            var why = SameStatements(analysis, record);
             if (why is not null)
             {
                 failures.Add(ApplyPrecondition.SqlHashMismatch);
                 reasons.Add(why);
             }
+            // 4b. EXEC(2026-11-17): 재분석한 문장의 프로시저 권한·정의(읽기만)
+            else await CheckProceduresAsync(analysis, context, failures, reasons, ct);
         }
         if (failures.Count > 0)
             return Make(record, ApplyStatus.PreconditionFailed, new ApplyVerification { Mode = mode }, [], string.Join(" ", reasons), run) with
@@ -224,6 +224,9 @@ public sealed class ApplyService : IApplyService
         var limitations = new List<string>();
         if (Settings.Mode == ServerMode.Split) limitations.Add(PrincipalLimitation);
         if (Settings.Mode == ServerMode.Split && context.OriginIsSysadmin == true) limitations.Add(SysadminLimitation);
+        if (analysis!.Statements.Any(s => s.Kind == ChangeOperation.Exec)) limitations.Add(OriginProcedures.Limitation);
+        foreach (var st in analysis.Statements.Where(s => s.Plan?.ReturnValueNondeterministic == true))
+            limitations.Add($"EXEC 문장 {st.Index}: 반환 값이 IDENTITY·비결정 함수에 따라 달라질 수 있어 반환 값은 NULL 여부만 대조함(WARN_PROC_NONDETERMINISTIC_RETURN)");
         limitations.AddRange(await origin.ReadOriginWarningsAsync(context.OriginDb, ct)); // 사전 경고(막지 않음)
         var snapshotCreated = false;
         try
@@ -350,21 +353,46 @@ public sealed class ApplyService : IApplyService
         var runContext = new StatementRunContext
         {
             Baseline = context,
-            ExecuteAsUser = Settings.Mode == ServerMode.Split ? null : Settings.ExecuteAsUser, // Split: 원본에서 가장하지 않는다(본인 로그인)
+            ExecuteAsUser = OriginExecuteAsUser,
             CommandTimeoutSeconds = Settings.CommandTimeoutSeconds,
             TransactionId = tranId,
         };
         var statements = new List<StatementResult>();
         StatementRunOutcome? failed = null;
+        // EXEC(2026-11-17): 선행 조건(별도 연결) 뒤 ALTER·ADD SIGNATURE가 끼어드는 시간 창을 줄이려고, 이 트랜잭션 연결에서 EXEC 실행 직전에 정의·서명을 다시 본다.
+        var procedures = OriginProcedures.Baseline(context.Catalog, OriginProcedures.Targets(analysis.Statements).All);
+        (int Index, string Reason)? changedBefore = null;
         foreach (var st in analysis.Statements.OrderBy(s => s.Index))
         {
-            if (failed is not null)
+            if (failed is not null || changedBefore is not null)
             {
                 statements.Add(NotRun(st));
                 continue;
             }
-            // 선행 조건이 이미 막는다. 여기 닿으면 코드 결함이므로 원본에서 실행하지 않고 예외로 롤백 경로에 넘긴다.
-            if (st.Kind == ChangeOperation.Exec) throw new InvalidOperationException("EXEC 문장은 [적용]하지 않는다(PROC_APPLY_NOT_SUPPORTED).");
+            if (st.Kind == ChangeOperation.Exec)
+            {
+                string? changed;
+                try
+                {
+                    changed = await DefinitionDriftAsync(conn, [st], procedures, ct);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException and not SandboxUnavailableException)
+                {
+                    // 앞 문장은 모두 성공했고 트랜잭션도 그대로다: 롤백하면 원본은 실행 전 상태다.
+                    run.Execute = run.Lap();
+                    await conn.RollbackAsync(CancellationToken.None);
+                    run.Commit = run.Lap();
+                    statements.AddRange(analysis.Statements.Where(s => s.Index >= st.Index).OrderBy(s => s.Index).Select(NotRun));
+                    return Make(record, ApplyStatus.Error, new ApplyVerification { Mode = mode, Limitations = limitations }, statements,
+                        $"문장 {st.Index} 실행 직전 원본 프로시저 정의를 다시 읽지 못해({DescribeLockError(ex)}) 실행하지 않고 롤백함: {ex.Message}", run);
+                }
+                if (changed is not null)
+                {
+                    changedBefore = (st.Index, $"문장 {st.Index} 실행 직전 다시 읽은 {changed}");
+                    statements.Add(NotRun(st));
+                    continue;
+                }
+            }
             run.OriginTouched = true;
             var outcome = await Runner.RunAsync(conn.Session, st, runContext, ct);
             statements.Add(outcome.Result with { CaptureSeqRange = null });
@@ -373,10 +401,27 @@ public sealed class ApplyService : IApplyService
         run.Execute = run.Lap();
         if (failed is not null)
             return await FailAsync(conn, record, context, tables, mode, snapshotDb, limitations, statements, failed, run, ct);
+        if (changedBefore is { } cb)
+        {
+            await conn.RollbackAsync(CancellationToken.None);
+            run.Commit = run.Lap();
+            var reason = $"{cb.Reason}. 바뀐 본문은 검사를 거치지 않았으므로 실행하지 않고 롤백함(샌드박스를 새로 고친 뒤 다시 미리보기 할 것)";
+            if (!run.OriginTouched)
+                return Make(record, ApplyStatus.PreconditionFailed, new ApplyVerification { Mode = mode }, [], reason, run) with
+                {
+                    PreconditionFailures = [ApplyPrecondition.ProcDefinitionChanged],
+                };
+            // 앞 문장은 실행했다(트랜잭션 안, 모두 롤백): 커밋 전 대조가 막은 것과 같이 rolled_back_mismatch.
+            var (rows, _) = ApplyMatcher.CompareStatements(record.Result.Statements, statements);
+            return Make(record, ApplyStatus.RolledBackMismatch,
+                new ApplyVerification { Mode = mode, StatementRowCounts = rows, Mismatches = [DefinitionMismatch(cb.Index, cb.Reason)], Limitations = limitations },
+                statements, reason, run);
+        }
 
         // 10. 검증
         MatchOutcome match;
         IReadOnlyList<TableCountChange> tableCounts = [];
+        string? definitionNote = null;
         try
         {
             if (mode == VerificationMode.SnapshotNetdiff)
@@ -392,6 +437,12 @@ public sealed class ApplyService : IApplyService
                 var keyRows = await conn.VerifyKeyRowsAsync(record, tables, context, ct);
                 tableCounts = counts;
                 match = new MatchOutcome { StatementRowCounts = rows, NetSummaryMatch = false, Mismatches = [.. statementMismatches, .. stateMismatches, .. keyRows] };
+            }
+            // EXEC(2026-11-17): 실행 중에 정의가 바뀌었으면 검사 안 받은 본문이 돌았을 수 있다. 커밋 전에 다시 보고 다르면 롤백한다.
+            if (await DefinitionDriftAsync(conn, analysis.Statements, procedures, ct) is { } changedDuring)
+            {
+                definitionNote = $"커밋 전 다시 읽은 {changedDuring}";
+                match = match with { Mismatches = [.. match.Mismatches, DefinitionMismatch(null, definitionNote)] };
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException and not SandboxUnavailableException)
@@ -424,7 +475,7 @@ public sealed class ApplyService : IApplyService
             await conn.RollbackAsync(CancellationToken.None);
             run.Commit = run.Lap();
             return Make(record, ApplyStatus.RolledBackMismatch, verification, statements,
-                $"원본 실행 결과가 미리보기와 {match.Mismatches.Count}건 달라 롤백함", run);
+                $"원본 실행 결과가 미리보기와 {match.Mismatches.Count}건 달라 롤백함" + (definitionNote is null ? "" : $". {definitionNote}"), run);
         }
         try
         {
@@ -521,12 +572,6 @@ public sealed class ApplyService : IApplyService
                 ? "미리보기가 이미지 상한을 넘어 잘렸으므로 적용할 수 없음(D8)."
                 : "미리보기 상태가 ok가 아님.");
         }
-        if (result.Statements.Any(s => s.Kind == ChangeOperation.Exec))
-        {
-            // EXEC [적용]은 2차(2026-11-13): 원본에서 프로시저를 다시 돌려 미리보기와 대조하는 경로가 아직 없다.
-            failures.Add(ApplyPrecondition.ProcApplyNotSupported);
-            reasons.Add("저장 프로시저 호출(EXEC)이 있는 미리보기는 아직 적용할 수 없음(미리보기 전용).");
-        }
         if (!string.Equals(ContractFormulas.SqlHash(record.Sql), result.SqlHash, StringComparison.Ordinal))
         {
             failures.Add(ApplyPrecondition.SqlHashMismatch);
@@ -577,17 +622,83 @@ public sealed class ApplyService : IApplyService
         return (failures, reasons);
     }
 
-    /// <summary>재분석 결과가 미리보기 문장과 같은지. 다르면 이유.</summary>
-    static string? SameStatements(AnalysisResult analysis, IReadOnlyList<StatementResult> preview)
+    /// <summary>원본 문장 실행 주체: SingleServer는 실행 사용자로 가장하고, Split은 가장하지 않는다(본인 로그인).</summary>
+    string? OriginExecuteAsUser => Settings.Mode == ServerMode.Split ? null : Settings.ExecuteAsUser;
+
+    /// <summary>
+    /// EXEC [적용] 선행 조건(2026-11-17, 원본 읽기만): 최상위 프로시저의 EXECUTE 권한(문장을 실행할 주체 기준), 최상위·펼친 중첩 프로시저의 원본 정의가 기준선과 같은지,
+    /// 모듈 서명이 없는지. EXEC가 없으면 원본을 읽지 않는다. 원본 연결 실패는 ORIGIN_UNREACHABLE, 그 밖의 읽기 실패(시간 초과, EXECUTE AS 실패 등)는
+    /// 확인할 수 없으므로 PROC_DEFINITION_CHANGED로 막는다(500으로 내보내지 않는다).
+    /// </summary>
+    async Task CheckProceduresAsync(AnalysisResult analysis, BaselineContext context, List<ApplyPrecondition> failures, List<string> reasons, CancellationToken ct)
+    {
+        var (top, all) = OriginProcedures.Targets(analysis.Statements);
+        if (all.Count == 0) return;
+        var baseline = OriginProcedures.Baseline(context.Catalog, all);
+        var user = OriginExecuteAsUser;
+        IReadOnlyList<OriginProcedure> read;
+        try
+        {
+            read = await origin.ReadProceduresAsync(context.OriginDb, OriginProcedures.Query(all, baseline), user, ct);
+        }
+        catch (SandboxUnavailableException ex)
+        {
+            failures.Add(ApplyPrecondition.OriginUnreachable);
+            reasons.Add(ex.Message + ".");
+            return;
+        }
+        catch (Exception ex) when (ex is SqlException or InvalidOperationException)
+        {
+            failures.Add(ApplyPrecondition.ProcDefinitionChanged);
+            var number = ex is SqlException sql ? $"오류 {sql.Number}" : "오류";
+            reasons.Add($"원본 프로시저 정보를 읽지 못함({number}): {ex.Message}. 정의·서명·권한을 확인할 수 없어 실행하지 않음.");
+            return;
+        }
+        var principal = user is null ? "원본 로그인(본인)" : $"원본 실행 사용자 {user}";
+        foreach (var (code, reason) in OriginProcedures.Judge(top, all, baseline, read, principal))
+        {
+            failures.Add(code);
+            reasons.Add(reason);
+        }
+    }
+
+    /// <summary>실행 트랜잭션 연결에서 statements의 EXEC 프로시저 정의·서명을 다시 읽어 기준선과 대조한다(2026-11-17). 같으면 null, 다르면 이유.</summary>
+    static async Task<string?> DefinitionDriftAsync(IOriginConnection conn, IEnumerable<AnalyzedStatement> statements, IReadOnlyDictionary<string, CatalogModule> baseline, CancellationToken ct)
+    {
+        var (_, all) = OriginProcedures.Targets(statements);
+        if (all.Count == 0) return null;
+        var read = await conn.ReadProceduresAsync(OriginProcedures.Query(all, baseline), ct);
+        return OriginProcedures.Drift(OriginProcedures.Compare(all, baseline, read));
+    }
+
+    static ApplyMismatch DefinitionMismatch(int? statementIndex, string message) =>
+        new() { Kind = MismatchKind.ProcDefinitionChanged, StatementIndex = statementIndex, Message = message };
+
+    /// <summary>
+    /// 재분석 결과가 미리보기 문장과 같은지. 다르면 이유. EXEC는 프로시저 이름이 같고, 실행 SQL이 있고, 미리보기가 저장한 실행 SQL(PreviewRecord.ExecSql)과
+    /// 글자 그대로 같아야 한다(2026-11-17).
+    /// </summary>
+    static string? SameStatements(AnalysisResult analysis, PreviewRecord record)
     {
         if (!analysis.IsAccepted)
             return $"재분석에서 거부됨({string.Join(", ", analysis.Rejects.Select(r => r.RuleId).Distinct())}). 기준선이 바뀌었을 수 있음.";
         var a = analysis.Statements.OrderBy(s => s.Index).ToList();
-        var p = preview.OrderBy(s => s.Index).ToList();
+        var p = record.Result.Statements.OrderBy(s => s.Index).ToList();
         if (a.Count != p.Count) return $"재분석 문장 수({a.Count})가 미리보기({p.Count})와 다름.";
         for (var i = 0; i < a.Count; i++)
-            if (a[i].Index != p[i].Index || a[i].Kind != p[i].Kind || !string.Equals(a[i].Target, p[i].Target, StringComparison.Ordinal))
+        {
+            if (a[i].Index != p[i].Index || a[i].Kind != p[i].Kind || !string.Equals(a[i].Target, p[i].Target, StringComparison.Ordinal)
+                || !string.Equals(a[i].Procedure, p[i].Procedure, StringComparison.Ordinal))
                 return $"재분석 문장 {a[i].Index}이(가) 미리보기와 다름.";
+            if (a[i].Kind != ChangeOperation.Exec) continue;
+            if (a[i].Plan is not { ExecSql.Length: > 0 } plan)
+                return $"재분석 문장 {a[i].Index}에 프로시저 실행 SQL이 없음(분석기 계약 위반).";
+            var saved = record.ExecSql.FirstOrDefault(x => x.StatementIndex == a[i].Index);
+            if (saved is null)
+                return $"미리보기에 문장 {a[i].Index}의 실행 SQL 기록이 없음(이전 판에서 만든 미리보기). 다시 미리보기 할 것.";
+            if (!string.Equals(saved.Sql, plan.ExecSql, StringComparison.Ordinal))
+                return $"재분석 문장 {a[i].Index}의 실행 SQL이 미리보기 때와 다름.";
+        }
         return null;
     }
 
