@@ -226,7 +226,7 @@ public sealed class ApplyService : IApplyService
         if (Settings.Mode == ServerMode.Split && context.OriginIsSysadmin == true) limitations.Add(SysadminLimitation);
         if (analysis!.Statements.Any(s => s.Kind == ChangeOperation.Exec)) limitations.Add(OriginProcedures.Limitation);
         foreach (var st in analysis.Statements.Where(s => s.Plan?.ReturnValueNondeterministic == true))
-            limitations.Add($"EXEC 문장 {st.Index}: 반환 값이 IDENTITY·비결정 함수에 따라 달라질 수 있어 반환 값은 NULL 여부만 대조함(WARN_PROC_NONDETERMINISTIC_RETURN)");
+            limitations.Add($"EXEC 문장 {st.Index}: 반환 값이 IDENTITY·비결정 함수에 따라 달라질 수 있어 리터럴 반환 값({string.Join(", ", st.Plan!.LiteralReturnValues)}) 밖의 반환 값은 NULL 여부만 대조함(WARN_PROC_NONDETERMINISTIC_RETURN)");
         limitations.AddRange(await origin.ReadOriginWarningsAsync(context.OriginDb, ct)); // 사전 경고(막지 않음)
         var snapshotCreated = false;
         try

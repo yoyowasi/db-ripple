@@ -431,6 +431,28 @@ public sealed class ApplySqlTests
             RETURN CAST(SCOPE_IDENTITY() AS int);
         END;
         """,
+        // PR #11 2차 검토(2026-11-17): 변수를 거친 비결정 쓰기, 비결정 쓰기 옆의 데이터 상태 코드, 다른 문장의 결정적 쓰기.
+        "CREATE TABLE dbo.Cfg (id int NOT NULL PRIMARY KEY, at datetime2 NOT NULL);",
+        "INSERT INTO dbo.Cfg (id, at) VALUES (1, '2020-01-01');",
+        """
+        CREATE PROCEDURE dbo.usp_stamp @id int AS
+        BEGIN
+            SET NOCOUNT ON;
+            DECLARE @now datetime2 = SYSDATETIME();
+            UPDATE dbo.T SET v = v + 1, modified = @now WHERE id = @id;
+            RETURN 0;
+        END;
+        """,
+        """
+        CREATE PROCEDURE dbo.usp_note_status @id int AS
+        BEGIN
+            SET NOCOUNT ON;
+            INSERT INTO dbo.Note (id, tag) VALUES (@id, NEWID());
+            DECLARE @status int;
+            SELECT @status = v FROM dbo.T WHERE id = 2;
+            RETURN @status;
+        END;
+        """,
     ];
 
     [SqlFact]
@@ -466,6 +488,56 @@ public sealed class ApplySqlTests
         Assert.Equal(2, Assert.Single(result.Statements).ReturnValue);
         Assert.Empty(result.Verification.Mismatches);
         Assert.Equal(1, await lab.ScalarAsync<int>("SELECT COUNT(*) FROM dbo.Item WHERE name = N'b';"));
+    }
+
+    [SqlFact]
+    public async Task Exec_with_nondeterministic_write_through_variable_commits()
+    {
+        // DECLARE @now = SYSDATETIME(); UPDATE … SET modified = @now 도 비결정 쓰기로 표시되어 값 대조에서 빠진다(예전에는 ROW_VALUE로 롤백).
+        await using var lab = await ApplyLab.CustomAsync("exvar", ProcVolatile);
+        var record = await lab.PreviewAsync("EXEC dbo.usp_stamp @id = 1;");
+        Assert.Contains(record.RowChanges, rc => rc.Volatile.Any(v => v is { Column: "modified", Reason: VolatileReason.StatementFunction }));
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal(ApplyStatus.Committed, result!.Status);
+        Assert.Empty(result.Verification.Mismatches);
+        Assert.Contains("dbo.T.modified", result.Verification.VolatileIgnored);
+        Assert.Equal(2, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
+    }
+
+    [SqlFact]
+    public async Task Exec_status_code_from_data_is_compared_exactly_next_to_nondeterministic_write()
+    {
+        // 본문에 NEWID 쓰기가 있어도 RETURN @status(데이터로 정해짐)는 그대로 비교한다(예전에는 NULL 여부만 봐서 커밋됐다).
+        await using var lab = await ApplyLab.CustomAsync("exst", ProcVolatile);
+        var record = await lab.PreviewAsync("EXEC dbo.usp_note_status @id = 1;");
+        Assert.Equal(5, Assert.Single(record.Result.Statements).ReturnValue);
+        Assert.DoesNotContain(record.Result.Warnings, w => w.RuleId == AnalysisRules.WarnProcNondeterministicReturn);
+        await lab.ExecOnOriginAsync("UPDATE dbo.T SET v = 6 WHERE id = 2;");   // 행 변경(Note 1행)은 같고 상태 코드만 5 → 6
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal(ApplyStatus.RolledBackMismatch, result!.Status);
+        var m = Assert.Single(result.Verification.Mismatches);
+        Assert.Equal((MismatchKind.ProcReturnValue, "5", "6"), (m.Kind, m.Expected, m.Actual));
+        Assert.Equal(0, await lab.ScalarAsync<int>("SELECT COUNT(*) FROM dbo.Note WHERE id = 1;"));
+    }
+
+    [SqlFact]
+    public async Task Deterministic_write_by_other_statement_to_volatile_column_is_compared_by_value()
+    {
+        // usp_touch가 T.modified에 SYSDATETIME을 쓰지만(id=1), 2번 문장이 id=2에 쓴 값은 Cfg에서 온 결정적 값이다. 예전에는 열 단위로 합쳐 존재·형식만 봤다.
+        await using var lab = await ApplyLab.CustomAsync("exrow", ProcVolatile);
+        var record = await lab.PreviewAsync("EXEC dbo.usp_touch @id = 1; UPDATE dbo.T SET modified = (SELECT at FROM dbo.Cfg WHERE id = 1) WHERE id = 2;");
+        await lab.ExecOnOriginAsync("UPDATE dbo.Cfg SET at = '2030-01-01' WHERE id = 1;");
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal(ApplyStatus.RolledBackMismatch, result!.Status);
+        var m = Assert.Single(result.Verification.Mismatches);
+        Assert.Equal((MismatchKind.RowValue, "dbo.T", "modified", "2"), (m.Kind, m.Table, m.Column, m.Key!.Values[0]));
+        Assert.Equal(1, await lab.ScalarAsync<int>("SELECT COUNT(*) FROM dbo.T WHERE id = 2 AND modified IS NULL;"));
     }
 }
 #endif

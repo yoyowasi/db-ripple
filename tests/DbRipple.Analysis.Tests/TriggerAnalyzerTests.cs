@@ -218,6 +218,21 @@ END;");
     }
 
     [Fact]
+    public void Nondeterministic_writes_through_simple_variable_assignment()
+    {
+        // 2026-11-17: 프로시저 본문과 같은 VariableFlow 규칙. 분기 안에서 대입한 변수는 잡지 않는다(엄격 비교).
+        var a = AnalyzeOne(@"CREATE TRIGGER dbo.trX ON dbo.T AFTER UPDATE AS BEGIN
+            DECLARE @now datetime2 = SYSDATETIME();
+            DECLARE @who sysname; SELECT @who = SUSER_SNAME();
+            DECLARE @flag int; IF EXISTS (SELECT 1 FROM inserted) SET @flag = DATEPART(ms, GETDATE());
+            UPDATE dbo.T SET b = @now FROM inserted;
+            INSERT INTO dbo.L (x, y) VALUES (@who, @flag); END;",
+            events: ["UPDATE"], more: b => b.Table("dbo", "L", "!id", "x", "y"));
+        var cols = a.NondeterministicWrites.Select(w => $"{w.Table}.{w.Column}").ToList();
+        Assert.Equal(["dbo.L.x", "dbo.T.b"], cols);
+    }
+
+    [Fact]
     public void Encrypted_trigger_has_unknown_targets()
     {
         var a = AnalyzeOne(null, name: "trEnc");

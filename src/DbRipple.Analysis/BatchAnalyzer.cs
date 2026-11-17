@@ -425,6 +425,7 @@ public sealed class BatchAnalyzer : IBatchAnalyzer
                     Procedure = proc, ExecSql = execSql, WriteTargets = info.WriteTargets, ExpandedCalls = info.ExpandedCalls,
                     FirstIndependentDelete = info.FirstIndependentDelete,
                     NondeterministicWrites = info.NondeterministicWrites, ReturnValueNondeterministic = info.ReturnValueNondeterministic,
+                    LiteralReturnValues = info.LiteralReturnValues,
                 },
             });
         }
@@ -487,7 +488,7 @@ public sealed class BatchAnalyzer : IBatchAnalyzer
                     $"{proc}가 비결정 값으로 쓰는 열: {string.Join(", ", info.NondeterministicWrites.Select(w => w.Table + "." + w.Column))}. 실행마다 값이 달라질 수 있습니다.", "E1", index, span);
             if (info.ReturnValueNondeterministic)
                 Warn(AnalysisRules.WarnProcNondeterministicReturn,
-                    $"{proc}의 반환 값(RETURN 식)이 IDENTITY·비결정 함수에 따라 실행마다 달라질 수 있습니다. [적용]은 반환 값의 NULL 여부만 미리보기와 대조합니다.", "E1", index, span);
+                    $"{proc}의 반환 값(RETURN 식)이 IDENTITY·비결정 함수에 따라 실행마다 달라질 수 있습니다. [적용]은 리터럴 반환 값({string.Join(", ", info.LiteralReturnValues)})은 그대로, 그 밖의 반환 값은 NULL 여부만 미리보기와 대조합니다.", "E1", index, span);
         }
 
         static string ProcDocRef(string rule) => rule switch

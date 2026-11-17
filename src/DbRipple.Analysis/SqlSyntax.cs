@@ -178,15 +178,21 @@ internal static class SqlSyntax
         }
     }
 
-    /// <summary>값이 비결정 함수를 포함하는 대입의 열 이름(중복 없음, 등장 순서).</summary>
-    public static List<string> NondeterministicColumns(TSqlFragment spec, Func<IReadOnlyList<string>?> tableColumns)
+    /// <summary>
+    /// 값이 비결정 함수를 포함하는 대입의 열 이름(중복 없음, 등장 순서). variables가 있으면 그 본문에서 비결정 값만 받는 변수를 읽는 값도 넣는다
+    /// (2026-11-17, <c>SET @t = GETDATE(); UPDATE … SET c = @t</c>, VariableFlow).
+    /// </summary>
+    public static List<string> NondeterministicColumns(TSqlFragment spec, Func<IReadOnlyList<string>?> tableColumns, VariableFlow? variables = null)
     {
         var result = new List<string>();
         foreach (var (column, value) in Assignments(spec, tableColumns))
-            if (FindNondeterminism(value).Count > 0 && !result.Contains(column, StringComparer.OrdinalIgnoreCase))
+            if ((FindNondeterminism(value).Count > 0 || variables?.ReadsSource(value) == true) && !result.Contains(column, StringComparer.OrdinalIgnoreCase))
                 result.Add(column);
         return result;
     }
+
+    /// <summary>비결정 함수가 있는가(VariableFlow 쓰기 판정의 원천).</summary>
+    public static bool IsNondeterministic(TSqlFragment fragment) => FindNondeterminism(fragment).Count > 0;
 
     /// <summary>열 목록이 없는 INSERT가 값을 받는 열 순서(계산·rowversion·IDENTITY 열은 값을 받지 않는다).</summary>
     public static IReadOnlyList<string>? InsertableColumns(DbCatalog catalog, CatalogTable? table) =>

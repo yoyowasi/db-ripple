@@ -72,14 +72,17 @@ public sealed record ProcedurePlan
     public IReadOnlyList<string> ExpandedCalls { get; init; } = [];
     /// <summary>
     /// 펼친 본문(안쪽 호출 포함)이 비결정 함수(GETDATE·NEWID 등)로 값을 정하는 (테이블, 열)(2026-11-17, E1). C11이 이 문장의 깊이 1 묶음에서 STATEMENT_FUNCTION volatile로 표시한다.
-    /// 변수를 거쳐 대입하는 값(<c>SET @t = GETDATE(); UPDATE … SET c = @t</c>)은 잡지 못한다(트리거 분석과 같은 한계).
+    /// 같은 본문의 단순 대입으로 비결정 값만 받는 변수를 거친 값(<c>SET @t = GETDATE(); UPDATE … SET c = @t</c>)도 넣는다. 분기·반복·TRY 안 대입, OUTPUT 매개변수로 받은 값은 넣지 않는다(엄격 비교).
     /// </summary>
     public IReadOnlyList<TableColumn> NondeterministicWrites { get; init; } = [];
     /// <summary>
-    /// 반환 값이 실행마다 달라질 수 있음(2026-11-17, 보수적 판정): 대상 프로시저의 RETURN 식에 리터럴이 아닌 것이 있고, 펼친 본문 어딘가에서
-    /// IDENTITY 함수(SCOPE_IDENTITY·IDENT_CURRENT·@@IDENTITY)나 비결정 함수(GETDATE 계열·NEWID·RAND 등)를 쓴다. [적용] 대조는 반환 값의 NULL 여부만 본다.
+    /// 반환 값이 실행마다 달라질 수 있음(2026-11-17): 대상 프로시저의 값 있는 RETURN이 모두 정수 리터럴이거나, IDENTITY 함수(SCOPE_IDENTITY·IDENT_CURRENT·@@IDENTITY)·비결정 함수에서
+    /// (직접 또는 같은 본문의 단순 대입 변수로) 온 식이고, 그런 식이 하나 이상이다. 펼친 안쪽 프로시저의 반환 값(<c>EXEC @v = 안쪽</c>)은 안쪽 본문이 그런 함수를 쓰면 원천으로 본다.
+    /// 데이터로 정해지는 반환 값이 하나라도 있거나 판정할 수 없으면 false(엄격 비교). [적용]은 LiteralReturnValues는 그대로, 그 밖의 값은 NULL 여부만 대조한다.
     /// </summary>
     public bool ReturnValueNondeterministic { get; init; }
+    /// <summary>대상 프로시저가 리터럴로 돌려줄 수 있는 값(값 없는 RETURN·본문 끝의 0 포함, 2026-11-17 추가). ReturnValueNondeterministic이어도 이 값은 그대로 비교한다.</summary>
+    public IReadOnlyList<int> LiteralReturnValues { get; init; } = [];
     /// <summary>직선형 루트 본문이 처음 실행하는 독립 DELETE. 정적 정보만으로 발동을 확정하지 않는다.</summary>
     public IndependentDelete? FirstIndependentDelete { get; init; }
 }

@@ -114,7 +114,7 @@ public enum MismatchKind
     [JsonStringEnumMemberName("OUTSIDE_TABLE_CHANGED")] OutsideTableChanged,
     /// <summary>
     /// EXEC(2026-11-17): 프로시저 반환 값(StatementResult.ReturnValue)이 미리보기와 다름. Expected/Actual은 10진 문자열(없으면 null).
-    /// 분석기가 반환 값을 비결정으로 본 문장(ProcedurePlan.ReturnValueNondeterministic)은 NULL 여부만 비교한다.
+    /// 분석기가 반환 값을 비결정으로 본 문장(ProcedurePlan.ReturnValueNondeterministic)은 리터럴 반환 값(LiteralReturnValues)이 아니면 NULL 여부만 비교한다.
     /// </summary>
     [JsonStringEnumMemberName("PROC_RETURN_VALUE")] ProcReturnValue,
     /// <summary>EXEC(2026-11-17): 프로시저가 낸 결과 집합 수(StatementResult.ResultSetCount)가 미리보기와 다름. 결과 집합 내용은 비교하지 않는다.</summary>

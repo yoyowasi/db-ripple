@@ -44,6 +44,7 @@ public sealed record MatchOutcome
 /// <item>문장별 직접 대상 행 수(StatementResult.RowsAffected)가 같다.</item>
 /// <item>테이블별 netSummary 다섯 건수가 같다(발동 단위가 아니라 최종 차이로 비교, 원본에는 감사 트리거가 없다).</item>
 /// <item>PK·UNIQUE 키 행은 비결정 열(RowChange.volatile + 매니페스트 volatileColumns)을 뺀 값이 모두 같다. 계산 열(derived)은 식이 결정적이므로 비교에 넣는다(E4).
+///   RowChange.volatile은 그 행을 만든 행 변경 것만 쓴다(2026-11-17, MatchRules.VolatileFor(NetChange)).
 ///   다만 새 IDENTITY 값이나 그 짝 매핑으로 치환한 FK 값에 기대는 계산 열(예: AW SalesOrderNumber = 'SO' + SalesOrderID)은 그 값만 짝 값으로 바꿔 비교한다.</item>
 /// <item>새 IDENTITY 행은 비결정 열을 뺀 값으로 짝을 짓고, 그 IDENTITY를 참조하는 자식 FK 값은 짝 매핑으로 치환해 비교한다.
 ///   같은 서명 행이 미리보기·원본에 같은 개수로 있으면 각 쪽을 IDENTITY 오름차순으로 정렬해 순서대로 짝짓는다(같은 문장이 같은 순서로 IDENTITY를 매긴다는 가정, Limitations에 남김).
@@ -117,6 +118,7 @@ public static class ApplyMatcher
     /// D7 1: 문장별 직접 대상 행 수. 실제가 ok가 아니면 실제 값은 null이다.
     /// EXEC(2026-11-17)는 행 수가 양쪽 다 null이므로 반환 값(PROC_RETURN_VALUE)과 결과 집합 수(PROC_RESULT_SET_COUNT)도 대조한다. 결과 집합 내용은 비교하지 않는다.
     /// 분석기가 반환 값을 비결정으로 본 문장(ProcedurePlan.ReturnValueNondeterministic)은 반환 값의 NULL 여부만 비교한다.
+    /// 다만 미리보기·원본 값 가운데 하나라도 리터럴 반환 값(ProcedurePlan.LiteralReturnValues)이면 그대로 비교한다(상태 코드 경로가 갈리면 잡는다).
     /// </summary>
     public static (IReadOnlyList<StatementRowCount> Rows, IReadOnlyList<ApplyMismatch> Mismatches) CompareStatements(
         IReadOnlyList<StatementResult> preview, IReadOnlyList<StatementResult> actual)
@@ -141,7 +143,10 @@ public static class ApplyMatcher
             if (p.Kind != ChangeOperation.Exec) continue;
             int? returnValue = ok ? a!.ReturnValue : null, resultSets = ok ? a!.ResultSetCount : null;
             // 반환 값이 IDENTITY·비결정 함수에 기대면(분석기 판정, 재분석한 실제 쪽 Plan 우선) NULL 여부만 비교한다(2026-11-17).
-            var loose = (a?.Plan ?? p.Plan)?.ReturnValueNondeterministic == true;
+            // 다만 어느 쪽이든 리터럴 RETURN 값(0 포함)이면 그 경로를 탔을 수 있으므로 그대로 비교한다.
+            var plan = a?.Plan ?? p.Plan;
+            bool Literal(int? v) => v is { } x && plan!.LiteralReturnValues.Contains(x);
+            var loose = plan?.ReturnValueNondeterministic == true && !Literal(p.ReturnValue) && !Literal(returnValue);
             if (loose ? p.ReturnValue.HasValue != returnValue.HasValue : p.ReturnValue != returnValue)
                 mismatches.Add(new ApplyMismatch
                 {
@@ -181,26 +186,39 @@ internal sealed class MatchRules
     static readonly Regex TimePattern = new(@"^\d{2}:\d{2}:\d{2}(\.\d+)?\z", RegexOptions.CultureInvariant);
 
     readonly Dictionary<string, TableInfo> tables;
+    /// <summary>테이블 단위 비결정 열(열 속성 + 그 테이블 RowChange.volatile 전부): IDENTITY 짝짓기 서명, 키 없는 테이블, 설명 연결이 없는 행.</summary>
     readonly Dictionary<string, HashSet<string>> insertVolatile;
     readonly Dictionary<string, HashSet<string>> updateVolatile;
+    /// <summary>열 속성만(카탈로그·매니페스트: IDENTITY·ROWVERSION·NONDETERMINISTIC_DEFAULT). 행 단위 집합의 바탕.</summary>
+    readonly Dictionary<string, HashSet<string>> insertStructural;
+    readonly Dictionary<string, HashSet<string>> updateStructural;
+    /// <summary>묶음 id → (그 묶음 테이블, 행 변경).</summary>
+    readonly Dictionary<string, List<(string Table, RowChange Row)>> rowsByFiring;
+    readonly Dictionary<NetChange, IReadOnlySet<string>> rowVolatile = new(ReferenceEqualityComparer.Instance);
     /// <summary>자식 테이블 → 자식 열 → (부모 테이블, 부모 IDENTITY 열).</summary>
     readonly Dictionary<string, Dictionary<string, (string Table, string Column)>> identityRefs;
     readonly HashSet<string> previewInsertTables;
 
     MatchRules(
         Dictionary<string, TableInfo> tables, Dictionary<string, HashSet<string>> insertVolatile, Dictionary<string, HashSet<string>> updateVolatile,
+        Dictionary<string, HashSet<string>> insertStructural, Dictionary<string, HashSet<string>> updateStructural,
+        Dictionary<string, List<(string, RowChange)>> rowsByFiring,
         Dictionary<string, Dictionary<string, (string, string)>> identityRefs, HashSet<string> previewInsertTables)
     {
         this.tables = tables;
         this.insertVolatile = insertVolatile;
         this.updateVolatile = updateVolatile;
+        this.insertStructural = insertStructural;
+        this.updateStructural = updateStructural;
+        this.rowsByFiring = rowsByFiring;
         this.identityRefs = identityRefs;
         this.previewInsertTables = previewInsertTables;
     }
 
     /// <summary>
-    /// 비결정 열: INSERT 쪽은 매니페스트 volatileColumns(IDENTITY·ROWVERSION·NONDETERMINISTIC_DEFAULT) + 카탈로그 열 속성 + 그 테이블 RowChange.volatile 전부,
+    /// 비결정 열: INSERT 쪽은 매니페스트 volatileColumns(IDENTITY·ROWVERSION·NONDETERMINISTIC_DEFAULT) + 카탈로그 열 속성 + RowChange.volatile 전부,
     /// UPDATE 쪽은 ROWVERSION + RowChange.volatile 중 STATEMENT_FUNCTION·TRIGGER_GETDATE·ROWVERSION. DELETE(before)는 비결정 열이 없다(기준선 값).
+    /// RowChange.volatile은 2026-11-17부터 값 비교에서 그 행을 만든 행 변경 것만 쓴다(<see cref="VolatileFor(NetChange)"/>).
     /// </summary>
     public static MatchRules Create(PreviewRecord preview, BaselineContext baseline)
     {
@@ -225,14 +243,19 @@ internal sealed class MatchRules
                 Set(ins, mt.Table).Add(v.Column);
                 if (v.Reason == "ROWVERSION") Set(upd, mt.Table).Add(v.Column);
             }
+        var insStructural = ins.ToDictionary(kv => kv.Key, kv => new HashSet<string>(kv.Value, StringComparer.Ordinal), StringComparer.Ordinal);
+        var updStructural = upd.ToDictionary(kv => kv.Key, kv => new HashSet<string>(kv.Value, StringComparer.Ordinal), StringComparer.Ordinal);
         var firingTable = preview.Result.Firings.GroupBy(f => f.Id, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First().Table, StringComparer.Ordinal);
+        var byFiring = new Dictionary<string, List<(string, RowChange)>>(StringComparer.Ordinal);
         foreach (var rc in preview.RowChanges)
         {
             if (!firingTable.TryGetValue(rc.FiringId, out var table)) continue;
+            if (!byFiring.TryGetValue(rc.FiringId, out var list)) byFiring[rc.FiringId] = list = [];
+            list.Add((table, rc));
             foreach (var v in rc.Volatile)
             {
                 Set(ins, table).Add(v.Column);
-                if (v.Reason is VolatileReason.StatementFunction or VolatileReason.TriggerGetdate or VolatileReason.Rowversion) Set(upd, table).Add(v.Column);
+                if (UpdateReason(v.Reason)) Set(upd, table).Add(v.Column);
             }
         }
 
@@ -247,8 +270,10 @@ internal sealed class MatchRules
         }
 
         var insertTables = preview.NetChanges.Where(n => n.Change == NetChangeKind.Inserted).Select(n => n.Table).ToHashSet(StringComparer.Ordinal);
-        return new MatchRules(tables, ins, upd, refs, insertTables);
+        return new MatchRules(tables, ins, upd, insStructural, updStructural, byFiring, refs, insertTables);
     }
+
+    static bool UpdateReason(VolatileReason r) => r is VolatileReason.StatementFunction or VolatileReason.TriggerGetdate or VolatileReason.Rowversion;
 
     /// <summary>KEYSET에서 INSERTED를 건수로만 확인할 테이블(IDENTITY가 있거나, 미리보기에서 새 행이 생긴 IDENTITY 테이블을 FK로 가리킴).</summary>
     public bool InsertCountsOnly(string table) =>
@@ -266,6 +291,50 @@ internal sealed class MatchRules
 
     static readonly HashSet<string> NoColumns = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// 미리보기 순 변경 한 행의 비결정 열(2026-11-17, 행 단위): 열 속성 + 그 행을 만든 묶음(ExplainedBy.FiringIds) 가운데 같은 테이블·같은 키 행 변경의 volatile
+    /// (키가 맞는 행 변경이 없으면 그 묶음들의 같은 테이블 행 변경 전부). 같은 배치의 다른 문장이 같은 열에 쓴 결정적 값은 엄격 비교한다.
+    /// 설명 연결이 없는 기록(C12 출력·예전 픽스처)과 키 없는 행은 테이블 단위(<see cref="VolatileFor(string, NetChangeKind)"/>)를 쓴다.
+    /// </summary>
+    internal IReadOnlySet<string> VolatileFor(NetChange row)
+    {
+        if (row.ExplainedBy is null || row.Key.Kind == KeyKind.ROW) return VolatileFor(row.Table, row.Change);
+        if (row.Change is not (NetChangeKind.Inserted or NetChangeKind.Updated)) return NoColumns;
+        if (rowVolatile.TryGetValue(row, out var cached)) return cached;
+        var structural = (row.Change == NetChangeKind.Inserted ? insertStructural : updateStructural).GetValueOrDefault(row.Table);
+        var set = new HashSet<string>(structural ?? NoColumns, StringComparer.Ordinal);
+        var touching = row.ExplainedBy.FiringIds.SelectMany(id => rowsByFiring.GetValueOrDefault(id) ?? [])
+            .Where(r => string.Equals(r.Table, row.Table, StringComparison.Ordinal)).Select(r => r.Row).ToList();
+        var keyed = touching.Where(r => SameKey(r, row.Key)).ToList();
+        foreach (var rc in keyed.Count > 0 ? keyed : touching)
+            foreach (var v in rc.Volatile)
+                if (row.Change == NetChangeKind.Inserted || UpdateReason(v.Reason)) set.Add(v.Column);
+        return rowVolatile[row] = set;
+    }
+
+    /// <summary>행 변경이 이 키의 행인가(키 열·값, 또는 이미지의 키 열 값). 값은 끝 공백·대소문자·숫자 표기를 무시한다(정렬 규칙을 모르므로 넓게 맞춘다).</summary>
+    static bool SameKey(RowChange rc, RowKey key)
+    {
+        if (rc.Key.Columns.Count == key.Columns.Count && rc.Key.Columns.Zip(key.Columns).All(p => string.Equals(p.First, p.Second, StringComparison.OrdinalIgnoreCase))
+            && rc.Key.Values.Count == key.Values.Count && rc.Key.Values.Zip(key.Values).All(p => KeyValue(p.First) == KeyValue(p.Second)))
+            return true;
+        foreach (var image in new[] { rc.After, rc.Before })
+        {
+            if (image is null) continue;
+            var lookup = image.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+            var match = key.Columns.Count > 0;
+            for (var i = 0; match && i < key.Columns.Count; i++)
+                match = lookup.TryGetValue(key.Columns[i], out var v) && i < key.Values.Count && KeyValue(v) == KeyValue(key.Values[i]);
+            if (match) return true;
+        }
+        return false;
+    }
+
+    static string KeyValue(string? v) =>
+        v is null ? "\u0000"
+        : decimal.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? "#" + d.ToString("G29", CultureInfo.InvariantCulture)
+        : v.TrimEnd(' ').ToUpperInvariant();
+
     string BaseColumn(string table, string property)
     {
         if (tables.TryGetValue(table, out var t))
@@ -281,15 +350,17 @@ internal sealed class MatchRules
         tables.TryGetValue(table, out var t) && t.Columns.Any(c => c.IsComputed && string.Equals(c.Name, column, StringComparison.Ordinal));
 
     /// <summary>
-    /// 값 비교(D7 3·6). expected는 짝 매핑 치환을 마친 미리보기 값. 비결정 열은 존재·형식만 보고 ignored에 "테이블.열"을 넣는다.
+    /// 값 비교(D7 3·6). row는 미리보기 순 변경(테이블·변경 종류·키·행 단위 비결정 열의 출처), expected는 짝 매핑 치환을 마친 미리보기 값.
+    /// 비결정 열(<see cref="VolatileFor(NetChange)"/>)은 존재·형식만 보고 ignored에 "테이블.열"을 넣는다.
     /// replacements(미리보기 값 → 실제 값)는 계산 열에만, 숫자 경계를 지켜 적용한다.
     /// </summary>
     public void CompareValues(
-        string table, NetChangeKind change, RowKey key, IReadOnlyDictionary<string, string?>? expected, IReadOnlyDictionary<string, string?>? actual,
+        NetChange row, IReadOnlyDictionary<string, string?>? expected, IReadOnlyDictionary<string, string?>? actual,
         IReadOnlyDictionary<string, string>? replacements, List<ApplyMismatch> mismatches, ISet<string> ignored)
     {
         if (expected is null && actual is null) return;
-        var volatileColumns = VolatileFor(table, change);
+        var (table, key) = (row.Table, row.Key);
+        var volatileColumns = VolatileFor(row);
         var props = (expected?.Keys ?? []).Concat(actual?.Keys ?? []).Distinct(StringComparer.Ordinal).ToList();
         foreach (var prop in props)
         {
@@ -425,7 +496,7 @@ internal sealed class MatchRules
         foreach (var (table, pv, av, replacements) in pairedRows)
         {
             var expected = Substitute(table, pv.After, idMap, replacements);
-            CompareValues(table, NetChangeKind.Inserted, pv.Key, expected, av.After, replacements, mismatches, ignored);
+            CompareValues(pv, expected, av.After, replacements, mismatches, ignored);
         }
 
         // D7 3: 키 있는 행(키의 FK 값도 짝 매핑으로 치환)
@@ -449,7 +520,7 @@ internal sealed class MatchRules
             var replacements = new Dictionary<string, string>(StringComparer.Ordinal);
             var source = n.Change == NetChangeKind.Deleted ? n.Before : n.After;
             var expected = Substitute(n.Table, source, idMap, replacements);
-            CompareValues(n.Table, n.Change, n.Key, expected, n.Change == NetChangeKind.Deleted ? a.Before : a.After, replacements, mismatches, ignored);
+            CompareValues(n, expected, n.Change == NetChangeKind.Deleted ? a.Before : a.After, replacements, mismatches, ignored);
         }
         foreach (var a in actualByKey.Values)
             mismatches.Add(new ApplyMismatch { Kind = MismatchKind.RowUnexpected, Table = a.Table, Key = a.Key, Actual = Name(a.Change), Message = $"{a.Table}에 미리보기에 없는 변경({Name(a.Change)})이 생김" });

@@ -26,8 +26,10 @@ public sealed record ProcedureStaticInfo
     public IReadOnlyList<string> UnresolvedCalls { get; init; } = [];
     public IReadOnlyList<string> External { get; init; } = [];
     public IReadOnlyList<TableColumn> NondeterministicWrites { get; init; } = [];
-    /// <summary>반환 값이 실행마다 달라질 수 있음(2026-11-17): 대상의 RETURN 식에 리터럴이 아닌 것이 있고 펼친 본문이 IDENTITY·비결정 함수를 쓴다.</summary>
+    /// <summary>반환 값이 실행마다 달라질 수 있음(2026-11-17, ReturnValues.Judge): 값 있는 RETURN이 모두 정수 리터럴이거나 IDENTITY·비결정 원천에서 온 식이고, 원천 식이 하나 이상.</summary>
     public bool ReturnValueNondeterministic { get; init; }
+    /// <summary>대상 프로시저가 리터럴로 돌려줄 수 있는 값(0 포함, 오름차순). ReturnValueNondeterministic일 때 [적용]이 이 값은 그대로 비교한다.</summary>
+    public IReadOnlyList<int> LiteralReturnValues { get; init; } = [];
     /// <summary>거부 사실(규칙 ID별로 묶는 것은 호출자).</summary>
     public IReadOnlyList<ProcedureFinding> Rejects { get; init; } = [];
     /// <summary>경고 사실.</summary>
@@ -68,6 +70,7 @@ public sealed class ProcedureAnalyzer
             p.VariableName.Value, p.Value is not null, p.Modifier == ParameterModifier.Output, p.Modifier == ParameterModifier.ReadOnly)).ToList();
         var e = expander.ExpandModule(module, 1, []);
         var a = e.Parsed!;
+        var (returnNondeterministic, literalReturns) = ReturnValues.Judge(body, a);
         return new ProcedureStaticInfo
         {
             Procedure = name,
@@ -79,7 +82,8 @@ public sealed class ProcedureAnalyzer
             UnresolvedCalls = a.UnresolvedNames.ToList(),
             External = a.External.ToList(),
             NondeterministicWrites = a.NondeterministicWrites.OrderBy(w => w.Table, StringComparer.OrdinalIgnoreCase).ThenBy(w => w.Column, StringComparer.OrdinalIgnoreCase).ToList(),
-            ReturnValueNondeterministic = a.ValueFunction && ReturnValues.HasNonLiteralReturn(body.StatementList),
+            ReturnValueNondeterministic = returnNondeterministic,
+            LiteralReturnValues = literalReturns,
             Rejects = a.ExecRejects.ToList(),
             Warnings = a.ExecWarnings.ToList(),
         };
@@ -172,7 +176,9 @@ internal sealed class ProcedureExpander(DbCatalog catalog, TableResolver resolve
         a.Modules.Add(name);
         var body = proc.StatementList;
         body.Accept(new CtePrepass(a.CteDefinitions));
-        body.Accept(new BodyVisitor(a));
+        // 변수를 거친 비결정 쓰기(SET @t = GETDATE(); UPDATE … SET c = @t)도 잡는다(2026-11-17). 매개변수는 입력 값이 있어 원천으로 보지 않는다.
+        var writes = VariableFlow.Analyze(body, SqlSyntax.IsNondeterministic, proc.Parameters.Select(p => p.VariableName.Value));
+        body.Accept(new BodyVisitor(a, writes));
         var rules = new ExecRulesVisitor(a, name, Functions);
         body.Accept(rules);
         rules.Finish(body);
@@ -194,6 +200,7 @@ internal sealed class ProcedureExpander(DbCatalog catalog, TableResolver resolve
         {
             var inner = Expand(node, module.Schema, depth + 1, stack);
             pathDependent |= inner.PathDependent;
+            a.CallValueFunction[callName] = inner.Parsed?.ValueFunction == true;
             if (inner.Parsed is { } p) a.Merge(p);
             if (!inner.Resolved)
             {
@@ -507,6 +514,8 @@ internal sealed class Accumulator(string moduleSchema, TableResolver resolver, D
     public readonly List<ProcedureFinding> ExecWarnings = [];
     /// <summary>본문(안쪽 호출 포함)이 IDENTITY 함수나 비결정 함수를 쓴다(반환 값 비결정 판정 재료, 2026-11-17).</summary>
     public bool ValueFunction;
+    /// <summary>이 모듈이 직접 부르는 프로시저(쓴 이름 그대로) → 펼친 그 프로시저의 ValueFunction. <c>EXEC @v = 안쪽</c> 반환 값 판정에 쓴다(합치지 않는다).</summary>
+    public readonly Dictionary<string, bool> CallValueFunction = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// 펼친(또는 본문만 읽은) 프로시저 결과를 합친다: 쓰기 대상, 비결정 쓰기, 외부 부작용, ROLLBACK, 트랜잭션 제어(+ EXEC 전용 사실).
@@ -528,8 +537,14 @@ internal sealed class Accumulator(string moduleSchema, TableResolver resolver, D
 }
 
 /// <summary>
-/// 반환 값 비결정 판정(2026-11-17, 보수적): RETURN 식이 리터럴이 아니고(변수·식), 본문 어딘가에서 IDENTITY 함수나 비결정 함수를 쓰면 반환 값이 실행마다 달라질 수 있다고 본다.
-/// 샌드박스 IDENTITY는 미리보기마다 소비되어 원본과 다르다(A13). 데이터 흐름은 따지지 않으므로 거짓 양성이 있다([적용]이 반환 값을 NULL 여부만 대조할 뿐이다).
+/// 반환 값 비결정 판정(2026-11-17, PR #11 검토 뒤 좁힘). 대상 프로시저의 값 있는 RETURN을 하나씩 본다.
+/// <list type="bullet">
+/// <item>정수 리터럴(괄호·부호 포함): LiteralReturnValues에 넣는다. 값 없는 RETURN과 본문 끝은 0이라 0은 늘 넣는다.</item>
+/// <item>IDENTITY 함수(SCOPE_IDENTITY·IDENT_CURRENT·@@IDENTITY)나 비결정 함수를 직접 쓰거나, 같은 본문의 단순 대입으로 그 값만 받는 변수를 읽는 식(VariableFlow): 원천 식.
+///   <c>EXEC @v = 안쪽</c>의 반환 값은 예전처럼 펼친 안쪽 본문이 그런 함수를 쓰면 원천으로 본다.</item>
+/// <item>그 밖(데이터로 정해지는 변수·@@ROWCOUNT·분기 안에서 대입한 변수·정수가 아닌 리터럴 등): 하나라도 있으면 비결정으로 보지 않는다(엄격 비교, 롤백 쪽).</item>
+/// </list>
+/// 원천 식이 하나 이상이고 나머지가 모두 정수 리터럴이면 비결정이다. [적용]은 리터럴 값은 그대로, 그 밖의 값은 NULL 여부만 대조한다(샌드박스 IDENTITY는 미리보기마다 소비되어 원본과 다르다, A13).
 /// </summary>
 internal static class ReturnValues
 {
@@ -544,28 +559,42 @@ internal static class ReturnValues
         return v.Found;
     }
 
-    /// <summary>값이 있는 RETURN 가운데 리터럴(괄호·음수 포함)이 아닌 것이 있는가. RETURN만 있으면 0을 돌려주므로 리터럴로 본다.</summary>
-    public static bool HasNonLiteralReturn(TSqlFragment body)
+    /// <summary>대상 프로시저 본문의 반환 값 판정. a는 그 본문을 펼친 누적값(안쪽 호출의 ValueFunction).</summary>
+    public static (bool Nondeterministic, IReadOnlyList<int> Literals) Judge(ProcedureStatementBody proc, Accumulator a)
     {
-        var v = new ReturnFinder();
-        body.Accept(v);
-        return v.NonLiteral;
+        var body = proc.StatementList;
+        var flow = VariableFlow.Analyze(body, UsesValueFunction, proc.Parameters.Select(p => p.VariableName.Value),
+            spec => spec.ExecutableEntity is ExecutableProcedureReference { ProcedureReference.ProcedureReference.Name: { } n }
+                && a.CallValueFunction.GetValueOrDefault(SqlSyntax.Name(n)));
+        var finder = new ReturnFinder();
+        body.Accept(finder);
+        var literals = new SortedSet<int> { 0 };
+        bool source = false, other = false;
+        foreach (var e in finder.Expressions)
+        {
+            if (IntegerLiteral(e) is { } v) literals.Add(v);
+            else if (flow.Classify(e) == VariableFlow.Kind.Source) source = true;
+            else other = true;
+        }
+        return (source && !other, literals.ToList());
     }
 
-    static bool IsLiteral(ScalarExpression e) => e switch
+    /// <summary>정수 리터럴(괄호, 단항 +·-)의 값. int 범위 밖이거나 정수 리터럴이 아니면 null.</summary>
+    static int? IntegerLiteral(ScalarExpression e) => e switch
     {
-        ParenthesisExpression p => IsLiteral(p.Expression),
-        UnaryExpression { Expression: { } inner } => IsLiteral(inner),
-        Literal => true,
-        _ => false,
+        ParenthesisExpression p => IntegerLiteral(p.Expression),
+        UnaryExpression { UnaryExpressionType: UnaryExpressionType.Positive, Expression: { } inner } => IntegerLiteral(inner),
+        UnaryExpression { UnaryExpressionType: UnaryExpressionType.Negative, Expression: { } inner } => IntegerLiteral(inner) is { } x ? -x : null,
+        IntegerLiteral i when int.TryParse(i.Value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var v) => v,
+        _ => null,
     };
 
     sealed class ReturnFinder : TSqlFragmentVisitor
     {
-        public bool NonLiteral;
+        public readonly List<ScalarExpression> Expressions = [];
         public override void Visit(ReturnStatement n)
         {
-            if (n.Expression is { } e && !IsLiteral(e)) NonLiteral = true;
+            if (n.Expression is { } e) Expressions.Add(e);
         }
     }
 
@@ -599,7 +628,7 @@ internal sealed class NamedReferenceCollector : TSqlFragmentVisitor
 }
 
 /// <summary>쓰기 대상·외부 부작용·트랜잭션 제어·프로시저 호출을 모은다(트리거 본문과 프로시저 본문 공통).</summary>
-internal sealed class BodyVisitor(Accumulator a) : TSqlFragmentVisitor
+internal sealed class BodyVisitor(Accumulator a, VariableFlow? variables = null) : TSqlFragmentVisitor
 {
     /// <summary>동적 SQL 진입점(이름 그대로 실행할 문자열·핸들을 받는 시스템 프로시저).</summary>
     static readonly HashSet<string> DynamicEntryPoints = new(
@@ -685,7 +714,7 @@ internal sealed class BodyVisitor(Accumulator a) : TSqlFragmentVisitor
                 var display = tables[0];
                 var ct = catalogTable ?? FindTable(display);
                 var known = ct is null ? null : a.Catalog.Columns.Where(c => c.ObjectId == ct.ObjectId).Select(c => c.Name).ToList();
-                foreach (var col in SqlSyntax.NondeterministicColumns(spec, () => SqlSyntax.InsertableColumns(a.Catalog, ct)))
+                foreach (var col in SqlSyntax.NondeterministicColumns(spec, () => SqlSyntax.InsertableColumns(a.Catalog, ct), variables))
                     a.NondeterministicWrites.Add(new TableColumn { Table = display, Column = known?.FirstOrDefault(k => k.Equals(col, StringComparison.OrdinalIgnoreCase)) ?? col });
             }
         }
