@@ -44,7 +44,7 @@ public sealed record AnalyzedStatement
     public required SourceSpan Span { get; init; }
     /// <summary>실행할 문장 원문(스크립트에서 오프셋으로 잘라낸 부분, 끝 세미콜론 포함 여부는 C6이 정함).</summary>
     public required string Sql { get; init; }
-    /// <summary>문장 안 비결정 함수(GETDATE·NEWID 등)로 값이 정해지는 직접 대상 열(E1, RowChange.volatile STATEMENT_FUNCTION). 없으면 빈 배열.</summary>
+    /// <summary>문장 안 비결정 함수(GETDATE·NEWID 등)만으로 된 순수한 식으로 값이 정해지는 직접 대상 열(E1, RowChange.volatile STATEMENT_FUNCTION, 2026-11-17부터 하위 쿼리·CASE 등이 섞이면 빼서 엄격 비교). 없으면 빈 배열.</summary>
     public IReadOnlyList<string> NondeterministicColumns { get; init; } = [];
 }
 
@@ -71,15 +71,19 @@ public sealed record ProcedurePlan
     /// <summary>펼친 안쪽 프로시저 "스키마.이름"(대상 자신 제외).</summary>
     public IReadOnlyList<string> ExpandedCalls { get; init; } = [];
     /// <summary>
-    /// 펼친 본문(안쪽 호출 포함)이 비결정 함수(GETDATE·NEWID 등)로 값을 정하는 (테이블, 열)(2026-11-17, E1). C11이 이 문장의 깊이 1 묶음에서 STATEMENT_FUNCTION volatile로 표시한다.
-    /// 변수를 거쳐 대입하는 값(<c>SET @t = GETDATE(); UPDATE … SET c = @t</c>)은 잡지 못한다(트리거 분석과 같은 한계).
+    /// 펼친 본문(안쪽 호출 포함)이 순수한 비결정 원천 식으로 값을 정하는 (테이블, 열)(2026-11-17, E1). C11이 이 문장의 깊이 1 묶음에서 STATEMENT_FUNCTION volatile로 표시한다.
+    /// 원천 식: 잎이 비결정 함수(GETDATE·NEWID 등)·숫자 리터럴·원천 변수뿐이고 CAST·CONVERT·산술·날짜 내장 함수로만 감싼 식(Analysis VariableFlow). 하위 쿼리·열 참조·CASE·COALESCE 등이 섞이면 넣지 않는다.
+    /// 같은 본문의 단순 대입으로 원천 식만 받는 변수를 거친 값(<c>SET @t = GETDATE(); UPDATE … SET c = @t</c>)도 넣는다. 분기·반복·TRY 안 대입, OUTPUT 매개변수로 받은 값은 넣지 않는다(엄격 비교).
     /// </summary>
     public IReadOnlyList<TableColumn> NondeterministicWrites { get; init; } = [];
     /// <summary>
-    /// 반환 값이 실행마다 달라질 수 있음(2026-11-17, 보수적 판정): 대상 프로시저의 RETURN 식에 리터럴이 아닌 것이 있고, 펼친 본문 어딘가에서
-    /// IDENTITY 함수(SCOPE_IDENTITY·IDENT_CURRENT·@@IDENTITY)나 비결정 함수(GETDATE 계열·NEWID·RAND 등)를 쓴다. [적용] 대조는 반환 값의 NULL 여부만 본다.
+    /// 반환 값이 실행마다 달라질 수 있음(2026-11-17): 대상 프로시저의 값 있는 RETURN이 모두 정수 리터럴이거나 순수한 원천 식(IDENTITY 함수 SCOPE_IDENTITY·IDENT_CURRENT·@@IDENTITY 포함,
+    /// 직접 또는 같은 본문의 단순 대입 변수로)이고, 그런 식이 하나 이상이다. <c>EXEC @v = 안쪽</c>은 펼친 안쪽 프로시저의 이 판정이 true일 때만 원천이고(식 전체가 그 변수일 때만), 안쪽 리터럴 값을 LiteralReturnValues에 합친다.
+    /// 데이터로 정해지는 반환 값이 하나라도 있거나 판정할 수 없으면 false(엄격 비교). [적용]은 LiteralReturnValues는 그대로, 그 밖의 값은 NULL 여부만 대조한다.
     /// </summary>
     public bool ReturnValueNondeterministic { get; init; }
+    /// <summary>대상 프로시저가 리터럴로 돌려줄 수 있는 값(값 없는 RETURN·본문 끝의 0, 비결정으로 판정한 안쪽 프로시저의 리터럴 포함, 2026-11-17 추가). ReturnValueNondeterministic이어도 이 값은 그대로 비교한다.</summary>
+    public IReadOnlyList<int> LiteralReturnValues { get; init; } = [];
     /// <summary>직선형 루트 본문이 처음 실행하는 독립 DELETE. 정적 정보만으로 발동을 확정하지 않는다.</summary>
     public IndependentDelete? FirstIndependentDelete { get; init; }
 }

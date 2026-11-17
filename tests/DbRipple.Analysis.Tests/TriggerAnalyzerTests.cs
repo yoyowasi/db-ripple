@@ -218,6 +218,35 @@ END;");
     }
 
     [Fact]
+    public void Nondeterministic_writes_through_simple_variable_assignment()
+    {
+        // 2026-11-17: 프로시저 본문과 같은 VariableFlow 규칙. 분기 안에서 대입한 변수, 하위 쿼리 필터에만 비결정 함수가 있는 값(@r)은 잡지 않는다(엄격 비교).
+        var a = AnalyzeOne(@"CREATE TRIGGER dbo.trX ON dbo.T AFTER UPDATE AS BEGIN
+            DECLARE @now datetime2 = SYSDATETIME();
+            DECLARE @who sysname; SELECT @who = SUSER_SNAME();
+            DECLARE @flag int; IF EXISTS (SELECT 1 FROM inserted) SET @flag = DATEPART(ms, GETDATE());
+            DECLARE @r int = (SELECT TOP (1) a FROM dbo.T WHERE b <= DATEPART(hour, GETDATE()));
+            UPDATE dbo.T SET b = @now FROM inserted;
+            UPDATE dbo.T SET a = @r FROM inserted;
+            INSERT INTO dbo.L (x, y) VALUES (@who, @flag); END;",
+            events: ["UPDATE"], more: b => b.Table("dbo", "L", "!id", "x", "y"));
+        var cols = a.NondeterministicWrites.Select(w => $"{w.Table}.{w.Column}").ToList();
+        Assert.Equal(["dbo.L.x", "dbo.T.b"], cols);
+    }
+
+    [Fact]
+    public void String_wrapped_nondeterministic_value_is_marked_but_data_mixed_value_is_not()
+    {
+        // PR #15 2차 검토 B: 문자열 감싸기는 순수(예상값), 열·하위 쿼리가 섞이면 엄격.
+        var a = AnalyzeOne(@"CREATE TRIGGER dbo.trX ON dbo.T AFTER UPDATE AS BEGIN
+            UPDATE dbo.T SET b = 'PO' + CONVERT(char(8), GETDATE(), 112) FROM inserted;
+            UPDATE dbo.T SET a = DATEADD(day, a, GETDATE()) FROM inserted;
+            INSERT INTO dbo.L (x, y) SELECT REPLACE(CONVERT(varchar(36), NEWID()), '-', ''), LEFT(i.a, 2) + FORMAT(GETDATE(), 'yyyy') FROM inserted AS i; END;",
+            events: ["UPDATE"], more: b => b.Table("dbo", "L", "!id", "x", "y"));
+        Assert.Equal(["dbo.L.x", "dbo.T.b"], a.NondeterministicWrites.Select(w => $"{w.Table}.{w.Column}"));
+    }
+
+    [Fact]
     public void Encrypted_trigger_has_unknown_targets()
     {
         var a = AnalyzeOne(null, name: "trEnc");

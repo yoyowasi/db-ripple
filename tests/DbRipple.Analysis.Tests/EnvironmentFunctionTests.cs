@@ -29,6 +29,25 @@ public class EnvironmentFunctionTests
         Assert.Contains(r.Warnings, w => w.RuleId == AnalysisRules.WarnNondeterministicFunction);
     }
 
+    // PR #15 2차 검토 C: 상수 인자 호출은 결정적(값 그대로 비교). 인자 없는 호출과 세션 값(SESSION_CONTEXT)만 원천.
+    [Theory]
+    [InlineData("RAND(42)", false)]
+    [InlineData("RAND()", true)]
+    [InlineData("DB_NAME(5)", false)]
+    [InlineData("DB_ID(N'master')", false)]
+    [InlineData("SUSER_SNAME(0x01)", false)]
+    [InlineData("USER_NAME(1)", false)]
+    [InlineData("DB_ID()", true)]
+    [InlineData("SESSION_CONTEXT(N'tenant')", true)]
+    public void Constant_argument_calls_are_deterministic(string expr, bool nondeterministic)
+    {
+        var r = new BatchAnalyzer().Analyze($"UPDATE dbo.T SET b = {expr} WHERE a = 1;", BatchAnalyzerTests.Ctx());
+        Assert.True(r.IsAccepted);
+        string[] expected = nondeterministic ? ["b"] : [];
+        Assert.Equal(expected, r.Statements[0].NondeterministicColumns);
+        Assert.Equal(nondeterministic, r.Warnings.Any(w => w.RuleId == AnalysisRules.WarnNondeterministicFunction));
+    }
+
     [Fact]
     public void Ordinary_functions_stay_deterministic()
     {

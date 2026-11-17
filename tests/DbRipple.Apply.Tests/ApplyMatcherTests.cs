@@ -286,6 +286,149 @@ public sealed class ApplyMatcherTests
     }
 
     [Fact]
+    public void Exec_literal_return_values_are_compared_exactly_even_when_nondeterministic()
+    {
+        // PR #11 2차 검토 1: IF … RETURN 5; … RETURN SCOPE_IDENTITY()처럼 리터럴 상태 코드가 섞이면 리터럴 값은 그대로 비교한다.
+        var plan = ExecAnalyzed(returnNondeterministic: true).Plan! with { LiteralReturnValues = [0, 5] };
+        IReadOnlyList<ApplyMismatch> Run(int? preview, int? actual) =>
+            ApplyMatcher.CompareStatements([ExecStatement(returnValue: preview)], [ExecStatement(returnValue: actual) with { Plan = plan }]).Mismatches;
+
+        Assert.Empty(Run(1042, 7));     // 둘 다 IDENTITY 경로: NULL 여부만
+        Assert.Empty(Run(5, 5));
+        Assert.Empty(Run(0, 0));
+        var m = Assert.Single(Run(1042, 5));   // 원본은 상태 코드 경로
+        Assert.Equal((MismatchKind.ProcReturnValue, "1042", "5"), (m.Kind, m.Expected, m.Actual));
+        Assert.DoesNotContain("NULL 여부", m.Message);
+        Assert.Single(Run(0, 1042));
+        Assert.Contains("NULL 여부", Assert.Single(Run(1042, null)).Message);
+    }
+
+    // PR #11 2차 검토 2: RowChange.volatile은 그 행을 만든 행 변경 것만 쓴다. 같은 배치의 다른 문장이 같은 열에 쓴 결정적 값은 값으로 비교한다.
+    static Firing UpdateFiring(string id, int statement, string table = "dbo.T", ChangeOperation op = ChangeOperation.Update) => new()
+    {
+        Id = id, CaptureSeq = long.Parse(id[2..], System.Globalization.CultureInfo.InvariantCulture), StatementIndex = statement, Depth = 1, Table = table,
+        Operation = op, RowCount = 1, ImageMode = ImageMode.Full, AuditOrder = AuditOrder.Last,
+    };
+
+    static RowChange Rc(string firing, string table, string id, IReadOnlyDictionary<string, string?>? after, ChangeOperation op, params (string Column, VolatileReason Reason)[] volatileCells) => new()
+    {
+        Id = "rc-" + firing[2..] + "-1", FiringId = firing, Operation = op, Key = Key(id), After = after,
+        Volatile = volatileCells.Select(v => new VolatileCell { Column = v.Column, Reason = v.Reason }).ToList(),
+        Pairing = Pairing.ByPk, FinalAfterSource = FinalAfterSource.Audit,
+    };
+
+    static NetChange Explained(NetChange n, params string[] firings) => n with { ExplainedBy = new ExplainedBy { FiringIds = firings } };
+
+    static PreviewRecord TwoStatementPreview(bool explained)
+    {
+        // 문장 1(f-1)은 id=1의 v를 비결정 값으로, 문장 2(f-2)는 id=2의 v를 결정적 값으로 바꿨다.
+        var net = new List<NetChange>
+        {
+            Updated("dbo.T", "1", Row(("id", "1"), ("v", "1")), Row(("id", "1"), ("v", "10")), "v"),
+            Updated("dbo.T", "2", Row(("id", "2"), ("v", "5")), Row(("id", "2"), ("v", "6")), "v"),
+        };
+        if (explained) net = [Explained(net[0], "f-1"), Explained(net[1], "f-2")];
+        return Record(net, [Statement(1, 1), Statement(2, 1)],
+            firings: [UpdateFiring("f-1", 1), UpdateFiring("f-2", 2)],
+            rowChanges:
+            [
+                Rc("f-1", "dbo.T", "1", Row(("id", "1"), ("v", "10")), ChangeOperation.Update, ("v", VolatileReason.StatementFunction)),
+                Rc("f-2", "dbo.T", "2", Row(("id", "2"), ("v", "6")), ChangeOperation.Update),
+            ]);
+    }
+
+    static readonly List<NetChange> TwoStatementActual =
+    [
+        Updated("dbo.T", "1", Row(("id", "1"), ("v", "1")), Row(("id", "1"), ("v", "11")), "v"),
+        Updated("dbo.T", "2", Row(("id", "2"), ("v", "5")), Row(("id", "2"), ("v", "7")), "v"),
+    ];
+
+    [Fact]
+    public void Volatile_mark_applies_only_to_rows_of_the_marked_row_change()
+    {
+        var preview = TwoStatementPreview(explained: true);
+
+        var outcome = ApplyMatcher.Match(new MatchInput { Preview = preview, Actual = preview.Result.Statements, ActualNet = TwoStatementActual, Baseline = Context() });
+
+        var m = Assert.Single(outcome.Mismatches);   // id=1은 비결정(존재·형식만), id=2는 값 비교
+        Assert.Equal((MismatchKind.RowValue, "2", "v", "6", "7"), (m.Kind, m.Key!.Values[0], m.Column, m.Expected, m.Actual));
+        Assert.Contains("dbo.T.v", outcome.VolatileIgnored);
+    }
+
+    [Fact]
+    public void Net_change_without_explanation_falls_back_to_table_level_volatile()
+    {
+        // 설명 연결(ExplainedBy)이 없는 기록(C12 출력·예전 픽스처)은 예전처럼 테이블 단위로 본다.
+        var preview = TwoStatementPreview(explained: false);
+
+        var outcome = ApplyMatcher.Match(new MatchInput { Preview = preview, Actual = preview.Result.Statements, ActualNet = TwoStatementActual, Baseline = Context() });
+
+        Assert.Empty(outcome.Mismatches);
+    }
+
+    [Fact]
+    public void Row_volatile_uses_the_firing_rows_when_no_row_change_key_matches()
+    {
+        // 키 표기가 달라 행 변경과 맞출 수 없으면 그 행을 만든 묶음의 같은 테이블 행 변경 표시를 쓴다(다른 묶음 표시는 쓰지 않는다).
+        var preview = TwoStatementPreview(explained: true);
+        preview = preview with
+        {
+            RowChanges =
+            [
+                Rc("f-1", "dbo.T", "x1", null, ChangeOperation.Update, ("v", VolatileReason.StatementFunction)),
+                Rc("f-2", "dbo.T", "x2", null, ChangeOperation.Update),
+            ],
+        };
+
+        var outcome = ApplyMatcher.Match(new MatchInput { Preview = preview, Actual = preview.Result.Statements, ActualNet = TwoStatementActual, Baseline = Context() });
+
+        Assert.Equal("2", Assert.Single(outcome.Mismatches, m => m.Kind == MismatchKind.RowValue).Key!.Values[0]);
+    }
+
+    [Theory]
+    [InlineData("7", "007")]   // 숫자 표기만 다름
+    [InlineData("a", "A")]     // 대소문자만 다름
+    public void Row_change_key_is_matched_ordinally(string markedKey, string rowKey)
+    {
+        // PR #15 검토 4: 같은 묶음 안에서 표기만 비슷한 다른 행의 표시를 붙이지 않는다.
+        var net = Explained(Updated("dbo.T", rowKey, Row(("id", rowKey), ("v", "5")), Row(("id", rowKey), ("v", "6")), "v"), "f-1");
+        var preview = Record([net], [Statement(1, 2)], firings: [UpdateFiring("f-1", 1)],
+            rowChanges:
+            [
+                Rc("f-1", "dbo.T", markedKey, Row(("id", markedKey), ("v", "10")), ChangeOperation.Update, ("v", VolatileReason.StatementFunction)),
+                Rc("f-1", "dbo.T", rowKey, Row(("id", rowKey), ("v", "6")), ChangeOperation.Update),
+            ]);
+        var actual = new List<NetChange> { Updated("dbo.T", rowKey, Row(("id", rowKey), ("v", "5")), Row(("id", rowKey), ("v", "7")), "v") };
+
+        var outcome = ApplyMatcher.Match(new MatchInput { Preview = preview, Actual = [Statement(1, 2)], ActualNet = actual, Baseline = Context() });
+
+        var m = Assert.Single(outcome.Mismatches, m => m.Kind == MismatchKind.RowValue);
+        Assert.Equal(("v", "6", "7"), (m.Column, m.Expected, m.Actual));
+    }
+
+    [Fact]
+    public void Paired_identity_rows_compare_values_with_their_own_volatile_marks()
+    {
+        // dbo.C 새 IDENTITY 행 두 개: f-1 행의 qty는 비결정, f-2 행의 qty는 결정적. 짝짓기 서명은 테이블 단위(qty 제외), 값 비교는 행 단위.
+        var preview = Record(
+            [Explained(Inserted("dbo.C", "500", C("500", "1", "3")), "f-1"), Explained(Inserted("dbo.C", "501", C("501", "2", "4")), "f-2")],
+            [Statement(1, 1, "dbo.C", ChangeOperation.Insert), Statement(2, 1, "dbo.C", ChangeOperation.Insert)],
+            firings: [UpdateFiring("f-1", 1, "dbo.C", ChangeOperation.Insert), UpdateFiring("f-2", 2, "dbo.C", ChangeOperation.Insert)],
+            rowChanges:
+            [
+                Rc("f-1", "dbo.C", "500", C("500", "1", "3"), ChangeOperation.Insert, ("id", VolatileReason.Identity), ("qty", VolatileReason.StatementFunction)),
+                Rc("f-2", "dbo.C", "501", C("501", "2", "4"), ChangeOperation.Insert, ("id", VolatileReason.Identity)),
+            ]);
+        var actual = new List<NetChange> { Inserted("dbo.C", "900", C("900", "1", "8")), Inserted("dbo.C", "901", C("901", "2", "9")) };
+
+        var outcome = ApplyMatcher.Match(new MatchInput { Preview = preview, Actual = preview.Result.Statements, ActualNet = actual, Baseline = Context() });
+
+        Assert.Equal(2, outcome.IdentityPairs.Count);
+        var m = Assert.Single(outcome.Mismatches);
+        Assert.Equal((MismatchKind.RowValue, "501", "qty", "4", "9"), (m.Kind, m.Key!.Values[0], m.Column, m.Expected, m.Actual));
+    }
+
+    [Fact]
     public void Dml_statement_does_not_compare_return_value()
     {
         var (_, mismatches) = ApplyMatcher.CompareStatements([Statement(1, 1)], [Statement(1, 1) with { ReturnValue = 9, ResultSetCount = 4 }]);

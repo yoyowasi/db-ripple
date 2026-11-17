@@ -547,7 +547,7 @@ internal static class KeysetVerifier
                     mismatches.Add(new ApplyMismatch { Kind = MismatchKind.RowMissing, Table = n.Table, Key = n.Key, Expected = n.Change == NetChangeKind.Inserted ? "INSERTED" : "UPDATED", Message = $"{n.Table} 행이 미리보기에는 있지만 원본에 없음" });
                     continue;
                 }
-                rules.CompareValues(n.Table, n.Change, n.Key, n.After, actual, null, mismatches, ignored);
+                rules.CompareValues(n, n.After, actual, null, mismatches, ignored);
             }
         }
         return mismatches;
