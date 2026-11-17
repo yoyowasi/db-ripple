@@ -1,8 +1,11 @@
 using System.Data;
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using DbRipple.Contracts;
 using DbRipple.Core.Baseline;
 using DbRipple.Core.Capture;
+using DbRipple.Core.Catalog;
 using DbRipple.Core.Sql;
 using Microsoft.Data.SqlClient;
 
@@ -576,6 +579,107 @@ internal static class OriginWarnings
         if (f.Published || f.MergePublished || f.Subscribed) list.Add(Replication);
         if (f.Cdc) list.Add(Cdc);
         if (f.Broker) list.Add(Broker);
+        return list;
+    }
+}
+
+/// <summary>원본 프로시저 하나의 EXEC [적용] 선행 조건 읽기 결과(2026-11-17). Definition은 없거나 볼 수 없으면(VIEW DEFINITION 없음) null.</summary>
+internal sealed record OriginProcedure(string Schema, string Name, string? Definition, bool CanExecute);
+
+/// <summary>
+/// EXEC [적용] 선행 조건(2026-11-17, 읽기만). 환경 지문(Core Fingerprint)에는 모듈 정의가 없으므로 따로 본다.
+/// <list type="bullet">
+/// <item>권한: 원본 실행 주체(SingleServer는 실행 사용자, Split은 본인 로그인)가 최상위 프로시저마다 EXECUTE를 가졌는지. 도구는 GRANT하지 않는다.</item>
+/// <item>정의: 최상위와 분석기가 펼친 중첩 프로시저(ProcedurePlan.ExpandedCalls)의 원본 정의가 기준선 카탈로그(샌드박스, 분석기가 거부 규칙을 본 본문)와 글자 그대로 같은지.
+///   함수·뷰·트리거 정의는 대조하지 않는다(DML [적용]과 같은 한계, 결과 limitations에 적는다).</item>
+/// </list>
+/// </summary>
+internal static class OriginProcedures
+{
+    /// <summary>EXEC를 [적용]할 때 결과 limitations에 싣는 한계.</summary>
+    public const string Limitation =
+        "EXEC: 프로시저는 반환 값과 결과 집합 수만 미리보기와 대조하고 결과 집합 내용은 비교하지 않음. 원본 정의는 호출 대상과 펼친 중첩 프로시저만 기준선과 대조함(함수·뷰·트리거 정의는 대조하지 않음)";
+
+    /// <summary>
+    /// 원본 DB 문맥의 읽기 SQL. 매개변수 @s{i}·@n{i}(스키마·이름). 결과 집합 둘: (i, definition), (i, 0/1 EXECUTE).
+    /// 정의는 가장 전에 도구 로그인으로 읽는다(가장한 사용자는 VIEW DEFINITION이 없어 NULL로 보인다). 권한은 executeAsUser가 있으면 EXECUTE AS USER 뒤 읽고 REVERT한다.
+    /// </summary>
+    public static string Sql(int count, string? executeAsUser)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
+        var values = string.Join(", ", Enumerable.Range(0, count).Select(i => string.Create(CultureInfo.InvariantCulture, $"({i}, @s{i}, @n{i})")));
+        var sb = new StringBuilder();
+        sb.Append("SET NOCOUNT ON;\n");
+        sb.Append($"SELECT v.i, m.definition FROM (VALUES {values}) AS v (i, s, n)\n")
+          .Append("LEFT JOIN sys.procedures AS p ON p.schema_id = SCHEMA_ID(v.s) AND p.name = v.n\n")
+          .Append("LEFT JOIN sys.sql_modules AS m ON m.object_id = p.object_id\n")
+          .Append("ORDER BY v.i;\n");
+        if (executeAsUser is not null) sb.Append($"EXECUTE AS USER = {SqlText.NLiteral(executeAsUser)};\n");
+        sb.Append("SELECT v.i, CASE WHEN HAS_PERMS_BY_NAME(QUOTENAME(v.s) + N'.' + QUOTENAME(v.n), N'OBJECT', N'EXECUTE') = 1 THEN 1 ELSE 0 END\n")
+          .Append($"FROM (VALUES {values}) AS v (i, s, n)\n")
+          .Append("ORDER BY v.i;\n");
+        if (executeAsUser is not null) sb.Append("REVERT;\n");
+        return sb.ToString();
+    }
+
+    /// <summary>EXEC 문장에서 확인할 프로시저 "스키마.이름"(카탈로그 철자, 처음 나온 순서, 중복 없음). TopLevel은 권한·정의, All은 정의를 본다.</summary>
+    public static (IReadOnlyList<string> TopLevel, IReadOnlyList<string> All) Targets(IEnumerable<AnalyzedStatement> statements)
+    {
+        var top = new List<string>();
+        var all = new List<string>();
+        foreach (var st in statements.Where(s => s.Kind == ChangeOperation.Exec).OrderBy(s => s.Index))
+        {
+            if ((st.Plan?.Procedure ?? st.Procedure) is { } p)
+            {
+                if (!top.Contains(p, StringComparer.Ordinal)) top.Add(p);
+                if (!all.Contains(p, StringComparer.Ordinal)) all.Add(p);
+            }
+            foreach (var c in st.Plan?.ExpandedCalls ?? [])
+                if (!all.Contains(c, StringComparer.Ordinal)) all.Add(c);
+        }
+        return (top, all);
+    }
+
+    /// <summary>기준선 카탈로그 프로시저를 "스키마.이름"(글자 그대로)으로 찾는다. 같은 이름이 둘 이상이면 찾지 못한 것으로 본다.</summary>
+    public static IReadOnlyDictionary<string, CatalogModule> Baseline(DbCatalog catalog, IEnumerable<string> names)
+    {
+        var wanted = names.ToHashSet(StringComparer.Ordinal);
+        return catalog.ProcedureModules
+            .GroupBy(m => m.Schema + "." + m.Name, StringComparer.Ordinal)
+            .Where(g => wanted.Contains(g.Key) && g.Count() == 1)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// 판정(순수). origin은 baseline에서 찾은 프로시저를 읽은 결과다. 실패마다 (코드, 이유). principal은 메시지용 실행 주체 이름이다.
+    /// 정의는 기준선에 없음·원본에서 못 읽음·다름을, 권한은 최상위만 본다(중첩은 소유권 체인을 타거나, 아니면 실행 중 229로 롤백된다).
+    /// </summary>
+    public static IReadOnlyList<(ApplyPrecondition Code, string Reason)> Judge(
+        IReadOnlyList<string> topLevel, IReadOnlyList<string> all, IReadOnlyDictionary<string, CatalogModule> baseline, IReadOnlyList<OriginProcedure> origin, string principal)
+    {
+        var read = origin.GroupBy(o => o.Schema + "." + o.Name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        List<string> missing = [], unreadable = [], changed = [], denied = [];
+        foreach (var name in all)
+        {
+            if (!baseline.TryGetValue(name, out var module)) missing.Add(name);
+            else if (!read.TryGetValue(name, out var o) || o.Definition is null) unreadable.Add(name);
+            else if (module.Definition is null || !string.Equals(module.Definition, o.Definition, StringComparison.Ordinal)) changed.Add(name);
+        }
+        foreach (var name in topLevel)
+            if (baseline.ContainsKey(name) && !(read.TryGetValue(name, out var o) && o.CanExecute)) denied.Add(name);
+
+        var list = new List<(ApplyPrecondition, string)>();
+        if (changed.Count > 0)
+            list.Add((ApplyPrecondition.ProcDefinitionChanged,
+                $"기준선 이후 원본에서 프로시저 정의가 바뀜: {string.Join(", ", changed)}. 바뀐 본문은 거부 규칙 검사를 거치지 않았으므로 실행하지 않음(샌드박스를 새로 고친 뒤 다시 미리보기 할 것)."));
+        if (unreadable.Count > 0)
+            list.Add((ApplyPrecondition.ProcDefinitionChanged,
+                $"원본에서 프로시저 정의를 읽지 못해 기준선과 같은지 확인할 수 없음: {string.Join(", ", unreadable)}(없거나 암호화됐거나 도구 로그인에 VIEW DEFINITION 권한이 없음)."));
+        if (missing.Count > 0)
+            list.Add((ApplyPrecondition.ProcDefinitionChanged, $"기준선 카탈로그에 프로시저 정의가 없음: {string.Join(", ", missing)}."));
+        if (denied.Count > 0)
+            list.Add((ApplyPrecondition.ProcExecutePermissionMissing,
+                $"{principal}에게 프로시저 EXECUTE 권한이 없음: {string.Join(", ", denied)}. 도구는 원본에 GRANT하지 않으므로 권한을 받은 뒤 다시 적용할 것."));
         return list;
     }
 }

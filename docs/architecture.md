@@ -79,7 +79,7 @@ INSERT/UPDATE/DELETE 한 문장이 FK 연쇄(CASCADE, SET NULL, SET DEFAULT)와 
 ### 1.3 비목표 (MVP)
 
 - LLM 사용, 실행하지 않고 추정하는 분석
-- DDL 미리보기. 저장 프로시저 호출(EXEC)은 2026-11-13부터 미리보기만 지원한다(D5 EXEC 결정). EXEC의 [적용]은 2차로 미룬다.
+- DDL 미리보기(프로시저 정의 수정 포함). 저장 프로시저 호출(EXEC)은 2026-11-13부터 미리보기를, 2026-11-17부터 [적용]도 지원한다(D5 EXEC 결정, D7 2026-11-17 결정).
 - 운영 환경 배포, 다중 사용자, 인증
 - 수십 GB 이상 DB 최적화, PostgreSQL 지원
 
@@ -291,7 +291,7 @@ flowchart LR
 - **C10:** EXEC 문장은 분석기가 만든 실행 SQL로 돌리고 `returnValue`·`resultSetCount`를 낸다. 프로시저가 ROLLBACK하면 failed다(§5.2 v1.6). 근거: `src/DbRipple.Execution/StatementRunner.cs`.
 - **C8·C9:** 실행 사용자에게 CALLER로 도는 T-SQL 사용자 프로시저마다 `EXECUTE`를 준다(`GRANT EXECUTE ON OBJECT::`, 함수에는 주지 않는다. 2026-11-13 보안 검토 뒤 스키마 단위에서 좁혔다). 기준선을 만들기 전에 DB 범위 DDL 트리거 안전 검사를 하고(`DdlTriggerSafety`, 설정 `DbRipple:AllowRiskyDdlTriggers` 기본 false), Split 복원 직후 샌드박스의 TRUSTWORTHY를 끈다. `SandboxStatus.instanceWarnings`가 위험한 샌드박스 인스턴스 설정을 알린다(막지 않음). 근거: `src/DbRipple.Core/Baseline/PreviewUserSql.cs`, `BaselineSql.cs`, `SandboxSafety.cs`, `src/DbRipple.Preview/SandboxManager.cs`.
 - **C13:** 원인 `PROC_DIRECT`, 그래프 노드 `procedureCall`, 간선 `PROC_DIRECT`(§6.3, §7.2 5단계). 근거: `src/DbRipple.Attribution/CausalResolver.cs`, `GraphBuilder.cs`.
-- **C15:** [적용] 선행 조건 `PROC_APPLY_NOT_SUPPORTED`, 검증 모드 `KEYSET_HASH`, 불일치 `OUTSIDE_TABLE_CHANGED`, 원본 사전 경고(D7). 근거: `src/DbRipple.Apply/ApplyService.cs`, `ApplySteps.cs`, `src/DbRipple.Contracts/Apply.cs`.
+- **C15:** [적용] 선행 조건 `PROC_APPLY_NOT_SUPPORTED`(2026-11-17부터 내지 않는다, EXEC [적용]은 D7 2026-11-17 결정), 검증 모드 `KEYSET_HASH`, 불일치 `OUTSIDE_TABLE_CHANGED`, 원본 사전 경고(D7). 근거: `src/DbRipple.Apply/ApplyService.cs`, `ApplySteps.cs`, `src/DbRipple.Contracts/Apply.cs`.
 - **C5:** 행 API에 `table` 필터가 생겼다(§6.4 v1.6). 근거: `src/DbRipple.Api/DbRippleApi.cs`.
 
 ## 5. 데이터 흐름
@@ -399,7 +399,7 @@ sequenceDiagram
 - 미리보기를 만든 지 30분(설정값) 안이다.
 - 원본과 샌드박스의 환경 지문이 같다.
 - v1.5: 원본에 실행 사용자가 있다(Q30). 코드와 기준선 변경 처리는 아래 v1.5 표에 있다.
-- v1.6: 미리보기에 EXEC 문장이 없다(`PROC_APPLY_NOT_SUPPORTED`). EXEC [적용]은 2차다(D5 EXEC 결정).
+- 2026-11-17(EXEC [적용]): 미리보기에 EXEC 문장이 있으면 원본 실행 주체가 부르는 최상위 프로시저마다 EXECUTE 권한을 가졌고(`PROC_EXECUTE_PERMISSION_MISSING`), 최상위와 분석기가 펼친 중첩 프로시저의 원본 정의가 기준선과 같다(`PROC_DEFINITION_CHANGED`). v1.6에서 EXEC를 막던 `PROC_APPLY_NOT_SUPPORTED`는 없앴다(D7 2026-11-17 결정).
 
 **드리프트 검사:** 미리보기에 나온 before 행이 원본에서 바뀌었는지 확인하고, 그 행을 커밋까지 잠근다. 다음 두 가지는 이 검사로 잡지 못한다. 기준선 이후 원본에 새로 생겨 WHERE를 만족하게 된 행, 그리고 스냅샷 생성 직후의 변경이다. 이것들은 커밋 전 최종 차이 대조가 잡고, 결과는 `rolled_back_mismatch`가 된다.
 
@@ -418,10 +418,10 @@ sequenceDiagram
 | 항목 | 규칙 | 근거(코드) |
 |---|---|---|
 | 잠금 | 미리보기와 같은 잠금을 잡은 뒤 저장소에서 미리보기를 다시 읽는다. 동시 적용이 이미 지운 건을 다시 적용하지 않기 위해서다(AD10). 잠금 충돌·구축 중은 409다. | `ApplyService.ApplyAsync` |
-| 선행 조건(Q28) | 아래 표의 코드다(2026-11-13까지 여덟 개). 하나라도 어기면 `precondition_failed`이고 원본에는 아무것도 하지 않는다. | `ApplyService.CheckPreconditionsAsync`, `ApplyPrecondition` |
+| 선행 조건(Q28) | 아래 표의 코드다(2026-11-17 기준 열 개, 그 가운데 `PROC_APPLY_NOT_SUPPORTED`는 더는 내지 않는다). 하나라도 어기면 `precondition_failed`이고 원본에는 아무것도 하지 않는다. | `ApplyService.CheckPreconditionsAsync`, `ApplyPrecondition` |
 | 기준선 변경 | 미리보기를 만든 뒤 기준선이 바뀌었으면(백업 완료 시각이나 DB 이름이 다름) `PREVIEW_EXPIRED`다. 30분이 지난 경우와 같은 코드다. | 같은 곳 |
 | 재분석 | 문장 원문을 얻으려고 다시 분석한다. 거부되거나 문장 수·번호·종류·대상이 미리보기와 다르면 `SQL_HASH_MISMATCH`(메시지로 구분)다. | `ApplyService.SameStatements` |
-| 원본 실행 사용자(Q30) | 원본에 `dbr_preview_user`가 없으면 `EXECUTE_AS_USER_MISSING`이다. [적용] 중에는 원본에 DDL을 하지 않는다. 사용자는 원본 준비 단계(`scripts/restore-aw-origin.ps1`)에서 멱등으로 만든다. 실제 운영 DB라면 미리 만들어 두는 설정 단계에 해당한다. | `OriginDatabase.UserExistsAsync`, `scripts/restore-aw-origin.ps1` |
+| 원본 실행 사용자(Q30) | 원본에 `dbr_preview_user`가 없으면 `EXECUTE_AS_USER_MISSING`이다. [적용] 중에는 원본에 DDL을 하지 않는다. 사용자는 원본 준비 단계(`scripts/restore-aw-origin.ps1`)에서 멱등으로 만든다(2026-11-17부터 EXEC [적용]용으로 프로시저마다 EXECUTE도 준다). 실제 운영 DB라면 미리 만들어 두는 설정 단계에 해당한다. | `OriginDatabase.UserExistsAsync`, `scripts/restore-aw-origin.ps1` |
 | 원본 스냅샷 실패 | 실행 전에 원본 권한(`HAS_PERMS_BY_NAME`)과 FILESTREAM·메모리 최적화 파일 그룹 유무로 정한다(D7 2026-11-13 결정). 스냅샷을 만들 수 없다고 판단되면 `KEYSET_HASH`(동의 필요)로 낮추고 `limitations`에 이유를 적는다. 만들 수 있다고 판단했는데 생성이 실패하면 원인과 상관없이 낮추지 않고 실행 없이 `error`다. 이름 충돌(50001·1801)·권한 오류(262·229·230·297·300·916·15247)·원본 파일 없음이 그런 설정 문제다. 권한 오류 번호는 문서 기준이고 실측 전이다. `ForceKeyset` 설정은 테스트·데모 전용이다. | `ApplySteps.cs` `OriginSnapshot`, `SnapshotOutcome` |
 | 드리프트 | 미리보기 최종 차이의 before 행(UPDATED·DELETED·MULTISET_REMOVED)을 UPDLOCK, HOLDLOCK으로 읽어 비교한다. 다르면 실행하지 않고 ROLLBACK, `drift_detected`다. | `ApplyService.ExecuteAsync` |
 | 문장 실패 | 문장이 ok가 아니거나, 트랜잭션이 끝났거나, 트랜잭션 ID가 바뀌면 ROLLBACK한 뒤 롤백 뒤 남은 변경을 원본 스냅샷과 비교하고 `error`다. 남은 변경이 있는데 `TriggerRollbackConfirmed = false`면 그 문장을 `failed`로 바꾼다(3609 보정). 비교가 예외면 `residualCheckFailed = true`이고, KEYSET_HASH는 스냅샷이 없어 늘 `residualCheckFailed = true`다. | `ApplyService.FailAsync`, `ResidualAsync` |
@@ -441,7 +441,9 @@ sequenceDiagram
 | `EXECUTE_AS_USER_MISSING` | 원본에 실행 사용자가 없다(Q30). |
 | `WEAK_VERIFICATION_NOT_ACCEPTED` | 원본 스냅샷을 만들 수 없어 `KEYSET_HASH`뿐인데 요청이 `allowKeysetVerification=true`가 아니다(2026-11-13, D7). |
 | `ORIGIN_UNREACHABLE` | 원본 서버에 연결할 수 없어 선행 조건을 읽지 못했다. 원본에는 아무것도 실행하지 않았다(2026-11-13, N4). |
-| `PROC_APPLY_NOT_SUPPORTED` | 미리보기에 EXEC 문장이 있다. EXEC [적용]은 2차라 원본에 아무것도 실행하지 않고 막는다(2026-11-13, D5). |
+| `PROC_APPLY_NOT_SUPPORTED` | 2026-11-13~16에 EXEC 미리보기의 [적용]을 막던 코드다. 2026-11-17부터 서버는 내지 않고, 옛 응답과의 호환을 위해 값만 남긴다. |
+| `PROC_EXECUTE_PERMISSION_MISSING` | 원본 실행 주체(SingleServer는 실행 사용자, Split은 본인 로그인)에게 미리보기 EXEC가 부르는 최상위 프로시저의 EXECUTE 권한이 없다. 읽기만 해서 판정하고 원본에 GRANT하지 않는다(2026-11-17, D7). |
+| `PROC_DEFINITION_CHANGED` | 최상위 또는 분석기가 펼친 중첩 프로시저의 원본 정의가 기준선(샌드박스 카탈로그)과 다르거나, 원본에서 읽을 수 없거나, 기준선에 없다(2026-11-17, D7). |
 
 ### 5.4 취소와 새로 고침
 
@@ -858,7 +860,7 @@ MVP의 미리보기 요청은 끝날 때까지 기다리는 동기 방식이다.
 | `verification.driftRows[]` | `{ table, key, kind, columns, expected, actual, expectedMultiplicity, actualMultiplicity }` | `kind`: `CHANGED`, `MISSING`, `MULTISET_COUNT`(키 없는 테이블) |
 | `verification.netSummaryMatch` | bool 또는 null | 대조까지 가지 못했거나 KEYSET_HASH이면 null |
 | `verification.actualNetSummary` | `NetSummaryRow[]` | 원본 실제 순 변경 건수 |
-| `verification.mismatches[]` | `{ kind, statementIndex, table, key, column, expected, actual, message }` | `kind`: `STATEMENT_ROW_COUNT`, `NET_SUMMARY`, `ROW_VALUE`, `ROW_MISSING`, `ROW_UNEXPECTED`, `IDENTITY_UNPAIRED`, `UNEXPECTED_TABLE`, `VOLATILE_FORMAT`, `KEYSET_TABLE_COUNT`, `OUTSIDE_TABLE_CHANGED`(v1.6, KEYSET_HASH에서 미리보기에 없던 테이블의 건수·해시가 바뀜) |
+| `verification.mismatches[]` | `{ kind, statementIndex, table, key, column, expected, actual, message }` | `kind`: `STATEMENT_ROW_COUNT`, `NET_SUMMARY`, `ROW_VALUE`, `ROW_MISSING`, `ROW_UNEXPECTED`, `IDENTITY_UNPAIRED`, `UNEXPECTED_TABLE`, `VOLATILE_FORMAT`, `KEYSET_TABLE_COUNT`, `OUTSIDE_TABLE_CHANGED`(v1.6, KEYSET_HASH에서 미리보기에 없던 테이블의 건수·해시가 바뀜), `PROC_RETURN_VALUE`·`PROC_RESULT_SET_COUNT`(2026-11-17, EXEC의 반환 값·결과 집합 수가 미리보기와 다름) |
 | `verification.identityPairs[]` | `{ table, previewKey, actualKey }` | 새 IDENTITY 행 짝(Q29, D7 v1.5) |
 | `verification.residualCheckFailed` | bool | 롤백 뒤 남은 변경 검사 자체가 실패했는지(Q31). true면 `residualCommitted`를 믿을 수 없다 |
 | `verification.tableCounts[]` | `{ table, before, after, expectedDelta }` | KEYSET_HASH의 테이블 건수 대조. SNAPSHOT_NETDIFF면 빈 배열 |
@@ -870,7 +872,9 @@ MVP의 미리보기 요청은 끝날 때까지 기다리는 동기 방식이다.
 - **행 API `table` 필터:** `GET /api/previews/{id}/rows?view=net&table=스키마.테이블`은 서버가 그 테이블만 거른 뒤 `offset`·`limit`으로 자른다. `total`도 거른 수이고, 없는 테이블이면 0이다. `firingId`와 함께 쓰면 둘 다 만족하는 행만 센다. `view=event`에 `table`을 주면 400이고, `table`을 안 주면 전과 같다. 형식은 `스키마.테이블`(스키마에 `.`·제어 문자 없음, 각 128자 이하)이다.
 - **`SandboxStatus.instanceWarnings`:** 문자열 배열(없으면 `[]`)이다. 샌드박스 인스턴스에서 `xp_cmdshell`, `Ole Automation Procedures`, `Ad Hoc Distributed Queries`, `clr enabled`, `external scripts enabled`가 켜져 있거나 로컬이 아닌 링크드 서버가 있으면 문구로 알린다. 막지 않는다. 읽지 못하면 "확인 못 함" 문구를 싣는다. 근거: `src/DbRipple.Core/Baseline/SandboxSafety.cs`(`SandboxInstanceCheck`).
 - **[적용] 원본 사전 경고:** 원본 DB가 TRUSTWORTHY ON이거나, 복제 게시·구독 중이거나, CDC·Service Broker가 켜져 있으면 `verification.limitations`에 문구로 적는다(막지 않음). 읽지 못하면 "확인 못 함" 문구다. 근거: `src/DbRipple.Apply/ApplySteps.cs`(`OriginWarnings`).
-- **`verification.mode` 값 `KEYSET_HASH`, 불일치 `OUTSIDE_TABLE_CHANGED`, 선행 조건 `PROC_APPLY_NOT_SUPPORTED`:** §5.3, D7.
+- **`verification.mode` 값 `KEYSET_HASH`, 불일치 `OUTSIDE_TABLE_CHANGED`, 선행 조건 `PROC_APPLY_NOT_SUPPORTED`:** §5.3, D7. `PROC_APPLY_NOT_SUPPORTED`는 2026-11-17부터 내지 않는다.
+
+**2026-11-17 계약 추가(EXEC [적용], 추가만, 근거 `src/DbRipple.Contracts/Apply.cs`):** 선행 조건 `PROC_EXECUTE_PERMISSION_MISSING`·`PROC_DEFINITION_CHANGED`(§5.3 표), 불일치 `PROC_RETURN_VALUE`·`PROC_RESULT_SET_COUNT`(`statementIndex`만 채우고 `table`은 null, `expected`·`actual`은 10진 문자열). EXEC를 [적용]하면 `verification.limitations`에 "결과 집합 내용은 비교하지 않음" 문구가 붙는다. 결정은 D7 2026-11-17.
 
 **v1.5 /catalog/schema 형식(Q23·Q25, 근거 `src/DbRipple.Contracts/CatalogSchema.cs`):** 현재 기준선 샌드박스 카탈로그에서 만들고 감사 저장소(audit.*)는 넣지 않는다. 프런트는 `baselineAt`을 캐시 키로 쓴다.
 
@@ -963,7 +967,7 @@ MVP의 미리보기 요청은 끝날 때까지 기다리는 동기 방식이다.
    - 깊이 1 묶음 가운데 테이블과 연산이 문장의 대상과 같으면 `DIRECT`(`certain`)다.
    - 대상에 그 연산의 INSTEAD OF 트리거가 있으면 직접 묶음이 생기지 않는다. 그 문장 안에서 깊이 1 부모가 없는 깊이 2 묶음은 모두 가상 INSTEAD OF 실행 노드(`REPLACES` 간선, `parentFiringId = null`)의 자식으로 두고 `inferred`로 귀속한다. 그 아래 깊이 3 이상은 2~4단계를 그대로 쓴다.
    - **v1.6 EXEC(2026-11-13, DB 미확인):** EXEC 문장에서는 `DIRECT`를 주지 않는다. 문장 창 안 깊이 1이고 FK로 설명되지 않은 묶음 가운데 분석기가 낸 정적 쓰기 대상(`ProcedurePlan.WriteTargets`)에 있는 테이블의 것이 `PROC_DIRECT`(`certain`, 근거 `depth`·`staticWriteSet`)다. 정적 쓰기 대상에 없는 테이블이면 설명할 근거가 없어 `unexplained`로 남고, 정적 쓰기 대상을 모르면(계약 위반·JSON에서 복원) `PROC_DIRECT`를 주지 않는다(닫힌 쪽). 프로시저가 자식 테이블에 직접 쓸 수 있으면(정적 쓰기 대상에 있으면) 그 자식의 FK 판정은 `certain`을 주지 않고 `inferred`로 내린다. 프로시저가 자식을 먼저 지우고 부모를 지우는 본문과 FK 연쇄를 구별할 수 없기 때문이다. "프로시저 안 DML의 감사 트리거 깊이가 1"이라는 가정은 SP12 뒤 재검토한다. 근거: `src/DbRipple.Attribution/CausalResolver.cs`.
-   - **2026-11-14 확장: 첫 독립 DELETE의 실행 증거.** CL22처럼 검증한 직선형 프로시저의 첫 DELETE 대상에 사용자 DELETE 트리거와 하위 FK action이 없으면, 그 문장이 남긴 첫 감사 헤더를 직접 쓰기의 증거로 사용할 수 있다. 분석 계획과 0행 헤더 수집 capability, 성공·완전한 실행 구간, 원시 최초 헤더의 object/operation/depth·경계를 모두 대조한 특정 발동 하나만 FK 판정 전에 `PROC_DIRECT certain`으로 귀속한다. 0행 헤더도 소비하므로 뒤에 같은 테이블에서 발생한 FK 삭제에 근거를 재사용하지 않는다. 분기·호출·트랜잭션 제어·미지원 본문, 구형 매니페스트와 불완전한 수집은 위의 기존 보수 판정으로 돌아간다. 원본·샌드박스 프로시저 정의와 실행 SQL은 바꾸지 않으며 EXEC [적용] 금지도 유지한다. 설계·범위: [첫 독립 DELETE](superpowers/specs/2026-11-14-exec-entry-delete.md). 실제 검증 결과는 날짜별 테스트 보고서에 별도로 기록한다.
+   - **2026-11-14 확장: 첫 독립 DELETE의 실행 증거.** CL22처럼 검증한 직선형 프로시저의 첫 DELETE 대상에 사용자 DELETE 트리거와 하위 FK action이 없으면, 그 문장이 남긴 첫 감사 헤더를 직접 쓰기의 증거로 사용할 수 있다. 분석 계획과 0행 헤더 수집 capability, 성공·완전한 실행 구간, 원시 최초 헤더의 object/operation/depth·경계를 모두 대조한 특정 발동 하나만 FK 판정 전에 `PROC_DIRECT certain`으로 귀속한다. 0행 헤더도 소비하므로 뒤에 같은 테이블에서 발생한 FK 삭제에 근거를 재사용하지 않는다. 분기·호출·트랜잭션 제어·미지원 본문, 구형 매니페스트와 불완전한 수집은 위의 기존 보수 판정으로 돌아간다. 원본·샌드박스 프로시저 정의와 실행 SQL은 바꾸지 않으며 EXEC [적용] 금지도 유지했다(EXEC [적용]은 2026-11-17에 별도 결정으로 열었다, D7). 설계·범위: [첫 독립 DELETE](superpowers/specs/2026-11-14-exec-entry-delete.md). 실제 검증 결과는 날짜별 테스트 보고서에 별도로 기록한다.
 6. **재조회와 잔차:** 롤백 전 재조회에서 감사 after와 다른 열은 RowChange.after를 고치고(`REREAD`), 원인은 Residual로 귀속한다. 최종 차이에만 있는 변경은 Residual만 만든다. 후보는 `EXCLUDED_TABLE` → `UNOBSERVABLE_COLUMN` → `SAME_TABLE_TRIGGER`(그 테이블에 쓰는 트리거가 실행된 경우) → `UNKNOWN` 순서로 따진다.
    - **v1.3 보완(2026-11-10, 근거: SP3, CascadeLab CL08a·CL08b):** 같은 행을 여러 묶음이 바꾸면 수집 순번은 실제 변경 순서와 반대일 수 있다(후위 기록). 재조회와 비교할 "감사 after"는 captureSeq가 가장 큰 묶음이 아니라, 트리거 문맥 트리를 전위 순서로 훑었을 때 그 행을 마지막으로 바꾼 묶음의 after다. captureSeq 최댓값을 쓰면 이미 묶음으로 설명된 변경이 잔차로 한 번 더 생긴다(CL08에서 바깥 문장 묶음의 after는 중첩 갱신 전 값이었다). 형제 순서가 `observed_only`라 마지막 묶음을 정할 수 없으면 재조회 값을 최종으로 쓴다(`REREAD`).
 7. **순서 표시:** 아래 세 층으로 나눠 표시한다.
@@ -1037,14 +1041,14 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 - **반대 의견(패널, 충실도 관점):** B가 IDENTITY·SEQUENCE를 원본과 같게 유지해 충실도가 높다. → 새 키는 어느 방식이든 [적용] 때 달라질 수 있어 "예상값"으로 표시해야 한다(A13). 그래서 C를 기본으로 두고, 비교에는 IDENTITY 짝 매핑(§10.4)을 쓴다. 평가는 제품과 같은 정책(C)으로 재고, 사례 사이에만 초기화한다.
 
 **2026-11-13 결정(샌드박스 위치):** `Split`(원본 서버 → 내 PC Docker 샌드박스)을 구현하고 목표 기본 모드로 삼는다. 각자 자기 PC에서 실행하고, 원본은 팀 개발·테스트 서버일 수 있다(운영 DB는 범위 밖). 같은 인스턴스(`SingleServer`)는 평가 하네스·DB 테스트용으로 남긴다(설정 `DbRipple:Mode`). 단, Split 경로를 실제 DB로 확인(SP17)하기 전까지 `appsettings.json`의 기본값은 `SingleServer`로 두고 Split은 설정으로 켠다(확인 안 된 경로를 기본으로 두지 않는다). 실행 파일 모드의 화면 설정 기본 선택이 "분리"인 점은 §3.2에 열린 점으로 적었다.
-- **원본 최소 권한:** 백업을 원본에서 만들면 `db_backupoperator`, 직접 .bak을 넘기면(`DbRipple:Backup:ImportFile`) 불필요. 그 밖은 본인의 SELECT·DML. 원본에 DDL·RESTORE·DROP·사용자 생성·가장을 하지 않는다.
+- **원본 최소 권한:** 백업을 원본에서 만들면 `db_backupoperator`, 직접 .bak을 넘기면(`DbRipple:Backup:ImportFile`) 불필요. 그 밖은 본인의 SELECT·DML(EXEC [적용]은 부르는 프로시저의 EXECUTE와, 정의를 대조하려고 VIEW DEFINITION도 필요, 2026-11-17 D7). 원본에 DDL·RESTORE·DROP·사용자 생성·가장을 하지 않는다.
 - **복제 방법:** 원본 `BACKUP … WITH COPY_ONLY, COMPRESSION, CHECKSUM, INIT`(파일 `dbr_<pc>_<UTC>.bak`) → UNC 공유 또는 지정 파일을 가져오기 폴더로 복사 → 로컬에서 `RESTORE HEADERONLY`(전체 백업, 암호화 거부, 주버전 ≤ 로컬, DB 이름) → `FILELISTONLY`(FILESTREAM·메모리 최적화 거부) → `RESTORE WITH MOVE`(로컬 기본 경로) → 소유자 sa·nested triggers·disallow results를 원본 값에 맞춤(로컬만) → 기존 4b·5·7.
 - **새로 고침:** Split은 [적용] 커밋 뒤 자동 재구축하지 않고 "기준선 오래됨"(`SandboxStatus.baselineStale`)으로 표시한다. 오염 뒤 재구축은 그대로다.
 - **안전장치:** 파괴 단계는 `SandboxConnection` 타입만 받는다(원본 연결 타입에는 임의 SQL 실행 메서드가 없다). 두 연결의 @@SERVERNAME·MachineName이 같거나 로컬 master 표식(`dbripple_instance` 확장 속성)이 원본 연결에서 보이면 기준선을 만들지 않는다. 샌드박스 Data Source가 루프백이 아니면 경고한다.
 - **DDL 트리거 안전 검사(2026-11-13, SingleServer·Split 공통):** 기준선을 만들기 전에 켜진 DB 범위 DDL 트리거의 본문을 분석기로 본다. 감사 장치와 실행 사용자를 설치하는 DDL이 이 트리거를 발동시키기 때문이다. 불투명(암호화·CLR), 동적 SQL, 외부 부작용, 펼칠 수 없는 프로시저 호출이 있으면 기준선 구축을 멈추고 이유를 보인다. 설정 `DbRipple:AllowRiskyDdlTriggers = true`로만 넘어간다(기본 false). 근거: `src/DbRipple.Preview/SandboxManager.cs`(`DdlTriggerSafety`), `BaselineOptions.DdlTriggerGuard`.
 - **Split의 TRUSTWORTHY OFF(2026-11-13):** 복원 직후, 소유자를 로컬 sa로 바꾸기 전에 샌드박스 DB의 TRUSTWORTHY를 끈다(`BaselineSql.TrustworthyOff`). sa 소유와 TRUSTWORTHY ON이 겹치면 DB 안 코드가 서버 권한을 얻을 수 있기 때문이다.
 - **인스턴스 경고(2026-11-13):** `SandboxStatus.instanceWarnings`로 위험한 샌드박스 인스턴스 설정을 알린다(막지 않음, §6.4 v1.6).
-- **미룬 것:** UNC 자동 백업·복사 고급 처리(원본 서버 쪽 백업 파일 정리 포함), SP17~SP21 실측(스크립트는 준비됨, 미실행), EXEC의 [적용](2차). 처음에 미뤘던 KEYSET_HASH(미리보기 밖 테이블 해시), 실행 파일 묶기·첫 실행 화면(N4), EXEC 미리보기는 같은 날 구현했다(DB 미확인).
+- **미룬 것:** UNC 자동 백업·복사 고급 처리(원본 서버 쪽 백업 파일 정리 포함), SP17~SP21 실측(스크립트는 준비됨, 미실행), EXEC의 [적용](2차, 2026-11-17에 구현, D7). 처음에 미뤘던 KEYSET_HASH(미리보기 밖 테이블 해시), 실행 파일 묶기·첫 실행 화면(N4), EXEC 미리보기는 같은 날 구현했다(DB 미확인).
 
 ### D3. 변경 수집 — 감사 트리거(Last) + 최종 차이 대조
 
@@ -1173,7 +1177,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 - **도달 폐포(위 v1.4 거부 추가의 2026-11-13 수정과 같은 검사):** 프로시저의 정적 쓰기 대상마다 세 연산(INSERT·UPDATE·DELETE)으로 같은 검사를 한다. 닿는 트리거가 외부 부작용·불투명·COMMIT/BEGIN/SAVE이면 규칙 ID는 `REJECT_PROC_*`가 아니라 `REJECT_TRIGGER_*`다.
 - **외부 부작용 보강(트리거·프로시저 본문 공용):** 다른 DB 3부분 이름(tempdb 제외), Service Broker 문장(BEGIN DIALOG, SEND, RECEIVE, END CONVERSATION 등), 카탈로그 밖의 `sp_`·`sys.`·`master.`·`xp_` 호출을 외부 부작용으로 표시한다. 트리거 본문에 있으면 `REJECT_TRIGGER_EXTERNAL_EFFECT`, 프로시저 본문에 있으면 `REJECT_PROC_EXTERNAL_EFFECT`다.
 - **계약:** 분석 문장 `kind = "EXEC"`, `target = null`, `procedure`, `parameters[]`. 결과 문장 `rowsAffected = null`, `procedure`(EXEC만, DML이면 필드 없음, 2026-11-13 추가), `returnValue`, `resultSetCount`(§6.2). 프로시저가 트랜잭션 수를 바꾸면 failed, `isToolFault = false`이고, 남은 변경 없이 롤백된 것이 확인되면 "프로시저가 트랜잭션을 롤백함"이다(§5.2 v1.6). 원인 `PROC_DIRECT`(§7.2 5단계), 그래프 노드 `procedureCall`과 간선 `PROC_DIRECT`(문장 노드와 S→P 간선 없음, §6.3). 실행 사용자는 CALLER로 도는 T-SQL 사용자 프로시저마다 `EXECUTE`를 받는다(`GRANT EXECUTE ON OBJECT::`, 함수 제외, 첫 판의 스키마 단위 권한이 남아 있으면 REVOKE, `src/DbRipple.Core/Baseline/PreviewUserSql.cs`). 그래서 DML 미리보기에서 사용자 함수가 새로 실행되지 않는다.
-- **[적용]은 2차:** 미리보기에 EXEC 문장이 있으면 선행 조건 `PROC_APPLY_NOT_SUPPORTED`로 막는다(`ApplyService`, `ApplyPrecondition`). 원본에서 프로시저를 다시 돌려 미리보기와 대조하는 경로가 아직 없다.
+- **[적용](2026-11-17, 2026-11-13의 "2차" 미룸을 바꿈):** EXEC가 든 미리보기도 [적용]한다. 원본에서 같은 실행 SQL로 프로시저를 다시 돌리고, 원본 EXECUTE 권한·프로시저 정의 일치를 실행 전에, 반환 값·결과 집합 수를 커밋 전에 대조한다(D7 2026-11-17 결정).
 - **`@@TRANCOUNT`·`XACT_STATE()`:** CATCH 밖에서 읽으면 거부, CATCH 안 검사는 경고다. 미리보기는 도구 트랜잭션 안에서 돌아 사용자의 단독 실행(보통 자동 커밋)과 값이 다를 수 있다. SP16 뒤 재검토한다.
 - **알려진 한계(코드 구조에서 나온 것이고 DB로는 확인하지 않았다):**
   - 사용자 정의 함수: 카탈로그가 함수 목록(`sys.objects` FN·IF·TF·FS·FT·AF + `sys.sql_modules`, `CatalogQueries.Functions`)을 읽는다. T-SQL 함수는 언어 규칙상 테이블에 쓸 수 없으므로, CLR이 아니고 CALLER로 돌며 본문(안쪽 함수 포함)에 외부 부작용·동적 SQL·프로시저 호출이 없으면 허용한다(`FunctionGate`, 2026-11-13). 그 밖은 `REJECT_PROC_UNRESOLVED_CALL`. 함수 목록이 없는 예전 기준선은 다시 만들기 전까지 함수 호출을 거부한다. `xml` 열 메서드(`t.col.value(...)`)는 함수와 구별하지 못해 거부한다(변수의 xml 메서드 `@x.value(...)`는 허용). 보안 검토 뒤(같은 날) 더 막은 것: 다른 DB(tempdb 포함)의 테이블 값 함수, CLR 사용자 형식의 정적 메서드(`dbo.T::M()`)·속성, xml이 아닌 식 메서드(`@x.M()`, 공간·hierarchyid 메서드도 닫힌 쪽으로 거부), 함수 본문의 `@@TRANCOUNT`·`XACT_STATE()`, 부르는 모듈 스키마와 dbo에 같은 이름이 있는 한 부분 테이블 값 함수(실제 해석 순서를 모름). 카탈로그가 동의어 목록(`sys.synonyms`, `CatalogQueries.Synonyms`)도 읽어, 함수·프로시저 이름이 동의어와 대소문자 무시로 겹치면 거부한다(대소문자 구분 정렬 DB에서 동의어가 대신 실행될 수 있어서). 뷰 목록(`sys.views` + `sys.sql_modules`, `CatalogQueries.Views`)도 읽어, 프로시저·함수가 읽는 뷰의 본문(안쪽 뷰·함수 포함)을 같은 기준으로 판정한다(암호화 뷰, 뷰 안의 CLR 함수·외부 참조는 거부). 뷰 목록이 없는 예전 기준선은 뷰 안을 판정하지 않는다(오늘 전과 같음, 기준선을 다시 만들면 판정). 테이블의 계산 열·DEFAULT·CHECK 제약이 부르는 함수(`sys.sql_expression_dependencies`, `CatalogQueries.TableFunctions`)도 읽어, 프로시저·함수·뷰가 읽거나 쓰는 테이블에 걸린 함수를 같은 기준으로 판정한다(다른 DB 함수는 거부). 예전 기준선(의존 목록 없음)은 판정하지 않는다. 두 번째 보안 검토(같은 날) 뒤: 읽거나 쓰는 대상이 동의어면 가리키는 개체를 판정하지 않으므로 거부하고(링크드 서버·다른 DB를 가리키는 동의어 포함), tempdb 영구 개체(`tempdb.dbo.x`)도 거부하며, CTE 이름은 뷰·테이블로 보지 않는다. 스키마 없는 이름은 부르는 모듈 스키마와 dbo를 모두 본다(실제 해석 순서를 DB로 확인하기 전까지 닫힌 쪽). 계산 열이 판정 중인 함수를 다시 부르는 순환은 거부한다. 인덱싱된 뷰(`CatalogQueries.IndexedViews`)도 읽어, 기준 테이블을 읽거나 쓰면 그 뷰 본문을 같은 기준으로 판정한다(쓸 때 뷰가 갱신되며 뷰 안의 함수가 실행되므로). 계산 열 정의(`CatalogQueries.ComputedColumns`)도 읽어, 열의 메서드 호출(`[col].M()`)과 두 부분 열 참조(`[col].[Prop]`, 계산 열 안에서는 형식 속성 접근)를 CLR 형식 코드일 수 있어 거부한다. 새 카탈로그 쿼리(함수·동의어·뷰·의존·인덱싱된 뷰·계산 열)는 모두 DB로 확인하지 않았다. 트리거 본문의 함수 호출은 트리거 분석(C6) 기준을 따르고 이 판정을 거치지 않는다, 일반 DML 미리보기 경로는 함수에 EXECUTE 권한이 없어 예전처럼 229로 실패한다. 함수에는 `EXECUTE` 권한을 주지 않는다(프로시저 소유권 체인으로만 실행). 카탈로그 쿼리는 DB로 확인하지 않았다.
@@ -1257,7 +1261,14 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 - **환경 의존 함수:** SUSER_SNAME·ORIGINAL_LOGIN·HOST_NAME·APP_NAME·DB_NAME·USER_NAME·CURRENT_USER·@@SERVERNAME 등은 E1 비결정으로 보고 값 대조에서 뺀다.
 - **동시 [적용]은 범위 밖:** 다른 세션의 쓰기로 생기는 불일치는 롤백 쪽으로 실패한다.
 - **원본 사전 경고(2026-11-13, 막지 않음):** 원본 `sys.databases`가 TRUSTWORTHY ON, 복제 게시·구독, CDC, Service Broker 켜짐이면 `verification.limitations`에 문구로 적는다(§6.4 v1.6). 커밋한 변경이 원본 밖(복제 대상, CDC 소비자, 브로커 큐)으로 전파되거나 EXECUTE AS가 DB 밖 권한을 쓸 수 있다는 뜻이다. 읽지 못하면 "확인 못 함" 문구다. 근거: `src/DbRipple.Apply/ApplySteps.cs`(`OriginWarnings`), `OriginDatabase.cs`. DB 미확인.
-- **EXEC [적용]은 2차(2026-11-13):** 미리보기에 EXEC 문장이 있으면 `PROC_APPLY_NOT_SUPPORTED`로 막는다(D5 EXEC 결정). 원본에서 프로시저를 다시 돌려 대조하는 일은 후속이다.
+- **EXEC [적용]은 2차(2026-11-13):** 미리보기에 EXEC 문장이 있으면 `PROC_APPLY_NOT_SUPPORTED`로 막았다(D5 EXEC 결정). 아래 2026-11-17 결정으로 바꿨다.
+
+**2026-11-17 결정(EXEC [적용], 근거 `src/DbRipple.Apply/ApplyService.cs`(`CheckProceduresAsync`)·`ApplySteps.cs`(`OriginProcedures`)·`ApplyMatcher.cs`(`CompareStatements`)·`OriginDatabase.cs`(`ReadProceduresAsync`), DB 미확인):** 저장 프로시저 호출(EXEC)이 든 미리보기도 [적용]한다. 원본에서 미리보기와 같은 실행기(`StatementRunner`)와 같은 실행 SQL(분석기 `ExecSqlBuilder`, BEGIN TRAN 한 겹·`dbr_dtc`)로 프로시저를 다시 돌린다. `PROC_APPLY_NOT_SUPPORTED`는 API 호환을 위해 값만 남기고 내지 않는다.
+- **선행 조건(원본 읽기만, 어기면 원본에 아무것도 실행하지 않는다):** 재분석이 미리보기와 같은지 볼 때 EXEC는 프로시저 이름과 실행 SQL이 있는지도 본다(`SQL_HASH_MISMATCH`). 그다음 한 번의 원본 읽기로 두 가지를 본다.
+  - 권한(`PROC_EXECUTE_PERMISSION_MISSING`): 문장을 실행할 주체가 최상위 프로시저마다 EXECUTE를 가졌는지 `HAS_PERMS_BY_NAME`으로 본다. SingleServer는 `EXECUTE AS USER = 실행 사용자` 뒤 읽고 REVERT하고, Split은 가장 없이 본인 로그인으로 읽는다. 펼친 중첩 프로시저의 권한은 보지 않는다(소유권 체인을 타거나, 아니면 실행 중 229로 실패해 롤백된다). 도구는 원본에 GRANT하지 않는다(원본에 DDL·DCL을 하지 않는 원칙, D2). 시연용 원본은 `scripts/restore-aw-origin.ps1`이 `PreviewUserSql`과 같은 규칙으로 프로시저마다 EXECUTE를 준다(스키마 단위는 함수까지 열리므로 주지 않는다).
+  - 정의(`PROC_DEFINITION_CHANGED`): 최상위와 분석기가 펼친 중첩 프로시저(`ProcedurePlan.ExpandedCalls`)의 원본 정의(`sys.sql_modules.definition`, 가장 전 도구 로그인으로 읽음)가 기준선 카탈로그(샌드박스, 분석기가 거부 규칙을 본 본문)와 글자 그대로 같아야 한다. 원본에서 읽을 수 없거나(없음·암호화·VIEW DEFINITION 없음) 기준선에 없어도 같은 코드로 막는다. 바뀐 본문은 거부 규칙(외부 부작용·동적 SQL 등)을 거치지 않았기 때문이다. 새 검사를 둔 이유: 환경 지문(`Core/Baseline/Fingerprint.cs`)에는 모듈 정의가 없고, DML [적용]도 원본 트리거 정의를 따로 대조하지 않고 실행 뒤 검증(최종 차이·KEYSET)에 기댄다. EXEC는 프로시저 본문 자체가 실행 대상이라 실행 전에 막는다.
+- **검증:** DML과 같이 문장별 행 수(EXEC는 양쪽 다 null)와 최종 차이(또는 KEYSET_HASH)로 커밋 전 대조하고, EXEC는 반환 값(`PROC_RETURN_VALUE`)과 결과 집합 수(`PROC_RESULT_SET_COUNT`)가 미리보기와 다르면 롤백한다(`rolled_back_mismatch`). 결과 집합 내용은 비교하지 않고 그 사실을 `verification.limitations`에 적는다. `dbr_dtc` 비정상(짝 안 맞는 트랜잭션)은 실행기가 failed로 돌려주어 기존 실패 경로(ROLLBACK → 롤백 뒤 남은 변경 검사 → `error`)를 탄다.
+- **한계:** 함수·뷰·트리거 정의는 원본과 대조하지 않는다(DML [적용]과 같음, limitations 문구). 선행 조건을 읽은 뒤 실행 전까지 정의가 바뀌는 짧은 시간 창은 실행 뒤 검증만 잡는다. Split에서 본인 로그인에 VIEW DEFINITION이 없으면 정의를 읽지 못해 막힌다. 프로시저 정의 수정(ALTER PROCEDURE) 미리보기, 결과 집합 내용 비교, Split 원본 자동 GRANT는 범위 밖이다.
 
 ### D8. 수만 행 변경 — 상한까지 행 이미지, 넘으면 키와 건수만
 
@@ -1317,7 +1328,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 | E23 | 영향 0행 문장, 연쇄 행 0개 | 문장 노드에 `rowsAffected=0`을 표시한다. 직접 대상의 0행 발동은 헤더만 남기고, 화면에서는 기본으로 숨긴다. 연쇄 행 0개일 때 발동하는지는 문서에 없으므로 SP2(d)로 실측한다. **v1.3(SP2(d)):** 연쇄 행이 0개이면 자식 테이블 트리거는 발동하지 않아 묶음이 없었다(ON DELETE CASCADE 1단계에서 관측). 그래프에는 그 FK 간선을 그리지 않는다. 다른 참조 동작의 0행은 2주차 CascadeLab 사례로 확인한다. | — | A3 |
 | E24 | 같은 행을 여러 문장이 바꿈 | "발동 보기"에서는 문장별 중간 값을, "최종 차이 보기"에서는 순 변경을 보인다. | — | §6.2 |
 | E25 | 사용자 트리거가 @@IDENTITY를 읽음 | 감사 저장소에 IDENTITY 열을 두지 않아 값이 바뀌지 않게 한다(D3 규칙 3). CL12로 확인한다. | — | D3 |
-| E26 | 저장 프로시저 호출(EXEC) | 미리보기만 한다(2026-11-13). 본문을 깊이 4까지 펼쳐 쓰기 대상·외부 부작용·트랜잭션 제어를 보고, 규칙(`REJECT_PROC_*`·`WARN_PROC_*`)으로 거부하거나 경고한다. 프로시저의 직접 쓰기는 `PROC_DIRECT`(`certain`)로 귀속한다. 프로시저가 ROLLBACK하면 failed(`isToolFault=false`)다. [적용]은 `PROC_APPLY_NOT_SUPPORTED`로 막는다. | EXEC [적용](2차), `@@TRANCOUNT` 분기 재검토(SP16) | D5 EXEC 결정 |
+| E26 | 저장 프로시저 호출(EXEC) | 미리보기(2026-11-13)와 [적용](2026-11-17)을 한다. 본문을 깊이 4까지 펼쳐 쓰기 대상·외부 부작용·트랜잭션 제어를 보고, 규칙(`REJECT_PROC_*`·`WARN_PROC_*`)으로 거부하거나 경고한다. 프로시저의 직접 쓰기는 `PROC_DIRECT`(`certain`)로 귀속한다. 프로시저가 ROLLBACK하면 failed(`isToolFault=false`)다. [적용]은 2026-11-17부터 한다(원본 EXECUTE 권한·프로시저 정의를 확인한 뒤 실행하고, 반환 값·결과 집합 수도 대조). | `@@TRANCOUNT` 분기 재검토(SP16) | D5 EXEC 결정, D7 2026-11-17 결정 |
 
 ## 10. 평가 방법
 
@@ -1551,7 +1562,7 @@ dotnet run --project eval\DbRipple.Eval.Cli -- report --run logs\week4\eval\<실
 | R15 | 미리보기를 반복하면 샌드박스 IDENTITY가 원본과 벌어진다. | 낮음 | 높음 | "예상값" 표시, 짝 매핑, [적용] 뒤 자동 새로 고침 | — |
 | R16 | 트리거 거부 뒤 남은 변경이 샌드박스를 오염시킨다(A22). | 중간 | 중간 | 실패 뒤 최종 차이 검사, 오염 표시, 다음 미리보기 전 재구축 | CL12 |
 | R17 | EXECUTE AS USER 범위 제한으로 다른 DB(스냅샷) 참조가 실패하거나 감사 쓰기 권한이 막힌다. | 높음 | 중간 | 사용자 문장 구간에만 가장, 읽기·비교는 REVERT 뒤 도구 계정, 감사 객체는 dbo 소유 | SP10 |
-| R19 | EXEC: 프로시저 본문을 정적으로 펼쳐 쓰기·외부 부작용을 판정하므로, 펼치지 못하는 쓰기(시노님·함수·뷰 경유)와 봉투 안 트랜잭션 동작의 차이로 미리보기가 실제와 다를 수 있다. | 중간 | 중간 | 모르면 거부하는 닫힌 쪽 규칙, 경고, [적용] 차단(`PROC_APPLY_NOT_SUPPORTED`), `@@TRANCOUNT` 분기 거부 | SP11~SP16(준비됨, 미실행) |
+| R19 | EXEC: 프로시저 본문을 정적으로 펼쳐 쓰기·외부 부작용을 판정하므로, 펼치지 못하는 쓰기(시노님·함수·뷰 경유)와 봉투 안 트랜잭션 동작의 차이로 미리보기가 실제와 다를 수 있다. | 중간 | 중간 | 모르면 거부하는 닫힌 쪽 규칙, 경고, [적용] 전 원본 프로시저 정의 대조(`PROC_DEFINITION_CHANGED`)와 커밋 전 반환 값·결과 집합 수 대조(2026-11-17), `@@TRANCOUNT` 분기 거부 | SP11~SP16(준비됨, 미실행) |
 | R20 | Split 경로(원본 서버 → 내 PC 샌드박스)가 실제 SQL Server 두 대로 확인되지 않았다. | 높음 | 중간 | 기본값을 SingleServer로 두고 Split은 설정으로 켠다. 확인 뒤 기본값을 바꾼다 | SP17·SP18·SP20·SP21(준비됨, 미실행) |
 
 ## 13. 초기 검증 실험 (스파이크)

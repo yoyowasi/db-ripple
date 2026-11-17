@@ -151,6 +151,25 @@ public sealed class ApplyServiceFlowTests
         public Task<(SnapshotOutcome Outcome, string? Reason)> CreateSnapshotAsync(string originDb, string snapshotDb, CancellationToken ct) { log.Add($"snapshot {snapshotDb}"); return Task.FromResult(Snapshot); }
         public Task DropSnapshotAsync(string originDb, string snapshotDb, CancellationToken ct) { log.Add($"drop {snapshotDb}"); return Task.CompletedTask; }
         public Task<IOriginConnection> OpenAsync(string originDb, CancellationToken ct) { log.Add("open"); return Task.FromResult<IOriginConnection>(Connection); }
+
+        /// <summary>원본 프로시저 정의(없으면 null). 기본은 기준선(ExecContext)과 같다.</summary>
+        public readonly Dictionary<string, string?> Definitions = new(StringComparer.Ordinal) { ["dbo.usp_T"] = ProcDefinition, ["dbo.usp_Inner"] = InnerDefinition };
+        /// <summary>EXECUTE 권한이 없는 프로시저.</summary>
+        public readonly HashSet<string> Denied = new(StringComparer.Ordinal);
+        public Exception? ProceduresError;
+        /// <summary>마지막 ReadProceduresAsync의 executeAsUser("unread"면 부르지 않음).</summary>
+        public string? ProceduresUser = "unread";
+        public Task<IReadOnlyList<OriginProcedure>> ReadProceduresAsync(string originDb, IReadOnlyList<(string Schema, string Name)> procedures, string? executeAsUser, CancellationToken ct)
+        {
+            log.Add("procs " + string.Join(",", procedures.Select(p => p.Schema + "." + p.Name)));
+            ProceduresUser = executeAsUser;
+            if (ProceduresError is { } e) return Task.FromException<IReadOnlyList<OriginProcedure>>(e);
+            return Task.FromResult<IReadOnlyList<OriginProcedure>>(procedures.Select(p =>
+            {
+                var name = p.Schema + "." + p.Name;
+                return new OriginProcedure(p.Schema, p.Name, Definitions.GetValueOrDefault(name), !Denied.Contains(name));
+            }).ToList());
+        }
     }
 
     sealed class Rig
@@ -245,18 +264,218 @@ public sealed class ApplyServiceFlowTests
         Assert.Equal("unlock", log[^1]);
     }
 
-    [Fact]
-    public async Task Precondition_exec_statement_is_not_applied()
+    // ---- EXEC [적용](2026-11-17) ----
+
+    /// <summary>EXEC 미리보기 한 건과, 같은 EXEC로 재분석하고 원본에서 미리보기와 같은 결과를 내는 가짜.</summary>
+    Rig NewExecRig(ApplySettings? settings = null, StatementResult? actual = null)
     {
-        var exec = Statement(0, null, "dbo.T", ChangeOperation.Exec) with { Target = null };
-        var rig = NewRig(Record(statements: [exec]));
+        var rig = NewRig(ExecRecord(), settings, ExecContext());
+        rig.Analyzer.Result = _ => new AnalysisResult { Statements = [ExecAnalyzed()] };
+        rig.Runner.Outcome = st => new StatementRunOutcome { Result = actual ?? ExecStatement(st.Index), TransactionOpen = true };
+        return rig;
+    }
+
+    [Fact]
+    public async Task Exec_commits_after_reading_procedure_permission_and_definitions_on_origin()
+    {
+        var rig = NewExecRig();
+
+        var result = await rig.ApplyAsync(new ApplyRequest { SqlHash = ContractFormulas.SqlHash(ExecSqlText) });
+
+        Assert.Equal(ApplyStatus.Committed, result!.Status);
+        Assert.Empty(result.PreconditionFailures);
+        Assert.Empty(result.Verification.Mismatches);
+        Assert.Equal(
+            ["lock", "context", "analyze", "procs dbo.usp_T,dbo.usp_Inner", "warnings", "snapshot Origin_pre", "open", "prepare", "begin", "drift", "run 1",
+             "diff Origin Origin_pre", "commit", "remove", "rollback", "close", "drop Origin_pre", "unlock", "refresh"],
+            log);
+        Assert.Equal(PreviewUserSql.UserName, rig.Origin.ProceduresUser);     // SingleServer: 문장을 실행할 실행 사용자 기준
+        Assert.Equal(PreviewUserSql.UserName, rig.Runner.Context!.ExecuteAsUser);
+        var st = Assert.Single(result.Statements);
+        Assert.Equal((ChangeOperation.Exec, (int?)0, (int?)0), (st.Kind, st.ReturnValue, st.ResultSetCount));
+        Assert.Contains(OriginProcedures.Limitation, result.Verification.Limitations);
+        Assert.DoesNotContain(ApplyPrecondition.ProcApplyNotSupported, result.PreconditionFailures);
+    }
+
+    [Fact]
+    public async Task Exec_without_execute_permission_is_precondition_failed_without_touching_origin()
+    {
+        var rig = NewExecRig();
+        rig.Origin.Denied.Add("dbo.usp_T");
+        rig.Origin.Denied.Add("dbo.usp_Inner");   // 중첩 프로시저 권한은 보지 않는다(소유권 체인)
 
         var result = await rig.ApplyAsync();
 
         Assert.Equal(ApplyStatus.PreconditionFailed, result!.Status);
-        Assert.Contains(ApplyPrecondition.ProcApplyNotSupported, result.PreconditionFailures);
+        Assert.Equal([ApplyPrecondition.ProcExecutePermissionMissing], result.PreconditionFailures);
+        Assert.Contains("원본 실행 사용자 dbr_preview_user", result.Message);
+        Assert.Contains("dbo.usp_T", result.Message);
+        Assert.DoesNotContain("dbo.usp_Inner", result.Message);
         AssertNothingRanOnOrigin();
+        Assert.DoesNotContain("warnings", log);
         Assert.Equal("unlock", log[^1]);
+    }
+
+    [Fact]
+    public async Task Exec_with_nested_procedure_changed_after_baseline_is_precondition_failed()
+    {
+        var rig = NewExecRig();
+        rig.Origin.Definitions["dbo.usp_Inner"] = InnerDefinition.Replace("SET NOCOUNT ON;", "EXEC master.dbo.xp_cmdshell 'dir';", StringComparison.Ordinal);
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal([ApplyPrecondition.ProcDefinitionChanged], result!.PreconditionFailures);
+        Assert.Contains("dbo.usp_Inner", result.Message);
+        Assert.Contains("거부 규칙 검사를 거치지 않았", result.Message);
+        AssertNothingRanOnOrigin();
+    }
+
+    [Fact]
+    public async Task Exec_with_unreadable_origin_definition_is_precondition_failed()
+    {
+        var rig = NewExecRig();
+        rig.Origin.Definitions["dbo.usp_T"] = null;   // 없거나 VIEW DEFINITION 권한 없음
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal([ApplyPrecondition.ProcDefinitionChanged], result!.PreconditionFailures);
+        Assert.Contains("읽지 못해", result.Message);
+        AssertNothingRanOnOrigin();
+    }
+
+    [Fact]
+    public async Task Exec_with_procedure_missing_from_baseline_catalog_is_precondition_failed_and_not_read()
+    {
+        var rig = NewExecRig();
+        rig.Analyzer.Result = _ => new AnalysisResult
+        {
+            Statements = [ExecAnalyzed() with { Plan = ExecAnalyzed().Plan! with { ExpandedCalls = ["dbo.usp_Inner", "dbo.usp_Gone"] } }],
+        };
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal([ApplyPrecondition.ProcDefinitionChanged], result!.PreconditionFailures);
+        Assert.Contains("기준선 카탈로그에 프로시저 정의가 없음: dbo.usp_Gone", result.Message);
+        Assert.Contains("procs dbo.usp_T,dbo.usp_Inner", log);   // 기준선에 없는 이름은 원본에 묻지 않는다
+        AssertNothingRanOnOrigin();
+    }
+
+    [Fact]
+    public async Task Split_exec_checks_execute_permission_of_own_login()
+    {
+        var rig = NewExecRig(new ApplySettings { Mode = ServerMode.Split, MachineTag = "devpc", ExecuteAsUser = PreviewUserSql.UserName });
+        rig.Origin.Denied.Add("dbo.usp_T");
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal([ApplyPrecondition.ProcExecutePermissionMissing], result!.PreconditionFailures);
+        Assert.Null(rig.Origin.ProceduresUser);                  // Split: 가장하지 않고 본인 로그인 기준
+        Assert.Contains("원본 로그인(본인)", result.Message);
+        AssertNothingRanOnOrigin();
+    }
+
+    [Fact]
+    public async Task Exec_origin_unreachable_while_reading_procedures()
+    {
+        var rig = NewExecRig();
+        rig.Origin.ProceduresError = new SandboxUnavailableException("원본 서버에 연결할 수 없음(DB Origin, 오류 53)");
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal([ApplyPrecondition.OriginUnreachable], result!.PreconditionFailures);
+        AssertNothingRanOnOrigin();
+    }
+
+    [Theory]
+    [InlineData(5, 0, MismatchKind.ProcReturnValue, "0", "5")]
+    [InlineData(0, 2, MismatchKind.ProcResultSetCount, "0", "2")]
+    public async Task Exec_return_value_or_result_set_count_differs_from_preview_rolls_back(int returnValue, int resultSets, MismatchKind kind, string expected, string actual)
+    {
+        var rig = NewExecRig(actual: ExecStatement(returnValue: returnValue, resultSets: resultSets));
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.RolledBackMismatch, result!.Status);
+        var m = Assert.Single(result.Verification.Mismatches);
+        Assert.Equal((kind, (int?)1, expected, actual), (m.Kind, m.StatementIndex, m.Expected, m.Actual));
+        Assert.DoesNotContain("commit", log);
+        Assert.Contains("rollback", log);
+        Assert.NotNull(rig.Store.Record);
+    }
+
+    [Fact]
+    public async Task Exec_return_value_mismatch_rolls_back_under_keyset_hash_too()
+    {
+        var rig = NewExecRig(new ApplySettings { ExecuteAsUser = PreviewUserSql.UserName, ForceKeyset = true }, ExecStatement(returnValue: 1));
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.RolledBackMismatch, result!.Status);
+        Assert.Equal(VerificationMode.KeysetHash, result.Verification.Mode);
+        Assert.Contains(result.Verification.Mismatches, m => m.Kind == MismatchKind.ProcReturnValue);
+        Assert.DoesNotContain("commit", log);
+    }
+
+    [Fact]
+    public async Task Exec_transaction_anomaly_on_origin_takes_existing_failure_path()
+    {
+        // dbr_dtc 비정상(프로시저가 트랜잭션을 롤백함 등)은 실행기가 failed·TransactionOpen=false로 돌려주고, 기존 실패 경로(롤백 → 남은 변경 검사 → error)를 탄다.
+        var rig = NewExecRig();
+        rig.Runner.Outcome = st => new StatementRunOutcome
+        {
+            Result = ExecStatement(st.Index, null, null) with
+            {
+                Status = StatementStatus.Failed,
+                Error = new StatementError { ErrorNumber = 0, Message = "프로시저가 트랜잭션 수를 바꿈(ROLLBACK 또는 짝 없는 COMMIT): 실행 뒤 열린 트랜잭션이 없음", IsToolFault = false },
+            },
+            TransactionOpen = false,
+        };
+        rig.Differ.Results.Clear();
+        rig.Differ.Results.Enqueue(() => []);   // 롤백 뒤 남은 변경 없음
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal(ApplyStatus.Error, result!.Status);
+        Assert.Equal(StatementStatus.Failed, Assert.Single(result.Statements).Status);
+        Assert.Empty(result.Verification.ResidualCommitted);
+        Assert.DoesNotContain("commit", log);
+        Assert.False(result.SandboxRefreshStarted);
+    }
+
+    [Fact]
+    public async Task Precondition_reanalysis_calling_another_procedure_is_sql_hash_mismatch()
+    {
+        var rig = NewExecRig();
+        rig.Analyzer.Result = _ => new AnalysisResult { Statements = [ExecAnalyzed(procedure: "dbo.usp_Inner")] };
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal([ApplyPrecondition.SqlHashMismatch], result!.PreconditionFailures);
+        Assert.DoesNotContain(log, e => e.StartsWith("procs", StringComparison.Ordinal));
+        AssertNothingRanOnOrigin();
+    }
+
+    [Fact]
+    public async Task Precondition_reanalysis_exec_without_exec_sql_is_sql_hash_mismatch()
+    {
+        var rig = NewExecRig();
+        rig.Analyzer.Result = _ => new AnalysisResult { Statements = [ExecAnalyzed(execSql: "")] };
+
+        var result = await rig.ApplyAsync();
+
+        Assert.Equal([ApplyPrecondition.SqlHashMismatch], result!.PreconditionFailures);
+        Assert.Contains("실행 SQL이 없음", result.Message);
+        AssertNothingRanOnOrigin();
+    }
+
+    [Fact]
+    public void New_exec_contract_values_serialize_with_design_names()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(
+            new object[] { ApplyPrecondition.ProcExecutePermissionMissing, ApplyPrecondition.ProcDefinitionChanged, MismatchKind.ProcReturnValue, MismatchKind.ProcResultSetCount },
+            ContractJson.Options);
+
+        Assert.Equal("[\"PROC_EXECUTE_PERMISSION_MISSING\",\"PROC_DEFINITION_CHANGED\",\"PROC_RETURN_VALUE\",\"PROC_RESULT_SET_COUNT\"]", json);
     }
 
     [Fact]

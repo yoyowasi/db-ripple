@@ -98,6 +98,36 @@ internal static class TestData
         Index = s.Index, Batch = s.Batch, Position = s.Position, Kind = s.Kind, Target = s.Target, Span = s.Span, Sql = sql,
     };
 
+    // ---- EXEC [적용](2026-11-17): dbo.usp_T가 dbo.usp_Inner를 부르고 dbo.T id=1을 1 → 2로 바꾼다. ----
+    public const string ExecSqlText = "EXEC dbo.usp_T @id = 1;";
+    public const string ProcDefinition = "CREATE PROCEDURE dbo.usp_T @id int AS BEGIN SET NOCOUNT ON; EXEC dbo.usp_Inner; UPDATE dbo.T SET v = 2 WHERE id = @id; RETURN 0; END;";
+    public const string InnerDefinition = "CREATE PROCEDURE dbo.usp_Inner AS SET NOCOUNT ON;";
+
+    /// <summary>기준선 카탈로그에 두 프로시저를 더한 문맥.</summary>
+    public static BaselineContext ExecContext() => Context() with
+    {
+        Catalog = Catalog() with { Procedures = [new(10, "dbo", "usp_T", ProcDefinition), new(11, "dbo", "usp_Inner", InnerDefinition)] },
+    };
+
+    /// <summary>EXEC 문장 결과(미리보기·원본 공용). 반환 값 0, 결과 집합 0개가 기본.</summary>
+    public static StatementResult ExecStatement(int index = 1, int? returnValue = 0, int? resultSets = 0, string procedure = "dbo.usp_T") => new()
+    {
+        Index = index, Batch = 1, Position = index, Kind = ChangeOperation.Exec, Target = null, Procedure = procedure, Span = Span(index),
+        Status = StatementStatus.Ok, RowsAffected = null, ReturnValue = returnValue, ResultSetCount = resultSets,
+    };
+
+    /// <summary>재분석한 EXEC 문장(분석기가 채우는 실행 계획 포함).</summary>
+    public static AnalyzedStatement ExecAnalyzed(int index = 1, string procedure = "dbo.usp_T", string execSql = "EXEC @dbr_rc = [dbo].[usp_T] @id = 1;") => new()
+    {
+        Index = index, Batch = 1, Position = index, Kind = ChangeOperation.Exec, Target = null, Procedure = procedure, Span = Span(index), Sql = ExecSqlText,
+        Parameters = ["@id = 1"],
+        Plan = new ProcedurePlan { Procedure = procedure, ExecSql = execSql, WriteTargets = ["dbo.T"], ExpandedCalls = ["dbo.usp_Inner"] },
+    };
+
+    /// <summary>EXEC 미리보기 한 건(최종 차이는 기본 미리보기와 같은 dbo.T id=1).</summary>
+    public static PreviewRecord ExecRecord(StatementResult? statement = null) =>
+        Record(statements: [statement ?? ExecStatement()], sql: ExecSqlText);
+
     public static Dictionary<string, string?> Row(params (string Column, string? Value)[] cells) =>
         cells.ToDictionary(c => c.Column, c => c.Value, StringComparer.Ordinal);
 

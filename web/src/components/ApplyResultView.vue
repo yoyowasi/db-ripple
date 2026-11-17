@@ -51,6 +51,8 @@ const MISMATCH_LABEL: Record<MismatchKind, string> = {
   VOLATILE_FORMAT: '예상값 형식 불일치',
   KEYSET_TABLE_COUNT: '테이블 건수 변화(약한 검증)',
   OUTSIDE_TABLE_CHANGED: '미리보기에 없던 테이블이 바뀜',
+  PROC_RETURN_VALUE: '프로시저 반환 값',
+  PROC_RESULT_SET_COUNT: '프로시저 결과 집합 수',
 }
 const DRIFT_LABEL: Record<DriftRow['kind'], string> = {
   CHANGED: '값이 바뀜',

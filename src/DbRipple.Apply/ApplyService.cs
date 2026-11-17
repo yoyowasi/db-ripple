@@ -16,7 +16,8 @@ namespace DbRipple.Apply;
 /// <item>sandbox.AcquirePreviewLockAsync(잠금 충돌은 PreviewConflictException 그대로 409) → 잠금 안에서 store.GetAsync를 다시(동시 적용이 지운 건을 다시 적용하지 않게) → sandbox.GetContextAsync.</item>
 /// <item>선행 조건(ApplyPrecondition): 상태 ok(D8 truncated 차단 포함), ContractFormulas.SqlHash(record.Sql) == result.SqlHash == request.SqlHash(있으면), CreatedAt + PreviewExpiry 안이고 미리보기의 기준선이 현재 기준선과 같음(아니면 PREVIEW_EXPIRED),
 ///   원본 지문(Core Fingerprint.ReadAsync(원본)) == baseline.Fingerprint == 미리보기 지문, 원본에 ExecuteAsUser 있음(Q30, 만들지 않는다). 어기면 precondition_failed(원본에 아무것도 안 함).</item>
-/// <item>analyzer.Analyze(record.Sql, baseline) 재분석(문장 원문 얻기). 거부·문장 수·번호·종류·대상이 미리보기와 다르면 precondition_failed(SQL_HASH_MISMATCH와 같은 취급, 메시지로 구분).</item>
+/// <item>analyzer.Analyze(record.Sql, baseline) 재분석(문장 원문 얻기). 거부·문장 수·번호·종류·대상·프로시저가 미리보기와 다르면 precondition_failed(SQL_HASH_MISMATCH와 같은 취급, 메시지로 구분).
+///   EXEC(2026-11-17)는 원본을 읽어 최상위 프로시저의 EXECUTE 권한(PROC_EXECUTE_PERMISSION_MISSING)과 최상위·펼친 중첩 프로시저 정의의 기준선 일치(PROC_DEFINITION_CHANGED)를 본다.</item>
 /// <item>검증 모드(2026-11-13): 선행 조건 단계에서 원본 CREATE DATABASE 권한·원본 DB의 CONTROL과 FILESTREAM·메모리 최적화 유무로 정한다. 스냅샷을 만들 수 없으면 KEYSET_HASH이고,
 ///   요청에 allowKeysetVerification=true가 없으면 precondition_failed(WEAK_VERIFICATION_NOT_ACCEPTED). ForceKeyset은 설정 동의로 본다.</item>
 /// <item>원본 스냅샷: Core BaselineSql.DropSnapshot·CreateSnapshot(SingleServer = OriginDb + 접미사, Split = 거기에 _PC_적용id, 스파스 파일은 원본 데이터 파일 폴더).
@@ -198,18 +199,14 @@ public sealed class ApplyService : IApplyService
         {
             // 4. 재분석: 문장 원문을 얻고, 분석 결과가 미리보기와 같은지 본다.
             analysis = Analyzer.Analyze(record.Sql, context);
-            if (analysis.Statements.Any(s => s.Kind == ChangeOperation.Exec))
-            {
-                // 방어 심화: 저장된 미리보기 결과가 아니라 지금 재분석한 문장으로도 EXEC를 막는다(2026-11-13).
-                failures.Add(ApplyPrecondition.ProcApplyNotSupported);
-                reasons.Add("저장 프로시저 호출(EXEC)이 있는 미리보기는 아직 적용할 수 없음(미리보기 전용).");
-            }
             var why = SameStatements(analysis, record.Result.Statements);
             if (why is not null)
             {
                 failures.Add(ApplyPrecondition.SqlHashMismatch);
                 reasons.Add(why);
             }
+            // 4b. EXEC(2026-11-17): 재분석한 문장의 프로시저 권한·정의(읽기만)
+            else await CheckProceduresAsync(analysis, context, failures, reasons, ct);
         }
         if (failures.Count > 0)
             return Make(record, ApplyStatus.PreconditionFailed, new ApplyVerification { Mode = mode }, [], string.Join(" ", reasons), run) with
@@ -224,6 +221,7 @@ public sealed class ApplyService : IApplyService
         var limitations = new List<string>();
         if (Settings.Mode == ServerMode.Split) limitations.Add(PrincipalLimitation);
         if (Settings.Mode == ServerMode.Split && context.OriginIsSysadmin == true) limitations.Add(SysadminLimitation);
+        if (analysis!.Statements.Any(s => s.Kind == ChangeOperation.Exec)) limitations.Add(OriginProcedures.Limitation);
         limitations.AddRange(await origin.ReadOriginWarningsAsync(context.OriginDb, ct)); // 사전 경고(막지 않음)
         var snapshotCreated = false;
         try
@@ -350,7 +348,7 @@ public sealed class ApplyService : IApplyService
         var runContext = new StatementRunContext
         {
             Baseline = context,
-            ExecuteAsUser = Settings.Mode == ServerMode.Split ? null : Settings.ExecuteAsUser, // Split: 원본에서 가장하지 않는다(본인 로그인)
+            ExecuteAsUser = OriginExecuteAsUser,
             CommandTimeoutSeconds = Settings.CommandTimeoutSeconds,
             TransactionId = tranId,
         };
@@ -363,8 +361,6 @@ public sealed class ApplyService : IApplyService
                 statements.Add(NotRun(st));
                 continue;
             }
-            // 선행 조건이 이미 막는다. 여기 닿으면 코드 결함이므로 원본에서 실행하지 않고 예외로 롤백 경로에 넘긴다.
-            if (st.Kind == ChangeOperation.Exec) throw new InvalidOperationException("EXEC 문장은 [적용]하지 않는다(PROC_APPLY_NOT_SUPPORTED).");
             run.OriginTouched = true;
             var outcome = await Runner.RunAsync(conn.Session, st, runContext, ct);
             statements.Add(outcome.Result with { CaptureSeqRange = null });
@@ -521,12 +517,6 @@ public sealed class ApplyService : IApplyService
                 ? "미리보기가 이미지 상한을 넘어 잘렸으므로 적용할 수 없음(D8)."
                 : "미리보기 상태가 ok가 아님.");
         }
-        if (result.Statements.Any(s => s.Kind == ChangeOperation.Exec))
-        {
-            // EXEC [적용]은 2차(2026-11-13): 원본에서 프로시저를 다시 돌려 미리보기와 대조하는 경로가 아직 없다.
-            failures.Add(ApplyPrecondition.ProcApplyNotSupported);
-            reasons.Add("저장 프로시저 호출(EXEC)이 있는 미리보기는 아직 적용할 수 없음(미리보기 전용).");
-        }
         if (!string.Equals(ContractFormulas.SqlHash(record.Sql), result.SqlHash, StringComparison.Ordinal))
         {
             failures.Add(ApplyPrecondition.SqlHashMismatch);
@@ -577,7 +567,39 @@ public sealed class ApplyService : IApplyService
         return (failures, reasons);
     }
 
-    /// <summary>재분석 결과가 미리보기 문장과 같은지. 다르면 이유.</summary>
+    /// <summary>원본 문장 실행 주체: SingleServer는 실행 사용자로 가장하고, Split은 가장하지 않는다(본인 로그인).</summary>
+    string? OriginExecuteAsUser => Settings.Mode == ServerMode.Split ? null : Settings.ExecuteAsUser;
+
+    /// <summary>
+    /// EXEC [적용] 선행 조건(2026-11-17, 원본 읽기만): 최상위 프로시저의 EXECUTE 권한(문장을 실행할 주체 기준)과, 최상위·펼친 중첩 프로시저의 원본 정의가 기준선과 같은지.
+    /// EXEC가 없으면 원본을 읽지 않는다. 원본 연결 실패는 ORIGIN_UNREACHABLE.
+    /// </summary>
+    async Task CheckProceduresAsync(AnalysisResult analysis, BaselineContext context, List<ApplyPrecondition> failures, List<string> reasons, CancellationToken ct)
+    {
+        var (top, all) = OriginProcedures.Targets(analysis.Statements);
+        if (all.Count == 0) return;
+        var baseline = OriginProcedures.Baseline(context.Catalog, all);
+        var user = OriginExecuteAsUser;
+        IReadOnlyList<OriginProcedure> read;
+        try
+        {
+            read = await origin.ReadProceduresAsync(context.OriginDb, baseline.Values.Select(m => (m.Schema, m.Name)).ToList(), user, ct);
+        }
+        catch (SandboxUnavailableException ex)
+        {
+            failures.Add(ApplyPrecondition.OriginUnreachable);
+            reasons.Add(ex.Message + ".");
+            return;
+        }
+        var principal = user is null ? "원본 로그인(본인)" : $"원본 실행 사용자 {user}";
+        foreach (var (code, reason) in OriginProcedures.Judge(top, all, baseline, read, principal))
+        {
+            failures.Add(code);
+            reasons.Add(reason);
+        }
+    }
+
+    /// <summary>재분석 결과가 미리보기 문장과 같은지. 다르면 이유. EXEC는 프로시저 이름과 실행 SQL이 있는지도 본다(2026-11-17).</summary>
     static string? SameStatements(AnalysisResult analysis, IReadOnlyList<StatementResult> preview)
     {
         if (!analysis.IsAccepted)
@@ -586,8 +608,13 @@ public sealed class ApplyService : IApplyService
         var p = preview.OrderBy(s => s.Index).ToList();
         if (a.Count != p.Count) return $"재분석 문장 수({a.Count})가 미리보기({p.Count})와 다름.";
         for (var i = 0; i < a.Count; i++)
-            if (a[i].Index != p[i].Index || a[i].Kind != p[i].Kind || !string.Equals(a[i].Target, p[i].Target, StringComparison.Ordinal))
+        {
+            if (a[i].Index != p[i].Index || a[i].Kind != p[i].Kind || !string.Equals(a[i].Target, p[i].Target, StringComparison.Ordinal)
+                || !string.Equals(a[i].Procedure, p[i].Procedure, StringComparison.Ordinal))
                 return $"재분석 문장 {a[i].Index}이(가) 미리보기와 다름.";
+            if (a[i].Kind == ChangeOperation.Exec && a[i].Plan is not { ExecSql.Length: > 0 })
+                return $"재분석 문장 {a[i].Index}에 프로시저 실행 SQL이 없음(분석기 계약 위반).";
+        }
         return null;
     }
 

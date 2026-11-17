@@ -138,7 +138,9 @@ export const PRECONDITION_LABEL: Record<ApplyPrecondition, string> = {
   FINGERPRINT_MISMATCH: '원본과 환경 지문이 다릅니다.',
   EXECUTE_AS_USER_MISSING: '원본 DB에 실행 사용자(dbr_preview_user)가 없습니다. 준비 단계가 필요합니다.',
   WEAK_VERIFICATION_NOT_ACCEPTED: '원본에 스냅샷 권한이 없어 약한 검증(KEYSET_HASH)이 필요한데 동의하지 않았습니다.',
-  PROC_APPLY_NOT_SUPPORTED: '프로시저 호출(EXEC)은 아직 적용할 수 없습니다(미리보기 전용).',
+  PROC_APPLY_NOT_SUPPORTED: '프로시저 호출(EXEC)을 적용할 수 없다는 옛 서버의 응답입니다. 서버를 새 판으로 바꾸세요.',
+  PROC_EXECUTE_PERMISSION_MISSING: '원본 실행 주체에게 호출한 프로시저의 EXECUTE 권한이 없습니다. 도구는 원본에 권한을 주지 않으므로 권한을 받은 뒤 다시 적용하세요.',
+  PROC_DEFINITION_CHANGED: '기준선 이후 원본에서 프로시저 정의가 바뀌었거나 읽을 수 없습니다. 샌드박스를 새로 고친 뒤 다시 미리보기 하세요.',
   ORIGIN_UNREACHABLE: '원본에 연결할 수 없습니다. 연결을 복구한 뒤 샌드박스를 새로 고치고 다시 시도하세요.',
 }
 

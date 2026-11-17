@@ -54,8 +54,21 @@ public enum ApplyPrecondition
     [JsonStringEnumMemberName("WEAK_VERIFICATION_NOT_ACCEPTED")] WeakVerificationNotAccepted,
     /// <summary>원본 서버에 연결할 수 없음(선행 조건을 읽지 못함). 원본에 아무것도 실행하지 않았다(2026-11-13 N4).</summary>
     [JsonStringEnumMemberName("ORIGIN_UNREACHABLE")] OriginUnreachable,
-    /// <summary>미리보기에 저장 프로시저 호출(EXEC) 문장이 있음. EXEC [적용]은 2차라 원본에 아무것도 실행하지 않고 막는다(2026-11-13).</summary>
+    /// <summary>
+    /// 미리보기에 저장 프로시저 호출(EXEC) 문장이 있음(2026-11-13). 2026-11-17부터 EXEC도 [적용]하므로 서버는 더는 내지 않는다.
+    /// 옛 응답·클라이언트와의 호환을 위해 값만 남긴다.
+    /// </summary>
     [JsonStringEnumMemberName("PROC_APPLY_NOT_SUPPORTED")] ProcApplyNotSupported,
+    /// <summary>
+    /// 원본 실행 주체(SingleServer는 실행 사용자, Split은 본인 로그인)에게 미리보기 EXEC가 부르는 최상위 프로시저의 EXECUTE 권한이 없음(2026-11-17).
+    /// 읽기만 해서 판정하고, 도구는 원본에 GRANT하지 않는다.
+    /// </summary>
+    [JsonStringEnumMemberName("PROC_EXECUTE_PERMISSION_MISSING")] ProcExecutePermissionMissing,
+    /// <summary>
+    /// 미리보기 EXEC가 부르는 프로시저 또는 분석기가 펼친 중첩 프로시저의 원본 정의가 기준선(샌드박스 카탈로그)과 다르거나 원본에서 읽을 수 없음(2026-11-17).
+    /// 바뀐 본문은 거부 규칙 검사를 거치지 않았으므로 실행하지 않는다.
+    /// </summary>
+    [JsonStringEnumMemberName("PROC_DEFINITION_CHANGED")] ProcDefinitionChanged,
 }
 
 /// <summary>드리프트 종류(§5.3 드리프트 검사). 설계는 driftRows 원소를 정하지 않았다(설계 외, Q24).</summary>
@@ -94,6 +107,10 @@ public enum MismatchKind
     [JsonStringEnumMemberName("KEYSET_TABLE_COUNT")] KeysetTableCount,
     /// <summary>KEYSET_HASH: 미리보기에 없던 테이블의 COUNT_BIG(*)·CHECKSUM_AGG(BINARY_CHECKSUM)가 실행 전후로 다름(Expected/Actual은 "count=…,checksum=…").</summary>
     [JsonStringEnumMemberName("OUTSIDE_TABLE_CHANGED")] OutsideTableChanged,
+    /// <summary>EXEC(2026-11-17): 프로시저 반환 값(StatementResult.ReturnValue)이 미리보기와 다름. Expected/Actual은 10진 문자열(없으면 null).</summary>
+    [JsonStringEnumMemberName("PROC_RETURN_VALUE")] ProcReturnValue,
+    /// <summary>EXEC(2026-11-17): 프로시저가 낸 결과 집합 수(StatementResult.ResultSetCount)가 미리보기와 다름. 결과 집합 내용은 비교하지 않는다.</summary>
+    [JsonStringEnumMemberName("PROC_RESULT_SET_COUNT")] ProcResultSetCount,
 }
 
 /// <summary>
@@ -145,9 +162,9 @@ public sealed record ApplyMismatch
 {
     /// <summary>위반 종류.</summary>
     public required MismatchKind Kind { get; init; }
-    /// <summary>STATEMENT_ROW_COUNT의 문장 번호. 그 밖은 null.</summary>
+    /// <summary>STATEMENT_ROW_COUNT·PROC_RETURN_VALUE·PROC_RESULT_SET_COUNT의 문장 번호. 그 밖은 null.</summary>
     public int? StatementIndex { get; init; }
-    /// <summary>"스키마.테이블". STATEMENT_ROW_COUNT면 null.</summary>
+    /// <summary>"스키마.테이블". STATEMENT_ROW_COUNT·PROC_RETURN_VALUE·PROC_RESULT_SET_COUNT면 null.</summary>
     public string? Table { get; init; }
     /// <summary>행 키(ROW_*, IDENTITY_UNPAIRED, VOLATILE_FORMAT). 그 밖은 null. IDENTITY 열은 짝 매핑 뒤의 미리보기 쪽 키.</summary>
     public RowKey? Key { get; init; }

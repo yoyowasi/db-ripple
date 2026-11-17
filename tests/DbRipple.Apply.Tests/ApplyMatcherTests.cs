@@ -237,6 +237,44 @@ public sealed class ApplyMatcherTests
         Assert.Equal(MismatchKind.StatementRowCount, Assert.Single(mismatches).Kind);
     }
 
+    [Fact]
+    public void Exec_same_return_value_and_result_set_count_has_no_mismatch()
+    {
+        var (rows, mismatches) = ApplyMatcher.CompareStatements([ExecStatement(returnValue: 3, resultSets: 2)], [ExecStatement(returnValue: 3, resultSets: 2)]);
+
+        Assert.Empty(mismatches);
+        var row = Assert.Single(rows);
+        Assert.Null(row.Preview);   // EXEC 행 수는 양쪽 다 null(A9)
+        Assert.Null(row.Actual);
+    }
+
+    [Fact]
+    public void Exec_return_value_and_result_set_count_differences_are_separate_mismatches()
+    {
+        var (_, mismatches) = ApplyMatcher.CompareStatements([ExecStatement(returnValue: 0, resultSets: 1)], [ExecStatement(returnValue: -1, resultSets: 0)]);
+
+        Assert.Equal(2, mismatches.Count);
+        Assert.Contains(mismatches, m => m is { Kind: MismatchKind.ProcReturnValue, StatementIndex: 1, Expected: "0", Actual: "-1", Table: null });
+        Assert.Contains(mismatches, m => m is { Kind: MismatchKind.ProcResultSetCount, StatementIndex: 1, Expected: "1", Actual: "0" });
+    }
+
+    [Fact]
+    public void Exec_failed_on_origin_has_no_actual_return_value()
+    {
+        var (_, mismatches) = ApplyMatcher.CompareStatements([ExecStatement()], [ExecStatement(returnValue: 0, resultSets: 0) with { Status = StatementStatus.Failed }]);
+
+        Assert.Contains(mismatches, m => m is { Kind: MismatchKind.ProcReturnValue, Expected: "0", Actual: null });
+        Assert.Contains(mismatches, m => m is { Kind: MismatchKind.ProcResultSetCount, Expected: "0", Actual: null });
+    }
+
+    [Fact]
+    public void Dml_statement_does_not_compare_return_value()
+    {
+        var (_, mismatches) = ApplyMatcher.CompareStatements([Statement(1, 1)], [Statement(1, 1) with { ReturnValue = 9, ResultSetCount = 4 }]);
+
+        Assert.Empty(mismatches);
+    }
+
     [Theory]
     [InlineData(null, "NULL")]
     [InlineData("42", "INTEGER")]

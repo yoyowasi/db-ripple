@@ -52,7 +52,7 @@ export const FIXTURE_IDS = [
   'settings',
   'env',
   'nosession',
-  // EXEC(프로시저 호출) 미리보기 · 미리보기 전용
+  // EXEC(프로시저 호출) 미리보기 · [적용](2026-11-17부터)
   'exec',
   'execrej',
   'execrb',
@@ -1052,7 +1052,7 @@ function outsideApply(finishedAt: string, previewId: string, req: ApplyRequest):
   }
 }
 
-// ---- EXEC(프로시저 호출) 시험 데이터: dm1(삭제)을 바탕으로 문장·그래프만 바꾼다. 미리보기 전용(적용 막힘). ----
+// ---- EXEC(프로시저 호출) 시험 데이터: dm1(삭제)을 바탕으로 문장·그래프만 바꾼다. [적용]은 2026-11-17부터 된다. ----
 // 계약 contract-exec.md §5(EXEC 미리보기)의 모양. 프로시저 이름·본문 동작·경고 문구는 전부 예시값이다(백엔드 문구와 다를 수 있음).
 const EXEC_SOURCE = 'EXEC 계약(contract-exec.md · be-exec 워크트리 Contracts: AnalyzedStatement·StatementResult·procedureCall 노드·PROC_DIRECT)'
 const EXEC_EXAMPLES = '프로시저·매개변수·본문 동작·경고 문구·행 값·소요 시간은 예시값(백엔드 문구와 다를 수 있음)'
@@ -1168,10 +1168,17 @@ const EXEC_EVENT: RowChange[] = [
 ]
 const EXEC_NET: NetChange[] = EXEC_EVENT.map((r) => net(EXEC_F.find((f) => f.id === r.firingId)!.table, r.key, 'DELETED', r.before, null, [], [r.firingId]))
 
-/** EXEC는 [적용]이 막힌다. 서버가 PROC_APPLY_NOT_SUPPORTED로 돌려주는 응답(화면은 미리 막아 보통 도달하지 않는다). */
-function procApplyBlocked(finishedAt: string, previewId: string): ApplyResult {
-  return { ...precondition('프로시저 호출(EXEC)은 아직 적용할 수 없습니다(미리보기 전용).')(finishedAt, previewId), preconditionFailures: ['PROC_APPLY_NOT_SUPPORTED'] }
-}
+/** EXEC [적용](2026-11-17): 원본 권한·프로시저 정의를 확인한 뒤 실행하고, 반환 값·결과 집합 수까지 미리보기와 같아 커밋한 응답. 시간은 예시값. */
+const execCommitted = committed(
+  [{ ...EXEC_STMT, captureSeqRange: null }],
+  EXEC_SUM,
+  {
+    limitations: [
+      'EXEC: 프로시저는 반환 값과 결과 집합 수만 미리보기와 대조하고 결과 집합 내용은 비교하지 않음. 원본 정의는 호출 대상과 펼친 중첩 프로시저만 기준선과 대조함(함수·뷰·트리거 정의는 대조하지 않음)',
+    ],
+  },
+  { snapshot: 400, drift: 5, execute: 210, netDiff: 1500, commit: 6 },
+)
 
 // 거부: 동적 SQL을 쓰는 프로시저(REJECT_PROC_DYNAMIC_SQL)
 const REJEXEC_SQL = "EXEC dbo.uspRunReport @TableName = N'Sales.Store';"
@@ -1289,9 +1296,9 @@ export const FIXTURES: Record<FixtureId, Fixture> = {
     autoRun: false,
     sandboxProblem: { status: 401, title: '실행 파일이 연 브라우저 창에서만 쓸 수 있습니다', reason: 'NO_SESSION' },
   }),
-  exec: variant('exec', 'EXEC 성공 · 프로시저 호출 → 직접 쓰기 2 → FK 연쇄 1 (미리보기 전용)', {
+  exec: variant('exec', 'EXEC 성공 · 프로시저 호출 → 직접 쓰기 2 → FK 연쇄 1 · [적용] 커밋', {
     source: EXEC_SOURCE,
-    examples: EXEC_EXAMPLES + ' · [적용]은 막힘(PROC_APPLY_NOT_SUPPORTED)',
+    examples: EXEC_EXAMPLES + ' · [적용] 결과(커밋, 반환 값·결과 집합 수 일치)도 예시값',
     sql: EXEC_SQL,
     analysis: { ...accepted(EXEC_A), warnings: EXEC_WARNINGS, diagnostics: EXEC_WARNINGS },
     preview: previewOf({
@@ -1307,7 +1314,7 @@ export const FIXTURES: Record<FixtureId, Fixture> = {
     }),
     eventRows: EXEC_EVENT,
     netRows: EXEC_NET,
-    apply: procApplyBlocked,
+    apply: execCommitted,
   }),
   execrej: variant('execrej', 'EXEC 거부 · REJECT_PROC_DYNAMIC_SQL (422)', {
     source: EXEC_SOURCE,
@@ -1342,6 +1349,6 @@ export const FIXTURES: Record<FixtureId, Fixture> = {
     }),
     eventRows: [],
     netRows: [],
-    apply: procApplyBlocked,
+    apply: precondition('미리보기 상태가 ok가 아님.'),
   }),
 }

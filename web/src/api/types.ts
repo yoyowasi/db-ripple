@@ -412,8 +412,12 @@ export type ApplyPrecondition =
   | 'EXECUTE_AS_USER_MISSING'
   | 'WEAK_VERIFICATION_NOT_ACCEPTED'
   | 'ORIGIN_UNREACHABLE'
-  /** 미리보기에 EXEC 문장이 있어 적용할 수 없다(EXEC는 미리보기 전용, 서버 쪽은 오케스트레이터가 넣는 중) */
+  /** 옛 값(2026-11-13): EXEC 미리보기를 막던 코드. 2026-11-17부터 서버는 내지 않고 호환을 위해 남긴다. */
   | 'PROC_APPLY_NOT_SUPPORTED'
+  /** EXEC가 부르는 최상위 프로시저에 원본 실행 주체(한 서버: 실행 사용자, 분리: 본인 로그인)의 EXECUTE 권한이 없다(2026-11-17) */
+  | 'PROC_EXECUTE_PERMISSION_MISSING'
+  /** 기준선 이후 원본의 프로시저(호출 대상·펼친 중첩) 정의가 바뀌었거나 읽을 수 없다(2026-11-17) */
+  | 'PROC_DEFINITION_CHANGED'
 export type ApplyStatus = 'committed' | 'rolled_back_mismatch' | 'drift_detected' | 'precondition_failed' | 'error'
 export interface ApplyRequest {
   sqlHash: string | null
@@ -442,6 +446,10 @@ export type MismatchKind =
   | 'KEYSET_TABLE_COUNT'
   /** KEYSET_HASH: 미리보기에 없던 테이블의 COUNT_BIG·CHECKSUM_AGG가 실행 전후로 달라짐 */
   | 'OUTSIDE_TABLE_CHANGED'
+  /** EXEC: 프로시저 반환 값이 미리보기와 다름(2026-11-17) */
+  | 'PROC_RETURN_VALUE'
+  /** EXEC: 프로시저 결과 집합 수가 미리보기와 다름(내용은 비교하지 않음, 2026-11-17) */
+  | 'PROC_RESULT_SET_COUNT'
 export interface ApplyMismatch {
   kind: MismatchKind
   statementIndex: number | null

@@ -21,6 +21,11 @@ internal interface IOriginDatabase
     Task<SnapshotCapability> CheckSnapshotCapabilityAsync(string originDb, CancellationToken ct);
     /// <summary>[적용] 원본 사전 경고(TRUSTWORTHY·복제·CDC·Service Broker, 읽기만). 읽지 못하면 "확인 못 함" 문구. 던지지 않는다.</summary>
     Task<IReadOnlyList<string>> ReadOriginWarningsAsync(string originDb, CancellationToken ct);
+    /// <summary>
+    /// EXEC [적용] 선행 조건(2026-11-17, 읽기만): 프로시저마다 원본 정의(도구 로그인으로 sys.sql_modules)와 EXECUTE 권한(executeAsUser면 EXECUTE AS USER 뒤 HAS_PERMS_BY_NAME, null이면 본인 로그인).
+    /// 결과는 입력 순서다. 원본에 GRANT·DDL을 하지 않는다. 연결 실패는 SandboxUnavailableException.
+    /// </summary>
+    Task<IReadOnlyList<OriginProcedure>> ReadProceduresAsync(string originDb, IReadOnlyList<(string Schema, string Name)> procedures, string? executeAsUser, CancellationToken ct);
     /// <summary>원본 스냅샷 생성. 실패하면 Failed(error로 끝낸다, KEYSET_HASH로 조용히 낮추지 않는다).</summary>
     Task<(SnapshotOutcome Outcome, string? Reason)> CreateSnapshotAsync(string originDb, string snapshotDb, CancellationToken ct);
     /// <summary>원본 스냅샷 삭제.</summary>
@@ -116,6 +121,30 @@ internal sealed class SqlOriginDatabase(string connectionString, ApplySettings s
         {
             return OriginWarnings.Describe(null);
         }
+    }
+
+    public async Task<IReadOnlyList<OriginProcedure>> ReadProceduresAsync(string originDb, IReadOnlyList<(string Schema, string Name)> procedures, string? executeAsUser, CancellationToken ct)
+    {
+        OriginNames.Validate(originDb, "원본");
+        if (procedures.Count == 0) return [];
+        // 풀링 없는 전용 연결: EXECUTE AS 뒤 오류로 REVERT를 못 해도 연결을 닫으면 가장이 끝난다.
+        await using var conn = await OriginConnections.OpenAsync(connectionString, originDb, ct);
+        await using var cmd = new SqlCommand(OriginProcedures.Sql(procedures.Count, executeAsUser), conn) { CommandTimeout = settings.ToolCommandTimeoutSeconds };
+        for (var i = 0; i < procedures.Count; i++)
+        {
+            cmd.Parameters.Add(new SqlParameter($"@s{i}", SqlDbType.NVarChar, 128) { Value = procedures[i].Schema });
+            cmd.Parameters.Add(new SqlParameter($"@n{i}", SqlDbType.NVarChar, 128) { Value = procedures[i].Name });
+        }
+        var definitions = new string?[procedures.Count];
+        var canExecute = new bool[procedures.Count];
+        await using (var r = await cmd.ExecuteReaderAsync(ct))
+        {
+            while (await r.ReadAsync(ct)) definitions[r.GetInt32(0)] = r.IsDBNull(1) ? null : r.GetString(1);
+            if (!await r.NextResultAsync(ct)) throw new InvalidOperationException("원본 프로시저의 EXECUTE 권한을 읽지 못함");
+            while (await r.ReadAsync(ct)) canExecute[r.GetInt32(0)] = r.GetInt32(1) == 1;
+            while (await r.NextResultAsync(ct)) { } // REVERT 오류까지 드러낸다
+        }
+        return procedures.Select((p, i) => new OriginProcedure(p.Schema, p.Name, definitions[i], canExecute[i])).ToList();
     }
 
     public Task<(SnapshotOutcome Outcome, string? Reason)> CreateSnapshotAsync(string originDb, string snapshotDb, CancellationToken ct) =>

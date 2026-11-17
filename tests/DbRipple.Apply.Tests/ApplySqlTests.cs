@@ -298,5 +298,93 @@ public sealed class ApplySqlTests
         Assert.Empty(result.Verification.Mismatches);
         Assert.Equal(2, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
     }
+
+    // EXEC [적용](2026-11-17): usp_bump가 usp_inner를 부르고 T를 바꾼 뒤 결과 집합 1개를 내고, Flag가 켜져 있으면 5를 돌려준다.
+    // 원본 실행 사용자 권한은 ApplyLab이 PreviewUserSql.EnsureBatch로 준다(프로시저마다 GRANT EXECUTE).
+    static readonly string[] Proc =
+    [
+        "CREATE TABLE dbo.T (id int NOT NULL PRIMARY KEY, v int NOT NULL);",
+        "INSERT INTO dbo.T (id, v) VALUES (1, 1), (2, 5);",
+        "CREATE TABLE dbo.Flag (id int NOT NULL PRIMARY KEY, active bit NOT NULL);",
+        "INSERT INTO dbo.Flag (id, active) VALUES (1, 0);",
+        "CREATE PROCEDURE dbo.usp_inner AS BEGIN SET NOCOUNT ON; RETURN 0; END;",
+        """
+        CREATE PROCEDURE dbo.usp_bump @id int AS
+        BEGIN
+            SET NOCOUNT ON;
+            EXEC dbo.usp_inner;
+            UPDATE dbo.T SET v = v + 1 WHERE id = @id;
+            SELECT v FROM dbo.T WHERE id = @id;
+            IF EXISTS (SELECT 1 FROM dbo.Flag WHERE id = 1 AND active = 1) RETURN 5;
+            RETURN 0;
+        END;
+        """,
+    ];
+
+    const string ExecBump = "EXEC dbo.usp_bump @id = 1;";
+
+    [SqlFact]
+    public async Task Exec_commits_to_origin_after_procedure_checks()
+    {
+        await using var lab = await ApplyLab.CustomAsync("exec", Proc);
+        var record = await lab.PreviewAsync(ExecBump);
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal(ApplyStatus.Committed, result!.Status);
+        Assert.Empty(result.Verification.Mismatches);
+        var st = Assert.Single(result.Statements);
+        Assert.Equal((ChangeOperation.Exec, (int?)0, (int?)1), (st.Kind, st.ReturnValue, st.ResultSetCount));
+        Assert.Contains(OriginProcedures.Limitation, result.Verification.Limitations);
+        Assert.Equal(2, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
+    }
+
+    [SqlFact]
+    public async Task Exec_without_execute_permission_on_origin_is_precondition_failed()
+    {
+        await using var lab = await ApplyLab.CustomAsync("exnp", Proc);
+        var record = await lab.PreviewAsync(ExecBump);
+        await lab.ExecOnOriginAsync($"REVOKE EXECUTE ON OBJECT::[dbo].[usp_bump] FROM [{PreviewUserSql.UserName}];");
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal(ApplyStatus.PreconditionFailed, result!.Status);
+        Assert.Equal([ApplyPrecondition.ProcExecutePermissionMissing], result.PreconditionFailures);
+        Assert.Empty(result.Statements);
+        Assert.False(result.SandboxRefreshStarted);
+        Assert.Equal(1, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
+    }
+
+    [SqlFact]
+    public async Task Exec_with_nested_procedure_altered_after_baseline_is_precondition_failed()
+    {
+        await using var lab = await ApplyLab.CustomAsync("exdef", Proc);
+        var record = await lab.PreviewAsync(ExecBump);
+        await lab.ExecOnOriginAsync("ALTER PROCEDURE dbo.usp_inner AS BEGIN SET NOCOUNT ON; UPDATE dbo.T SET v = 100 WHERE id = 2; RETURN 0; END;");
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal([ApplyPrecondition.ProcDefinitionChanged], result!.PreconditionFailures);
+        Assert.Contains("dbo.usp_inner", result.Message);
+        Assert.Empty(result.Statements);
+        Assert.Equal(5, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 2;"));
+        Assert.Equal(1, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
+    }
+
+    [SqlFact]
+    public async Task Exec_return_value_different_on_origin_is_rolled_back_mismatch()
+    {
+        await using var lab = await ApplyLab.CustomAsync("exrv", Proc);
+        var record = await lab.PreviewAsync(ExecBump);
+        await lab.ExecOnOriginAsync("UPDATE dbo.Flag SET active = 1 WHERE id = 1;");   // 행 변경은 같고 반환 값만 0 → 5
+
+        var result = await lab.ApplyAsync(record);
+
+        Assert.Equal(ApplyStatus.RolledBackMismatch, result!.Status);
+        var m = Assert.Single(result.Verification.Mismatches);
+        Assert.Equal((MismatchKind.ProcReturnValue, "0", "5"), (m.Kind, m.Expected, m.Actual));
+        Assert.False(result.SandboxRefreshStarted);
+        Assert.Equal(1, await lab.ScalarAsync<int>("SELECT v FROM dbo.T WHERE id = 1;"));
+    }
 }
 #endif
