@@ -23,7 +23,7 @@ public class LargeDeletePerfTests(ITestOutputHelper output)
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(x => int.Parse(x, CultureInfo.InvariantCulture)).ToList();
         var repeat = int.Parse(Environment.GetEnvironmentVariable("DBR_PERF_REPEAT") ?? "3", CultureInfo.InvariantCulture);
         var csv = Environment.GetEnvironmentVariable("DBR_PERF_OUT");
-        var lines = new List<string> { "parents,rows,sample,resolve_ms" };
+        var lines = new List<string> { "parents,rows,sample,resolve_ms,alloc_mb,peak_ws_mb" };
 
         foreach (var n in sizes)
         {
@@ -34,13 +34,17 @@ public class LargeDeletePerfTests(ITestOutputHelper output)
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
+                var alloc0 = GC.GetAllocatedBytesForCurrentThread();
                 var sw = Stopwatch.StartNew();
                 var r = new CausalResolver().Resolve(input);
                 sw.Stop();
+                var allocMb = (GC.GetAllocatedBytesForCurrentThread() - alloc0) / (1024 * 1024);
                 Assert.Equal(5 * n, r.Model.RowChanges.Count);
+                var peakMb = Process.GetCurrentProcess().PeakWorkingSet64 / (1024 * 1024);
+                output.WriteLine($"N={n} #{i}{(i == 0 ? "(워밍업)" : "")} {sw.ElapsedMilliseconds}ms alloc={allocMb}MB peakWS={peakMb}MB");
                 if (i == 0) continue; // 워밍업
                 samples.Add(sw.ElapsedMilliseconds);
-                lines.Add($"{n},{5 * n},{i},{sw.ElapsedMilliseconds}");
+                lines.Add($"{n},{5 * n},{i},{sw.ElapsedMilliseconds},{allocMb},{peakMb}");
             }
             var sorted = samples.Order().ToList();
             output.WriteLine($"N={n} rows={5 * n} resolve ms: {string.Join(" / ", samples)} median {sorted[sorted.Count / 2]}");
