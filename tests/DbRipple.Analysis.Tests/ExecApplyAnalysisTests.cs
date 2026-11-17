@@ -149,6 +149,12 @@ public sealed class ExecApplyAnalysisTests
     [InlineData("UPDATE dbo.U SET y = (SELECT TOP (1) y FROM dbo.U WHERE x <= DATEPART(hour, GETDATE()) ORDER BY x DESC) WHERE x = 1;")]
     [InlineData("UPDATE dbo.U SET y = CASE WHEN x > 0 THEN DATEPART(ms, GETDATE()) ELSE 0 END WHERE x = 1;")]
     [InlineData("UPDATE dbo.U SET y = DATEPART(ms, GETDATE()) + x WHERE x = 1;")]                                              // 열 참조가 섞임
+    // PR #15 2차 검토 B: 문자열 감싸기에 데이터 인자가 섞이면 엄격
+    [InlineData("UPDATE dbo.U SET y = LEFT(y, 2) + CONVERT(char(8), GETDATE(), 112) WHERE x = 1;")]
+    [InlineData("UPDATE dbo.U SET y = REPLACE(CONVERT(varchar(36), NEWID()), '-', (SELECT MAX(y) FROM dbo.U)) WHERE x = 1;")]
+    [InlineData("UPDATE dbo.U SET y = FORMAT(GETDATE(), 'yyyyMMdd') + (SELECT MAX(y) FROM dbo.U) WHERE x = 1;")]
+    [InlineData("UPDATE dbo.U SET y = DATEADD(day, x, GETDATE()) WHERE x = 1;")]
+    [InlineData("UPDATE dbo.U SET y = RAND(42) WHERE x = 1;")]                                                                 // 상수 시드(C)
     public void Variable_writes_that_are_not_surely_nondeterministic_stay_strict(string body)
     {
         var st = Accepted("EXEC dbo.q;", Ctx(("q", $"CREATE PROCEDURE dbo.q AS BEGIN SET NOCOUNT ON; {body} RETURN 0; END;")), out _);
@@ -160,6 +166,12 @@ public sealed class ExecApplyAnalysisTests
     [InlineData("DECLARE @t datetime2; SET @t = GETDATE(); UPDATE dbo.U SET y = @t WHERE x = 1;")]
     [InlineData("DECLARE @t int = CAST(DATEPART(ms, SYSDATETIME()) AS int) * 10; UPDATE dbo.U SET y = @t WHERE x = 1;")]
     [InlineData("UPDATE dbo.U SET y = CONVERT(varchar(30), SYSDATETIME(), 126) WHERE x = 1;")]
+    // PR #15 2차 검토 B: 문자열 감싸기
+    [InlineData("UPDATE dbo.U SET y = FORMAT(GETDATE(), 'yyyyMMdd') WHERE x = 1;")]
+    [InlineData("UPDATE dbo.U SET y = 'PO' + CONVERT(char(8), GETDATE(), 112) WHERE x = 1;")]
+    [InlineData("UPDATE dbo.U SET y = REPLACE(CONVERT(varchar(36), NEWID()), '-', '') WHERE x = 1;")]
+    [InlineData("UPDATE dbo.U SET y = UPPER(LEFT(CONCAT('n', CONVERT(varchar(36), NEWID())), 8)) WHERE x = 1;")]
+    [InlineData("DECLARE @n varchar(20) = 'PO' + CONVERT(char(8), GETDATE(), 112); UPDATE dbo.U SET y = @n WHERE x = 1;")]
     public void Pure_nondeterministic_writes_stay_marked(string body)
     {
         var st = Accepted("EXEC dbo.q;", Ctx(("q", $"CREATE PROCEDURE dbo.q AS BEGIN SET NOCOUNT ON; {body} RETURN 0; END;")), out _);
@@ -192,6 +204,39 @@ public sealed class ExecApplyAnalysisTests
 
         Assert.True(st.Plan!.ReturnValueNondeterministic);
         Assert.Equal([-1, 0, 7], st.Plan.LiteralReturnValues);   // 안쪽 RETURN 7도 그대로 비교
+    }
+
+    // PR #15 2차 검토 A: 자기 참조 산술로 EXEC 반환 값을 바꾸면 엄격(안쪽 RETURN 7이 8이 되어 리터럴 집합으로 잡을 수 없다).
+    [Theory]
+    [InlineData("DECLARE @rc int; EXEC @rc = dbo.innerid; SET @rc = @rc + 1; RETURN @rc;")]
+    [InlineData("DECLARE @rc int; EXEC @rc = dbo.innerid; SET @rc += 1; RETURN @rc;")]
+    [InlineData("DECLARE @rc int; EXEC @rc = dbo.innerid; DECLARE @x int = @rc; SET @x = @x * 2; RETURN @x;")]
+    public void Inner_procedure_return_changed_by_self_referencing_arithmetic_is_strict(string body)
+    {
+        var ctx = Ctx(
+            ("q", $"CREATE PROCEDURE dbo.q AS BEGIN SET NOCOUNT ON; {body} END;"),
+            ("innerid", "CREATE PROCEDURE dbo.innerid AS BEGIN IF EXISTS (SELECT 1 FROM dbo.U WHERE x = 2) RETURN 7; INSERT INTO dbo.U (x, y) VALUES (1, 2); RETURN CAST(SCOPE_IDENTITY() AS int); END;"));
+
+        var st = Accepted("EXEC dbo.q;", ctx, out _);
+
+        Assert.False(st.Plan!.ReturnValueNondeterministic);
+    }
+
+    // PR #15 2차 검토 B: 사용자 문장. 영향 열로 표시하지 않은 비결정 사용이 있으면 경고 문구에 롤백 가능성을 덧붙인다.
+    [Theory]
+    [InlineData("UPDATE dbo.U SET y = 'PO' + CONVERT(char(8), GETDATE(), 112) WHERE x = 1;", true, false)]
+    [InlineData("UPDATE dbo.U SET y = GETDATE() WHERE x = 1;", true, false)]
+    [InlineData("UPDATE dbo.U SET y = DATEADD(day, x, GETDATE()) WHERE x = 1;", false, true)]
+    [InlineData("UPDATE dbo.U SET y = GETDATE() WHERE x < DATEPART(hour, GETDATE());", true, true)]
+    [InlineData("DELETE dbo.U WHERE x < DATEPART(hour, GETDATE());", false, true)]
+    public void User_statement_warning_says_when_nondeterministic_use_is_compared_by_value(string sql, bool marked, bool rollbackNote)
+    {
+        var r = new BatchAnalyzer().Analyze(sql, Ctx());
+
+        Assert.True(r.IsAccepted);
+        Assert.Equal(marked, r.Statements[0].NondeterministicColumns.Contains("y"));
+        var w = Assert.Single(r.Warnings, w => w.RuleId == AnalysisRules.WarnNondeterministicFunction);
+        Assert.Equal(rollbackNote, w.Message.Contains("롤백될 수 있음", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -227,9 +227,13 @@ public sealed class BatchAnalyzer : IBatchAnalyzer
             if (nondeterminism.Count > 0)
             {
                 var names = nondeterminism.Select(n => n.Name).Distinct().ToList();
+                // 영향 열(예상값)로 표시하지 않은 사용(WHERE·하위 쿼리·CASE 안 등)은 [적용] 값 대조에 그대로 들어간다(2026-11-17).
+                var unmarked = kind == ChangeOperation.Delete
+                    || SqlSyntax.HasUnmarkedNondeterminism(spec, () => SqlSyntax.InsertableColumns(baseline.Catalog, table), nondeterminism);
                 Warn(AnalysisRules.WarnNondeterministicFunction,
                     $"문장 안 비결정 함수({string.Join(", ", names)})가 있어 실행마다 값이 달라질 수 있습니다." +
-                    (nondeterministicColumns.Count > 0 ? $" 영향 열: {string.Join(", ", nondeterministicColumns)}." : ""),
+                    (nondeterministicColumns.Count > 0 ? $" 영향 열: {string.Join(", ", nondeterministicColumns)}." : "") +
+                    (unmarked ? " 영향 열로 표시하지 않은 비결정 사용이 있습니다: 이 값은 [적용] 값 대조에 포함되어 실행마다 달라지면 롤백될 수 있음." : ""),
                     "E1", index, lines.Span(nondeterminism[0].Node));
             }
 

@@ -5,8 +5,9 @@ namespace DbRipple.Analysis;
 /// <summary>
 /// 비결정 "원천 식" 판정과 같은 본문 안 단순 대입 추적(2026-11-17, PR #11 검토에서 미룬 것, PR #15 검토로 좁힘). 판정이 불확실하면 원천으로 보지 않는다(엄격 비교 쪽).
 /// <para>
-/// 원천 식은 순수해야 한다: 잎이 비결정 함수(반환 값 판정에서는 IDENTITY 함수도), 숫자 리터럴, 원천 변수뿐이고, 감싸는 것은 괄호·CAST·CONVERT·단항/이항 산술,
-/// 인자가 모두 순수한 스칼라 내장 함수(DATEPART·DATEADD·DATEDIFF·CHECKSUM 등, <see cref="PureFunctions"/>)뿐이다. 원천 잎이 하나 이상 있어야 한다.
+/// 원천 식은 순수해야 한다: 잎이 비결정 함수(반환 값 판정에서는 IDENTITY 함수도), 숫자·문자열 리터럴, 원천 변수뿐이고, 감싸는 것은 괄호·CAST·CONVERT·단항/이항 산술(문자열 + 연결 포함),
+/// 인자가 모두 순수한 스칼라 내장 함수(DATEPART·DATEADD·DATEDIFF·CHECKSUM, LEFT·REPLACE·FORMAT 같은 문자열 함수 등, <see cref="PureFunctions"/>)뿐이다. 원천 잎이 하나 이상 있어야 한다.
+/// 비결정 함수 목록은 SqlSyntax.FindNondeterminism이다(상수 인자 RAND(시드)·DB_ID('x') 같은 호출은 결정적이라 빠진다).
 /// 하위 쿼리·열 참조·원천 아닌 변수·매개변수·@@ROWCOUNT 같은 전역 변수, CASE·COALESCE·ISNULL·IIF·NULLIF·CHOOSE, 사용자 함수가 하나라도 있으면 원천이 아니다.
 /// </para>
 /// <list type="bullet">
@@ -21,10 +22,11 @@ internal sealed class VariableFlow
     /// <summary>IDENTITY 함수(반환 값 판정에서만 원천).</summary>
     static readonly HashSet<string> IdentityFunctions = new(["SCOPE_IDENTITY", "IDENT_CURRENT"], StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>인자가 순수하면 결과도 순수한 스칼라 내장 함수.</summary>
+    /// <summary>인자가 순수하면(원천 또는 리터럴) 결과도 순수한 스칼라 내장 함수. 문자열 함수는 2026-11-17 PR #15 2차 검토(예: FORMAT(GETDATE(), 'yyyyMMdd')).</summary>
     static readonly HashSet<string> PureFunctions = new(
         ["DATEPART", "DATEADD", "DATEDIFF", "DATEDIFF_BIG", "DATENAME", "DATETRUNC", "YEAR", "MONTH", "DAY", "EOMONTH",
-         "ABS", "FLOOR", "CEILING", "ROUND", "SIGN", "CHECKSUM", "SWITCHOFFSET", "TODATETIMEOFFSET"],
+         "ABS", "FLOOR", "CEILING", "ROUND", "SIGN", "CHECKSUM", "SWITCHOFFSET", "TODATETIMEOFFSET",
+         "LEFT", "RIGHT", "SUBSTRING", "REPLACE", "UPPER", "LOWER", "LTRIM", "RTRIM", "TRIM", "CONCAT", "FORMAT"],
         StringComparer.OrdinalIgnoreCase);
 
     /// <summary>첫 인자가 날짜 부분 이름(ms, hour 등)인 함수.</summary>
@@ -77,11 +79,14 @@ internal sealed class VariableFlow
             foreach (var g in byVar)
             {
                 if (sources.Contains(g.Key)) continue;
-                var flow = new VariableFlow(identity, sources, directOnly);
-                var withSelf = new VariableFlow(identity, new HashSet<string>(sources, StringComparer.OrdinalIgnoreCase) { g.Key }, directOnly);
+                // EXEC 반환 값(이나 그것을 그대로 옮긴 값)을 받는 변수는 평가 전에 directOnly로 둔다: SET @rc = @rc + 1 같은 자기 참조 식이 Pure를 통과하지 않게(PR #15 2차 검토).
+                var direct = g.Any(a => a.Fixed == true || (a.Value is not null && DirectVariable(a.Value) is { } v && directOnly.Contains(v)));
+                var selfDirect = direct ? new HashSet<string>(directOnly, StringComparer.OrdinalIgnoreCase) { g.Key } : directOnly;
+                var flow = new VariableFlow(identity, sources, selfDirect);
+                var withSelf = new VariableFlow(identity, new HashSet<string>(sources, StringComparer.OrdinalIgnoreCase) { g.Key }, selfDirect);
                 if (!g.All(a => withSelf.Value(a)) || !g.Any(a => flow.Value(a))) continue;
                 sources.Add(g.Key);
-                if (g.Any(a => a.Fixed == true || (a.Value is not null && DirectVariable(a.Value) is { } v && directOnly.Contains(v)))) directOnly.Add(g.Key);
+                if (direct) directOnly.Add(g.Key);
                 changed = true;
             }
         } while (changed);
@@ -114,16 +119,14 @@ internal sealed class VariableFlow
         _ => null,
     };
 
-    bool Pure(ScalarExpression e, ref bool hasSource, bool argument = false)
+    bool Pure(ScalarExpression e, ref bool hasSource)
     {
         switch (e)
         {
             case ParenthesisExpression p:
                 return Pure(p.Expression, ref hasSource);
-            case IntegerLiteral or NumericLiteral or RealLiteral or MoneyLiteral:
-                return true;
-            case StringLiteral:
-                return argument;   // 함수 인자(형식 문자열, IDENT_CURRENT 테이블 이름 등)로만
+            case IntegerLiteral or NumericLiteral or RealLiteral or MoneyLiteral or StringLiteral:
+                return true;   // 문자열 리터럴: 함수 인자(형식 문자열 등)와 'PO' + CONVERT(…) 같은 + 연결(원천 잎은 따로 하나 이상 필요)
             case VariableReference v:
                 if (!sources.Contains(v.Name) || directOnly.Contains(v.Name)) return false;
                 hasSource = true;
@@ -136,7 +139,7 @@ internal sealed class VariableFlow
             case CastCall c:
                 return Pure(c.Parameter, ref hasSource);
             case ConvertCall c:
-                return Pure(c.Parameter, ref hasSource) && (c.Style is null || Pure(c.Style, ref hasSource, argument: true));
+                return Pure(c.Parameter, ref hasSource) && (c.Style is null || Pure(c.Style, ref hasSource));
             case ParameterlessCall pc:
                 // CURRENT_TIMESTAMP, CURRENT_USER 등(SqlSyntax.FindNondeterminism과 같은 목록)
                 if (SqlSyntax.FindNondeterminism(pc).Count == 0) return false;
@@ -149,6 +152,10 @@ internal sealed class VariableFlow
             case NextValueForExpression { OverClause: null }:
                 hasSource = true;
                 return true;
+            case LeftFunctionCall l:   // LEFT·RIGHT는 키워드라 ScriptDom이 따로 만든다
+                return AllPure(l.Parameters, ref hasSource);
+            case RightFunctionCall r:
+                return AllPure(r.Parameters, ref hasSource);
             case FunctionCall f when f.CallTarget is null && f.OverClause is null && f.WithinGroupClause is null && f.UniqueRowFilter == UniqueRowFilter.NotSpecified:
                 var name = f.FunctionName.Value;
                 var isSource = SqlSyntax.FindNondeterminism(f).Any(h => ReferenceEquals(h.Node, f)) || (identity && IdentityFunctions.Contains(name));
@@ -156,13 +163,20 @@ internal sealed class VariableFlow
                 for (var i = 0; i < f.Parameters.Count; i++)
                 {
                     if (i == 0 && DatePartFunctions.Contains(name) && f.Parameters[0] is IdentifierLiteral) continue;   // 날짜 부분 이름(ms, hour 등)
-                    if (!Pure(f.Parameters[i], ref hasSource, argument: true)) return false;
+                    if (!Pure(f.Parameters[i], ref hasSource)) return false;
                 }
                 hasSource |= isSource;
                 return true;
             default:
                 return false;
         }
+    }
+
+    bool AllPure(IList<ScalarExpression> parameters, ref bool hasSource)
+    {
+        foreach (var p in parameters)
+            if (!Pure(p, ref hasSource)) return false;
+        return true;
     }
 
     /// <summary>Site = 대입 구문 노드(추적 여부를 참조로 맞춘다). Fixed = 값이 식이 아니라 정해짐(EXEC @v =, 산술이 아닌 복합 대입). Compound = +=처럼 자기 값을 읽음.</summary>

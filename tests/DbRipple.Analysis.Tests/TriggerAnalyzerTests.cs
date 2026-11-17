@@ -235,6 +235,18 @@ END;");
     }
 
     [Fact]
+    public void String_wrapped_nondeterministic_value_is_marked_but_data_mixed_value_is_not()
+    {
+        // PR #15 2차 검토 B: 문자열 감싸기는 순수(예상값), 열·하위 쿼리가 섞이면 엄격.
+        var a = AnalyzeOne(@"CREATE TRIGGER dbo.trX ON dbo.T AFTER UPDATE AS BEGIN
+            UPDATE dbo.T SET b = 'PO' + CONVERT(char(8), GETDATE(), 112) FROM inserted;
+            UPDATE dbo.T SET a = DATEADD(day, a, GETDATE()) FROM inserted;
+            INSERT INTO dbo.L (x, y) SELECT REPLACE(CONVERT(varchar(36), NEWID()), '-', ''), LEFT(i.a, 2) + FORMAT(GETDATE(), 'yyyy') FROM inserted AS i; END;",
+            events: ["UPDATE"], more: b => b.Table("dbo", "L", "!id", "x", "y"));
+        Assert.Equal(["dbo.L.x", "dbo.T.b"], a.NondeterministicWrites.Select(w => $"{w.Table}.{w.Column}"));
+    }
+
+    [Fact]
     public void Encrypted_trigger_has_unknown_targets()
     {
         var a = AnalyzeOne(null, name: "trEnc");

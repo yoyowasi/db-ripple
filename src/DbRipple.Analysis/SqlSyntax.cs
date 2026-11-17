@@ -77,12 +77,30 @@ internal static class SqlSyntax
         return v.Hits;
     }
 
+    /// <summary>
+    /// 상수 인자면 결정적인 호출(2026-11-17, PR #15 2차 검토): RAND(시드)와 환경 함수의 상수 인자 호출(DB_ID('x'), DB_NAME(5), SUSER_SNAME(0x01) 등).
+    /// SESSION_CONTEXT(N'키')는 세션 값이라 인자가 상수여도 비결정이다. 결정적으로 보면 [적용]은 값을 그대로 비교한다(다르면 롤백, 안전 쪽).
+    /// </summary>
+    static bool ConstantArgumentCall(FunctionCall n) =>
+        n.Parameters.Count > 0 && n.Parameters.All(IsConstant)
+        && !n.FunctionName.Value.Equals("SESSION_CONTEXT", StringComparison.OrdinalIgnoreCase)
+        && (n.FunctionName.Value.Equals("RAND", StringComparison.OrdinalIgnoreCase) || EnvironmentFunctions.Contains(n.FunctionName.Value, StringComparer.OrdinalIgnoreCase));
+
+    static bool IsConstant(ScalarExpression e) => e switch
+    {
+        ParenthesisExpression p => IsConstant(p.Expression),
+        UnaryExpression { Expression: { } inner } => IsConstant(inner),
+        NullLiteral => false,
+        Literal => true,
+        _ => false,
+    };
+
     sealed class NondeterminismFinder : TSqlFragmentVisitor
     {
         public readonly List<(string, TSqlFragment)> Hits = [];
         public override void Visit(FunctionCall n)
         {
-            if (NondeterministicFunctions.Contains(n.FunctionName.Value)) Hits.Add((n.FunctionName.Value.ToUpperInvariant(), n));
+            if (NondeterministicFunctions.Contains(n.FunctionName.Value) && !ConstantArgumentCall(n)) Hits.Add((n.FunctionName.Value.ToUpperInvariant(), n));
         }
         public override void Visit(ParameterlessCall n)
         {
@@ -190,6 +208,16 @@ internal static class SqlSyntax
             if (flow.IsSource(value) && !result.Contains(column, StringComparer.OrdinalIgnoreCase))
                 result.Add(column);
         return result;
+    }
+
+    /// <summary>
+    /// 비결정 사용(hits) 가운데 예상값으로 표시하는 대입 값(순수 원천 식, NondeterministicColumns) 밖에 있는 것이 있는가.
+    /// WHERE·하위 쿼리·CASE 안 등에 있으면 그 값은 [적용] 값 대조에 그대로 들어간다(2026-11-17, PR #15 2차 검토 경고 문구).
+    /// </summary>
+    public static bool HasUnmarkedNondeterminism(TSqlFragment spec, Func<IReadOnlyList<string>?> tableColumns, IEnumerable<(string Name, TSqlFragment Node)> hits)
+    {
+        var marked = Assignments(spec, tableColumns).Select(a => a.Value).Where(v => VariableFlow.Empty.IsSource(v)).ToList();
+        return hits.Any(h => !marked.Any(v => h.Node.StartOffset >= v.StartOffset && h.Node.StartOffset + h.Node.FragmentLength <= v.StartOffset + v.FragmentLength));
     }
 
     /// <summary>열 목록이 없는 INSERT가 값을 받는 열 순서(계산·rowversion·IDENTITY 열은 값을 받지 않는다).</summary>
