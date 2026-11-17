@@ -119,8 +119,13 @@ public sealed record RawCapture
     public IReadOnlyList<AuditHeaderRow> Headers { get; init; } = [];
     /// <summary>위 헤더의 행 이미지.</summary>
     public IReadOnlyList<AuditRowImageRow> Images { get; init; } = [];
-    /// <summary>수집된 키의 재조회(키 있는 테이블만).</summary>
+    /// <summary>수집된 키의 재조회(키 있는 테이블만). 2026-11-18부터 INSERTED 이미지에도 나온 키만 읽는다(DELETE로만 나온 키는 비교할 감사 after가 없음, RereadSkippedKeys).</summary>
     public IReadOnlyList<RereadRow> Rereads { get; init; } = [];
+    /// <summary>
+    /// 진단: 재조회 후보(FULL 묶음 keyJson) 가운데 DELETE로만 나와 읽지 않은 키 수. 2026-11-18 추가(비파괴). 0이면 JSON에서 빠진다(기존 픽스처·계약 모양 유지).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public long RereadSkippedKeys { get; init; }
     /// <summary>롤백 전 같은 연결에서 계산한 최종 차이(C12). 범위: "감사 기록에 나온 테이블 ∪ 제외 테이블", 평가 모드면 전체 사용자 테이블(D3 대조 2). 실패면 빈 배열.</summary>
     public IReadOnlyList<NetChange> NetChanges { get; init; } = [];
     /// <summary>실패·거부 뒤 트랜잭션 밖에서 확정된 변경(롤백 뒤 전체 사용자 테이블 대 기준 스냅샷, §5.2 4, §6.2 residualCommitted).</summary>

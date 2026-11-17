@@ -256,7 +256,7 @@ flowchart LR
 | C7 | 카탈로그 | 다음을 읽어 기준선마다 캐시한다.<br/>• 테이블, 열·형식, PK·유일 인덱스, 데이터 파일 논리 이름<br/>• FK와 참조 동작(`is_disabled` 포함)<br/>• 트리거(이벤트, AFTER/INSTEAD OF, First/Last, 암호화 여부)<br/>• 트리거 본문 정적 분석(ScriptDom: 쓰기 대상, 동적 SQL, ROLLBACK, 외부 호출)<br/>• 비결정 열(IDENTITY, SEQUENCE 기본값, GETDATE·NEWID 기본값, rowversion, 계산 열) | `GetCatalog(db)` → `Catalog` |
 | C8 | 샌드박스 관리자 | 기준선을 만든다(§5.1: 기존 스냅샷 삭제 → 원본 COPY_ONLY 백업 → RESTORE WITH MOVE → 수집 장치 설치 → 파일별 경로를 지정한 기준 스냅샷). 새로 고침, 환경 지문 비교, 미리보기 1건 잠금, "오염" 표시와 재구축을 맡는다. | `BuildBaseline()`, `Refresh()`, `GetStatus()` → `SandboxStatus` |
 | C9 | 수집 장치 설치기 | 감사 저장소(헤더·행 이미지·제어 테이블, SEQUENCE, §6.2)를 만든다. 테이블·연산별 감사 트리거를 생성하고(형식 변환 규칙 포함) 각각 그 연산의 Last로 지정한다. 감사 저장소에는 IDENTITY 열을 두지 않는다. 수집 범위 매니페스트를 쓴다. | `Install(catalog)` → `CaptureManifest` |
-| C10 | 미리보기 실행기 | 실행 봉투(전용 연결, 풀링 끔, 고정 SET 옵션, 도구 소유 트랜잭션)를 연다. 문장마다 `EXECUTE AS USER` → 실행 → REVERT → 경계·이미지 수 읽기 → 상한 점검(제어 테이블 갱신)을 한다. 롤백 전에 수집 기록을 읽고, 수집된 키를 재조회하고, 최종 차이를 계산한다. 평가 모드에서는 ROLLBACK 직전에 평가 훅을 같은 연결로 부른다. BEGIN TRAN 직후 수집 순번 최댓값을 읽어 경계 0으로 둔다. 실패하면 전체 사용자 테이블을 대상으로 롤백 뒤 남은 변경을 검사한다. | `Execute(analysis)` → `RawCapture` |
+| C10 | 미리보기 실행기 | 실행 봉투(전용 연결, 풀링 끔, 고정 SET 옵션, 도구 소유 트랜잭션)를 연다. 문장마다 `EXECUTE AS USER` → 실행 → REVERT → 경계·이미지 수 읽기 → 상한 점검(제어 테이블 갱신)을 한다. 롤백 전에 수집 기록을 읽고, 수집된 키 가운데 INSERTED 이미지에 나온 키를 재조회하고(2026-11-18, §5.2 7), 최종 차이를 계산한다. 평가 모드에서는 ROLLBACK 직전에 평가 훅을 같은 연결로 부른다. BEGIN TRAN 직후 수집 순번 최댓값을 읽어 경계 0으로 둔다. 실패하면 전체 사용자 테이블을 대상으로 롤백 뒤 남은 변경을 검사한다. | `Execute(analysis)` → `RawCapture` |
 | C11 | 변경 수집기 | 헤더와 행 이미지로 변경 묶음을 구성하고, UPDATE 전후 행을 짝짓고, 바뀐 열을 계산하고, 비결정 열을 표시하고, 값을 정규화한다. 재조회 값을 반영한다(§7.2 6단계). | `Collect(raw)` → `Firing[]`, `RowChange[]` |
 | C12 | 최종 차이 계산기 | 스냅샷과 현재 DB의 테이블별 순 변경을 계산한다. PK로 조인하고, 힙은 다중집합으로 비교하고, 형식을 정규화한다. **열린 트랜잭션을 가진 연결을 받아 그 연결에서 계산한다**(미커밋 변경을 보기 위해). 제품 전용이며 평가 오라클과 코드를 공유하지 않는다. | `Diff(connection, liveDb, snapshotDb, tables)` → `NetChange[]` |
 | C13 | 원인 귀속·그래프 조립 | §7의 단계로 부모 찾기, 원인 종류·확신도 판정, 잔차 귀속을 하고 그래프 DTO를 만든다. | `Resolve(firings, net, catalog, manifest)` → `CausalModel`, `GraphDto` |
@@ -332,7 +332,7 @@ sequenceDiagram
     SBX-->>PE: 영향 행 수, 오류
     PE->>SBX: 수집 순번 최댓값·이미지 수 읽기, 상한이면 KEYS로 전환
   end
-  PE->>SBX: 헤더·행 이미지 읽기, 수집된 키 재조회
+  PE->>SBX: 헤더·행 이미지 읽기, 수집된 키 재조회(INSERTED에 나온 키)
   PE->>ND: 같은 연결로 최종 차이(AW_Sandbox 대 AW_Sandbox_base)
   PE->>SBX: ROLLBACK
   PE->>CR: 원자료 전달
@@ -359,6 +359,10 @@ sequenceDiagram
 4. 문장 실행 중 오류가 나면 거기서 멈추고, 트랜잭션이 남아 있으면 ROLLBACK한다. 결과 상태는 `failed`다. 트리거가 거부한 경우(A22)는 `trigger_blocked`다. 두 경우 모두 롤백 뒤 같은 연결에서 전체 사용자 테이블(감사 스키마 제외)을 기준 스냅샷과 비교한다. 범위는 §5.3 `SNAPSHOT_NETDIFF`와 같다. 감사 기록이 함께 롤백되어 범위를 좁히는 데 쓸 수 없기 때문이다. 트랜잭션 밖에서 확정된 변경(예: 트리거 CATCH 블록이 쓴 오류 로그 행)이 나오면 "롤백 뒤 남은 변경"으로 결과에 보인다. 그 테이블의 감사 트리거도 자동 커밋으로 감사 행을 남기므로 샌드박스를 "오염"으로 표시한다. 이 변경은 [적용] 때 원본에도 똑같이 생길 수 있다.
 5. 수집 이미지 수가 상한을 넘으면 제어 테이블을 `KEYS`로 바꾼다. 그 뒤 묶음은 헤더와 키만 남긴다. 결과 상태는 `truncated`이고, 테이블별 정확한 건수는 최종 차이로 계산한다(D8).
 6. 롤백 전에 읽은 원자료만으로 결과를 만든다. 롤백한 뒤에는 샌드박스 상태를 다시 보지 않는다(4의 실패 검사는 예외).
+7. **재조회 범위(2026-11-18, 큰 DELETE 성능, D3 대조 1):** 후보는 전과 같이 FULL 묶음 행 이미지의 keyJson(키 있는 테이블, 테이블마다 중복 제거)이고, 그 가운데 같은 테이블의 INSERTED 이미지(FULL·KEYS 묶음 모두)에 나온 키만 읽는다. DELETE로만 나온 키(지운 행, PK를 바꾼 UPDATE의 옛 키)는 읽지 않고 그 개수를 `RawCapture.RereadSkippedKeys`(진단, 0이면 JSON에서 빠짐)에 남긴다. 남은 키의 재조회 SQL은 그대로다.
+   - 근거: C11은 재조회 행을 (테이블, keyJson 서수 일치) 묶음에 대고, 그 묶음에 after가 있는 행 변경이 없으면 버린다(§7.2 6단계, `ChangeCollector.ApplyRereads`). after가 있는 행 변경의 묶음 키는 INSERTED 이미지의 keyJson이므로, 생략한 키의 재조회 값은 C11 출력(묶음·행 변경·before/after·재조회 차이)을 바꿀 수 없다. 감사 밖 경로로 다시 생긴 행은 전에도 재조회가 아니라 최종 차이(대조 2)의 잔차로 잡혔다. 재조회 행을 읽는 곳은 C11뿐이다(파이프라인은 시간만, 저장소·평가 하네스·API는 읽지 않는다).
+   - 키 비교는 서수로 먼저 하고, 못 찾으면 접어서(후행 공백·대소문자·숫자 표기 무시) 한 번 더 본다. 정렬 규칙상 같은 키를 빠뜨리지 않게 넓게 남기는 쪽이다.
+   - 효과: CL20(부모 N 삭제 → 자식 2N 연쇄 삭제 → 로그 2N 기록)에서 재조회 키가 5N에서 2N으로 줄고, 클라우드 실측에서 키마다 빈 테이블 Clustered Index Scan을 반복하던 지운 행 키 조회가 모두 빠진다(`docs/test-reports/2026-11-17-cloud-db-and-perf.md`). 근거: `src/DbRipple.Execution/RereadSql.cs`(`Plan`), `PreviewExecutor.cs`(`RereadAsync`), `tests/DbRipple.Execution.Tests/RereadPlanTests.cs`(전체 재조회와 생략 재조회의 C11 출력 동일, CascadeLab 픽스처 30개 포함). DB 실측은 아직이다.
 
 ### 5.3 적용
 
@@ -1075,7 +1079,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 
 **대조:** 롤백 전에 두 가지를 한다.
 
-1. 수집된 모든 키의 현재 행을 다시 읽어 마지막 감사 after와 비교한다.
+1. 수집된 모든 키의 현재 행을 다시 읽어 마지막 감사 after와 비교한다. **2026-11-18 범위 조정:** 비교할 감사 after가 있을 수 있는 키, 곧 같은 테이블의 INSERTED 이미지에 나온 키만 읽는다. DELETE로만 나온 키는 C11이 재조회 값을 쓰지 않으므로 읽지 않는다(§5.2 7).
 2. "감사 기록에 나온 테이블 ∪ 제외 테이블"에 대해 기준 스냅샷과의 최종 차이를 계산한다.
 
 감사로 설명되지 않는 변경은 잔차(§6.2)가 된다. 평가 모드에서는 모든 테이블을 비교한다.
