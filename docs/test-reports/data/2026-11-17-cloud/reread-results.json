@@ -1,0 +1,182 @@
+[
+  {
+    "table": "Child",
+    "count": 1000,
+    "rows": 1000,
+    "present": 0,
+    "elapsedMs": 125.0466,
+    "operators": [
+      "Compute Scalar",
+      "Nested Loops",
+      "Table-valued function",
+      "Clustered Index Scan",
+      "UDX",
+      "Constant Scan"
+    ],
+    "statistics": [
+      "SQL Server parse and compile time: \n   CPU time = 1 ms, elapsed time = 1 ms.",
+      "Table \u0027Child\u0027. Scan count 1, logical reads 13001, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.",
+      "\n SQL Server Execution Times:\n   CPU time = 120 ms,  elapsed time = 120 ms."
+    ]
+  },
+  {
+    "table": "Child",
+    "count": 5000,
+    "rows": 5000,
+    "present": 0,
+    "elapsedMs": 592.9386,
+    "operators": [
+      "Compute Scalar",
+      "Nested Loops",
+      "Table-valued function",
+      "Clustered Index Scan",
+      "UDX",
+      "Constant Scan"
+    ],
+    "statistics": [
+      "SQL Server parse and compile time: \n   CPU time = 0 ms, elapsed time = 0 ms.",
+      "Table \u0027Child\u0027. Scan count 1, logical reads 65001, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.",
+      "\n SQL Server Execution Times:\n   CPU time = 590 ms,  elapsed time = 591 ms."
+    ]
+  },
+  {
+    "table": "Child",
+    "count": 10000,
+    "rows": 10000,
+    "present": 0,
+    "elapsedMs": 1192.2657,
+    "operators": [
+      "Compute Scalar",
+      "Nested Loops",
+      "Table-valued function",
+      "Clustered Index Scan",
+      "UDX",
+      "Constant Scan"
+    ],
+    "statistics": [
+      "SQL Server parse and compile time: \n   CPU time = 0 ms, elapsed time = 0 ms.",
+      "Table \u0027Child\u0027. Scan count 1, logical reads 130001, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.",
+      "\n SQL Server Execution Times:\n   CPU time = 1188 ms,  elapsed time = 1190 ms."
+    ]
+  },
+  {
+    "table": "ChildLog",
+    "count": 1000,
+    "rows": 1000,
+    "present": 1000,
+    "elapsedMs": 47.4867,
+    "operators": [
+      "Compute Scalar",
+      "Nested Loops",
+      "Table-valued function",
+      "Clustered Index Seek",
+      "UDX",
+      "Constant Scan"
+    ],
+    "statistics": [
+      "SQL Server parse and compile time: \n   CPU time = 40 ms, elapsed time = 40 ms.",
+      "Table \u0027ChildLog\u0027. Scan count 0, logical reads 2071, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.",
+      "\n SQL Server Execution Times:\n   CPU time = 5 ms,  elapsed time = 5 ms."
+    ]
+  },
+  {
+    "table": "ChildLog",
+    "count": 5000,
+    "rows": 5000,
+    "present": 5000,
+    "elapsedMs": 26.6915,
+    "operators": [
+      "Compute Scalar",
+      "Nested Loops",
+      "Table-valued function",
+      "Clustered Index Seek",
+      "UDX",
+      "Constant Scan"
+    ],
+    "statistics": [
+      "SQL Server parse and compile time: \n   CPU time = 0 ms, elapsed time = 0 ms.",
+      "Table \u0027ChildLog\u0027. Scan count 0, logical reads 10321, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.",
+      "\n SQL Server Execution Times:\n   CPU time = 23 ms,  elapsed time = 23 ms."
+    ]
+  },
+  {
+    "table": "ChildLog",
+    "count": 10000,
+    "rows": 10000,
+    "present": 10000,
+    "elapsedMs": 53.7669,
+    "operators": [
+      "Compute Scalar",
+      "Nested Loops",
+      "Table-valued function",
+      "Clustered Index Seek",
+      "UDX",
+      "Constant Scan"
+    ],
+    "statistics": [
+      "SQL Server parse and compile time: \n   CPU time = 0 ms, elapsed time = 0 ms.",
+      "Table \u0027ChildLog\u0027. Scan count 0, logical reads 20634, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.",
+      "\n SQL Server Execution Times:\n   CPU time = 47 ms,  elapsed time = 50 ms."
+    ]
+  },
+  {
+    "table": "Parent",
+    "count": 1000,
+    "rows": 1000,
+    "present": 0,
+    "elapsedMs": 160.3743,
+    "operators": [
+      "Compute Scalar",
+      "Nested Loops",
+      "Table-valued function",
+      "Clustered Index Scan",
+      "UDX",
+      "Constant Scan"
+    ],
+    "statistics": [
+      "SQL Server parse and compile time: \n   CPU time = 1 ms, elapsed time = 1 ms.",
+      "Table \u0027Parent\u0027. Scan count 1, logical reads 14001, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.",
+      "\n SQL Server Execution Times:\n   CPU time = 157 ms,  elapsed time = 157 ms."
+    ]
+  },
+  {
+    "table": "Parent",
+    "count": 5000,
+    "rows": 5000,
+    "present": 0,
+    "elapsedMs": 804.832,
+    "operators": [
+      "Compute Scalar",
+      "Nested Loops",
+      "Table-valued function",
+      "Clustered Index Scan",
+      "UDX",
+      "Constant Scan"
+    ],
+    "statistics": [
+      "SQL Server parse and compile time: \n   CPU time = 0 ms, elapsed time = 0 ms.",
+      "Table \u0027Parent\u0027. Scan count 1, logical reads 70001, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.",
+      "\n SQL Server Execution Times:\n   CPU time = 802 ms,  elapsed time = 803 ms."
+    ]
+  },
+  {
+    "table": "Parent",
+    "count": 10000,
+    "rows": 10000,
+    "present": 0,
+    "elapsedMs": 1597.2647,
+    "operators": [
+      "Compute Scalar",
+      "Nested Loops",
+      "Table-valued function",
+      "Clustered Index Scan",
+      "UDX",
+      "Constant Scan"
+    ],
+    "statistics": [
+      "SQL Server parse and compile time: \n   CPU time = 0 ms, elapsed time = 0 ms.",
+      "Table \u0027Parent\u0027. Scan count 1, logical reads 140001, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.",
+      "\n SQL Server Execution Times:\n   CPU time = 1589 ms,  elapsed time = 1592 ms."
+    ]
+  }
+]

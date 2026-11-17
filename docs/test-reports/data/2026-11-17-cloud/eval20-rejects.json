@@ -1,0 +1,65 @@
+[
+  {
+    "case": "CL25a",
+    "database": "CascadeLab",
+    "expected": [
+      {
+        "ruleId": "REJECT_PROC_DYNAMIC_SQL",
+        "statementIndex": 1,
+        "ruleIdPending": false
+      }
+    ],
+    "actual": [
+      {
+        "ruleId": "REJECT_PROC_DYNAMIC_SQL",
+        "statementIndex": 1
+      }
+    ],
+    "differences": []
+  },
+  {
+    "case": "CL25b",
+    "database": "CascadeLab",
+    "expected": [
+      {
+        "ruleId": "REJECT_PROC_UNBALANCED_COMMIT",
+        "statementIndex": 1,
+        "ruleIdPending": false
+      }
+    ],
+    "actual": [
+      {
+        "ruleId": "REJECT_PROC_UNBALANCED_COMMIT",
+        "statementIndex": 1
+      }
+    ],
+    "differences": []
+  },
+  {
+    "case": "CL25c",
+    "database": "CascadeLab",
+    "expected": [
+      {
+        "ruleId": "REJECT_PROC_EXTERNAL_EFFECT",
+        "statementIndex": 1,
+        "ruleIdPending": false
+      },
+      {
+        "ruleId": "REJECT_PROC_WRITE_TARGET",
+        "statementIndex": 1,
+        "ruleIdPending": false
+      }
+    ],
+    "actual": [
+      {
+        "ruleId": "REJECT_PROC_EXTERNAL_EFFECT",
+        "statementIndex": 1
+      },
+      {
+        "ruleId": "REJECT_PROC_WRITE_TARGET",
+        "statementIndex": 1
+      }
+    ],
+    "differences": []
+  }
+]

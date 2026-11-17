@@ -1,0 +1,54 @@
+{
+  "runId": "cloud-20261117-eval20",
+  "startedAt": "2026-11-17T08:06:00.2904317\u002B00:00",
+  "suite": "cascadelab",
+  "executeAsUser": "dbr_preview_user",
+  "systems": "preview,B0,B2",
+  "cases": "CL01,CL02,CL03,CL03b,CL04,CL04b,CL05,CL06,CL07,CL08a,CL08b,CL09,CL10,CL11,CL11b,CL12a,CL12b,CL12c,CL13,CL14,CL14b,CL15,CL15b,CL16,CL16b,CL17,CL18,CL19,CL20,CL20b,CL21,CL22,CL23,CL24,CL25a,CL25b,CL25c",
+  "repeat": "20",
+  "finishedAt": "2026-11-17T08:19:16.4584393\u002B00:00",
+  "productVersion": "17.0.5035.5",
+  "productLevel": "RTM",
+  "productUpdateLevel": "CU10",
+  "edition": "Enterprise Developer Edition (64-bit)",
+  "engineEdition": 3,
+  "nestedTriggers": 1,
+  "disallowResultsFromTriggers": 0,
+  "sessionOptions": 5432,
+  "serverCpuCount": 5,
+  "serverPhysicalMemoryKb": 4194304,
+  "serverCommittedTargetKb": 3442376,
+  "databases": {
+    "dbrt_eval_cli_b5fd25af": {
+      "compatibility_level": "170",
+      "is_recursive_triggers_on": "False",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS",
+      "is_read_committed_snapshot_on": "False",
+      "snapshot_isolation_state_desc": "OFF"
+    },
+    "dbrt_eval_cli_b5fd25af_sbx": {
+      "compatibility_level": "170",
+      "is_recursive_triggers_on": "False",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS",
+      "is_read_committed_snapshot_on": "False",
+      "snapshot_isolation_state_desc": "OFF"
+    },
+    "dbrt_eval_clirt_65deb754": {
+      "compatibility_level": "170",
+      "is_recursive_triggers_on": "True",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS",
+      "is_read_committed_snapshot_on": "False",
+      "snapshot_isolation_state_desc": "OFF"
+    },
+    "dbrt_eval_clirt_65deb754_sbx": {
+      "compatibility_level": "170",
+      "is_recursive_triggers_on": "True",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS",
+      "is_read_committed_snapshot_on": "False",
+      "snapshot_isolation_state_desc": "OFF"
+    }
+  },
+  "clientOs": "Debian GNU/Linux 13 (trixie)",
+  "clientRuntime": ".NET 10.0.15",
+  "clientProcessorCount": 4
+}
