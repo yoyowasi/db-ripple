@@ -180,6 +180,7 @@ if (-not $isWin) {
         # rootless DockerRootDir는 호스트 사용자에게 접근 불가할 수 있다.
         # 경고만 내고 건너뛰지 않고 실제 SQL 데이터 볼륨에서 같은 기준을 검사한다.
         $dockerFree = Get-FreeGb '/var/opt/mssql' $SandboxContainer
+        $dockerRoot = '샌드박스 볼륨 /var/opt/mssql'
         Say 'Docker 루트 접근 불가: 샌드박스 /var/opt/mssql 볼륨에서 디스크 여유 확인'
     }
 }
