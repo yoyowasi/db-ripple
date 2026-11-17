@@ -144,14 +144,14 @@ internal sealed class FkJudge(CatalogIndex cat, IReadOnlyDictionary<string, List
         return new Result(verdict, parentRowIds, unmatched);
     }
 
-    sealed record ParentSet(bool Complete, HashSet<string> Before, HashSet<string> After, List<(RowChange Row, string? B, string? A)> Rows);
+    /// <summary>부모 묶음의 FK 키 집합. ByBefore = before 키 → 그 키를 가진 부모 행(묶음 안 순서 유지, after 키 포함). 자식 행마다 부모 행 전체를 훑지 않게 한다(큰 DELETE O(부모×자식) 해소, 2026-11-17).</summary>
+    sealed record ParentSet(bool Complete, Dictionary<string, List<(RowChange Row, string? A)>> ByBefore, HashSet<string> After);
 
     ParentSet ParentSets(Pair pair)
     {
         var prows = RowsOf(pair.Parent.Id);
-        var before = new HashSet<string>();
+        var byBefore = new Dictionary<string, List<(RowChange, string?)>>(StringComparer.Ordinal);
         var after = new HashSet<string>();
-        var list = new List<(RowChange, string?, string?)>();
         var complete = prows.Count == pair.Parent.RowCount;
         foreach (var r in prows)
         {
@@ -161,11 +161,14 @@ internal sealed class FkJudge(CatalogIndex cat, IReadOnlyDictionary<string, List
             if (b is null && (pair.Event == FkEvent.Delete || a is null)) complete = false;
             var bt = b is null ? null : cat.Values.Tuple(b);
             var at = a is null ? null : cat.Values.Tuple(a);
-            if (bt is not null) before.Add(bt);
+            if (bt is not null)
+            {
+                if (!byBefore.TryGetValue(bt, out var same)) byBefore[bt] = same = [];
+                same.Add((r, at));
+            }
             if (at is not null) after.Add(at);
-            list.Add((r, bt, at));
         }
-        return new ParentSet(complete, before, after, list);
+        return new ParentSet(complete, byBefore, after);
     }
 
     (RowMatch, bool Weak, List<string> ParentIds) MatchRow(Pair pair, ParentSet ps, RowChange rc)
@@ -175,7 +178,7 @@ internal sealed class FkJudge(CatalogIndex cat, IReadOnlyDictionary<string, List
         if (cb is null) return (RowMatch.Unverifiable, false, none);
         var tb = cat.Values.Tuple(cb);
         if (tb is null) return (RowMatch.NoMatch, false, none); // NULL FK 값은 부모를 참조하지 않는다.
-        if (!ps.Before.Contains(tb)) return ps.Complete ? (RowMatch.NoMatch, false, none) : (RowMatch.Unverifiable, false, none);
+        if (!ps.ByBefore.TryGetValue(tb, out var sameKey)) return ps.Complete ? (RowMatch.NoMatch, false, none) : (RowMatch.Unverifiable, false, none);
 
         var weak = false;
         string? ta = null;
@@ -207,9 +210,8 @@ internal sealed class FkJudge(CatalogIndex cat, IReadOnlyDictionary<string, List
 
         // 행 단위 부모(parentRowIds): before 키가 같은 부모 행. UPDATE 이벤트는 부모 짝이 확정된 행만(UNPAIRED 제외), CASCADE는 after까지 같아야 한다.
         var ids = new List<string>();
-        foreach (var (row, b, a) in ps.Rows)
+        foreach (var (row, a) in sameKey)
         {
-            if (b != tb) continue;
             if (pair.Event == FkEvent.Update)
             {
                 if (row.Pairing == Pairing.Unpaired || row.Before is null || row.After is null) continue;
