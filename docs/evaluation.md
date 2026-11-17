@@ -277,9 +277,9 @@ M6(§4)을 처음 잰 값이다. 출처는 PR #14의 CI 실행 44021793087(커�
 
 | 사례 | 비교한 서명(1회) | 중간 변경(1회) | 무엇 |
 |---|---|---|---|
-| CL08a | 2 | 1 | `cl08.Acct(ID=1)`을 트리거가 다시 UPDATE해 첫 UPDATE 값이 남지 않음 |
-| CL08b | 4 | 3 | 같은 행을 트리거가 거듭 UPDATE(중간 값 3개) |
-| CL17 | 3 | 1 | `cl17.Txn(ID=900)` INSERT 직후 트리거가 같은 행을 고쳐 INSERT 값이 남지 않음 |
+| CL08a | 2 | 1 | 같은 테이블 재갱신(RECURSIVE_TRIGGERS OFF): 트리거가 `cl08.Acct(ID=1)`을 다시 UPDATE해 첫 UPDATE 값이 남지 않음 |
+| CL08b | 4 | 3 | 같은 테이블 재갱신(RECURSIVE_TRIGGERS ON): 같은 행을 트리거가 거듭 UPDATE(중간 값 3개) |
+| CL17 | 3 | 1 | 같은 배치의 다음 문장이 앞 문장이 INSERT한 `cl17.Txn(ID=900)`을 UPDATE해 INSERT 값이 남지 않음(문장 3개: INSERT → 의존 UPDATE → DELETE) |
 
 이 변경은 최종 상태만 비교하는 B2(사본 + 최종 차이, Data Compare 방식)로는 원리상 볼 수 없다. 30사례 가운데 3사례에만 나타나므로, 합성 사례 분포에서의 비율이지 실제 업무 DB의 빈도는 아니다.
 
