@@ -116,6 +116,8 @@ reread 코드는 바꾸지 않았다(DB로 효과를 잴 수 없고, 1안은 계
 
 ## 7. Codex 클라우드 DB 재측정
 
+> 2026-11-17 후속 실측 완료: [클라우드 DB·성능 검증](2026-11-17-cloud-db-and-perf.md). M5 6조합×5회와 확장 37사례×20회를 실행했다. CL20 resolve p50은 1만/5만/10만에서 627/3,242/7,413ms였다. reread 추가 실험에서는 DELETE 후 빈 Parent·Child의 반복 Scan을 확인했다. 아래는 당시 재측정 요청과 비교 기준이다.
+
 브랜치 `feat/large-delete-perf`를 받아, 이전 측정과 같은 방식(워밍업 1회 + 5회, Release, 제품 모드)으로 잰다. 연결 환경 변수는 `scripts/env.ps1`이 만드는 값(`DBRIPPLE_SQL_CONNECTION` 등)과 같게 둔다.
 
 ```

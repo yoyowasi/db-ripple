@@ -1,0 +1,10 @@
+table,keys,operator,estimated_table_cardinality,actual_executions,actual_rows,logical_reads,cpu_ms
+Child,1000,Clustered Index Scan,0,1000,0,13001,116
+Child,10000,Clustered Index Scan,0,10000,0,130001,1172
+Child,5000,Clustered Index Scan,0,5000,0,65001,582
+ChildLog,1000,Clustered Index Seek,200000,1000,1000,1929,2
+ChildLog,10000,Clustered Index Seek,200000,10000,10000,19366,19
+ChildLog,5000,Clustered Index Seek,200000,5000,5000,9679,9
+Parent,1000,Clustered Index Scan,0,1000,0,14001,155
+Parent,10000,Clustered Index Scan,0,10000,0,140001,1572
+Parent,5000,Clustered Index Scan,0,5000,0,70001,792
