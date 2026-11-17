@@ -765,7 +765,7 @@ internal static class OriginProcedures
         origin.GroupBy(o => o.Schema + "." + o.Name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
 }
 
-// <summary>원본 스냅샷 생성 결과. 2026-11-13: 생성 실패는 모두 Failed(error)다. KEYSET_HASH는 실행 전 CheckSnapshotCapability로만 정한다(조용한 강등 없음).</summary>
+/// <summary>원본 스냅샷 생성 결과. 2026-11-13: 생성 실패는 모두 Failed(error)다. KEYSET_HASH는 실행 전 CheckSnapshotCapability로만 정한다(조용한 강등 없음).</summary>
 internal enum SnapshotOutcome
 {
     /// <summary>만들었다(SNAPSHOT_NETDIFF).</summary>

@@ -15,7 +15,7 @@ public enum ApplyStatus
     [JsonStringEnumMemberName("rolled_back_mismatch")] RolledBackMismatch,
     /// <summary>미리보기의 before 행이 원본에서 바뀌어 실행하지 않고 ROLLBACK(§5.3 드리프트 검사).</summary>
     [JsonStringEnumMemberName("drift_detected")] DriftDetected,
-    /// <summary>선행 조건 위반(§5.3). 원본에 아무것도 실행하지 않았다. 어긴 조건은 ApplyResult.PreconditionFailures.</summary>
+    /// <summary>선행 조건 위반(§5.3). 사용자 문장은 원본에서 실행하지 않았다(EXEC 직전 정의 재확인으로 막힌 경우 원본 스냅샷·드리프트 읽기는 이미 했다). 어긴 조건은 ApplyResult.PreconditionFailures.</summary>
     [JsonStringEnumMemberName("precondition_failed")] PreconditionFailed,
     /// <summary>원본 실행 중 오류·트리거 거부(§5.3 "트리거가 거부하면 … 상태는 error"). 트랜잭션은 이미 끝났거나 ROLLBACK했다.</summary>
     [JsonStringEnumMemberName("error")] Error,
