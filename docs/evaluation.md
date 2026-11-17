@@ -1,6 +1,6 @@
 # 평가 보고서
 
-> 상태: 2026-11-12 첫 전체 실행 반영(2026-11-13: EXEC 사례 CL21~CL25와 정답 형식 v0.3을 더했고, 2026-11-15~16에 EXEC 포함 37사례 × 3회로 돌렸다, §2.1·§6.3). **CascadeLab CL01~CL20(변형 30개) M1~M4를 제품·B0·B2로 20회 반복해 쟀고(`logs/eval/eval-20261112-143835`), M5를 N = 1~10만 행으로 쟀다(`logs/eval-m5/m5-20261112-145013`, 10만 행은 `m5-20261112-145801`).** 아직 측정 전: 누적 구성 등(§6.3). SP9 브라우저 렌더는 2026-11-16에 쟀고(§6.2), 대조군 B1은 2026-11-16 로컬 3회 실행에서 쟀다(§6.1). 수치는 CSV와 로그에서만 옮기고 손으로 만든 값은 넣지 않는다(설계 §10.6).
+> 상태: 2026-11-12 첫 전체 실행 반영(2026-11-13: EXEC 사례 CL21~CL25와 정답 형식 v0.3을 더했고, 2026-11-15~16에 EXEC 포함 37사례 × 3회로 돌렸다, §2.1·§6.3). **CascadeLab CL01~CL20(변형 30개) M1~M4를 제품·B0·B2로 20회 반복해 쟀고(`logs/eval/eval-20261112-143835`), M5를 N = 1~10만 행으로 쟀다(`logs/eval-m5/m5-20261112-145013`, 10만 행은 `m5-20261112-145801`).** 아직 측정 전: 누적 구성 등(§6.3). SP9 브라우저 렌더는 2026-11-16에 쟀고(§6.2), 대조군 B1은 2026-11-16 로컬 3회 실행에서 쟀다(§6.1). 2026-11-17 클라우드에서 원인 귀속 수정(#16) 뒤 M5를 다시 쟀고, EXEC 포함 37사례 × 20회 평가로 M6을 쟀다(§6.1·§6.2). 수치는 CSV와 로그에서만 옮기고 손으로 만든 값은 넣지 않는다(설계 §10.6).
 > 설계: [architecture.md](architecture.md) v1.6 §10 · 결정: [week3-plan.md](week3-plan.md) · 지표 열 정의: `eval/DbRipple.Eval/MetricsCsv.cs` 주석 · 자동 생성 보고서: `report` 명령이 실행 폴더에 쓰는 `report.md`(`eval/DbRipple.Eval/ReportBuilder.cs`)
 
 이 문서는 사람이 읽는 보고서다. 실행마다 생기는 `report.md`는 CSV 표를 그대로 옮긴 부록이고, 이 문서의 §6 결과 표는 그 `report.md`와 CSV에서 옮겨 채운다.
@@ -283,6 +283,8 @@ M6(§4)을 처음 잰 값이다. 출처는 PR #14의 CI 실행 44021793087(커�
 
 이 변경은 최종 상태만 비교하는 B2(사본 + 최종 차이, Data Compare 방식)로는 원리상 볼 수 없다. 30사례 가운데 3사례에만 나타나므로, 합성 사례 분포에서의 비율이지 실제 업무 DB의 빈도는 아니다.
 
+20회 값(2026-11-17 클라우드, 실행 `cloud-20261117-eval20`, EXEC 포함 37사례 × 20회, 출처 [eval20-metrics.csv](test-reports/data/2026-11-17-cloud/eval20-metrics.csv)): 100/2,340(0.0427), 1회분 5/117이다. 중간 변경 수는 3회 값(1회분 5)과 같고, 분모가 10 늘어난 것은 EXEC 사례의 서명이 더해졌기 때문이다. 곧 EXEC 사례에서는 중간 변경이 나오지 않았다.
+
 #### 사례별 불일치와 원인
 
 1.0이 아닌 제품 수치와 `differences.txt` 줄을 모두 사례별로 따졌다. 제품 결함, 하네스 결함, 손 정답 오류는 0건이고 하네스를 고치지 않았다.
@@ -331,6 +333,23 @@ M6(§4)을 처음 잰 값이다. 출처는 PR #14의 CI 실행 44021793087(커�
 - **수집 오버헤드:** 1천 행 이상에서 DELETE 2.1~2.8배, UPDATE 7.7~10.3배(10만 행 8.3배)다. 1~100행의 6.6~13배는 실행 봉투 비용(§4 정의 차이 4)이 문장 실행(1~5ms)보다 커서 생긴 값이다.
 - **브라우저 첫 그래프·첫 그리드(SP9):** 2026-11-16에 측정 화면 `/sp9`로 따로 쟀다(창 보임·배포 빌드·3회, 그래프 노드 500개 815ms, 그리드 5만 행 328ms, [spikes/SP9.md](spikes/SP9.md)). `m5.csv`의 두 열은 하네스가 채우지 않아 비어 있다.
 
+#### 원인 귀속 수정 뒤 재측정(2026-11-17, 클라우드)
+
+PR #16(FK 판정의 부모 × 자식 이중 반복 제거) 뒤 Codex 클라우드에서 같은 설정(워밍업 1회 + 5회, 제품 모드)으로 다시 쟀다. 실행 `cloud-20261117-m5`, 출처 [m5.csv](test-reports/data/2026-11-17-cloud/m5.csv), 보고서 [2026-11-17-cloud-db-and-perf.md](test-reports/2026-11-17-cloud-db-and-perf.md). 환경이 위 실행(Windows Docker Desktop, 메모리 4GB 컨테이너)과 다르다(Debian 13, 4 CPU, SQL Server 메모리 4GiB). 그래서 아래 값을 같은 기계의 전후 개선 배수로 읽지 않는다.
+
+| 사례 | 연산 | N | 상태 | execute p50 | reread p50 | resolve p50 | total p50 |
+|---|---|---|---|---|---|---|---|
+| CL20 | DELETE | 10,000 | ok | 766 | 4,693 | 627 | 6,471 |
+| CL20 | DELETE | 50,000 | truncated(KEYS) | 3,231 | 22,905 | 3,242 | 31,401 |
+| CL20 | DELETE | 100,000 | truncated(KEYS) | 6,103 | 47,784 | 7,413 | 65,510 |
+| CL20b | UPDATE | 10,000 | ok | 266 | 91 | 281 | 826 |
+| CL20b | UPDATE | 50,000 | truncated(KEYS) | 1,343 | 467 | 1,424 | 4,441 |
+| CL20b | UPDATE | 100,000 | truncated(KEYS) | 2,594 | 957 | 3,160 | 8,464 |
+
+- **resolve가 선형에 가까워졌다:** CL20 resolve는 1만→5만 5.17배, 5만→10만 2.29배다(위 실행은 약 16배, 3.5배). 10만 행 resolve는 7.4초다(위 실행 55.7초). 이 열은 수집(C11)과 귀속(C13)을 합친 값이다.
+- **다음 병목은 재조회다:** CL20 10만 행 total 65.5초 중 reread가 47.8초(약 73%)다. 재조회는 키 수에 선형이지만 DELETE 키당 비용이 UPDATE보다 크다.
+- **재조회가 느린 원인(실제 실행 계획):** 한 트랜잭션에서 DELETE 뒤 실제 재조회 SQL을 돌리면, 행이 지워져 빈 Parent·Child 테이블에 대해 Clustered Index Scan이 키마다 다시 실행된다(1천 키 청크에서 실행 1,000회, 논리 읽기 14,001·13,001). 행이 남아 있는 ChildLog는 Seek다. 출처 [reread-plan-summary.csv](test-reports/data/2026-11-17-cloud/reread-plan-summary.csv). 청크 크기만 키워서는 없어지지 않는다. 고칠 후보(지운 키만 나온 키는 재조회하지 않기, Seek 유도, 키를 임시 테이블로 보내 한 번 조인)는 [성능 보고서](test-reports/2026-11-17-large-delete-perf.md) 6절에 있고 아직 구현하지 않았다.
+
 ### 6.3 측정 전·이후 확인한 항목
 
 | 항목 | 상태 | 명령(저장소 루트, `eval/DbRipple.Eval.Cli/Program.cs` 옵션) |
@@ -339,6 +358,8 @@ M6(§4)을 처음 잰 값이다. 출처는 PR #14의 CI 실행 44021793087(커�
 | SP8 AW DM1·DM2·DM3 실제 전파 | **확인함(2026-11-12)**: DM1 주문 43697, DM2 상세 52, DM3 직원 1. DM2의 SalesYTD는 회계 기간 불일치로 늘 0행 | [spikes/SP8.md](spikes/SP8.md), `spikes/logs/sp8-*.log`(AW_Origin 읽기 전용) |
 | [적용] 검증 게이트(AW DM1~DM3, DM7) | **확인함(2026-11-12, 전용 원본 사본 `dbrt_e2e_origin`)**: DM1·DM2 `committed`(원본에서 실제 반영을 독립 SQL로 확인), DM3 `precondition_failed`(미리보기 `trigger_blocked`), DM7 `drift_detected`(원본 값 커밋 안 됨). CSRF 403, 동시 요청 409 LOCKED도 확인 | `logs/e2e/host-e2e-2026-11-12.log`, `logs/e2e/sql-*.log` |
 | 누적 구성(초기화 없이 연속 실행, IDENTITY 벌어짐) | 측정 전 | 설계 §10.3 "구성". 하네스 옵션 없음(방법 미정) |
+| 대조군 B1 20회 정식 실행 | 측정 전. 2026-11-16 로컬 3회 값만 있다(§6.1). 2026-11-17 클라우드 20회는 B1 없이(`preview,B0,B2`) 돌렸다 | `cascadelab --systems preview,B0,B1,B2 --repeat 20` |
+| Split 모드(원본 서버 → 내 PC 샌드박스)의 EXEC [적용] | 확인 전. CI는 한 서버 모드만 돈다 | [spikes/SP17.md](spikes/SP17.md) 순서 + EXEC 미리보기·[적용] |
 | CL21~CL25(EXEC·거부 사례) 평가 실행 | **실행함(2026-11-15 클라우드, 2026-11-16 CI·로컬)**: 37사례 × 3회, 제품·B0·B1·B2, 상태 불일치 0, certain 과신 0/171. 사례 집합이 기준선과 달라 위 지표와 직접 비교하지 않는다 | `.\scripts\home-test.ps1 -IncludeExec`, [test-reports/2026-11-15-cloud-db-validation.md](test-reports/2026-11-15-cloud-db-validation.md), [home-test-plan.md](home-test-plan.md) 5절 |
 | 2026-11-13에 더한 기능(도달 폐포 거부, EXEC 미리보기, KEYSET_HASH, Split)의 DB 확인 | **확인함(2026-11-16)**: 실제 SQL Server 테스트 1195개(CI), [적용] DB 테스트 106개(2026-11-17 EXEC [적용] 추가 뒤 153개, PR #11 CI 실행 44000072102의 Apply DB 테스트 단계), SP11~SP21 실행 | [home-test-plan.md](home-test-plan.md), [spikes/README.md](spikes/README.md) SP11~SP21 |
 
