@@ -1,6 +1,6 @@
 # 평가 보고서
 
-> 상태: 2026-11-12 첫 전체 실행 반영(2026-11-13: EXEC 사례 CL21~CL25와 정답 형식 v0.3을 더했다. **이 사례들은 평가를 아직 실행하지 않았다**, §2.1). **CascadeLab CL01~CL20(변형 30개) M1~M4를 제품·B0·B2로 20회 반복해 쟀고(`logs/eval/eval-20261112-143835`), M5를 N = 1~10만 행으로 쟀다(`logs/eval-m5/m5-20261112-145013`, 10만 행은 `m5-20261112-145801`).** 아직 측정 전: SP9 브라우저 렌더 시간, 누적 구성 등(§6.3). 수치는 CSV와 로그에서만 옮기고 손으로 만든 값은 넣지 않는다(설계 §10.6).
+> 상태: 2026-11-12 첫 전체 실행 반영(2026-11-13: EXEC 사례 CL21~CL25와 정답 형식 v0.3을 더했고, 2026-11-15~16에 EXEC 포함 37사례 × 3회로 돌렸다, §2.1·§6.3). **CascadeLab CL01~CL20(변형 30개) M1~M4를 제품·B0·B2로 20회 반복해 쟀고(`logs/eval/eval-20261112-143835`), M5를 N = 1~10만 행으로 쟀다(`logs/eval-m5/m5-20261112-145013`, 10만 행은 `m5-20261112-145801`).** 아직 측정 전: 누적 구성 등(§6.3). SP9 브라우저 렌더는 2026-11-16에 쟀고(§6.2), 대조군 B1은 2026-11-16 로컬 3회 실행에서 쟀다(§6.1). 수치는 CSV와 로그에서만 옮기고 손으로 만든 값은 넣지 않는다(설계 §10.6).
 > 설계: [architecture.md](architecture.md) v1.6 §10 · 결정: [week3-plan.md](week3-plan.md) · 지표 열 정의: `eval/DbRipple.Eval/MetricsCsv.cs` 주석 · 자동 생성 보고서: `report` 명령이 실행 폴더에 쓰는 `report.md`(`eval/DbRipple.Eval/ReportBuilder.cs`)
 
 이 문서는 사람이 읽는 보고서다. 실행마다 생기는 `report.md`는 CSV 표를 그대로 옮긴 부록이고, 이 문서의 §6 결과 표는 그 `report.md`와 CSV에서 옮겨 채운다.
@@ -12,7 +12,7 @@
 | 미리보기가 실제 실행과 같다 | M1 일치율 | CL01~CL20 측정함(2026-11-12, §6.1) |
 | 연쇄·트리거 변경까지 찾는다 | M2 탐지 | CL01~CL20 측정함(2026-11-12, §6.1) |
 | 원인과 순서를 맞게 귀속한다(신규성의 근거) | M3 귀속 정확도, M4 순서 안정성 | CL01~CL20 측정함(2026-11-12, §6.1) |
-| 쓸 만한 시간 안에 끝난다 | M5 응답 시간 | N = 1~10만 측정함(2026-11-12, §6.2). 브라우저 렌더(SP9)는 측정 전 |
+| 쓸 만한 시간 안에 끝난다 | M5 응답 시간 | N = 1~10만 측정함(2026-11-12, §6.2). 브라우저 렌더(SP9)는 2026-11-16에 쟀다(그래프 노드 500개 815ms, 그리드 5만 행 328ms) |
 
 신규성 주장은 M3·M4에 둔다. 가장 강한 반론인 "사본 + 최종 차이"(B2)를 같은 사례·같은 지표로 비교한다(§5).
 
@@ -20,7 +20,7 @@
 
 ### 2.1 CascadeLab (합성 정답 DB, 저장소에 포함)
 
-공개 샘플에 없는 연쇄 패턴을 담은 합성 DB다. 사례마다 손 정답(변경 키 집합, 간선, 기대 오류)을 JSON으로 썼다. 형식은 answer-format v0.3([cascadelab/answer-format.md](../cascadelab/answer-format.md))다(2026-11-13, v0.2에 필드만 더했고 v0.2 파일은 그대로 v0.3 파일이다). 사례 파일은 변형을 포함해 38개다(`cascadelab/cases/`). 2026-11-12 평가는 그 가운데 CL01~CL20의 30개를 쟀고, 나머지 8개(CL21~CL25)는 2026-11-13에 작성했으며 실행 전이다. 사례별 문장과 기대값은 [cascadelab/README.md](../cascadelab/README.md) "사례 요약"에 있다.
+공개 샘플에 없는 연쇄 패턴을 담은 합성 DB다. 사례마다 손 정답(변경 키 집합, 간선, 기대 오류)을 JSON으로 썼다. 형식은 answer-format v0.3([cascadelab/answer-format.md](../cascadelab/answer-format.md))다(2026-11-13, v0.2에 필드만 더했고 v0.2 파일은 그대로 v0.3 파일이다). 사례 파일은 변형을 포함해 38개다(`cascadelab/cases/`). 2026-11-12 평가는 그 가운데 CL01~CL20의 30개를 쟀고, 나머지 8개(CL21~CL25)는 2026-11-13에 작성했고 2026-11-15~16에 EXEC 포함 평가로 돌렸다(§6.3). 사례별 문장과 기대값은 [cascadelab/README.md](../cascadelab/README.md) "사례 요약"에 있다.
 
 | 패턴 | 사례 | 확인 대상 | 손 정답 대 실DB 대조 |
 |---|---|---|---|
@@ -44,15 +44,15 @@
 | CL18 | CL18 | NO ACTION 위반(547)과 not_run | 2026-11-12 키 일치(오라클, 20회) |
 | CL19 | CL19 | xml·hierarchyid·geography·text 열 | 2026-11-12 키 일치(오라클, 20회) |
 | CL20 | CL20, CL20b | 행 수 생성기(`cl20.usp_Generate @parents = N`), M5 DELETE·UPDATE 틀 | 2026-11-12 키 일치(오라클, 20회) |
-| CL21 | CL21 | EXEC: 분기 없는 프로시저, 안쪽 프로시저 1개(`PROC_DIRECT`, 반환값) | 미실행(2026-11-13 작성, 정적 검토만) |
-| CL22 | CL22 | EXEC: 프로시저가 CASCADE 자식 하나를 먼저 DELETE한 뒤 부모를 DELETE(`PROC_DIRECT`와 FK 연쇄 구분) | 미실행 |
-| CL23 | CL23 | EXEC: 균형 BEGIN/COMMIT 프로시저 + 트리거 쓰기(트리거 깊이 2) | 미실행 |
-| CL24 | CL24 | EXEC: CATCH에서 ROLLBACK한 뒤 로그 프로시저가 씀(failed, 266, `isToolFault=false`, 롤백 뒤 남은 변경) | 미실행 |
-| CL25 | CL25a, CL25b, CL25c, CL25d | 거부 사례: 동적 SQL(`REJECT_PROC_DYNAMIC_SQL`), 짝 안 맞는 COMMIT(`REJECT_PROC_UNBALANCED_COMMIT`), 다른 DB(master) 3부분 이름(`REJECT_PROC_EXTERNAL_EFFECT`), 도달 폐포 안 외부 부작용 트리거(`REJECT_TRIGGER_EXTERNAL_EFFECT`, DB `CascadeLab_Reach`) | 미실행 |
+| CL21 | CL21 | EXEC: 분기 없는 프로시저, 안쪽 프로시저 1개(`PROC_DIRECT`, 반환값) | 실행(2026-11-15~16, EXEC 포함 37사례 × 3회, 상태 불일치 0) |
+| CL22 | CL22 | EXEC: 프로시저가 CASCADE 자식 하나를 먼저 DELETE한 뒤 부모를 DELETE(`PROC_DIRECT`와 FK 연쇄 구분) | 실행(같은 평가) |
+| CL23 | CL23 | EXEC: 균형 BEGIN/COMMIT 프로시저 + 트리거 쓰기(트리거 깊이 2) | 실행(같은 평가) |
+| CL24 | CL24 | EXEC: CATCH에서 ROLLBACK한 뒤 로그 프로시저가 씀(failed, 266, `isToolFault=false`, 롤백 뒤 남은 변경) | 실행(같은 평가) |
+| CL25 | CL25a, CL25b, CL25c, CL25d | 거부 사례: 동적 SQL(`REJECT_PROC_DYNAMIC_SQL`), 짝 안 맞는 COMMIT(`REJECT_PROC_UNBALANCED_COMMIT`), 다른 DB(master) 3부분 이름(`REJECT_PROC_EXTERNAL_EFFECT`), 도달 폐포 안 외부 부작용 트리거(`REJECT_TRIGGER_EXTERNAL_EFFECT`, DB `CascadeLab_Reach`) | 실행(같은 평가) |
 
 CL01~CL08b의 대조 기록은 [cascadelab/verification/report-2026-11-10.md](../cascadelab/verification/report-2026-11-10.md)다. CL09~CL20은 별도 대조 기록 없이 2026-11-12 평가 실행(`logs/eval/eval-20261112-143835`)에서 오라클 상태와 변경 키 집합이 손 정답과 20회 모두 같았다(`cases.csv`의 `status_match`·`oracle_vs_hand_keys_match`). M1의 셀 비교 상대는 오라클 값이다(§4, `total` = 미리보기 대 오라클).
 
-CL21~CL25의 정답은 정답 형식 v0.3을 쓴다. 노드 `P:<스키마.프로시저>`(프로시저 호출 노드), 간선·원인 `PROC_DIRECT`, `statements[].returnValue`, `statementStatus[].isToolFault`, `expected.rejects[]`(`{ruleId, statementIndex}`)가 새로 생겼다. 규칙 이름(CL25a~d)과 EXEC 사례 그래프 모양(S 노드 없이 `P:`가 뿌리)은 통합 때 확정했다. 이 사례들의 정답은 SP11~SP16(준비됨, 미실행)의 추정에 기대므로 DB로 확인하기 전까지는 정답이 틀릴 수 있다(§8 16번).
+CL21~CL25의 정답은 정답 형식 v0.3을 쓴다. 노드 `P:<스키마.프로시저>`(프로시저 호출 노드), 간선·원인 `PROC_DIRECT`, `statements[].returnValue`, `statementStatus[].isToolFault`, `expected.rejects[]`(`{ruleId, statementIndex}`)가 새로 생겼다. 규칙 이름(CL25a~d)과 EXEC 사례 그래프 모양(S 노드 없이 `P:`가 뿌리)은 통합 때 확정했다. 이 사례들의 정답은 SP11~SP16의 추정에 기대어 썼고, 2026-11-16에 SP11~SP16을 실행해 확인했다(SP13 Q4만 정정). EXEC 포함 평가에서 상태·오라클 손정답 키 불일치는 없었다(§6.3). 남은 위험은 §8 16번.
 
 ### 2.2 AdventureWorks (공개 샘플, 시연)
 
@@ -253,6 +253,22 @@ CL12a의 정답 셀 2개는 ROLLBACK 뒤 커밋된 `ErrLog` 행(residualCommitte
 
 B2는 무엇이 바뀌었는지(M1·M2)는 제품과 같지만 왜 바뀌었는지(M3)는 0이다. B0은 연쇄 변경을 하나도 못 찾고 트리거 변경은 직접 대상 테이블의 것만 찾는다. 세 지표를 함께 채운 것은 제품뿐이다. 다만 합성 사례 30개, 같은 오라클 데이터에서 나온 비교다(§8).
 
+#### 대조군 B1(2026-11-16, 로컬 3회)
+
+B1(FK 정의만 따라가는 정적 예측, §5)은 위 20회 실행 뒤에 넣어, 2026-11-16 로컬 home-test의 기본 평가(`eval-quick`, CL01~CL20 30사례 × 3회, 제품·B0·B1·B2를 함께 실행)에서 처음 쟀다. 분모는 1회분의 3배다. 출처는 `logs/home-test/local-20261116/eval/eval-quick/metrics.csv`다(로그 폴더는 저장소에 커밋하지 않는다). CI 기본 평가도 PR마다 같은 네 시스템을 3회 돌린다. 20회 정식 실행은 하지 않았다.
+
+| 지표 | preview | B0(직접 대상만) | B1(FK 정적 예측) | B2(사본 + 최종 차이) |
+|---|---|---|---|---|
+| M1 셀 recall(total) | 528/528 | 201/528 | 330/528 | 528/528 |
+| M2 FK 연쇄(CASCADE·SET NULL·SET DEFAULT 합) | 129/129 | 0/129 | 129/129 | 129/129 |
+| M2 TRIGGER | 87/87 | 6/87 | 6/87 | 87/87 |
+| M2 INSTEAD_OF | 15/15 | 6/15 | 6/15 | 15/15 |
+| M2 ALL 재현율 | 345/345 | 126/345 (0.3652) | 255/345 (0.7391) | 345/345 |
+| M3 all recall | 306/306 | 84/306 | 141/306 (0.4608) | 0/306 |
+| M3 certain 과신 | 0/141 | 0/84 | 21/150 (0.1400) | 해당 없음(예측 없음) |
+
+B1은 FK 연쇄로 바뀐 행은 모두 찾지만, 트리거가 바꾼 행은 직접 대상 테이블의 것만 찾아 B0과 같다(6/87). certain으로 낸 간선 가운데 21/150이 틀렸다. 이 21건의 원인은 사례별로 따지지 않았다(§5 B1 행의 예상 한계 참고). 같은 실행의 제품·B0·B2 수치는 위 20회 실행의 1회분 값과 비율이 같다.
+
 #### 사례별 불일치와 원인
 
 1.0이 아닌 제품 수치와 `differences.txt` 줄을 모두 사례별로 따졌다. 제품 결함, 하네스 결함, 손 정답 오류는 0건이고 하네스를 고치지 않았다.
@@ -299,18 +315,18 @@ B2는 무엇이 바뀌었는지(M1·M2)는 제품과 같지만 왜 바뀌었는�
 - **5만·10만 행:** 두 사례 모두 행 이미지 상한을 넘어 KEYS 모드(`truncated`)가 됐다. DELETE는 43.4초(5만)·105.2초(10만)로 대화형으로 쓰기 어렵다. UPDATE는 4.7초·9.8초다.
 - **DELETE의 병목은 재조회(reread)와 귀속(resolve)이다.** 1만 행에서 total 6.1초 중 reread 4.0초·resolve 1.0초, 5만 행에서 43.4초 중 reread 21.1초·resolve 16.0초다. resolve는 1만→5만(5배)에서 약 16배, 5만→10만(2배)에서 약 3.5배(55.7초)라 선형보다 빨리 는다. 10만 행 DELETE는 total 105.2초 중 resolve 55.7초·reread 38.9초다. execute(샌드박스 실행)는 1만 행 0.7초, 5만 행 3.4초로 작다. UPDATE는 같은 행 수에서 reread가 작다(5만 행 0.6초). 원인 분석은 하지 않았다(측정만, 제품 코드는 읽기 전용).
 - **수집 오버헤드:** 1천 행 이상에서 DELETE 2.1~2.8배, UPDATE 7.7~10.3배(10만 행 8.3배)다. 1~100행의 6.6~13배는 실행 봉투 비용(§4 정의 차이 4)이 문장 실행(1~5ms)보다 커서 생긴 값이다.
-- **브라우저 첫 그래프·첫 그리드(SP9):** 측정 전이다. `m5.csv`의 두 열은 비어 있다.
+- **브라우저 첫 그래프·첫 그리드(SP9):** 2026-11-16에 측정 화면 `/sp9`로 따로 쟀다(창 보임·배포 빌드·3회, 그래프 노드 500개 815ms, 그리드 5만 행 328ms, [spikes/SP9.md](spikes/SP9.md)). `m5.csv`의 두 열은 하네스가 채우지 않아 비어 있다.
 
-### 6.3 측정 전
+### 6.3 측정 전·이후 확인한 항목
 
 | 항목 | 상태 | 명령(저장소 루트, `eval/DbRipple.Eval.Cli/Program.cs` 옵션) |
 |---|---|---|
-| M5 브라우저 첫 그래프·첫 그리드 렌더(SP9) | 측정 전(참고값 1회, 브라우저 창이 보여야 함) | 웹 화면 `/sp9`. 기록은 [spikes/SP9.md](spikes/SP9.md) |
+| M5 브라우저 첫 그래프·첫 그리드 렌더(SP9) | **확인함(2026-11-16)**: 창 보임·배포 빌드·3회, 그래프 노드 500개 815ms, 그리드 5만 행 328ms | 웹 화면 `/sp9`. 기록은 [spikes/SP9.md](spikes/SP9.md) |
 | SP8 AW DM1·DM2·DM3 실제 전파 | **확인함(2026-11-12)**: DM1 주문 43697, DM2 상세 52, DM3 직원 1. DM2의 SalesYTD는 회계 기간 불일치로 늘 0행 | [spikes/SP8.md](spikes/SP8.md), `spikes/logs/sp8-*.log`(AW_Origin 읽기 전용) |
 | [적용] 검증 게이트(AW DM1~DM3, DM7) | **확인함(2026-11-12, 전용 원본 사본 `dbrt_e2e_origin`)**: DM1·DM2 `committed`(원본에서 실제 반영을 독립 SQL로 확인), DM3 `precondition_failed`(미리보기 `trigger_blocked`), DM7 `drift_detected`(원본 값 커밋 안 됨). CSRF 403, 동시 요청 409 LOCKED도 확인 | `logs/e2e/host-e2e-2026-11-12.log`, `logs/e2e/sql-*.log` |
 | 누적 구성(초기화 없이 연속 실행, IDENTITY 벌어짐) | 측정 전 | 설계 §10.3 "구성". 하네스 옵션 없음(방법 미정) |
-| CL21~CL25(EXEC·거부 사례) 평가 실행 | 측정 전(2026-11-13 작성). 정답 형식 v0.3 | 집에서 `.\scripts\home-test.ps1 -IncludeExec`(아래) |
-| 2026-11-13에 더한 기능(도달 폐포 거부, EXEC 미리보기, KEYSET_HASH, Split)의 DB 확인 | 측정 전. 정적 검사와 단위 테스트만 했다 | [home-test-plan.md](home-test-plan.md), [spikes/README.md](spikes/README.md) SP11~SP21 |
+| CL21~CL25(EXEC·거부 사례) 평가 실행 | **실행함(2026-11-15 클라우드, 2026-11-16 CI·로컬)**: 37사례 × 3회, 제품·B0·B1·B2, 상태 불일치 0, certain 과신 0/171. 사례 집합이 기준선과 달라 위 지표와 직접 비교하지 않는다 | `.\scripts\home-test.ps1 -IncludeExec`, [test-reports/2026-11-15-cloud-db-validation.md](test-reports/2026-11-15-cloud-db-validation.md), [home-test-plan.md](home-test-plan.md) 5절 |
+| 2026-11-13에 더한 기능(도달 폐포 거부, EXEC 미리보기, KEYSET_HASH, Split)의 DB 확인 | **확인함(2026-11-16)**: 실제 SQL Server 테스트 1195개(CI), [적용] DB 테스트 106개(2026-11-17 EXEC [적용] 추가 뒤 153개, PR #11 CI 실행 44000072102의 Apply DB 테스트 단계), SP11~SP21 실행 | [home-test-plan.md](home-test-plan.md), [spikes/README.md](spikes/README.md) SP11~SP21 |
 
 집에서 평가를 다시 돌릴 때는 `scripts\home-test.ps1`을 쓴다. Eval 단계의 기본 사례는 CL01~CL20(30개)이고(EXEC·거부 사례 제외), `-IncludeExec`를 주면 CL21~CL25를 더한다(그때는 사례 집합이 달라 이전 실행과의 지표 비교는 참고용이다).
 
@@ -349,8 +365,8 @@ dotnet run --project eval\DbRipple.Eval.Cli -c Release -- report --run logs\eval
 - **확인(DB 실측):** SP0 에디션·스냅샷, SP1 전제 H1~H5 성립(H3은 3회 관측), SP2 관찰자 효과 점검 (a)(c)(d)(e) 성립((b)는 하네스의 E_obs로 대신 잰다), SP3 자기 테이블 재갱신이 감사 묶음으로 잡힘, SP5 기준선 시간, SP6 형식 변환(규칙 수정), SP7 열린 트랜잭션 안 최종 차이, SP10 트랜잭션 안 EXECUTE AS/REVERT.
 - **추정으로 남긴 것:** H2·H3·H5는 관측이지 문서 보장이 아니어서 트리거 귀속 상한 `inferred`와 형제·2차 체인 순서 `observed_only`를 유지한다(설계 §7.1).
 - **확인(2026-11-12):** SP8 AW DM1·DM2·DM3 실제 전파([spikes/SP8.md](spikes/SP8.md)).
-- **측정 전:** SP9(측정 화면 준비, 참고값 1회, 브라우저 창이 보이는 상태에서 다시 재야 함).
-- **준비됨, 미실행(2026-11-13):** SP11(트랜잭션 제어 프로시저), SP12(깊이 신호), SP13(`EXEC @rc` 래퍼), SP14(실행 사용자 권한), SP16(`@@TRANCOUNT` 분기), SP17(Split 끝까지), SP18(스냅샷 실패 오류 번호), SP20(고아 dbo), SP21(KEYSET_HASH). 결과 칸이 모두 비어 있다.
+- **확인(2026-11-16):** SP9 브라우저 렌더(그래프 노드 500개 815ms, 그리드 5만 행 328ms).
+- **실행(2026-11-16):** SP11·SP12·SP14·SP16·SP17·SP20 통과, SP13 확정. SP18·SP21은 가설을 정정했고 제품 결함 D1·D2를 찾아 #3에서 고쳤다. SP19 큰 DB 시간은 로컬 부분 측정 뒤 클라우드에서 쟀다(1GB [적용] 잠금 보유 중앙값 4.862초). 결과는 [spikes/README.md](spikes/README.md).
 - **정답 정정:** §3 마지막 항목.
 
 ## 8. 타당성 위협
@@ -370,7 +386,7 @@ dotnet run --project eval\DbRipple.Eval.Cli -c Release -- report --run logs\eval
 13. **E_cap의 재조회 셀 제외:** CL19 `text` 열처럼 감사 기록에 값이 없는 셀은 제품이 재조회로 채우고, 하네스는 그 셀을 E_cap 예측에서 뺀다. E_cap 0.9943은 수집 오류가 아니라 감사 기록이 담지 못하는 열의 비율로 읽는다.
 14. **M5 total에 들지 않는 시간(새로 봄):** M5 total은 제품 `timingsMs` 7단계의 합이다. 샌드박스 잠금 획득과 오염 시 재구축, 기준선 문맥 읽기, 결과 저장(`PreviewStore`), HTTP 전송, 브라우저 렌더는 들지 않는다(`src/DbRipple.Preview/PreviewPipeline.cs`). 사용자가 겪는 시간은 이보다 길다. 표본은 크기마다 5회라 p95는 4·5번째 값 사이 보간이고, 10만 행은 따로 실행했다(같은 설정, 다른 전용 DB).
 15. **M5 규모 사례가 둘뿐이다:** CL20(3단 연쇄 DELETE)·CL20b(UPDATE) 두 틀만 쟀다. 5만 행부터 KEYS 모드라 행 값 화면이 없는 상태의 시간이다. 귀속(resolve)이 선형보다 빨리 느는 것(§6.2)이 다른 그래프 모양에서도 같은지는 재지 않았다.
-16. **EXEC 정답이 추정에 기댄다(2026-11-13):** CL21~CL25의 손 정답은 SP11~SP16으로 확인할 트랜잭션·깊이·권한 동작의 추정(봉투 안 BEGIN/COMMIT은 중첩이라 확정하지 않는다, CATCH ROLLBACK 뒤에는 266, 프로시저 안 DML의 감사 트리거 깊이는 1)에 기댄다. DB로 확인하기 전까지는 정답이 틀릴 수 있고, 7번(정답 작성자와 구현자가 같은 설계를 읽음)의 위험이 EXEC에서 더 크다.
+16. **EXEC 정답이 추정에 기댄다(2026-11-13):** CL21~CL25의 손 정답은 SP11~SP16으로 확인할 트랜잭션·깊이·권한 동작의 추정(봉투 안 BEGIN/COMMIT은 중첩이라 확정하지 않는다, CATCH ROLLBACK 뒤에는 266, 프로시저 안 DML의 감사 트리거 깊이는 1)에 기댄다. 2026-11-16 SP11~SP16 실행으로 이 추정을 확인했다(SP13 Q4만 정정). 7번(정답 작성자와 구현자가 같은 설계를 읽음)의 위험은 EXEC에서 더 크다.
 17. **거부 사례는 지표에 들어가지 않는다(2026-11-13):** CL25a~d는 M1~M3·대조군에서 빠진다. 거부 규칙의 정확도는 지표가 아니라 (규칙 ID, 문장 번호) 일치 여부로만 본다(`rejects.json`, `differences.txt`).
 
 ## 9. 재현 방법
