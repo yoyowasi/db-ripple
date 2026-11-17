@@ -104,6 +104,16 @@ public static class MetricsCsv
     ];
 
     /// <summary>
+    /// m6.csv(2026-11-17): (실행, 시스템, 사례, 반복)당 1행, preview만, 미리보기 상태가 ok인 사례만(TransientChanges). 중간 변경 = 발동 보기에는 있고 최종 차이에는 없는 행 변경.
+    /// event_rows: 발동 보기 행 변경 수. measured_rows: 비교한 이벤트 서명 = 서로 다른 (행, after) 수(KEYS 묶음·UNPAIRED 반쪽 제외). transient_rows: 그 가운데 최종 차이에 없는 수.
+    /// transient_rate = transient_rows ÷ measured_rows. transient_keys: 그 행 서명의 표시(; 구분). B0·B2는 최종 상태만 봐서 정의상 0이라 행이 없다.
+    /// </summary>
+    public static readonly IReadOnlyList<string> M6Columns =
+    [
+        "run_id", "system", "case_id", "repeat", "event_rows", "measured_rows", "transient_rows", "transient_rate", "transient_keys",
+    ];
+
+    /// <summary>
     /// m5.csv(3주차): (실행, 사례, 연산, N)당 1행(ResponseTime). N = 문장의 직접 대상 행 수(CL20 scaling, cl20.usp_Generate @parents = N).
     /// <list type="bullet">
     /// <item>samples: 워밍업을 뺀 측정 수. ok_samples: 미리보기 결과가 있는 수. statuses: 나온 상태(;로 구분).</item>
@@ -130,7 +140,8 @@ public static class MetricsCsv
     /// M2.recall(scope = cause, ALL 포함), M3.precision·M3.recall(scope = 확신도 또는 all), M3.ambiguous_hit_rate(scope ambiguous),
     /// M3.certain_overconfident(scope certain, 분모 = certain 예측 간선), M3.manual_select_tables(scope all, 분모 = 사례·반복 수),
     /// M4.canonical_stable_rate(scope case, 분모 = 유효 반복이 하나라도 있는 사례), M4.observed_only_variation_rate(scope repeat, 분모 = 유효 반복),
-    /// M4.error_run_rate(scope repeat, 예외 반복 ÷ 전체 반복), status_match_rate(scope case).
+    /// M4.error_run_rate(scope repeat, 예외 반복 ÷ 전체 반복), status_match_rate(scope case),
+    /// M6.transient_changes(preview만, scope all, 분자 = 중간 변경 수, 분모 = 비교한 행 서명 수, cases = 계산한 사례 수).
     /// </summary>
     public static readonly IReadOnlyList<string> SuiteColumns =
     [

@@ -26,6 +26,8 @@ public sealed record SandboxManagerOptions
     public required string ManifestPath { get; init; }
     /// <summary>위험한 DB 범위 DDL 트리거(불투명·동적 SQL·외부 부작용)가 있어도 기준선을 만든다(DbRipple:AllowRiskyDdlTriggers, 기본 false).</summary>
     public bool AllowRiskyDdlTriggers { get; init; }
+    /// <summary>기준선 단계 로그 수신기(BACKUP·RESTORE·스냅샷 등 "[db] Nms 첫 줄"). SQL 첫 줄만 넘기며 연결 문자열은 넘기지 않는다. null이면 기록하지 않는다.</summary>
+    public Action<string>? Log { get; init; }
 
     /// <summary>비밀값을 뺀 표시.</summary>
     public override string ToString() => $"{OriginDb} → {SandboxDb} / {SnapshotDb}";
@@ -222,14 +224,14 @@ public sealed class SandboxManager(SandboxManagerOptions options, ITriggerAnalyz
                 ImportContainerDir = b.ImportContainerDir, DeleteImportedBackup = b.DeleteAfterRestore, MachineTag = b.MachineTag,
                 DdlTriggerGuard = DdlGuard,
             };
-            await using var steps = new SqlBaselineSteps(Options.Connections.Sandbox);
-            result = await BaselineBuilder.BuildSplitAsync(o, new SqlOriginSteps(Options.Connections.Origin), steps,
+            await using var steps = new SqlBaselineSteps(Options.Connections.Sandbox, Options.Log);
+            result = await BaselineBuilder.BuildSplitAsync(o, new SqlOriginSteps(Options.Connections.Origin, Options.Log), steps,
                 new FileBackupImporter(b.ImportDir), () => Clock.GetLocalNow(), CancellationToken.None);
         }
         else
         {
             var o = new BaselineOptions(Options.OriginDb, Options.SandboxDb, Options.SnapshotDb, Options.BackupPath) { DdlTriggerGuard = DdlGuard };
-            await using var steps = new SqlBaselineSteps(Options.Connections.Sandbox);
+            await using var steps = new SqlBaselineSteps(Options.Connections.Sandbox, Options.Log);
             result = await BaselineBuilder.BuildAsync(o, steps, () => Clock.GetLocalNow(), CancellationToken.None);
         }
         var manifest = result.Install.Manifest;

@@ -157,6 +157,24 @@ public sealed class SandboxManagerTests : IClassFixture<SandboxManagerTests.Fixt
     }
 
     [SqlFact]
+    public async Task RefreshAsync_logs_baseline_steps_without_secrets()
+    {
+        await WriteManifestAsync();
+        var lines = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        var sbx = NewManager(new CountingTriggerAnalyzer(), Options() with { Log = lines.Enqueue });
+        await sbx.RefreshAsync(default);
+        var all = string.Join(" | ", lines);
+        Assert.Contains("RESTORE", all);      // 단계 줄: "[db] Nms 첫 줄"
+        Assert.Contains("BACKUP", all);       // SingleServer는 같은 인스턴스에서 백업
+        Assert.Contains("CREATE DATABASE", all); // 스냅샷 단계: 한 줄 SQL이 120자에서 잘려 끝의 AS SNAPSHOT OF는 안 보일 수 있다
+        Assert.Matches(@"\d+ms ", all);
+        Assert.DoesNotContain("Password", all, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Server=", all, StringComparison.OrdinalIgnoreCase);
+        var pw = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(TestDb.ConnectionString()).Password;
+        if (!string.IsNullOrEmpty(pw)) Assert.DoesNotContain(pw, all);
+    }
+
+    [SqlFact]
     public async Task RefreshAsync_rebuilds_baseline_writes_manifest_and_clears_dirty()
     {
         var analyzer = new CountingTriggerAnalyzer();

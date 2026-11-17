@@ -214,6 +214,7 @@ Engine CreateEngine(IServiceProvider sp, RuntimeProfile profile)
             ManifestPath = manifestPath,
             Backup = mode == ServerMode.Split ? SplitBackup(profile.Backup) : null,
             AllowRiskyDdlTriggers = cfg.GetValue("AllowRiskyDdlTriggers", false),
+            Log = m => sp.GetRequiredService<ILoggerFactory>().CreateLogger("DbRipple.Baseline").LogInformation("{Step}", m), // 기준선 단계별 시간(SP19)
         },
         sp.GetRequiredService<ITriggerAnalyzer>(), clock);
     var executor = new PreviewExecutor(profile.Connections.Sandbox.ConnectionString, sp.GetRequiredService<ExecutionSettings>(), sp.GetRequiredService<INetDiffer>());

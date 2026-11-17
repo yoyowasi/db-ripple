@@ -43,6 +43,8 @@ public sealed record CaseScore(IReadOnlyList<string?> CaseRow, IReadOnlyList<IRe
     public IReadOnlyList<string> RejectDifferences { get; init; } = [];
     /// <summary>제품이 낸 거부(ruleId, 문장 번호). 거부 사례의 rejects.json 기록용.</summary>
     public IReadOnlyList<(string RuleId, int? StatementIndex)> ActualRejects { get; init; } = [];
+    /// <summary>m6.csv 한 행(M6 중간 변경, preview이고 상태가 ok일 때만).</summary>
+    public IReadOnlyList<string?>? TransientRow { get; init; }
     /// <summary>v0.3 returnValue·isToolFault 차이(preview만, 손 정답에 그 필드가 있는 사례만).</summary>
     public IReadOnlyList<string> V03Differences { get; init; } = [];
 }
@@ -177,8 +179,12 @@ public sealed class CaseScorer(MetricsCalculator calculator)
             edgeDiff.AddRange(missing.Select(k => "정답에만: " + k));
         }
 
+        var transient = isPreview ? TransientChanges.Compute(record, folding, vol) : null;
+        if (transient is not null) suite.AddTransient(system, hand.Id, transient);
+
         return new CaseScore(caseRow, m1Rows, m2Rows, handDiff, rawDiff)
         {
+            TransientRow = transient is null ? null : [run.RunId, system, hand.Id, MetricsCsv.Int(run.Repeat), .. transient.CsvCells()],
             M3Rows = m3Rows,
             Signature = isPreview ? OrderStability.Signature(record?.Result, statusActual) : null,
             EdgeDifferences = edgeDiff,
