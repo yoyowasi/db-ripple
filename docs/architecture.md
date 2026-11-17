@@ -1172,8 +1172,8 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 | `WARN_PROC_TEMP_TABLE` | #임시 테이블(변경 수집 밖) |
 | `WARN_PROC_TABLE_VARIABLE` | 테이블 변수(변경 수집 밖) |
 | `WARN_PROC_RESULT_SET` | 결과 집합을 낸다(개수만 세고 버린다) |
-| `WARN_PROC_NONDETERMINISTIC_WRITE` | 비결정 값(GETDATE·NEWID 등)으로 쓰는 열. 2026-11-17부터 이 (테이블, 열)을 실행 계획에 싣고, 깊이 1 묶음에서 `STATEMENT_FUNCTION` 예상값으로 표시해 [적용] 값 대조에서 뺀다 |
-| `WARN_PROC_NONDETERMINISTIC_RETURN` | 반환 값이 실행마다 달라질 수 있다(RETURN 식이 리터럴이 아니고 펼친 본문이 SCOPE_IDENTITY·IDENT_CURRENT·@@IDENTITY나 비결정 함수를 쓴다, 2026-11-17). [적용]은 반환 값의 NULL 여부만 대조한다 |
+| `WARN_PROC_NONDETERMINISTIC_WRITE` | 비결정 값(GETDATE·NEWID 등)으로 쓰는 열. 같은 본문의 단순 대입(`SET`·`SELECT`·`DECLARE @v = 식`, 분기 밖)을 거친 변수 값도 포함한다(`VariableFlow`). 2026-11-17부터 이 (테이블, 열)을 실행 계획에 싣고, 깊이 1 묶음에서 `STATEMENT_FUNCTION` 예상값으로 표시해 [적용] 값 대조에서 뺀다. 대조는 그 행 변경에 붙은 표시만 쓴다(행 단위) |
+| `WARN_PROC_NONDETERMINISTIC_RETURN` | 반환 값이 실행마다 달라질 수 있다. 값 있는 RETURN이 모두 정수 리터럴이거나 IDENTITY·비결정 함수에서 (단순 대입으로) 온 식이고, 그런 식이 하나 이상일 때만 낸다(분기 안 대입·데이터로 정해지는 값이 섞이면 내지 않고 엄격 비교, 2026-11-17). [적용]은 리터럴 반환 값이면 그대로, 아니면 NULL 여부만 대조한다 |
 
 - **예전 규칙과의 관계:** `EXEC dbo.x`처럼 카탈로그에 없는 호출은 예전 `REJECT_EXEC`가 아니라 `REJECT_PROC_NOT_FOUND`다. `REJECT_EXEC`는 동적 SQL(`EXEC('…')`, `EXEC @변수`, sp_executesql 계열)과 `INSERT … EXEC`에만 남는다.
 - **도달 폐포(위 v1.4 거부 추가의 2026-11-13 수정과 같은 검사):** 프로시저의 정적 쓰기 대상마다 세 연산(INSERT·UPDATE·DELETE)으로 같은 검사를 한다. 닿는 트리거가 외부 부작용·불투명·COMMIT/BEGIN/SAVE이면 규칙 ID는 `REJECT_PROC_*`가 아니라 `REJECT_TRIGGER_*`다.
