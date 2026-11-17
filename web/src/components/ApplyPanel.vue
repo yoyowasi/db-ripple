@@ -254,6 +254,7 @@ function refresh(): void {
           <p>
             원본에 스냅샷 권한(CREATE DATABASE와 원본 DB CONTROL)이 없어 키 집합·테이블 건수와 미리보기에 없던 테이블의 해시(CHECKSUM)만 비교합니다. 해시 충돌이나 비교할 수 없는 형식의 열 변경은 놓칠 수 있습니다.
           </p>
+          <p>원본 데이터가 클수록 [적용] 동안 원본 행 잠금이 길어집니다(합성 1GB에서 약 5초 측정).</p>
           <label class="chk"><input v-model="weakOk" type="checkbox" /> 위 한계를 이해하고 약한 검증으로 적용합니다</label>
         </div>
         <p v-else class="hint">원본에 스냅샷 권한이 없으면 서버가 약한 검증 동의를 물어봅니다.</p>

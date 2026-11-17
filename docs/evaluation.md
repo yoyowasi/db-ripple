@@ -106,6 +106,8 @@ CL21~CL25의 정답은 정답 형식 v0.3을 쓴다. 노드 `P:<스키마.프로
 
 스위트 집계(`metrics.csv`)는 마이크로 평균이다. 사례 상태 일치(`status_match_rate`)도 함께 낸다.
 
+**M6 중간 변경(2026-11-17 추가, `m6.csv`·`metrics.csv`의 `M6.transient_changes`, `eval/DbRipple.Eval/TransientChanges.cs`):** 제품의 "발동 보기"(묶음마다 일어난 그대로의 행 변경)에는 보이지만 "최종 차이"(실행 끝의 순 변경)에서는 사라지는 행 변경의 수다. 행 서명 (테이블, 키, 연산, after 값) 기준으로, 발동 보기의 서로 다른 행 서명 가운데 최종 차이(NetChanges ∪ ResidualCommitted)에 같은 (테이블, 키, 연산 종류, after 값)이 없는 것을 센다. 예: 같은 행을 UPDATE한 뒤 다른 트리거가 DELETE, 값이 바뀌었다가 원래 값으로 돌아옴, 중간 값을 거친 UPDATE. 사례별 값은 `m6.csv`(`measured_rows` 분모, `transient_rows`, 해당 행 서명 목록), 전체는 `metrics.csv`의 `M6.transient_changes`(분자 = 중간 변경 수, 분모 = 비교한 행 서명 수)다. 미리보기 상태가 ok인 사례만 계산하고(실패·거부·truncated는 롤백된 변경이 섞인다), KEYS 모드 묶음과 짝을 못 지은 UPDATE 반쪽은 after가 없어 뺀다. **B0·B2는 최종 상태(순 변경)만 보므로 이 지표가 정의상 0이라 행을 내지 않는다(해당 없음).** "사본 + Data Compare"는 최종 상태만 비교하므로 이 정보를 원리상 볼 수 없다. 대조군 B2와의 차이를 정의가 아니라 측정으로 보이는 근거다. 수치는 DB 실행이 필요해 아직 없다(정의만).
+
 **v0.3(2026-11-13)에서 바뀐 계산 범위:**
 
 - **거부 사례는 M1·M2·M3와 대조군(B0·B2) 행에서 뺀다.** 오라클을 실행하지 않기 때문이다. `cases.csv`에는 `status_expected = rejected`와 미리보기 상태(`status_actual`)만 남고, (규칙 ID, 문장 번호) 비교는 `differences.txt`와 실행 폴더의 `rejects.json`에 쓴다. 규칙 ID가 `*`로 끝나면 접두 패턴이다.

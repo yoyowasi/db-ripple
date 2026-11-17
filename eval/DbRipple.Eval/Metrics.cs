@@ -318,6 +318,18 @@ public sealed class SuiteAccumulator
         }
     }
 
+    readonly Dictionary<string, (long Transient, long Measured, HashSet<string> Cases)> transient = [];
+
+    /// <summary>M6 중간 변경 한 사례·반복을 더한다.</summary>
+    public void AddTransient(string system, string caseId, TransientCounts c)
+    {
+        if (!transient.TryGetValue(system, out var cur)) cur = (0, 0, new HashSet<string>());
+        cur.Transient += c.Transient;
+        cur.Measured += c.Measured;
+        cur.Cases.Add(caseId);
+        transient[system] = cur;
+    }
+
     /// <summary>사례 상태 일치 한 건을 더한다.</summary>
     public void AddStatus(string system, string caseId, bool match)
     {
@@ -359,5 +371,7 @@ public sealed class SuiteAccumulator
         }
         foreach (var (system, (match, total, cases)) in status.OrderBy(x => x.Key, StringComparer.Ordinal))
             yield return Row(system, "status_match_rate", "case", match, total, cases.Count);
+        foreach (var (system, (tr, measured, cases)) in transient.OrderBy(x => x.Key, StringComparer.Ordinal))
+            yield return Row(system, "M6.transient_changes", "all", tr, measured, cases.Count);
     }
 }

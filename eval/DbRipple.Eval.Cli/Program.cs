@@ -159,6 +159,7 @@ async Task RunCascadeLabAsync()
     var m1Csv = Path.Combine(outDir, "m1.csv");
     var m2Csv = Path.Combine(outDir, "m2.csv");
     var m3Csv = Path.Combine(outDir, "m3.csv");
+    var m6Csv = Path.Combine(outDir, "m6.csv");
 
     void Write(CaseScore score)
     {
@@ -166,6 +167,7 @@ async Task RunCascadeLabAsync()
         foreach (var row in score.M1Rows) MetricsCsv.Append(m1Csv, MetricsCsv.M1Columns, row);
         foreach (var row in score.M2Rows) MetricsCsv.Append(m2Csv, MetricsCsv.M2Columns, row);
         foreach (var row in score.M3Rows) MetricsCsv.Append(m3Csv, MetricsCsv.M3Columns, row);
+        if (score.TransientRow is { } tr) MetricsCsv.Append(m6Csv, MetricsCsv.M6Columns, tr);
     }
 
     foreach (var group in cases.GroupBy(c => c.Database))
