@@ -220,12 +220,14 @@ END;");
     [Fact]
     public void Nondeterministic_writes_through_simple_variable_assignment()
     {
-        // 2026-11-17: 프로시저 본문과 같은 VariableFlow 규칙. 분기 안에서 대입한 변수는 잡지 않는다(엄격 비교).
+        // 2026-11-17: 프로시저 본문과 같은 VariableFlow 규칙. 분기 안에서 대입한 변수, 하위 쿼리 필터에만 비결정 함수가 있는 값(@r)은 잡지 않는다(엄격 비교).
         var a = AnalyzeOne(@"CREATE TRIGGER dbo.trX ON dbo.T AFTER UPDATE AS BEGIN
             DECLARE @now datetime2 = SYSDATETIME();
             DECLARE @who sysname; SELECT @who = SUSER_SNAME();
             DECLARE @flag int; IF EXISTS (SELECT 1 FROM inserted) SET @flag = DATEPART(ms, GETDATE());
+            DECLARE @r int = (SELECT TOP (1) a FROM dbo.T WHERE b <= DATEPART(hour, GETDATE()));
             UPDATE dbo.T SET b = @now FROM inserted;
+            UPDATE dbo.T SET a = @r FROM inserted;
             INSERT INTO dbo.L (x, y) VALUES (@who, @flag); END;",
             events: ["UPDATE"], more: b => b.Table("dbo", "L", "!id", "x", "y"));
         var cols = a.NondeterministicWrites.Select(w => $"{w.Table}.{w.Column}").ToList();

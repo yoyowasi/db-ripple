@@ -124,7 +124,7 @@ public static class AnalysisRules
     /// <summary>비결정 값(GETDATE·NEWID 등)으로 쓰는 열.</summary>
     public const string WarnProcNondeterministicWrite = "WARN_PROC_NONDETERMINISTIC_WRITE";
     /// <summary>
-    /// 반환 값이 실행마다 달라질 수 있음(2026-11-17): RETURN 식이 IDENTITY 함수(SCOPE_IDENTITY 등)나 비결정 함수에서 (직접 또는 단순 대입 변수로) 온다.
+    /// 반환 값이 실행마다 달라질 수 있음(2026-11-17): RETURN 식이 IDENTITY 함수(SCOPE_IDENTITY 등)나 비결정 함수만으로 된 순수한 식이다(직접 또는 단순 대입 변수, 비결정 반환으로 판정한 안쪽 프로시저 반환 값).
     /// [적용]은 리터럴 반환 값은 그대로, 그 밖의 반환 값은 NULL 여부만 대조한다(ProcedurePlan.ReturnValueNondeterministic·LiteralReturnValues).
     /// </summary>
     public const string WarnProcNondeterministicReturn = "WARN_PROC_NONDETERMINISTIC_RETURN";

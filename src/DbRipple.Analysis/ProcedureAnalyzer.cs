@@ -26,7 +26,7 @@ public sealed record ProcedureStaticInfo
     public IReadOnlyList<string> UnresolvedCalls { get; init; } = [];
     public IReadOnlyList<string> External { get; init; } = [];
     public IReadOnlyList<TableColumn> NondeterministicWrites { get; init; } = [];
-    /// <summary>반환 값이 실행마다 달라질 수 있음(2026-11-17, ReturnValues.Judge): 값 있는 RETURN이 모두 정수 리터럴이거나 IDENTITY·비결정 원천에서 온 식이고, 원천 식이 하나 이상.</summary>
+    /// <summary>반환 값이 실행마다 달라질 수 있음(2026-11-17, ReturnValues.Judge): 값 있는 RETURN이 모두 정수 리터럴이거나 순수한 IDENTITY·비결정 원천 식이고, 원천 식이 하나 이상.</summary>
     public bool ReturnValueNondeterministic { get; init; }
     /// <summary>대상 프로시저가 리터럴로 돌려줄 수 있는 값(0 포함, 오름차순). ReturnValueNondeterministic일 때 [적용]이 이 값은 그대로 비교한다.</summary>
     public IReadOnlyList<int> LiteralReturnValues { get; init; } = [];
@@ -70,7 +70,7 @@ public sealed class ProcedureAnalyzer
             p.VariableName.Value, p.Value is not null, p.Modifier == ParameterModifier.Output, p.Modifier == ParameterModifier.ReadOnly)).ToList();
         var e = expander.ExpandModule(module, 1, []);
         var a = e.Parsed!;
-        var (returnNondeterministic, literalReturns) = ReturnValues.Judge(body, a);
+        var judged = a.Return ?? ReturnValues.Judge(body, a.CallReturns);
         return new ProcedureStaticInfo
         {
             Procedure = name,
@@ -82,8 +82,8 @@ public sealed class ProcedureAnalyzer
             UnresolvedCalls = a.UnresolvedNames.ToList(),
             External = a.External.ToList(),
             NondeterministicWrites = a.NondeterministicWrites.OrderBy(w => w.Table, StringComparer.OrdinalIgnoreCase).ThenBy(w => w.Column, StringComparer.OrdinalIgnoreCase).ToList(),
-            ReturnValueNondeterministic = returnNondeterministic,
-            LiteralReturnValues = literalReturns,
+            ReturnValueNondeterministic = judged.Nondeterministic,
+            LiteralReturnValues = judged.Literals,
             Rejects = a.ExecRejects.ToList(),
             Warnings = a.ExecWarnings.ToList(),
         };
@@ -177,12 +177,11 @@ internal sealed class ProcedureExpander(DbCatalog catalog, TableResolver resolve
         var body = proc.StatementList;
         body.Accept(new CtePrepass(a.CteDefinitions));
         // 변수를 거친 비결정 쓰기(SET @t = GETDATE(); UPDATE … SET c = @t)도 잡는다(2026-11-17). 매개변수는 입력 값이 있어 원천으로 보지 않는다.
-        var writes = VariableFlow.Analyze(body, SqlSyntax.IsNondeterministic, proc.Parameters.Select(p => p.VariableName.Value));
+        var writes = VariableFlow.Analyze(body, identity: false, proc.Parameters.Select(p => p.VariableName.Value));
         body.Accept(new BodyVisitor(a, writes));
         var rules = new ExecRulesVisitor(a, name, Functions);
         body.Accept(rules);
         rules.Finish(body);
-        a.ValueFunction = ReturnValues.UsesValueFunction(body);
 
         // (d) WITH EXECUTE AS OWNER·SELF·사용자: 실행 사용자 권한 밖에서 돈다(CALLER만 허용).
         foreach (var o in proc.Options.OfType<ExecuteAsProcedureOption>())
@@ -200,7 +199,7 @@ internal sealed class ProcedureExpander(DbCatalog catalog, TableResolver resolve
         {
             var inner = Expand(node, module.Schema, depth + 1, stack);
             pathDependent |= inner.PathDependent;
-            a.CallValueFunction[callName] = inner.Parsed?.ValueFunction == true;
+            a.CallReturns[callName] = inner.Resolved ? inner.Parsed?.Return : null;   // 펼치지 못한 안쪽은 판정 없음(엄격)
             if (inner.Parsed is { } p) a.Merge(p);
             if (!inner.Resolved)
             {
@@ -210,6 +209,7 @@ internal sealed class ProcedureExpander(DbCatalog catalog, TableResolver resolve
             resolved &= inner.Resolved;
         }
         stack.Remove(module.ObjectId);
+        a.Return = ReturnValues.Judge(proc, a.CallReturns);
         var result = new Expansion(resolved, a, pathDependent);
         if (!pathDependent) memo[(module.ObjectId, depth)] = result;
         return result;
@@ -512,10 +512,10 @@ internal sealed class Accumulator(string moduleSchema, TableResolver resolver, D
     public readonly SortedSet<string> UnresolvedNames = new(StringComparer.OrdinalIgnoreCase);
     public readonly List<ProcedureFinding> ExecRejects = [];
     public readonly List<ProcedureFinding> ExecWarnings = [];
-    /// <summary>본문(안쪽 호출 포함)이 IDENTITY 함수나 비결정 함수를 쓴다(반환 값 비결정 판정 재료, 2026-11-17).</summary>
-    public bool ValueFunction;
-    /// <summary>이 모듈이 직접 부르는 프로시저(쓴 이름 그대로) → 펼친 그 프로시저의 ValueFunction. <c>EXEC @v = 안쪽</c> 반환 값 판정에 쓴다(합치지 않는다).</summary>
-    public readonly Dictionary<string, bool> CallValueFunction = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>이 모듈 자신의 반환 값 판정(ReturnValues.Judge, 2026-11-17). 합치지 않는다.</summary>
+    public ReturnJudgement? Return;
+    /// <summary>이 모듈이 직접 부르는 프로시저(쓴 이름 그대로) → 펼친 그 프로시저의 반환 값 판정(펼치지 못했으면 null). <c>EXEC @v = 안쪽</c> 판정에 쓴다(합치지 않는다).</summary>
+    public readonly Dictionary<string, ReturnJudgement?> CallReturns = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// 펼친(또는 본문만 읽은) 프로시저 결과를 합친다: 쓰기 대상, 비결정 쓰기, 외부 부작용, ROLLBACK, 트랜잭션 제어(+ EXEC 전용 사실).
@@ -528,7 +528,6 @@ internal sealed class Accumulator(string moduleSchema, TableResolver resolver, D
         External.UnionWith(p.External);
         Rollback |= p.Rollback;
         TransactionControl |= p.TransactionControl;
-        ValueFunction |= p.ValueFunction;
         Modules.UnionWith(p.Modules);
         UnresolvedNames.UnionWith(p.UnresolvedNames);
         foreach (var f in p.ExecRejects) if (!ExecRejects.Contains(f)) ExecRejects.Add(f);
@@ -540,43 +539,40 @@ internal sealed class Accumulator(string moduleSchema, TableResolver resolver, D
 /// 반환 값 비결정 판정(2026-11-17, PR #11 검토 뒤 좁힘). 대상 프로시저의 값 있는 RETURN을 하나씩 본다.
 /// <list type="bullet">
 /// <item>정수 리터럴(괄호·부호 포함): LiteralReturnValues에 넣는다. 값 없는 RETURN과 본문 끝은 0이라 0은 늘 넣는다.</item>
-/// <item>IDENTITY 함수(SCOPE_IDENTITY·IDENT_CURRENT·@@IDENTITY)나 비결정 함수를 직접 쓰거나, 같은 본문의 단순 대입으로 그 값만 받는 변수를 읽는 식(VariableFlow): 원천 식.
-///   <c>EXEC @v = 안쪽</c>의 반환 값은 예전처럼 펼친 안쪽 본문이 그런 함수를 쓰면 원천으로 본다.</item>
+/// <item>순수한 원천 식(VariableFlow.IsSource, IDENTITY 함수 포함): 비결정 함수·IDENTITY 함수(SCOPE_IDENTITY·IDENT_CURRENT·@@IDENTITY)·숫자 리터럴·원천 변수를
+///   CAST·CONVERT·산술·날짜 내장 함수로만 감싼 식. 하위 쿼리·CASE·COALESCE 등이 섞이면 원천이 아니다(PR #15 검토).</item>
+/// <item><c>EXEC @v = 안쪽</c>: 펼친 안쪽 프로시저의 이 판정이 비결정일 때만 @v가 원천이고(식 전체가 그 변수일 때만), 안쪽 리터럴 반환 값을 바깥 집합에 합친다.
+///   안쪽을 펼치지 못했으면 원천이 아니다.</item>
 /// <item>그 밖(데이터로 정해지는 변수·@@ROWCOUNT·분기 안에서 대입한 변수·정수가 아닌 리터럴 등): 하나라도 있으면 비결정으로 보지 않는다(엄격 비교, 롤백 쪽).</item>
 /// </list>
 /// 원천 식이 하나 이상이고 나머지가 모두 정수 리터럴이면 비결정이다. [적용]은 리터럴 값은 그대로, 그 밖의 값은 NULL 여부만 대조한다(샌드박스 IDENTITY는 미리보기마다 소비되어 원본과 다르다, A13).
 /// </summary>
 internal static class ReturnValues
 {
-    static readonly HashSet<string> IdentityFunctions = new(["SCOPE_IDENTITY", "IDENT_CURRENT"], StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>IDENTITY 함수(SCOPE_IDENTITY·IDENT_CURRENT·@@IDENTITY)나 비결정 함수(SqlSyntax.FindNondeterminism)를 쓰는가.</summary>
-    public static bool UsesValueFunction(TSqlFragment body)
-    {
-        if (SqlSyntax.FindNondeterminism(body).Count > 0) return true;
-        var v = new IdentityFinder();
-        body.Accept(v);
-        return v.Found;
-    }
-
-    /// <summary>대상 프로시저 본문의 반환 값 판정. a는 그 본문을 펼친 누적값(안쪽 호출의 ValueFunction).</summary>
-    public static (bool Nondeterministic, IReadOnlyList<int> Literals) Judge(ProcedureStatementBody proc, Accumulator a)
+    /// <summary>프로시저 본문의 반환 값 판정. calls는 이 본문이 직접 부르는 프로시저(쓴 이름) → 펼친 그 프로시저의 판정(펼치지 못했으면 null).</summary>
+    public static ReturnJudgement Judge(ProcedureStatementBody proc, IReadOnlyDictionary<string, ReturnJudgement?> calls)
     {
         var body = proc.StatementList;
-        var flow = VariableFlow.Analyze(body, UsesValueFunction, proc.Parameters.Select(p => p.VariableName.Value),
-            spec => spec.ExecutableEntity is ExecutableProcedureReference { ProcedureReference.ProcedureReference.Name: { } n }
-                && a.CallValueFunction.GetValueOrDefault(SqlSyntax.Name(n)));
+        var literals = new SortedSet<int> { 0 };
+        ReturnJudgement? Inner(ExecuteSpecification spec) =>
+            spec.ExecutableEntity is ExecutableProcedureReference { ProcedureReference.ProcedureReference.Name: { } n }
+            && calls.TryGetValue(SqlSyntax.Name(n), out var j) ? j : null;
+        var flow = VariableFlow.Analyze(body, identity: true, proc.Parameters.Select(p => p.VariableName.Value), spec =>
+        {
+            if (Inner(spec) is not { Nondeterministic: true } j) return false;
+            literals.UnionWith(j.Literals);   // 안쪽이 리터럴로 돌려준 값은 바깥에서도 그대로 비교한다
+            return true;
+        });
         var finder = new ReturnFinder();
         body.Accept(finder);
-        var literals = new SortedSet<int> { 0 };
         bool source = false, other = false;
         foreach (var e in finder.Expressions)
         {
             if (IntegerLiteral(e) is { } v) literals.Add(v);
-            else if (flow.Classify(e) == VariableFlow.Kind.Source) source = true;
+            else if (flow.IsSource(e)) source = true;
             else other = true;
         }
-        return (source && !other, literals.ToList());
+        return new ReturnJudgement(source && !other, literals.ToList());
     }
 
     /// <summary>정수 리터럴(괄호, 단항 +·-)의 값. int 범위 밖이거나 정수 리터럴이 아니면 null.</summary>
@@ -597,20 +593,10 @@ internal static class ReturnValues
             if (n.Expression is { } e) Expressions.Add(e);
         }
     }
-
-    sealed class IdentityFinder : TSqlFragmentVisitor
-    {
-        public bool Found;
-        public override void Visit(FunctionCall n)
-        {
-            if (IdentityFunctions.Contains(n.FunctionName.Value)) Found = true;
-        }
-        public override void Visit(GlobalVariableExpression n)
-        {
-            if (string.Equals(n.Name, "@@IDENTITY", StringComparison.OrdinalIgnoreCase)) Found = true;
-        }
-    }
 }
+
+/// <summary>반환 값 판정 결과(ReturnValues.Judge): 비결정 여부와 리터럴로 돌려줄 수 있는 값(0 포함, 오름차순).</summary>
+internal sealed record ReturnJudgement(bool Nondeterministic, IReadOnlyList<int> Literals);
 
 internal sealed class CtePrepass(Dictionary<string, List<QueryExpression>> defs) : TSqlFragmentVisitor
 {

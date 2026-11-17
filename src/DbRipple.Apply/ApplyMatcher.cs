@@ -312,11 +312,14 @@ internal sealed class MatchRules
         return rowVolatile[row] = set;
     }
 
-    /// <summary>행 변경이 이 키의 행인가(키 열·값, 또는 이미지의 키 열 값). 값은 끝 공백·대소문자·숫자 표기를 무시한다(정렬 규칙을 모르므로 넓게 맞춘다).</summary>
+    /// <summary>
+    /// 행 변경이 이 키의 행인가(키 열·값, 또는 이미지의 키 열 값). 값은 §6.1 문자열 그대로(ordinal) 비교한다: "007"·"7"이나 대소문자만 다른 키를
+    /// 같은 행으로 보지 않는다(PR #15 검토). 표기가 달라 맞는 것이 없으면 호출자가 묶음 단위로 물러난다.
+    /// </summary>
     static bool SameKey(RowChange rc, RowKey key)
     {
         if (rc.Key.Columns.Count == key.Columns.Count && rc.Key.Columns.Zip(key.Columns).All(p => string.Equals(p.First, p.Second, StringComparison.OrdinalIgnoreCase))
-            && rc.Key.Values.Count == key.Values.Count && rc.Key.Values.Zip(key.Values).All(p => KeyValue(p.First) == KeyValue(p.Second)))
+            && rc.Key.Values.Count == key.Values.Count && rc.Key.Values.Zip(key.Values).All(p => string.Equals(p.First, p.Second, StringComparison.Ordinal)))
             return true;
         foreach (var image in new[] { rc.After, rc.Before })
         {
@@ -324,16 +327,11 @@ internal sealed class MatchRules
             var lookup = image.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
             var match = key.Columns.Count > 0;
             for (var i = 0; match && i < key.Columns.Count; i++)
-                match = lookup.TryGetValue(key.Columns[i], out var v) && i < key.Values.Count && KeyValue(v) == KeyValue(key.Values[i]);
+                match = lookup.TryGetValue(key.Columns[i], out var v) && i < key.Values.Count && string.Equals(v, key.Values[i], StringComparison.Ordinal);
             if (match) return true;
         }
         return false;
     }
-
-    static string KeyValue(string? v) =>
-        v is null ? "\u0000"
-        : decimal.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? "#" + d.ToString("G29", CultureInfo.InvariantCulture)
-        : v.TrimEnd(' ').ToUpperInvariant();
 
     string BaseColumn(string table, string property)
     {

@@ -68,6 +68,16 @@ public sealed class ExecApplyAnalysisTests
     [InlineData("DECLARE @id int = SCOPE_IDENTITY(); GOTO done; done: RETURN @id;", false)]                                     // GOTO가 있으면 추적하지 않음
     [InlineData("IF EXISTS (SELECT 1 FROM dbo.U WHERE x = 1) RETURN @@ROWCOUNT; RETURN CAST(SCOPE_IDENTITY() AS int);", false)] // 데이터로 정해지는 RETURN이 섞임
     [InlineData("IF EXISTS (SELECT 1 FROM dbo.U WHERE x = 1) RETURN 1.5; RETURN CAST(SCOPE_IDENTITY() AS int);", false)]        // 정수가 아닌 리터럴
+    [InlineData("DECLARE @id int; SET @id = CAST(SCOPE_IDENTITY() AS int); RETURN @id;", true)]                                 // 순수 원천
+    [InlineData("RETURN DATEDIFF(second, '20000101', SYSDATETIME()) % 1000 + 1;", true)]                                      // 날짜 함수·산술
+    // PR #15 검토 재현(순수하지 않은 식은 엄격): COALESCE·CASE·ISNULL·하위 쿼리
+    [InlineData("DECLARE @s int; SELECT @s = y FROM dbo.U WHERE x = 1; RETURN COALESCE(@s, CAST(SCOPE_IDENTITY() AS int));", false)]
+    [InlineData("RETURN CASE WHEN EXISTS (SELECT 1 FROM dbo.U WHERE x = 1) THEN 5 ELSE CAST(SCOPE_IDENTITY() AS int) END;", false)]
+    [InlineData("RETURN ISNULL(CAST(SCOPE_IDENTITY() AS int), 0);", false)]
+    [InlineData("DECLARE @c int; SET @c = (SELECT COUNT(*) FROM dbo.U WHERE x < DATEPART(hour, GETDATE())); RETURN @c;", false)]
+    [InlineData("RETURN (SELECT MAX(y) FROM dbo.U WHERE x < DATEPART(hour, GETDATE()));", false)]
+    [InlineData("DECLARE @n int; SET @n = DATEPART(ms, GETDATE()) + (SELECT MAX(y) FROM dbo.U); RETURN @n;", false)]           // 원천 + 하위 쿼리
+    [InlineData("DECLARE @n int = 3; RETURN DATEPART(ms, GETDATE()) + @n;", false)]                                           // 원천 아닌 변수가 섞임
     public void Return_value_is_nondeterministic_only_when_it_comes_from_identity_or_nondeterministic_source(string body, bool expected)
     {
         var st = Accepted("EXEC dbo.q;", Ctx(("q", $"CREATE PROCEDURE dbo.q AS BEGIN SET NOCOUNT ON; {body} END;")), out var r);
@@ -133,11 +143,68 @@ public sealed class ExecApplyAnalysisTests
     [InlineData("DECLARE @t int = DATEPART(ms, SYSDATETIME()); SET @t = 7; UPDATE dbo.U SET y = @t WHERE x = 1;")]               // 결정적 대입이 섞임
     [InlineData("DECLARE @id int = SCOPE_IDENTITY(); UPDATE dbo.U SET y = @id WHERE x = 1;")]                                   // IDENTITY는 쓰기 쪽 원천이 아님(FK 짝 매핑이 맡음)
     [InlineData("DECLARE @t int; SELECT @t = y FROM dbo.U WHERE x = 2; UPDATE dbo.U SET y = @t WHERE x = 1;")]                 // 데이터 값
+    // PR #15 검토 재현: 하위 쿼리 필터에만 비결정 함수(값은 데이터), CASE, 직접 대입도 같은 규칙
+    [InlineData("DECLARE @r int = (SELECT TOP (1) y FROM dbo.U WHERE x <= DATEPART(hour, GETDATE()) ORDER BY x DESC); UPDATE dbo.U SET y = @r WHERE x = 1;")]
+    [InlineData("DECLARE @r int; SELECT TOP (1) @r = y FROM dbo.U WHERE x <= DATEPART(hour, GETDATE()) ORDER BY x DESC; UPDATE dbo.U SET y = @r WHERE x = 1;")]
+    [InlineData("UPDATE dbo.U SET y = (SELECT TOP (1) y FROM dbo.U WHERE x <= DATEPART(hour, GETDATE()) ORDER BY x DESC) WHERE x = 1;")]
+    [InlineData("UPDATE dbo.U SET y = CASE WHEN x > 0 THEN DATEPART(ms, GETDATE()) ELSE 0 END WHERE x = 1;")]
+    [InlineData("UPDATE dbo.U SET y = DATEPART(ms, GETDATE()) + x WHERE x = 1;")]                                              // 열 참조가 섞임
     public void Variable_writes_that_are_not_surely_nondeterministic_stay_strict(string body)
     {
         var st = Accepted("EXEC dbo.q;", Ctx(("q", $"CREATE PROCEDURE dbo.q AS BEGIN SET NOCOUNT ON; {body} RETURN 0; END;")), out _);
 
         Assert.Empty(st.Plan!.NondeterministicWrites);
+    }
+
+    [Theory]
+    [InlineData("DECLARE @t datetime2; SET @t = GETDATE(); UPDATE dbo.U SET y = @t WHERE x = 1;")]
+    [InlineData("DECLARE @t int = CAST(DATEPART(ms, SYSDATETIME()) AS int) * 10; UPDATE dbo.U SET y = @t WHERE x = 1;")]
+    [InlineData("UPDATE dbo.U SET y = CONVERT(varchar(30), SYSDATETIME(), 126) WHERE x = 1;")]
+    public void Pure_nondeterministic_writes_stay_marked(string body)
+    {
+        var st = Accepted("EXEC dbo.q;", Ctx(("q", $"CREATE PROCEDURE dbo.q AS BEGIN SET NOCOUNT ON; {body} RETURN 0; END;")), out _);
+
+        Assert.Equal(["dbo.U.y"], st.Plan!.NondeterministicWrites.Select(w => w.Table + "." + w.Column));
+    }
+
+    // PR #15 검토 2: EXEC @rc = 안쪽은 안쪽 반환 값 판정을 쓴다.
+    [Fact]
+    public void Inner_procedure_status_codes_are_not_a_source_even_if_inner_writes_nondeterministic_values()
+    {
+        var ctx = Ctx(
+            ("q", "CREATE PROCEDURE dbo.q AS BEGIN SET NOCOUNT ON; DECLARE @rc int; EXEC @rc = dbo.inner1; RETURN @rc; END;"),
+            ("inner1", "CREATE PROCEDURE dbo.inner1 AS BEGIN UPDATE dbo.U SET y = DATEPART(ms, GETDATE()) WHERE x = 1; IF EXISTS (SELECT 1 FROM dbo.U WHERE x = 2) RETURN 2; RETURN 1; END;"));
+
+        var st = Accepted("EXEC dbo.q;", ctx, out var r);
+
+        Assert.False(st.Plan!.ReturnValueNondeterministic);
+        Assert.DoesNotContain(r.Warnings, w => w.RuleId == AnalysisRules.WarnProcNondeterministicReturn);
+    }
+
+    [Fact]
+    public void Inner_procedure_identity_return_is_a_source_and_its_literals_are_merged()
+    {
+        var ctx = Ctx(
+            ("q", "CREATE PROCEDURE dbo.q AS BEGIN SET NOCOUNT ON; DECLARE @rc int; EXEC @rc = dbo.inner1; IF @rc IS NULL RETURN -1; RETURN @rc; END;"),
+            ("inner1", "CREATE PROCEDURE dbo.inner1 AS BEGIN IF EXISTS (SELECT 1 FROM dbo.U WHERE x = 2) RETURN 7; INSERT INTO dbo.U (x, y) VALUES (1, 2); RETURN CAST(SCOPE_IDENTITY() AS int); END;"));
+
+        var st = Accepted("EXEC dbo.q;", ctx, out _);
+
+        Assert.True(st.Plan!.ReturnValueNondeterministic);
+        Assert.Equal([-1, 0, 7], st.Plan.LiteralReturnValues);   // 안쪽 RETURN 7도 그대로 비교
+    }
+
+    [Fact]
+    public void Inner_procedure_return_used_in_an_expression_is_strict()
+    {
+        // 안쪽 리터럴 반환 값이 식을 거치면 바깥 리터럴 집합으로 잡을 수 없다.
+        var ctx = Ctx(
+            ("q", "CREATE PROCEDURE dbo.q AS BEGIN SET NOCOUNT ON; DECLARE @rc int; EXEC @rc = dbo.inner1; DECLARE @x int = @rc; RETURN @x + 1; END;"),
+            ("inner1", "CREATE PROCEDURE dbo.inner1 AS BEGIN INSERT INTO dbo.U (x, y) VALUES (1, 2); RETURN CAST(SCOPE_IDENTITY() AS int); END;"));
+
+        var st = Accepted("EXEC dbo.q;", ctx, out _);
+
+        Assert.False(st.Plan!.ReturnValueNondeterministic);
     }
 
     [Fact]

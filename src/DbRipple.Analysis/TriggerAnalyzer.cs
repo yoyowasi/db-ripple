@@ -119,7 +119,7 @@ public sealed class TriggerAnalyzer : ITriggerAnalyzer
         {
             stmt.StatementList.Accept(new CtePrepass(a.CteDefinitions));
             // 변수를 거친 비결정 쓰기도 잡는다(2026-11-17, 프로시저 본문과 같은 VariableFlow 규칙).
-            stmt.StatementList.Accept(new BodyVisitor(a, VariableFlow.Analyze(stmt.StatementList, SqlSyntax.IsNondeterministic)));
+            stmt.StatementList.Accept(new BodyVisitor(a, VariableFlow.Analyze(stmt.StatementList, identity: false)));
         }
 
         // 인계 1: 직접 부르는 프로시저를 펼쳐 합친다. ProcedureCalls(이름 그대로)를 펼친 것·못 펼친 것으로 나눈다.

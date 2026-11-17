@@ -385,6 +385,27 @@ public sealed class ApplyMatcherTests
         Assert.Equal("2", Assert.Single(outcome.Mismatches, m => m.Kind == MismatchKind.RowValue).Key!.Values[0]);
     }
 
+    [Theory]
+    [InlineData("7", "007")]   // 숫자 표기만 다름
+    [InlineData("a", "A")]     // 대소문자만 다름
+    public void Row_change_key_is_matched_ordinally(string markedKey, string rowKey)
+    {
+        // PR #15 검토 4: 같은 묶음 안에서 표기만 비슷한 다른 행의 표시를 붙이지 않는다.
+        var net = Explained(Updated("dbo.T", rowKey, Row(("id", rowKey), ("v", "5")), Row(("id", rowKey), ("v", "6")), "v"), "f-1");
+        var preview = Record([net], [Statement(1, 2)], firings: [UpdateFiring("f-1", 1)],
+            rowChanges:
+            [
+                Rc("f-1", "dbo.T", markedKey, Row(("id", markedKey), ("v", "10")), ChangeOperation.Update, ("v", VolatileReason.StatementFunction)),
+                Rc("f-1", "dbo.T", rowKey, Row(("id", rowKey), ("v", "6")), ChangeOperation.Update),
+            ]);
+        var actual = new List<NetChange> { Updated("dbo.T", rowKey, Row(("id", rowKey), ("v", "5")), Row(("id", rowKey), ("v", "7")), "v") };
+
+        var outcome = ApplyMatcher.Match(new MatchInput { Preview = preview, Actual = [Statement(1, 2)], ActualNet = actual, Baseline = Context() });
+
+        var m = Assert.Single(outcome.Mismatches, m => m.Kind == MismatchKind.RowValue);
+        Assert.Equal(("v", "6", "7"), (m.Column, m.Expected, m.Actual));
+    }
+
     [Fact]
     public void Paired_identity_rows_compare_values_with_their_own_volatile_marks()
     {
