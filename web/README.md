@@ -2,8 +2,6 @@
 
 Vue 3 + Vite + TypeScript + Pinia. 설계: [docs/architecture.md](../docs/architecture.md) §4 C1~C4, §6.3, D6. API 모양: [docs/week3-plan.md](../docs/week3-plan.md) §5.
 
-> 3주차 1라운드에서 코드만 썼다. 설치·타입 검사·빌드·실행은 아직 한 번도 하지 않았다.
-
 ## 설치와 실행
 
 API 서버(`src/DbRipple.Host`, `http://127.0.0.1:5080`)를 먼저 켠다([루트 README](../README.md) 실행 방법). 그다음:
@@ -11,8 +9,8 @@ API 서버(`src/DbRipple.Host`, `http://127.0.0.1:5080`)를 먼저 켠다([루�
 ```powershell
 cd web
 npm install
-npx vue-tsc --noEmit      # 타입 검사
-npx vite build            # 빌드(dist/)
+npm run typecheck         # 타입 검사
+npm run build             # 타입 검사 + 빌드(dist/)
 npm run dev               # 개발 서버 http://localhost:5273
 ```
 
