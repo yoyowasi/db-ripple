@@ -13,6 +13,8 @@ TestResults/
 # Node · Vue
 node_modules/
 dist/
+# Vite 의존성 캐시(docs/mockups를 vite로 띄울 때 생긴다)
+.vite/
 
 # SQL Server 백업·데이터 파일(공개 샘플도 저장소에 넣지 않는다)
 *.bak

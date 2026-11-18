@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>db-ripple · 리플(동심원) 목업</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font:"Noto Sans KR","Malgun Gothic","맑은 고딕",system-ui,sans-serif;
+  --mono:"JetBrains Mono",Consolas,"D2Coding","Malgun Gothic",monospace;
+  --bg:#F2F5F6; --surface:#FFFFFF; --surface2:#E9EFF1;
+  --ink:#10242C; --muted:#4A5F68; --line:#B9C8CE; --line-strong:#6F8791;
+  --w1:#D6E3E8; --w2:#E0E9ED; --w3:#E9F0F2; --ring:#7B939D;
+  --del:#B42318; --upd:#8F5600; --add:#0A6B4B;
+  --del-bg:#FBE9E7; --upd-bg:#FAF0DA; --add-bg:#DDF2E8;
+  --on-op:#FFFFFF;
+  --accent:#0B5C70; --on-accent:#FFFFFF; --focus:#0B5C70;
+  --warn:#8F5600; --warn-bg:#FAF0DA;
+  --kw:#0B5C70; --shadow:0 1px 0 rgba(16,36,44,.06);
+}
+:root[data-theme="dark"]{
+  --bg:#0B161B; --surface:#12232A; --surface2:#182E36;
+  --ink:#E7EFF2; --muted:#A3B8C0; --line:#2C444E; --line-strong:#7E98A3;
+  --w1:#183039; --w2:#132830; --w3:#0F1F26; --ring:#5C7782;
+  --del:#FF9D93; --upd:#F2BD55; --add:#63D9A5;
+  --del-bg:#3A1C1A; --upd-bg:#38290D; --add-bg:#10332A;
+  --on-op:#0B161B;
+  --accent:#58C6DE; --on-accent:#04222B; --focus:#58C6DE;
+  --warn:#F2BD55; --warn-bg:#38290D;
+  --kw:#58C6DE; --shadow:none;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--font);overflow:hidden}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:4px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mono{font-family:var(--mono)}
+
+/* ---------- 틀 ---------- */
+#app{display:grid;grid-template-rows:44px 1fr;height:100vh}
+header.top{display:flex;align-items:center;gap:20px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--surface)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px;letter-spacing:-.01em}
+.sbx{position:relative}
+.sbx>button{display:flex;align-items:center;gap:8px;background:none;border:0;padding:4px 8px;border-radius:6px;cursor:pointer;color:var(--muted);font-size:14px}
+.sbx>button:hover{background:var(--surface2)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--add);flex:none}
+.dot.busy{background:none;border:2px solid var(--warn);border-top-color:transparent;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pop{position:absolute;top:36px;left:0;z-index:20;width:430px;background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:12px 14px;font-size:14px}
+.pop[hidden]{display:none}
+.pop dl{margin:0;display:grid;grid-template-columns:96px 1fr;gap:6px 10px}
+.pop dt{color:var(--muted)} .pop dd{margin:0}
+main{display:grid;grid-template-columns:clamp(320px,25vw,372px) minmax(0,1fr) clamp(320px,26vw,380px);min-height:0}
+.col{min-height:0;overflow:auto}
+.left{border-right:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column}
+.right{border-left:1px solid var(--line);background:var(--surface);padding:18px 18px 56px}
+.center{display:flex;flex-direction:column;position:relative}
+
+/* ---------- 왼쪽: 편집기·판정·적용 ---------- */
+.editor{margin:14px 14px 0;border:1px solid var(--line-strong);border-radius:6px;background:var(--bg);overflow:hidden}
+.editor .code{font:14px/22px var(--mono);padding:6px 0}
+.ln{display:grid;grid-template-columns:34px 1fr;padding-right:8px}
+.ln i{font-style:normal;text-align:right;padding-right:8px;color:var(--muted);user-select:none}
+.ln code{white-space:pre-wrap;word-break:break-word}
+.ln.bad{background:var(--del-bg);box-shadow:inset 3px 0 0 var(--del)}
+.ln.bad i{color:var(--del);font-weight:700}
+.k{color:var(--kw);font-weight:600}
+.editor footer{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--line);padding:6px 8px;font-size:13px;color:var(--muted);background:var(--surface)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line-strong);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer;font-weight:500;font-size:14px}
+.btn:hover:not([disabled]){background:var(--surface2)}
+.btn[disabled]{opacity:.55;cursor:not-allowed}
+.btn.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:700}
+.btn.primary:hover:not([disabled]){filter:brightness(1.08);background:var(--accent)}
+.btn.big{width:100%;height:54px;font-size:18px;border-radius:8px}
+.btn.link{border:0;background:none;color:var(--muted);text-decoration:underline;text-underline-offset:3px;padding:6px 2px}
+kbd{font:12px var(--mono);border:1px solid var(--line-strong);border-radius:4px;padding:0 5px;background:var(--surface)}
+.btn.primary kbd{background:transparent;color:inherit;border-color:currentColor;white-space:nowrap}
+
+.verdict{padding:18px 18px 4px}
+.verdict h1{margin:0;font-size:34px;line-height:1.15;font-weight:700;letter-spacing:-.02em}
+.verdict h1 small{font-size:inherit;font-weight:400;color:var(--muted)}
+.ops{display:flex;flex-wrap:wrap;gap:8px 14px;margin:10px 0 0;font-size:22px;font-weight:700}
+.opc{display:inline-flex;align-items:center;gap:6px}
+.opc svg{width:22px;height:22px;flex:none}
+.opc.del{color:var(--del)} .opc.upd{color:var(--upd)} .opc.add{color:var(--add)}
+.meta{margin:8px 0 0;color:var(--muted);font-size:14px}
+.verdict.ok h1{color:var(--add)}
+.verdict.warn h1{color:var(--warn);font-size:26px}
+
+.apply{margin-top:auto;padding:14px 18px 16px;border-top:1px solid var(--line);background:var(--surface)}
+.apply .what{margin:0 0 10px;font-size:14px;color:var(--muted)}
+.apply .what b{color:var(--ink);font-weight:700}
+.conds{margin-top:10px;font-size:14px}
+.conds>button{background:none;border:0;padding:2px 0;color:var(--muted);cursor:pointer;display:flex;gap:8px;align-items:center}
+.conds ul{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:3px;color:var(--muted)}
+.conds li{display:flex;gap:8px}
+.conds svg{width:16px;height:16px;flex:none;margin-top:3px;color:var(--add)}
+.row2{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.why{margin:8px 0 0;font-size:14px;color:var(--muted)}
+.prog{height:8px;border-radius:4px;background:var(--surface2);overflow:hidden;margin:10px 0 8px;border:1px solid var(--line)}
+.prog i{display:block;height:100%;width:0;background:var(--accent)}
+details.info{margin:10px 18px 0;font-size:14px;color:var(--muted)}
+details.info summary{cursor:pointer;padding:3px 0}
+details.info dl{margin:6px 0 0;display:grid;grid-template-columns:90px 1fr;gap:3px 10px}
+details.info dd{margin:0;font-family:var(--mono);font-size:13px;color:var(--ink)}
+
+/* ---------- 가운데 ---------- */
+.tools{display:flex;align-items:center;gap:12px;padding:8px 14px;min-height:44px;font-size:14px}
+.tools .sp{flex:1}
+.sw{display:inline-flex;align-items:center;gap:8px;background:none;border:1px solid var(--line-strong);border-radius:16px;padding:3px 12px 3px 6px;cursor:pointer;color:var(--ink)}
+.sw .tr{width:30px;height:18px;border-radius:9px;background:var(--surface2);border:1px solid var(--line-strong);position:relative}
+.sw .tr::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--muted);transition:transform .15s}
+.sw[aria-checked="true"] .tr{background:var(--accent);border-color:var(--accent)}
+.sw[aria-checked="true"] .tr::after{transform:translateX(12px);background:var(--on-accent)}
+.sw[hidden]{display:none}
+.find{display:inline-flex;gap:8px;align-items:center;border:1px dashed var(--line-strong);border-radius:6px;padding:3px 10px;background:none;color:var(--muted);cursor:pointer}
+.tag{font-size:12px;border:1px dashed var(--line-strong);border-radius:4px;padding:0 6px;color:var(--muted);white-space:nowrap}
+.stage{flex:1;min-height:0;position:relative}
+.stage svg{position:absolute;inset:0;width:100%;height:100%}
+.msg{position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);width:min(440px,86%);text-align:center}
+.msg h2{margin:0 0 12px;font-size:36px;line-height:1.15;letter-spacing:-.02em;color:var(--del)}
+.msg .rule{display:inline-block;margin-bottom:10px;font:600 13px var(--mono);color:var(--del);border:1px solid var(--del);border-radius:4px;padding:1px 8px}
+.msg p{margin:0 0 16px;font-size:17px}
+.msg.warn h2{color:var(--warn)}
+.msg.warn .rule{color:var(--warn);border-color:var(--warn)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding:6px 14px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend svg{width:20px;height:20px}
+details.memo{border-top:1px solid var(--line);padding:6px 14px;font-size:13px;color:var(--muted)}
+details.memo summary{cursor:pointer}
+details.memo ul{margin:6px 0 2px;padding-left:18px}
+details.memo li{margin:2px 0}
+
+/* SVG 텍스트 */
+svg text{font-family:var(--font)}
+.t-sch{font-size:13px;fill:var(--muted)}
+.t-name{font-size:15px;font-weight:700;fill:var(--ink)}
+.t-op{font-size:13px;font-weight:700}
+.t-note{font-size:13px;fill:var(--muted)}
+.halo-t{paint-order:stroke;stroke:var(--w2);stroke-width:4px;stroke-linejoin:round}
+.t-ring{font-size:13px;fill:var(--muted);text-anchor:middle}
+.node{cursor:pointer;outline:none}
+.node .sel{fill:none;stroke:var(--ink);stroke-width:3;opacity:0}
+.node.on .sel{opacity:1}
+.node:focus-visible .sel{opacity:1;stroke:var(--focus);stroke-width:4;stroke-dasharray:none}
+.node:hover .sel{opacity:.55}
+.zero{display:none}
+.show-zero .zero{display:inline}
+.edge-c{stroke:var(--ink);stroke-width:3;fill:none}
+.edge-i{stroke:var(--ink);stroke-width:2.5;fill:none;stroke-dasharray:9 7}
+.edge-z{stroke:var(--muted);stroke-width:1.5;fill:none;stroke-dasharray:2 5;stroke-linecap:round}
+.pill rect{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.5}
+.pill.inf rect{stroke-dasharray:5 3}
+.pill text{font-size:13px;fill:var(--ink)}
+.pill .sub{fill:var(--muted)}
+.op-del{--op:var(--del)} .op-upd{--op:var(--upd)} .op-add{--op:var(--add)}
+.nbody{fill:var(--op)}
+.nsym{stroke:var(--on-op);stroke-width:3.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.t-op.op-del{fill:var(--del)} .t-op.op-upd{fill:var(--upd)} .t-op.op-add{fill:var(--add)}
+.dim{opacity:.4}
+
+/* ---------- 오른쪽: 상세 ---------- */
+.right h2{margin:0;font-size:22px;line-height:1.25;letter-spacing:-.01em;word-break:break-all}
+.right h2 small{display:block;font-size:14px;font-weight:400;color:var(--muted);letter-spacing:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;border:1px solid currentColor;border-radius:12px;padding:0 9px}
+.chip svg{width:14px;height:14px}
+.chip.del{color:var(--del);background:var(--del-bg)} .chip.upd{color:var(--upd);background:var(--upd-bg)} .chip.add{color:var(--add);background:var(--add-bg)}
+.chip.plain{color:var(--muted);font-weight:500}
+.chip.dash{border-style:dashed;color:var(--muted);font-weight:500}
+.right h3{margin:22px 0 8px;font-size:15px;font-weight:700}
+ol.chain{list-style:none;margin:0;padding:0}
+ol.chain li{position:relative;padding:0 0 14px 24px;font-size:14px}
+ol.chain li::before{content:"";position:absolute;left:2px;top:6px;width:11px;height:11px;border-radius:50%;border:2px solid var(--ink);background:var(--surface)}
+ol.chain li::after{content:"";position:absolute;left:7px;top:19px;bottom:-4px;border-left:2px solid var(--ink)}
+ol.chain li.inf::after{border-left-style:dashed}
+ol.chain li:last-child{padding-bottom:0}
+ol.chain li:last-child::after{display:none}
+ol.chain li.here::before{background:var(--op,var(--ink))}
+ol.chain li.stmt::before{border-radius:2px}
+ol.chain li.trig::before{border-style:dashed}
+ol.chain li.unobs{color:var(--muted)}
+ol.chain li.unobs::before{border-style:dotted}
+ol.chain .lk{display:block;font-size:13px;color:var(--muted)}
+ol.chain b{font-weight:700}
+ol.chain .mono{font-size:13px;word-break:break-all}
+table.vals{width:100%;border-collapse:collapse;font-size:14px}
+table.vals th{text-align:left;font-weight:500;color:var(--muted);font-size:13px;padding:2px 6px 4px 0}
+table.vals td{padding:6px 6px 6px 0;border-top:1px solid var(--line);vertical-align:top}
+table.vals td:first-child{color:var(--muted);width:34%;word-break:break-all}
+.v{font-family:var(--mono);font-size:13px;word-break:break-all}
+.arrow{color:var(--muted);padding:0 4px}
+.tg{font-size:12px;border-radius:4px;padding:0 5px;margin-left:5px;border:1px solid var(--line-strong);color:var(--muted);white-space:nowrap;font-family:var(--font)}
+.tg.vol{border-style:dashed}
+.keyrow{font-size:14px;color:var(--muted);margin:0 0 6px}
+.note{font-size:14px;color:var(--muted);margin:8px 0 0}
+.hint{color:var(--muted);font-size:15px;margin-top:40px;text-align:center}
+.pass{color:var(--add)} .fail{color:var(--del)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:14px;margin:0}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+.big-eq{font-size:26px;font-weight:700;color:var(--add);margin:6px 0 2px}
+tr.pick td{background:var(--surface2)}
+
+/* ---------- 목업 전환기 ---------- */
+#mock{position:fixed;right:10px;bottom:8px;z-index:30;display:flex;gap:2px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:2px;font-size:12px;opacity:.9}
+#mock span{color:var(--muted);padding:0 6px}
+#mock button{border:0;background:none;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:12px;color:var(--muted)}
+#mock button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+
+dialog{border:1px solid var(--line-strong);border-radius:10px;background:var(--surface);color:var(--ink);padding:22px 24px;width:min(460px,92vw)}
+dialog::backdrop{background:rgba(5,15,20,.55)}
+dialog h2{margin:0 0 10px;font-size:22px}
+dialog ul{margin:0 0 14px;padding:0;list-style:none;font-size:15px;display:grid;gap:4px}
+dialog .acts{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brand" aria-label="db-ripple">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="2.5" fill="currentColor"/><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="10.5" stroke-dasharray="3 3"/></svg>
+      db-ripple
+    </div>
+    <div class="sbx">
+      <button id="sbxBtn" aria-expanded="false" aria-controls="sbxPop"><span class="dot" id="sbxDot"></span><span id="sbxTxt">샌드박스 준비됨</span></button>
+      <div class="pop" id="sbxPop" hidden>
+        <dl>
+          <dt>원본 → 복제</dt><dd class="mono">AW_Origin → AW_Sandbox</dd>
+          <dt>기준선</dt><dd>2026-11-12 14:27 · 수집 테이블 71개 · 제외 0</dd>
+          <dt>환경 지문</dt><dd>원본과 일치<br><span class="mono" style="font-size:13px">SQL Server 16.0.4175.1 Enterprise Edition (64-bit) · 호환 수준 160 · SQL_Latin1_General_CP1_CI_AS · 트리거 중첩 1 · 재귀 OFF</span></dd>
+          <dt>잠금</dt><dd>없음</dd>
+          <dt>행 이미지 상한</dt><dd class="mono">100,000</dd>
+        </dl>
+      </div>
+    </div>
+  </header>
+  <main>
+    <section class="col left" aria-label="SQL과 판정">
+      <div class="editor" id="editor"></div>
+      <div id="verdict"></div>
+      <div id="infoWrap"></div>
+      <div class="apply" id="apply"></div>
+    </section>
+    <section class="col center" aria-label="영향 동심원">
+      <div class="tools" id="tools"></div>
+      <div class="stage" id="stage"></div>
+      <details class="memo" id="memo">
+        <summary>제안(현재 API 없음) · 노드가 수백 개일 때</summary>
+        <ul>
+          <li>고리마다 스키마로 묶고 "Sales 38개" 같은 개수 노드만 그린다. 누르면 그 묶음만 고리 위에 펼친다.</li>
+          <li>펼친 묶음은 행 수 순으로 위에서 24개까지, 나머지는 "외 n개"로 접는다. 테이블 찾기(Ctrl+K)로 바로 이동한다.</li>
+          <li>순변경 0행만 있는 묶음은 개수 점으로만 남긴다.</li>
+        </ul>
+      </details>
+      <div class="legend" id="legend"></div>
+    </section>
+    <aside class="col right" id="panel" aria-label="선택한 테이블 상세" aria-live="polite"></aside>
+  </main>
+</div>
+
+<div id="mock" role="group" aria-label="목업 상태 전환">
+  <span>목업</span>
+  <button data-s="dm1">dm1</button><button data-s="dm2">dm2</button><button data-s="rej">rej</button><button data-s="applied">applied</button><button data-s="drift">drift</button>
+  <button id="themeBtn" aria-label="테마 전환">밝음/어두움</button>
+</div>
+<div class="sr" id="live" aria-live="polite" role="status"></div>
+
+<dialog id="dlg" aria-labelledby="dlgT">
+  <h2 id="dlgT">원본에 적용할까요?</h2>
+  <ul id="dlgList"></ul>
+  <div class="acts">
+    <button class="btn" id="dlgNo" type="button">돌아가기</button>
+    <button class="btn primary" id="dlgYes" type="button">적용 확정</button>
+  </div>
+</dialog>
+
+<script>
+(function(){
+"use strict";
+var $=function(s){return document.querySelector(s)};
+var SYM={
+  del:'<path d="M-8 0H8"/>',
+  add:'<path d="M-8 0H8M0 -8V8"/>',
+  upd:'<path d="M-10 2C-6 -7 -2 -7 0 0S6 7 10 -2"/>'
+};
+function symSvg(op,sz){return '<svg viewBox="-12 -12 24 24" width="'+(sz||22)+'" height="'+(sz||22)+'" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+SYM[op]+'</svg>'}
+var OPN={del:'삭제',upd:'수정',add:'추가'};
+var CHECK='<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg>';
+
+/* ---------- 상태 데이터(브리프 값 그대로) ---------- */
+var SQL={
+  dm1:['<b class="k">DELETE FROM</b> Sales.SalesOrderHeader <b class="k">WHERE</b> SalesOrderID = 43697;'],
+  dm2:['<b class="k">UPDATE</b> Sales.SalesOrderDetail <b class="k">SET</b> OrderQty = OrderQty + 1 <b class="k">WHERE</b> SalesOrderDetailID = 52;'],
+  rej:['<b class="k">DELETE FROM</b> Sales.SalesOrderHeader <b class="k">WHERE</b> SalesOrderID = 43697;','<b class="k">DROP TABLE</b> Sales.Store;'],
+  drift:['<b class="k">UPDATE</b> Production.Product <b class="k">SET</b> ListPrice = ListPrice + 1.00 <b class="k">WHERE</b> ProductID = 680;']
+};
+SQL.applied=SQL.dm2;
+
+var CONDS=['미리보기 정상','환경 지문 일치','30분 안(남은 30분)','SQL이 미리보기 뒤 바뀌지 않음','잔여 변경 확인 성공','샌드박스 준비됨','다른 작업 잠금 없음'];
+
+var TRIG_IDU='Sales.iduSalesOrderDetail';
+var D={};
+D.dm1={
+  sqlKey:'dm1', ms:'1.6초', center:{t:'DELETE',s:'문장'}, sel:'soh',
+  head:{tables:3,ops:[['del',4]],net:'순변경 4행 · 1.6초',sub:'0행 쓰기 2건(숨김)'},
+  nodes:[
+    {id:'soh',x:320,y:220,r:24,op:'del',rows:1,sch:'Sales',name:'SalesOrderHeader',lab:{x:320,y:150,a:'middle'},note:[],from:'c',kind:'certain'},
+    {id:'sod',x:130,y:230,r:24,op:'del',rows:1,sch:'Sales',name:'SalesOrderDetail',lab:{x:130,y:274,a:'middle'},note:['트리거 발동 · 0행 쓰기 2'],from:'soh',kind:'certain',pill:'FK 연쇄 · 확실',px:225,py:225},
+    {id:'rsn',x:510,y:230,r:31,op:'del',rows:2,sch:'Sales',name:'SalesOrderHeaderSalesReason',lab:{x:510,y:282,a:'middle'},note:[],from:'soh',kind:'certain',pill:'FK 연쇄 · 확실',px:415,py:225}
+  ],
+  zeros:[
+    {x:38,y:237,from:'sod',obs:false},
+    {x:90,y:147,from:'sod',obs:false},
+    {lab:{x:10,y:72,a:'start'},l:['SalesOrderHeader 0행 · Person.Person 0행','이어진 트리거 2개 · 관측 안 됨'],obs:false,labelOnly:1}
+  ],
+  zeroCount:2,
+  detail:{
+    soh:{full:'Sales.SalesOrderHeader',op:'del',tx:'삭제 1행',cert:'확실 · 직접',
+      path:[{t:'stmt',x:'DELETE Sales.SalesOrderHeader'},{t:'node',x:'Sales.SalesOrderHeader',lk:'직접 · 확실',here:1}],
+      grid:{cols:['SalesOrderID','CustomerID','Status'],rows:[['43697','21768','5']],cap:'삭제된 행(이전 값)'}},
+    sod:{full:'Sales.SalesOrderDetail',op:'del',tx:'삭제 1행',cert:'확실 · FK 연쇄',
+      path:[{t:'stmt',x:'DELETE Sales.SalesOrderHeader'},{t:'node',x:'Sales.SalesOrderHeader 1행 삭제',lk:'직접 · 확실'},{t:'node',x:'Sales.SalesOrderDetail',lk:'FK 연쇄 CASCADE · 확실 · 일치 1',fk:'FK_SalesOrderDetail_SalesOrderHeader_SalesOrderID',here:1}],
+      grid:{cols:['SalesOrderID','SalesOrderDetailID'],rows:[['43697','353']],cap:'삭제된 행(이전 값)'},
+      note:'이 삭제로 트리거 Sales.iduSalesOrderDetail이 발동했다(관측됨 · 추론). 그 쓰기는 모두 0행이다. 위쪽 "0행 쓰기 2건 보기"로 확인한다.'},
+    rsn:{full:'Sales.SalesOrderHeaderSalesReason',op:'del',tx:'삭제 2행',cert:'확실 · FK 연쇄',
+      path:[{t:'stmt',x:'DELETE Sales.SalesOrderHeader'},{t:'node',x:'Sales.SalesOrderHeader 1행 삭제',lk:'직접 · 확실'},{t:'node',x:'Sales.SalesOrderHeaderSalesReason',lk:'FK 연쇄 CASCADE · 확실 · 일치 2',fk:'FK_SalesOrderHeaderSalesReason_SalesOrderHeader_SalesOrderID',here:1}],
+      grid:{cols:['SalesOrderID','SalesReasonID'],rows:[['43697','5'],['43697','9']],cap:'삭제된 행 2건(이전 값)'}}
+  }
+};
+D.dm2={
+  sqlKey:'dm2', center:{t:'UPDATE',s:'문장'}, sel:'per',
+  head:{tables:4,ops:[['add',1],['upd',3]],net:'순변경 4행 · 1.2초',sub:'발동 12 · 행 바뀜 6 · 0행 6'},
+  nodes:[
+    {id:'sod',x:320,y:220,r:24,op:'upd',rows:1,sch:'Sales',name:'SalesOrderDetail',lab:{x:288,y:203,a:'end'},note:[],from:'c',kind:'certain',
+     trig:{x:362,y:200,l1:'트리거 '+TRIG_IDU,l2:'관측됨 · 추론'}},
+    {id:'th',x:113,y:415,r:24,op:'add',rows:1,sch:'Production',name:'TransactionHistory',lab:{x:113,y:459,a:'middle'},note:[],from:'sod',kind:'inferred'},
+    {id:'per',x:320,y:120,r:24,op:'upd',rows:1,sch:'Person',name:'Person',lab:{x:352,y:104,a:'start'},note:['같은 행 2번 · 순변경 1행'],from:'sod',kind:'inferred'},
+    {id:'soh',x:527,y:415,r:24,op:'upd',rows:1,sch:'Sales',name:'SalesOrderHeader',lab:{x:495,y:399,a:'end'},note:['같은 행 2번 · 순변경 1행'],from:'sod',kind:'inferred'}
+  ],
+  zeros:[
+    {x:242,y:50,from:'per'},{x:283,y:42,from:'per'},{x:357,y:42,from:'per'},{x:398,y:50,from:'per'},
+    {lab:{x:418,y:56,a:'start'},l:['Person.Person 0행 ×4','트리거 iuPerson · 관측 안 됨'],obs:false,labelOnly:1},
+    {x:615,y:392,from:'soh',lab:{x:632,y:350,a:'end'},l:['SalesPerson 0행','트리거 uSalesOrderHeader · 관측됨'],obs:true},
+    {x:585,y:481,from:'soh',lab:{x:632,y:512,a:'end'},l:['SalesTerritory 0행','트리거 uSalesOrderHeader · 관측됨'],obs:true}
+  ],
+  zeroCount:6,
+  detail:{
+    sod:{full:'Sales.SalesOrderDetail',op:'upd',tx:'수정 1행',cert:'확실 · 직접',
+      path:[{t:'stmt',x:'UPDATE Sales.SalesOrderDetail'},{t:'node',x:'Sales.SalesOrderDetail',lk:'직접 · 확실',here:1}],
+      key:'(SalesOrderID 43663, SalesOrderDetailID 52)',
+      kv:[['OrderQty','1','2'],['LineTotal','419.458900','838.917800','파생']]},
+    th:{full:'Production.TransactionHistory',op:'add',tx:'추가 1행',cert:'추론 · 트리거',
+      path:[{t:'stmt',x:'UPDATE Sales.SalesOrderDetail'},{t:'node',x:'Sales.SalesOrderDetail 1행 수정',lk:'직접 · 확실'},{t:'trig',x:'트리거 '+TRIG_IDU,lk:'발동 · 추론 · 관측됨'},{t:'node',x:'Production.TransactionHistory',lk:'쓰기 · 추론',inf:1,here:1}],
+      key:'추가된 행(이후 값)',
+      kv:[['TransactionID','—','213443','예상값 · IDENTITY'],['ProductID','—','760'],['ReferenceOrderID','—','43663'],['ReferenceOrderLineID','—','52'],['TransactionDate','—','2026-11-12T14:28:38.997','예상값'],['TransactionType','—','S'],['Quantity','—','2'],['ActualCost','—','419.4589'],['ModifiedDate','—','2026-11-12T14:28:38.997','예상값']]},
+    per:{full:'Person.Person',op:'upd',tx:'수정 1행',cert:'추론 · 트리거',merge:'발동 2회 → 순변경 1행',
+      path:[{t:'stmt',x:'UPDATE Sales.SalesOrderDetail'},{t:'node',x:'Sales.SalesOrderDetail 1행 수정',lk:'직접 · 확실'},{t:'trig',x:'트리거 '+TRIG_IDU,lk:'발동 · 추론 · 관측됨'},{t:'node',x:'Person.Person',lk:'쓰기 · 추론 · 2번',inf:1,here:1},{t:'trig',x:'트리거 Person.iuPerson',lk:'발동 · 관측 안 됨',unobs:1},{t:'node',x:'Person.Person 0행 ×4',lk:'쓰기 · 추론',inf:1,unobs:1}],
+      key:'BusinessEntityID 483',
+      kv:[['Demographics (XML)','TotalPurchaseYTD -4416.2024','TotalPurchaseYTD -3996.7435']],
+      note:'같은 행을 두 번 바꿔 중간값은 -4206.2024였고, 순변경은 이전과 이후만 비교한다.'},
+    soh:{full:'Sales.SalesOrderHeader',op:'upd',tx:'수정 1행',cert:'추론 · 트리거',merge:'발동 2회 → 순변경 1행',
+      path:[{t:'stmt',x:'UPDATE Sales.SalesOrderDetail'},{t:'node',x:'Sales.SalesOrderDetail 1행 수정',lk:'직접 · 확실'},{t:'trig',x:'트리거 '+TRIG_IDU,lk:'발동 · 추론 · 관측됨'},{t:'node',x:'Sales.SalesOrderHeader',lk:'쓰기 · 추론 · 2번',inf:1,here:1},{t:'trig',x:'트리거 Sales.uSalesOrderHeader',lk:'발동 · 추론 · 관측됨'},{t:'node',x:'SalesPerson · SalesTerritory 0행',lk:'쓰기 · 추론',inf:1}],
+      key:'SalesOrderID 43663',
+      kv:[['RevisionNumber','10','11'],['SubTotal','419.4589','838.9178'],['TotalDue','472.3108','891.7697','파생']]}
+  },
+  steps:[['analyze','25ms'],['execute','679'],['readLog','247'],['reread','86'],['netDiff','148'],['resolve','37'],['serialize','12']],
+  pv:'pv_20261112_dc819fb8'
+};
+D.applied={
+  sqlKey:'applied', center:{t:'완료',s:'4 = 4행',done:1}, sel:'per',
+  nodes:D.dm2.nodes, zeros:[],
+  pairs:[['Person.Person','upd',1,1,'per'],['Production.TransactionHistory','add',1,1,'th'],['Sales.SalesOrderDetail','upd',1,1,'sod'],['Sales.SalesOrderHeader','upd',1,1,'soh']]
+};
+D.drift={
+  sqlKey:'drift', center:{t:'롤백함',s:'실행 안 함'}, sel:'prod',
+  nodes:[{id:'prod',x:320,y:220,r:24,op:'upd',rows:1,sch:'Production',name:'Product',lab:{x:352,y:203,a:'start'},note:['미리보기: 수정 1행'],from:'c',kind:'certain',warn:1}],
+  zeros:[]
+};
+
+/* ---------- SVG ---------- */
+function charW(s){var w=0;for(var i=0;i<s.length;i++){w+=s.charCodeAt(i)>255?13:7.2}return w}
+var CX=320,CY=340,R1=120,R2=220,R3=300;
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+function textLines(lines,x,y,a,cls){
+  var o='<text x="'+x+'" y="'+y+'" text-anchor="'+a+'" class="halo-t">';
+  lines.forEach(function(l,i){o+='<tspan x="'+x+'" dy="'+(i?17:0)+'" class="'+l[0]+'">'+esc(l[1])+'</tspan>'});
+  return o+'</text>';
+}
+function rings(dimmed){
+  var o='<g'+(dimmed?' class="dim"':'')+'>';
+  o+='<circle cx="'+CX+'" cy="'+CY+'" r="'+R3+'" fill="var(--w3)" stroke="var(--ring)" stroke-width="1.5" stroke-dasharray="3 6"/>';
+  o+='<circle cx="'+CX+'" cy="'+CY+'" r="'+R2+'" fill="var(--w2)" stroke="var(--ring)" stroke-width="1.5"/>';
+  o+='<circle cx="'+CX+'" cy="'+CY+'" r="'+R1+'" fill="var(--w1)" stroke="var(--ring)" stroke-width="1.5"/>';
+  [[R1,'깊이 1'],[R2,'깊이 2'],[R3,'깊이 3']].forEach(function(r){
+    o+='<text class="t-ring halo-t" x="'+CX+'" y="'+(CY+r[0]+4)+'">'+r[1]+'</text>';
+  });
+  return o+'</g>';
+}
+function pill(cx,cy,l1,l2,inf,left){
+  var w=Math.max(charW(l1),l2?charW(l2):0)+20,h=l2?40:24;
+  var x=left?cx:cx-w/2,y=left?cy:cy-h/2;
+  var o='<g class="pill'+(inf?' inf':'')+'"><rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="12"/>';
+  o+='<text x="'+(x+10)+'" y="'+(y+(l2?17:16))+'">'+esc(l1)+'</text>';
+  if(l2)o+='<text class="sub" x="'+(x+10)+'" y="'+(y+33)+'">'+esc(l2)+'</text>';
+  return o+'</g>';
+}
+function nodeEl(n,st,sel){
+  var o='<g class="node op-'+n.op+(sel===n.id?' on':'')+'" data-id="'+n.id+'" tabindex="0" role="button" aria-pressed="'+(sel===n.id)+'" aria-label="'+n.sch+'.'+n.name+' '+OPN[n.op]+' '+n.rows+'행. 눌러서 원인 경로와 행 값 보기" transform="translate('+n.x+' '+n.y+')">';
+  o+='<circle class="sel" r="'+(n.r+7)+'"/>';
+  o+='<circle class="nbody" r="'+n.r+'"/>';
+  o+='<g class="nsym" transform="scale('+(n.r/24*1.15).toFixed(2)+')">'+SYM[n.op]+'</g>';
+  if(st==='applied'){o+='<g transform="translate('+(n.r*.75)+' '+(-n.r*.75)+')"><circle r="10" fill="var(--accent)" stroke="var(--w2)" stroke-width="2"/><path d="M-4.5 0.5l3 3 6-6.5" fill="none" stroke="var(--on-accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></g>'}
+  if(n.warn){o+='<g transform="translate('+(n.r*.75)+' '+(-n.r*.75)+')"><circle r="10" fill="var(--warn)" stroke="var(--w2)" stroke-width="2"/><text y="5" text-anchor="middle" style="font-size:14px;font-weight:700;fill:var(--surface)">!</text></g>'}
+  o+='</g>';
+  return o;
+}
+function buildSvg(st,sel,zeroOn){
+  var d=D[st],o='<svg viewBox="0 0 640 670" preserveAspectRatio="xMidYMid meet" role="group" aria-label="영향 동심원. 가운데가 문장이고 바깥 고리일수록 몇 단계 건너 바뀐 테이블이다">';
+  o+='<title>영향 동심원</title>'+rings(false);
+  var by={c:{x:CX,y:CY}};d.nodes.forEach(function(n){by[n.id]=n});
+  /* 선 */
+  d.nodes.forEach(function(n){
+    var f=by[n.from];
+    o+='<line class="'+(n.kind==='inferred'?'edge-i':'edge-c')+'" x1="'+f.x+'" y1="'+f.y+'" x2="'+n.x+'" y2="'+n.y+'"/>';
+  });
+  /* 0행·관측 안 된 트리거 */
+  var zg='<g class="zero">';
+  (d.zeros||[]).forEach(function(z){
+    if(z.from){var f=by[z.from];zg+='<line class="edge-z" x1="'+f.x+'" y1="'+f.y+'" x2="'+z.x+'" y2="'+z.y+'"/>';}
+  });
+  (d.zeros||[]).forEach(function(z){
+    if(z.x!==undefined)zg+='<circle cx="'+z.x+'" cy="'+z.y+'" r="7" fill="var(--w2)" stroke="var(--ink)" stroke-width="2" '+(z.obs===false?'stroke-dasharray="3 2.5"':'')+'/>';
+    if(z.l){zg+=textLines([['t-note halo-t',z.l[0]],['t-note halo-t',z.l[1]]].map(function(a){return [ 't-note',a[1]]}),z.lab.x,z.lab.y,z.lab.a);}
+  });
+  zg+='</g>';
+  o+=zg;
+  /* 가운데 */
+  var c=d.center;
+  o+='<circle cx="'+CX+'" cy="'+CY+'" r="46" fill="'+(c.done?'var(--add)':'var(--ink)')+'"/>';
+  o+='<text x="'+CX+'" y="'+(CY-1)+'" text-anchor="middle" style="font-size:'+(c.done?19:15)+'px;font-weight:700;fill:'+(c.done?'var(--on-op)':'var(--bg)')+'">'+c.t+'</text>';
+  o+='<text x="'+CX+'" y="'+(CY+18)+'" text-anchor="middle" style="font-size:13px;fill:'+(c.done?'var(--on-op)':'var(--bg)')+'">'+c.s+'</text>';
+  /* 선 위 라벨 */
+  d.nodes.forEach(function(n){
+    if(n.pill)o+=pill(n.px,n.py,n.pill,null,false);
+    if(n.trig)o+=pill(n.trig.x,n.trig.y,n.trig.l1,n.trig.l2,true,true);
+  });
+  /* 노드 */
+  d.nodes.forEach(function(n){
+    o+=nodeEl(n,st,sel);
+    var ls=[['t-sch',n.sch],['t-name',n.name]];
+    var optxt=OPN[n.op]+' '+n.rows+'행';
+    if(st==='applied'){var pr=D.applied.pairs.filter(function(p){return p[4]===n.id})[0];ls.push(['t-op op-'+n.op,optxt]);ls.push(['t-note','미리보기 '+pr[2]+' → 실제 '+pr[3]]);}
+    else{ls.push(['t-op op-'+n.op,optxt]);(n.note||[]).forEach(function(t){ls.push(['t-note',t])});}
+    o+=textLines(ls,n.lab.x,n.lab.y,n.lab.a);
+  });
+  return o+'</svg>';
+}
+function emptySvg(){return '<svg viewBox="0 0 640 670" preserveAspectRatio="xMidYMid meet" aria-hidden="true">'+rings(true)+'</svg>'}
+
+/* ---------- 상태 ---------- */
+var state='dm2',sel=null,zeroOn=false,condOpen=false,baseTimer=null,baseDone=false;
+var theme='light';
+function announce(t){var l=$('#live');l.textContent='';setTimeout(function(){l.textContent=t},30)}
+
+function renderEditor(){
+  var key=state==='idle'?'dm2':state;var L=SQL[key]||SQL.dm2;
+  var h='<div class="code" role="textbox" aria-readonly="true" aria-label="SQL 편집기">';
+  L.forEach(function(l,i){
+    var bad=(state==='rej'&&i===1);
+    h+='<div class="ln'+(bad?' bad':'')+'"><i>'+(bad?'✕ ':'')+(i+1)+'</i><code>'+l+'</code></div>';
+  });
+  h+='</div><footer>';
+  if(state==='rej')h+='<span>문장 2 · 통과 1 · 거부 1</span>';
+  else if(state==='applied')h+='<span>읽기 전용 · 적용 끝남</span>';
+  else h+='<span>문장 1</span>';
+  var dis=(state==='applied'&&!baseDone)?' disabled':'';
+  h+='<button class="btn'+(state==='rej'?' primary':'')+'" id="runBtn"'+dis+'>'+(state==='rej'||state==='idle'?'미리보기 실행':'다시 실행')+' <kbd>Ctrl+Enter</kbd></button></footer>';
+  $('#editor').innerHTML=h;
+}
+function opsHtml(ops){return ops.map(function(o){return '<span class="opc '+o[0]+'">'+symSvg(o[0],22)+OPN[o[0]]+' '+o[1]+'</span>'}).join('')}
+function renderVerdict(){
+  var v=$('#verdict'),w=$('#infoWrap');w.innerHTML='';
+  var d=D[state];
+  if(state==='dm1'||state==='dm2'){
+    var h=d.head;
+    v.innerHTML='<div class="verdict"><h1>테이블 '+h.tables+'개</h1><div class="ops">'+opsHtml(h.ops)+'</div><p class="meta">'+h.net+'</p><p class="meta" style="margin-top:2px">'+h.sub+'</p></div>';
+    var info='<details class="info"><summary>미리보기 정보</summary><dl>';
+    if(state==='dm2'){info+='<dt>미리보기 id</dt><dd>'+d.pv+'</dd>';d.steps.forEach(function(s){info+='<dt>'+s[0]+'</dt><dd>'+s[1]+(s[1].indexOf('ms')<0?'ms':'')+'</dd>'})}
+    else info+='<dt>소요</dt><dd>1581ms</dd><dt>경고</dt><dd>없음</dd><dt>롤백 뒤</dt><dd>남은 변경 없음</dd>';
+    info+='</dl></details>';w.innerHTML=info;
+  }else if(state==='applied'){
+    v.innerHTML='<div class="verdict ok"><h1>원본에 적용됨</h1><div class="ops" style="color:var(--add)">'+CHECK.replace('<svg','<svg style="width:22px;height:22px"')+'<span>4 = 4행 일치</span></div><p class="meta">2026-11-18 09:39:21 · 2.73초</p></div>';
+  }else if(state==='drift'){
+    v.innerHTML='<div class="verdict warn"><h1>원본이 바뀌어<br>적용하지 않음</h1><p class="meta">미리보기 뒤 원본의 이전 행 1건이 달라져 실행하지 않고 롤백함</p></div>';
+  }else if(state==='rej'){
+    v.innerHTML='';
+  }else v.innerHTML='';
+}
+function renderApply(){
+  var a=$('#apply'),h='';
+  if(state==='dm1'||state==='dm2'){
+    var what=state==='dm1'?'<b>AW_Origin</b>에서 <b>4행</b> 삭제':'<b>AW_Origin</b>에서 <b>4행</b> 바뀜(추가 1 · 수정 3)';
+    h+='<p class="what">'+what+'</p>';
+    h+='<button class="btn primary big" id="applyBtn">원본에 적용</button>';
+    h+='<div class="conds"><button id="condBtn" aria-expanded="'+condOpen+'"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--add)" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg>적용 조건 7/7 충족 · 남은 30분</button>';
+    if(condOpen){h+='<ul>'+CONDS.map(function(c){return '<li>'+CHECK+c+'</li>'}).join('')+'</ul>'}
+    h+='</div><div class="row2"><span></span><button class="btn link" id="cancelBtn">미리보기 취소</button></div>';
+  }else if(state==='rej'){
+    h+='<button class="btn big" disabled>원본에 적용</button><p class="why">먼저 미리보기를 실행해야 합니다</p>';
+  }else if(state==='applied'){
+    h+='<div id="baseTxt" class="meta" style="margin:0"></div><div class="prog" role="progressbar" aria-label="기준선 다시 만드는 중" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="prog"><i id="progI"></i></div>';
+    h+='<button class="btn primary big" id="newBtn" disabled>새 미리보기</button>';
+  }else if(state==='drift'){
+    h+='<button class="btn primary big" id="refreshBtn">샌드박스 새로 고침</button><p class="why">새로 고친 뒤 다시 미리보기를 실행합니다</p>';
+  }else{
+    h+='<button class="btn primary big" disabled>원본에 적용</button><p class="why">미리보기를 실행하면 켜집니다</p>';
+  }
+  a.innerHTML=h;
+}
+function renderTools(){
+  var t=$('#tools'),h='<button class="find" id="findBtn" aria-disabled="true" title="제안(현재 API 없음): 테이블 이름으로 노드를 찾아 이동"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>테이블 찾기 <kbd>Ctrl+K</kbd><span class="tag">제안(현재 API 없음)</span></button><span class="sp"></span>';
+  var d=D[state];
+  if(d&&d.zeroCount){h+='<button class="sw" id="zeroSw" role="switch" aria-checked="'+zeroOn+'"><span class="tr"></span>0행 쓰기 '+d.zeroCount+'건 보기</button>'}
+  t.innerHTML=h;
+}
+function renderLegend(){
+  var h='<span>'+symSvg('del',16).replace('stroke="currentColor"','stroke="var(--del)"')+'삭제</span><span>'+symSvg('upd',16).replace('stroke="currentColor"','stroke="var(--upd)"')+'수정</span><span>'+symSvg('add',16).replace('stroke="currentColor"','stroke="var(--add)"')+'추가</span>';
+  h+='<span><svg viewBox="0 0 28 10"><line x1="1" y1="5" x2="27" y2="5" stroke="var(--ink)" stroke-width="3"/></svg>확실</span>';
+  h+='<span><svg viewBox="0 0 28 10"><line x1="1" y1="5" x2="27" y2="5" stroke="var(--ink)" stroke-width="2.5" stroke-dasharray="6 4"/></svg>추론(트리거)</span>';
+  h+='<span><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6" fill="none" stroke="var(--ink)" stroke-width="2" stroke-dasharray="3 2.5"/></svg>0행</span>';
+  h+='<span>크기 = 행 수</span><span>고리 = 몇 단계 건너(시간 아님)</span>';
+  $('#legend').innerHTML=h;
+}
+function renderStage(){
+  var s=$('#stage'),d=D[state];
+  if(state==='rej'){
+    s.innerHTML=emptySvg()+'<div class="msg"><span class="rule">REJECT_DDL</span><h2>실행하지 않음</h2><p>2행 <b class="mono">DROP TABLE Sales.Store</b><br>DDL은 미리보기할 수 없습니다. 스키마를 바꾸면 트랜잭션 제약과 DDL 트리거 반응이 달라집니다.</p><button class="btn primary" id="gotoBtn">2행으로 이동</button></div>';
+    return;
+  }
+  if(state==='idle'){s.innerHTML=emptySvg()+'<div class="msg"><h2 style="color:var(--ink);font-size:28px">미리보기 없음</h2><p>SQL을 쓰고 <kbd>Ctrl+Enter</kbd>를 누르세요</p></div>';return}
+  s.innerHTML=buildSvg(state,sel,zeroOn);
+  var svg=s.querySelector('svg');if(zeroOn)svg.classList.add('show-zero');
+  if(state==='drift'){
+    s.insertAdjacentHTML('beforeend','');
+  }
+}
+function valCell(k){return '<span class="v">'+esc(k)+'</span>'}
+function renderPanel(){
+  var p=$('#panel'),h='';
+  if(state==='rej'){
+    h+='<h2>문장별 분석</h2><table class="vals" style="margin-top:12px"><tr><th>줄</th><th>결과</th></tr>';
+    h+='<tr><td>1</td><td><span class="pass">'+CHECK.replace('<svg','<svg style="width:15px;height:15px;vertical-align:-2px"')+' 통과</span><div class="v">DELETE Sales.SalesOrderHeader</div></td></tr>';
+    h+='<tr><td>2</td><td><span class="fail">✕ 거부</span><div class="v">DROP TABLE Sales.Store</div><div class="v" style="color:var(--muted)">규칙 REJECT_DDL</div></td></tr></table>';
+    p.innerHTML=h;return;
+  }
+  if(state==='idle'){p.innerHTML='<p class="hint">미리보기를 실행하면<br>테이블 상세가 여기에 보입니다</p>';return}
+  if(state==='applied'){
+    h+='<h2>건수 대조<small>미리보기 → 실제 · 비교 방식 SNAPSHOT_NETDIFF</small></h2>';
+    h+='<p class="big-eq">건수 일치 4 = 4행</p>';
+    h+='<table class="vals"><tr><th>테이블</th><th>미리보기</th><th>실제</th></tr>';
+    D.applied.pairs.forEach(function(r){
+      h+='<tr'+(sel===r[4]?' class="pick"':'')+'><td style="width:auto;color:var(--ink)">'+r[0]+'</td><td>'+OPN[r[1]]+' '+r[2]+'</td><td class="pass">'+OPN[r[1]]+' '+r[3]+' '+CHECK.replace('<svg','<svg style="width:14px;height:14px;vertical-align:-2px"')+'</td></tr>';
+    });
+    h+='</table>';
+    h+='<h3>IDENTITY 짝</h3><p class="keyrow" style="margin:0">TransactionHistory.TransactionID<br><span class="v">미리보기 213443 → 실제 213443</span> <span class="pass">같은 값</span></p>';
+    h+='<h3>비교에서 제외(예상값)</h3><p class="keyrow" style="margin:0">TransactionHistory의 <span class="v">TransactionID · TransactionDate · ModifiedDate</span></p>';
+    h+='<details class="info" style="margin:16px 0 0"><summary>단계별 소요</summary><dl><dt>snapshot</dt><dd>398ms</dd><dt>drift</dt><dd>6ms</dd><dt>execute</dt><dd>175ms</dd><dt>netDiff</dt><dd>2144ms</dd><dt>commit</dt><dd>6ms</dd></dl></details>';
+    p.innerHTML=h;return;
+  }
+  if(state==='drift'){
+    h+='<h2>바뀐 행<small>Production.Product · ProductID 680</small></h2><div class="chips"><span class="chip upd">'+symSvg('upd',14)+'수정 1행 (미리보기)</span><span class="chip plain">확실 · 직접</span></div>';
+    h+='<h3>ListPrice 비교</h3><table class="vals"><tr><th></th><th>값</th></tr>';
+    h+='<tr><td>미리보기 이전(예상)</td><td>'+valCell('1431.5000')+'</td></tr>';
+    h+='<tr><td>원본 지금(실제)</td><td>'+valCell('1431.5100')+' <span class="tg" style="color:var(--warn);border-color:var(--warn)">다름</span></td></tr>';
+    h+='<tr><td>미리보기 변경</td><td>'+valCell('1431.5000')+'<span class="arrow">→</span>'+valCell('1432.5000')+'</td></tr></table>';
+    h+='<p class="note">결과 drift_detected. 원본에는 아무것도 쓰지 않았다.</p>';
+    p.innerHTML=h;return;
+  }
+  var dt=D[state].detail[sel];
+  if(!dt){p.innerHTML='<p class="hint">고리 위의 테이블을 눌러<br>원인 경로와 행 값을 보세요</p>';return}
+  var n=D[state].nodes.filter(function(x){return x.id===sel})[0];
+  var sc=dt.full.split('.');
+  h+='<h2><small>'+sc[0]+'</small>'+sc[1]+'</h2>';
+  h+='<div class="chips"><span class="chip '+dt.op+'">'+symSvg(dt.op,14)+dt.tx+'</span>';
+  h+='<span class="chip '+(dt.cert.indexOf('추론')===0?'dash':'plain')+'">'+dt.cert+'</span>';
+  if(dt.merge)h+='<span class="chip plain">'+dt.merge+'</span>';
+  h+='</div>';
+  h+='<h3>왜 바뀌었나</h3><ol class="chain" style="--op:var(--'+dt.op+')">';
+  dt.path.forEach(function(s){
+    var cls=[];if(s.t==='stmt')cls.push('stmt');if(s.t==='trig')cls.push('trig');if(s.inf||s.t==='trig')cls.push('inf');if(s.here)cls.push('here');if(s.unobs)cls.push('unobs');
+    h+='<li class="'+cls.join(' ')+'">';
+    if(s.lk)h+='<span class="lk">'+s.lk+'</span>';
+    h+=(s.t==='stmt'?'<span class="mono">'+esc(s.x)+'</span>':'<b>'+esc(s.x)+'</b>');
+    if(s.fk)h+='<span class="lk mono">'+s.fk+'</span>';
+    h+='</li>';
+  });
+  h+='</ol>';
+  h+='<h3>행 값</h3>';
+  if(dt.key)h+='<p class="keyrow">'+esc(dt.key)+'</p>';
+  if(dt.kv){
+    var upd=dt.kv[0][1]!=='—';
+    h+='<table class="vals"><tr><th>열</th><th>'+(upd?'이전 → 이후':'이후')+'</th></tr>';
+    dt.kv.forEach(function(r){
+      var tag=r[3]?'<span class="tg'+(r[3].indexOf('예상')===0?' vol':'')+'">'+r[3]+'</span>':'';
+      h+='<tr><td>'+r[0]+'</td><td>'+(upd?valCell(r[1])+'<span class="arrow">→</span>'+valCell(r[2]):valCell(r[2]))+tag+'</td></tr>';
+    });
+    h+='</table>';
+  }
+  if(dt.grid){
+    h+='<table class="vals"><tr>'+dt.grid.cols.map(function(c){return '<th>'+c+'</th>'}).join('')+'</tr>';
+    dt.grid.rows.forEach(function(r){h+='<tr>'+r.map(function(c){return '<td style="width:auto;color:var(--ink)">'+valCell(c)+'</td>'}).join('')+'</tr>'});
+    h+='</table><p class="note">'+dt.grid.cap+'</p>';
+  }
+  if(dt.note)h+='<p class="note">'+dt.note+'</p>';
+  p.innerHTML=h;
+}
+function renderAll(){
+  renderEditor();renderVerdict();renderApply();renderTools();renderLegend();renderStage();renderPanel();
+  $('#memo').style.display=(state==='dm1'||state==='dm2')?'':'none';
+  var busy=(state==='applied'&&!baseDone);
+  $('#sbxDot').className='dot'+(busy?' busy':'');
+  $('#sbxTxt').textContent=busy?'기준선 다시 만드는 중':'샌드박스 준비됨';
+  document.querySelectorAll('#mock button[data-s]').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.s===state)});
+  bind();
+}
+
+function setState(s,opts){
+  if(baseTimer){clearInterval(baseTimer);baseTimer=null}
+  state=s;baseDone=false;
+  var d=D[s];sel=d&&d.sel?d.sel:null;zeroOn=false;condOpen=false;
+  renderAll();
+  var h=new URLSearchParams();h.set('state',s==='idle'?'dm2':s);h.set('theme',theme);
+  try{history.replaceState(null,'','#'+h.toString())}catch(e){}
+  if(s==='applied')startBase();
+  if(!(opts&&opts.quiet)){
+    var m={dm1:'삭제 미리보기. 테이블 3개, 4행 삭제',dm2:'수정 미리보기. 테이블 4개, 추가 1, 수정 3',rej:'실행하지 않음. 2행 DDL 거부',applied:'원본에 적용됨. 건수 4 = 4행 일치',drift:'원본이 바뀌어 적용하지 않음',idle:'미리보기를 취소했습니다'};
+    announce(m[s]);
+  }
+}
+function startBase(){
+  var t=0,total=8000;
+  baseTimer=setInterval(function(){
+    t+=200;var pc=Math.min(100,Math.round(t/total*100));
+    var pi=$('#progI'),pr=$('#prog'),bt=$('#baseTxt');
+    if(pi){pi.style.width=pc+'%';pr.setAttribute('aria-valuenow',pc);bt.textContent='샌드박스 기준선을 다시 만드는 중 · 그동안 미리보기 불가'}
+    if(t>=total){
+      clearInterval(baseTimer);baseTimer=null;baseDone=true;
+      if(state==='applied'){
+        bt.textContent='샌드박스 준비됨 · 새 기준선 만들기 끝';
+        $('#newBtn').disabled=false;
+        var r=$('#runBtn');if(r)r.disabled=false;
+        $('#sbxDot').className='dot';$('#sbxTxt').textContent='샌드박스 준비됨';
+        announce('샌드박스 기준선을 다시 만들었습니다. 새 미리보기를 실행할 수 있습니다');
+      }
+    }
+  },200);
+}
+function setTheme(t){theme=t;document.documentElement.setAttribute('data-theme',t);var h=new URLSearchParams(location.hash.slice(1));h.set('theme',t);if(!h.get('state'))h.set('state',state);try{history.replaceState(null,'','#'+h.toString())}catch(e){}}
+
+function selectNode(id){
+  sel=id;
+  var d=D[state];
+  document.querySelectorAll('.node').forEach(function(g){var on=g.dataset.id===id;g.classList.toggle('on',on);g.setAttribute('aria-pressed',on)});
+  renderPanel();
+  var n=d.nodes.filter(function(x){return x.id===id})[0];
+  if(n)announce(n.sch+'.'+n.name+' '+OPN[n.op]+' '+n.rows+'행 상세');
+}
+function openDlg(){
+  var d=$('#dlg'),L=$('#dlgList');
+  var items=state==='dm1'?[['del','Sales.SalesOrderHeader 삭제 1'],['del','Sales.SalesOrderDetail 삭제 1'],['del','Sales.SalesOrderHeaderSalesReason 삭제 2']]:
+    [['upd','Sales.SalesOrderDetail 수정 1'],['add','Production.TransactionHistory 추가 1'],['upd','Person.Person 수정 1'],['upd','Sales.SalesOrderHeader 수정 1']];
+  L.innerHTML='<li style="color:var(--muted)">AW_Origin에 아래 4행이 실제로 커밋됩니다.</li>'+items.map(function(i){return '<li><span class="opc '+i[0]+'" style="font-size:15px;font-weight:600">'+symSvg(i[0],16)+i[1]+'</span></li>'}).join('');
+  if(d.showModal)d.showModal();else d.setAttribute('open','');
+  $('#dlgYes').focus();
+}
+function closeDlg(){var d=$('#dlg');if(d.close)d.close();else d.removeAttribute('open');var b=$('#applyBtn');if(b)b.focus()}
+
+function bind(){
+  document.querySelectorAll('.node').forEach(function(g){
+    g.addEventListener('click',function(){selectNode(g.dataset.id)});
+    g.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();selectNode(g.dataset.id)}});
+  });
+  var z=$('#zeroSw');if(z)z.addEventListener('click',function(){
+    zeroOn=!zeroOn;z.setAttribute('aria-checked',zeroOn);
+    var s=$('#stage svg');if(s)s.classList.toggle('show-zero',zeroOn);
+    announce(zeroOn?'0행 쓰기를 표시합니다':'0행 쓰기를 숨깁니다');
+  });
+  var cb=$('#condBtn');if(cb)cb.addEventListener('click',function(){condOpen=!condOpen;renderApply();bind();$('#condBtn').focus()});
+  var ab=$('#applyBtn');if(ab)ab.addEventListener('click',openDlg);
+  var cn=$('#cancelBtn');if(cn)cn.addEventListener('click',function(){setState('idle')});
+  var nb=$('#newBtn');if(nb)nb.addEventListener('click',function(){setState('idle');announce('새 미리보기를 시작합니다')});
+  var rf=$('#refreshBtn');if(rf)rf.addEventListener('click',function(){setState('idle');announce('샌드박스를 새로 고쳤습니다')});
+  var rb=$('#runBtn');if(rb)rb.addEventListener('click',function(){setState(state==='rej'?'dm1':(state==='idle'?'dm2':state))});
+  var gb=$('#gotoBtn');if(gb)gb.addEventListener('click',function(){var l=document.querySelectorAll('.ln')[1];if(l){l.setAttribute('tabindex','-1');l.focus();}announce('편집기 2행으로 이동')});
+  var fb=$('#findBtn');if(fb)fb.addEventListener('click',function(){announce('제안 기능입니다. 현재 API가 없습니다')});
+}
+
+$('#sbxBtn').addEventListener('click',function(){var p=$('#sbxPop'),o=p.hidden;p.hidden=!o;this.setAttribute('aria-expanded',o)});
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){var p=$('#sbxPop');if(!p.hidden){p.hidden=true;$('#sbxBtn').setAttribute('aria-expanded','false');$('#sbxBtn').focus()}}
+  if(e.ctrlKey&&e.key==='Enter'){var r=$('#runBtn');if(r&&!r.disabled){e.preventDefault();r.click()}}
+});
+$('#dlgNo').addEventListener('click',closeDlg);
+$('#dlg').addEventListener('cancel',function(){setTimeout(function(){var b=$('#applyBtn');if(b)b.focus()},0)});
+$('#dlgYes').addEventListener('click',function(){var d=$('#dlg');if(d.close)d.close();else d.removeAttribute('open');setState('applied')});
+document.querySelectorAll('#mock button[data-s]').forEach(function(b){b.addEventListener('click',function(){setState(b.dataset.s)})});
+$('#themeBtn').addEventListener('click',function(){setTheme(theme==='light'?'dark':'light')});
+window.addEventListener('hashchange',function(){applyHash()});
+
+function applyHash(){
+  var h=new URLSearchParams(location.hash.slice(1));
+  var s=h.get('state'),t=h.get('theme');
+  if(t==='dark'||t==='light'){theme=t;document.documentElement.setAttribute('data-theme',t)}
+  if(s&&(D[s]||s==='rej'||s==='idle')&&s!==state)setState(s,{quiet:1});
+}
+(function init(){
+  var h=new URLSearchParams(location.hash.slice(1));
+  var t=h.get('theme');theme=(t==='dark')?'dark':'light';
+  document.documentElement.setAttribute('data-theme',theme);
+  var s=h.get('state');if(!s||!(D[s]||s==='rej'||s==='idle'))s='dm2';
+  setState(s,{quiet:1});
+})();
+})();
+</script>
+</body>
+</html>

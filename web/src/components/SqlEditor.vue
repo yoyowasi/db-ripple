@@ -150,6 +150,17 @@ watch(
 watch(() => props.readonly, (r) => view?.dispatch({ effects: editableCompartment.reconfigure(EditorView.editable.of(!r)) }))
 
 watch(() => props.diagnostics, applyDiagnostics)
+
+/** 거부 진단의 [n행으로 이동]: 그 줄(열)에 커서를 두고 편집기로 초점을 옮긴다. */
+function focusAt(line: number, column = 1): void {
+  if (!view) return
+  const doc = view.state.doc
+  const l = doc.line(Math.min(Math.max(1, line), doc.lines))
+  const pos = Math.min(l.from + Math.max(0, column - 1), l.to)
+  view.dispatch({ selection: { anchor: pos }, scrollIntoView: true })
+  view.focus()
+}
+defineExpose({ focusAt })
 </script>
 
 <template>

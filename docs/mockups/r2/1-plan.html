@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>db-ripple · 플랜 (방향 1 목업)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --font:Pretendard,"Malgun Gothic","맑은 고딕",system-ui,sans-serif;
+  --mono:"JetBrains Mono",Consolas,"D2Coding","Courier New",monospace;
+  --desk:#e3e4df; --sheet:#fdfdfb; --band:#f1f1ed;
+  --ink:#17191c; --ink2:#454b52; --ink3:#5d646c;
+  --line:#dcddd6; --line2:#868b92;
+  --add:#136c3a; --add-bg:#e2f2e8;
+  --mod:#835000; --mod-bg:#f7ecd4;
+  --del:#b0202a; --del-bg:#fae3e4;
+  --focus:#1d5fd1; --btn:#17191c; --btn-ink:#fdfdfb;
+  --warn-bg:#fbf0d6;
+}
+:root[data-theme="dark"]{
+  --desk:#050607; --sheet:#0e1114; --band:#13171b;
+  --ink:#d9dee4; --ink2:#aab2bb; --ink3:#8b939d;
+  --line:#232a31; --line2:#5b6672;
+  --add:#62d18d; --add-bg:#0f2a1a;
+  --mod:#e3ab4c; --mod-bg:#2b2110;
+  --del:#ff7d84; --del-bg:#2f1317;
+  --focus:#6aa7ff; --btn:#d9dee4; --btn-ink:#0e1114;
+  --warn-bg:#2b2110;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--desk);color:var(--ink);font:14px/1.5 var(--font);padding-bottom:56px;min-width:320px}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+code,kbd,.mono{font-family:var(--mono)}
+kbd{font-size:11px;border:1px solid var(--line2);border-radius:3px;padding:0 4px;margin-left:6px;color:inherit;opacity:.9}
+
+/* 상단 얇은 띠 */
+.top{max-width:1040px;margin:0 auto;padding:10px 0 10px;display:flex;align-items:center;gap:16px}
+@media(max-width:1072px){.top,.sheet{margin-left:16px;margin-right:16px;max-width:none}}
+.brand{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;letter-spacing:-.01em}
+.sp{flex:1}
+.sb{position:relative}
+.sb summary{list-style:none;cursor:pointer;font-size:13px;color:var(--ink2);display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:4px}
+.sb summary::-webkit-details-marker{display:none}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--add);display:inline-block}
+.dot.build{background:var(--mod)}
+.pop{position:absolute;right:0;top:34px;z-index:5;width:380px;background:var(--sheet);border:1px solid var(--line2);border-radius:4px;padding:12px 14px;font-size:12.5px}
+.pop dl{margin:0;display:grid;grid-template-columns:96px 1fr;gap:4px 10px}
+.pop dt{color:var(--ink3)} .pop dd{margin:0;font-family:var(--mono);font-size:12px;word-break:break-word}
+.tbtn{border:1px solid var(--line2);background:transparent;border-radius:4px;padding:4px 10px;font-size:12.5px;color:var(--ink2)}
+
+/* 종이 */
+.sheet{max-width:1040px;margin:0 auto;background:var(--sheet);border:1px solid var(--line)}
+.ed{display:flex;gap:16px;align-items:flex-start;background:var(--band);border-bottom:1px solid var(--line);padding:12px 16px}
+.lines{flex:1;min-width:0;min-height:48px;font:13.5px/24px var(--mono)}
+.ln{display:flex;gap:14px;white-space:pre-wrap;word-break:break-word}
+.ln .no{width:16px;text-align:right;color:var(--ink3);flex:none;user-select:none}
+.ln code{font:inherit}
+.k{color:var(--ink2);font-weight:600}
+.ln.err .no{color:var(--del);font-weight:700}
+.ln.err .sq{text-decoration:underline wavy var(--del);text-underline-offset:4px}
+.ln.ok .no::after{content:""}
+.edact{flex:none;display:flex;gap:8px;align-items:center;padding-top:2px}
+.btn{border:1px solid var(--line2);background:transparent;border-radius:4px;padding:6px 12px;font-weight:600;font-size:13.5px}
+.btn[disabled]{color:var(--ink3);border-style:dashed;cursor:not-allowed}
+.btn.pri{background:var(--btn);color:var(--btn-ink);border-color:var(--btn);padding:10px 18px;font-size:15px}
+.btn.pri[disabled]{background:transparent;color:var(--ink3);border-color:var(--line2)}
+.btn.ghost{border-color:transparent;color:var(--ink2);font-weight:500}
+.btn.ghost:hover{text-decoration:underline}
+
+.body{padding:24px 32px 28px}
+.verdict{margin:0;font-size:32px;line-height:1.2;font-weight:700;letter-spacing:-.02em;display:flex;flex-wrap:wrap;gap:4px 28px;align-items:baseline}
+.verdict .t{white-space:nowrap}
+.verdict .g{font-family:var(--mono);font-weight:600;margin-right:8px;font-size:26px}
+.g.add{color:var(--add)} .g.mod{color:var(--mod)} .g.del{color:var(--del)}
+.sub{margin:8px 0 0;color:var(--ink2);font-size:14px;display:flex;flex-wrap:wrap;gap:2px 20px}
+.tip{position:relative;border-bottom:1px dotted var(--ink3);cursor:help}
+.tip::after{content:attr(data-tip);position:absolute;left:0;top:26px;width:260px;background:var(--ink);color:var(--sheet);font-size:12.5px;line-height:1.45;padding:8px 10px;border-radius:4px;z-index:6;display:none}
+.tip:hover::after,.tip:focus::after{display:block}
+.bar{display:flex;align-items:center;gap:18px;margin:22px 0 6px;padding-bottom:8px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--ink2)}
+.lg{display:flex;gap:14px;align-items:center}
+.bar .tb{border:0;background:none;padding:2px 4px;color:var(--ink2);font-size:12.5px;text-decoration:underline;text-underline-offset:3px}
+.bar .tb[aria-pressed="true"]{color:var(--ink);font-weight:600}
+.cf{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ink2);margin-right:6px;vertical-align:0}
+.ci{display:inline-block;width:8px;height:8px;border-radius:50%;border:1.5px dashed var(--ink2);margin-right:6px;vertical-align:0}
+
+/* 트리 */
+.tree{font:13.5px/1.4 var(--mono)}
+.item{display:block}
+.item:focus-visible{outline:none}
+.row{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;min-height:30px;cursor:default}
+.item[data-x="1"] .row{cursor:pointer}
+.item:focus-visible>.row{outline:2px solid var(--focus);outline-offset:-2px;background:var(--band)}
+.row:hover{background:var(--band)}
+.sg{align-self:stretch;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
+.sg.add{background:var(--add-bg);color:var(--add)}
+.sg.mod{background:var(--mod-bg);color:var(--mod)}
+.sg.del{background:var(--del-bg);color:var(--del)}
+.sg.zero,.sg.merged{color:var(--ink3);font-weight:400}
+.nm{padding:0 8px 0 10px;white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.pf{color:var(--ink3)}
+.car{display:inline-block;width:2ch;color:var(--ink2)}
+.nm b{font-weight:600}
+.vb{font:12.5px var(--font);color:var(--ink2);margin-left:8px}
+.row.zero .nm,.row.zero .nt{color:var(--ink3)}
+.trg{font:12.5px var(--font);color:var(--ink2);margin-right:6px}
+.trg+code{font-size:13px}
+.un code{color:var(--ink3);border:1px dashed var(--line2);padding:0 6px;border-radius:3px}
+.chip{font:12px var(--font);border:1px solid var(--line2);border-radius:10px;padding:0 8px;margin-left:10px;background:transparent;color:var(--ink2)}
+.nt{font:12.5px var(--font);color:var(--ink2);padding-right:10px;white-space:nowrap;display:flex;align-items:center}
+.nt .m{color:var(--ink3);margin-left:8px}
+
+.diff{padding:2px 12px 10px calc(32px + var(--ind)*1ch + 10px)}
+.dl{border-left:1px solid var(--line2);margin-left:6px}
+.dl.inf{border-left-style:dashed}
+.dm{font:12px var(--font);color:var(--ink3);padding:2px 0 4px 12px}
+.dr{display:grid;grid-template-columns:22px 250px minmax(0,1fr);align-items:baseline;min-height:22px;font:13px/22px var(--mono)}
+.dr .s{text-align:center;font-weight:700}
+.dr.del{background:var(--del-bg)} .dr.del .s{color:var(--del)}
+.dr.add{background:var(--add-bg)} .dr.add .s{color:var(--add)}
+.dr.ctx{color:var(--ink3)}
+.dr .kk{color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dr.ctx .kk{color:var(--ink3)}
+.dr .vv{word-break:break-all}
+.tag{font:11.5px var(--font);border:1px solid var(--line2);border-radius:3px;padding:0 5px;margin-left:10px;color:var(--ink2)}
+.dr.note{display:block;font:12.5px var(--font);color:var(--ink2);padding:2px 0 2px 34px;font-style:normal}
+.dr.sep{height:6px;min-height:6px}
+
+.foot{margin:14px 0 0;color:var(--ink3);font-size:12.5px;display:flex;flex-wrap:wrap;gap:2px 18px}
+.foot details{display:inline}
+.foot summary{cursor:pointer;display:inline}
+.stg{font:12px var(--mono);margin:6px 0 0;color:var(--ink2)}
+
+/* 적용 명령 */
+.apply{margin-top:26px;border-top:2px solid var(--ink);padding-top:14px}
+.apply h2{margin:0 0 10px;font-size:15px;font-weight:700}
+.ps{font-family:var(--mono);color:var(--ink3);margin-right:8px;font-weight:400}
+.cs{display:flex;align-items:center;gap:12px;font-size:13.5px}
+.cs .ok{color:var(--add);font-weight:700}
+.cs .lk{border:0;background:none;color:var(--ink2);text-decoration:underline;text-underline-offset:3px;padding:0;font-size:12.5px}
+.cl{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:2px 24px;font-size:13px;color:var(--ink2)}
+.cl li::before{content:"✓";color:var(--add);font-weight:700;margin-right:8px}
+.cl li.no::before{content:"✕";color:var(--del)}
+.go{display:flex;align-items:center;gap:16px;margin-top:14px;flex-wrap:wrap}
+.go .what{font-size:13.5px;color:var(--ink2)}
+.go .what code{color:var(--ink);font-size:13px}
+.confirm{margin-top:14px;border:1px solid var(--ink);padding:14px 16px;background:var(--band)}
+.confirm h3{margin:0 0 4px;font-size:16px}
+.confirm p{margin:0 0 10px;color:var(--ink2);font-size:13.5px}
+.confirm label{font-size:13.5px;display:block;margin-bottom:8px}
+.confirm input{font:14px var(--mono);padding:6px 10px;border:1px solid var(--line2);background:var(--sheet);color:var(--ink);border-radius:4px;width:160px;margin-left:8px}
+.crow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.crow .hint{font-size:12.5px;color:var(--ink3)}
+
+/* 거부·실패 블록 */
+.err{border:1px solid var(--del);border-left-width:5px;padding:16px 20px;margin:0}
+.err .loc{font:12.5px var(--mono);color:var(--del);margin:0 0 4px;font-weight:600}
+.err h2{margin:0 0 8px;font-size:22px;line-height:1.3;letter-spacing:-.01em}
+.err p{margin:0 0 8px;max-width:70ch}
+.err .fix{color:var(--ink2)}
+.warnb{border:1px solid var(--mod);border-left-width:5px;padding:14px 18px;margin-top:26px}
+.warnb h2{margin:0 0 6px;font-size:18px}
+.warnb .dr{margin:6px 0}
+.empty{padding:36px 0;color:var(--ink2)}
+.empty h2{margin:0 0 6px;color:var(--ink);font-size:22px}
+
+/* 적용됨 */
+.okv{color:var(--add)}
+.sec{margin-top:22px}
+.sec h3{margin:0 0 6px;font-size:14px;font-weight:700}
+.cmp{font:13.5px/26px var(--mono)}
+.cmp .r{display:grid;grid-template-columns:32px 290px 100px 120px 1fr;align-items:center}
+.cmp .r .sg{height:26px}
+.cmp .r .ar{color:var(--ink2)}
+.cmp .tot{margin-top:6px;padding-left:32px;font:700 15px var(--font);color:var(--add)}
+.pg{height:6px;background:var(--line);border-radius:3px;overflow:hidden;width:320px}
+.pg i{display:block;height:100%;width:0;background:var(--ink2)}
+
+/* 하단 띠 */
+.bot{position:fixed;left:0;right:0;bottom:0;background:var(--desk);border-top:1px solid var(--line);padding:6px 16px;display:flex;gap:16px;align-items:center;font-size:11.5px;color:var(--ink3);z-index:4;flex-wrap:wrap}
+.bot .sw button{border:1px solid var(--line2);background:transparent;color:var(--ink2);font:11.5px var(--mono);padding:1px 7px;border-radius:3px;margin-left:4px}
+.bot .sw button[aria-pressed="true"]{background:var(--ink);color:var(--sheet);border-color:var(--ink)}
+.bot kbd{font-size:10.5px;margin:0 3px 0 8px}
+@media(max-width:900px){.row{grid-template-columns:28px minmax(0,1fr)}.nt{display:none}.dr{grid-template-columns:22px 150px 1fr}.verdict{font-size:24px}.cl{grid-template-columns:1fr}.cmp .r{grid-template-columns:28px 1fr 60px}.cmp .r span:nth-child(n+4){display:none}.body{padding:18px 16px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="11" cy="11" r="2.2" fill="currentColor" stroke="none"/><path d="M6.5 11a4.5 4.5 0 0 1 4.5-4.5M15.5 11A4.5 4.5 0 0 1 11 15.5"/><path d="M3 11a8 8 0 0 1 8-8M19 11a8 8 0 0 1-8 8" stroke-dasharray="2 2.5"/></svg>
+    db-ripple
+  </div>
+  <div class="sp"></div>
+  <div id="sbwrap"></div>
+  <button class="tbtn" id="theme" aria-pressed="false"></button>
+</header>
+
+<main class="sheet" id="app"></main>
+
+<div class="bot">
+  <span class="sw">목업 상태
+    <button data-s="dm1">dm1</button><button data-s="dm2">dm2</button><button data-s="rej">rej</button><button data-s="applied">applied</button><button data-s="drift">drift</button>
+  </span>
+  <span class="sp"></span>
+  <span><kbd>j</kbd><kbd>k</kbd>이동<kbd>Enter</kbd>펼치기<kbd>e</kbd>모두 펼치기<kbd>z</kbd>0행 쓰기<kbd>Ctrl+Enter</kbd>미리보기<kbd>Ctrl+Shift+Enter</kbd>적용<kbd>Esc</kbd>취소</span>
+</div>
+<div class="sr" id="live" aria-live="polite" role="status"></div>
+
+<script>
+(function(){
+"use strict";
+var $=function(s,r){return (r||document).querySelector(s)};
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function live(m){var l=$("#live");l.textContent="";setTimeout(function(){l.textContent=m},30)}
+
+/* ---------- 데이터(브리프 실측값) ---------- */
+var SQL={
+  dm1:["DELETE FROM Sales.SalesOrderHeader WHERE SalesOrderID = 43697;"],
+  dm2:["UPDATE Sales.SalesOrderDetail SET OrderQty = OrderQty + 1 WHERE SalesOrderDetailID = 52;"],
+  rej:["DELETE FROM Sales.SalesOrderHeader WHERE SalesOrderID = 43697;","DROP TABLE Sales.Store;"],
+  drift:["UPDATE Production.Product SET ListPrice = ListPrice + 1.00 WHERE ProductID = 680;"]
+};
+SQL.applied=SQL.dm2;
+var COND=[["미리보기 정상",1],["환경 지문 일치",1],["30분 안 · 남은 30분",1],["SQL이 미리보기 뒤 바뀌지 않음",1],["잔여 변경 확인 성공",1],["샌드박스 준비됨",1],["다른 작업 잠금 없음",1]];
+
+function D(t,k,v,tag){return {t:t,k:k,v:v,tag:tag}}
+var DIFF={
+  soh1:[D("del","SalesOrderID","43697"),D("del","CustomerID","21768"),D("del","Status","5")],
+  sod1:[D("del","SalesOrderID","43697"),D("del","SalesOrderDetailID","353")],
+  sohsr:[D("del","SalesOrderID","43697"),D("del","SalesReasonID","5"),{t:"sep"},D("del","SalesOrderID","43697"),D("del","SalesReasonID","9")],
+  sod:[D("ctx","SalesOrderID","43663"),D("ctx","SalesOrderDetailID","52"),D("del","OrderQty","1"),D("add","OrderQty","2"),D("del","LineTotal","419.458900","파생"),D("add","LineTotal","838.917800","파생")],
+  th:[D("add","TransactionID","213443","예상값 · IDENTITY"),D("add","ProductID","760"),D("add","ReferenceOrderID","43663"),D("add","ReferenceOrderLineID","52"),D("add","TransactionDate","2026-11-12T14:28:38.997","예상값"),D("add","TransactionType","S"),D("add","Quantity","2"),D("add","ActualCost","419.4589"),D("add","ModifiedDate","2026-11-12T14:28:38.997","예상값")],
+  per:[D("ctx","BusinessEntityID","483"),D("del","Demographics · TotalPurchaseYTD","-4416.2024","XML 열"),D("add","Demographics · TotalPurchaseYTD","-3996.7435","XML 열"),{t:"note",v:"같은 행을 두 번 바꿔 순변경이 됨 · 중간값 -4206.2024"}],
+  per2:[{t:"note",v:"같은 행(BusinessEntityID 483)을 다시 바꿈 · 위 Person.Person의 순변경에 합쳐짐"}],
+  soh:[D("ctx","SalesOrderID","43663"),D("del","RevisionNumber","10"),D("add","RevisionNumber","11"),D("del","SubTotal","419.4589"),D("add","SubTotal","838.9178"),D("del","TotalDue","472.3108","파생"),D("add","TotalDue","891.7697","파생")],
+  soh2:[{t:"note",v:"같은 행(SalesOrderID 43663)을 다시 바꿈 · 위 Sales.SalesOrderHeader의 순변경에 합쳐짐"}],
+  prod:[D("ctx","ProductID","680"),D("del","ListPrice","1431.5000"),D("add","ListPrice","1432.5000")]
+};
+function Z(name,via,kids){return {id:"z"+Math.random().toString(36).slice(2,7),t:"zero",name:name,via:via,children:kids||[]}}
+function TR(name,obs,kids){return {id:"t"+Math.random().toString(36).slice(2,7),t:"trg",name:name,obs:obs,children:kids||[]}}
+function TB(id,sign,name,n,verb,via,conf,diff,kids,o){var r={id:id,t:"tbl",sign:sign,name:name,n:n,verb:verb,via:via,conf:conf,diff:diff,children:kids||[]};if(o)for(var k in o)r[k]=o[k];return r}
+var TREE={
+ dm1:{root:"DELETE 문장",open:["soh"],kids:[
+  TB("soh","del","Sales.SalesOrderHeader",1,"삭제","직접","c",DIFF.soh1,[
+   TB("sod","del","Sales.SalesOrderDetail",1,"삭제","FK CASCADE","c",DIFF.sod1,[
+     TR("Sales.iduSalesOrderDetail",true,[
+       Z("Sales.SalesOrderHeader","트리거 iduSalesOrderDetail",[TR("Sales.uSalesOrderHeader",false)]),
+       Z("Person.Person","트리거 iduSalesOrderDetail",[TR("Person.iuPerson",false)])
+     ])
+   ],{fk:"FK_SalesOrderDetail_SalesOrderHeader_SalesOrderID · 일치 1"}),
+   TB("sohsr","del","Sales.SalesOrderHeaderSalesReason",2,"삭제","FK CASCADE","c",DIFF.sohsr,[],{fk:"FK_SalesOrderHeaderSalesReason_SalesOrderHeader_SalesOrderID · 일치 2"})
+  ])
+ ]},
+ dm2:{root:"UPDATE 문장",open:["sod"],kids:[
+  TB("sod","mod","Sales.SalesOrderDetail",1,"수정","직접","c",DIFF.sod,[
+   TR("Sales.iduSalesOrderDetail",true,[
+    TB("th","add","Production.TransactionHistory",1,"추가","트리거 iduSalesOrderDetail","i",DIFF.th),
+    TB("per","mod","Person.Person",1,"수정","트리거 iduSalesOrderDetail","i",DIFF.per,[TR("Person.iuPerson",false,[Z("Person.Person","트리거 iuPerson"),Z("Person.Person","트리거 iuPerson")])]),
+    TB("soh","mod","Sales.SalesOrderHeader",1,"수정","트리거 iduSalesOrderDetail","i",DIFF.soh,[TR("Sales.uSalesOrderHeader",true,[
+       TB("soh2","mod","Sales.SalesOrderHeader",1,"수정","트리거 uSalesOrderHeader","i",DIFF.soh2,[],{merged:true}),
+       Z("Sales.SalesPerson","트리거 uSalesOrderHeader"),Z("Sales.SalesTerritory","트리거 uSalesOrderHeader")])]),
+    TB("per2","mod","Person.Person",1,"수정","트리거 iduSalesOrderDetail","i",DIFF.per2,[TR("Person.iuPerson",false,[Z("Person.Person","트리거 iuPerson"),Z("Person.Person","트리거 iuPerson")])],{merged:true})
+   ])
+  ])
+ ]},
+ drift:{root:"UPDATE 문장",open:["prod"],kids:[TB("prod","mod","Production.Product",1,"수정","직접","c",DIFF.prod)]}
+};
+var VERDICT={
+  dm1:{head:'<span class="t">테이블 3개</span><span class="t"><span class="g del" aria-hidden="true">−</span>4행 삭제</span>',sub:['<span class="tip" tabindex="0" data-tip="끝난 뒤 실제로 달라진 행. 같은 행을 두 번 바꿔도 1행입니다.">순변경 4행</span>','1.6초','경고 없음'],net:4,summary:"DELETE 1건 · 테이블 3개 · 4행 삭제",short:"4행 삭제",meta:"기준선 2026-11-12 14:27 · 롤백 뒤 남은 변경 없음"},
+  dm2:{head:'<span class="t">테이블 4개</span><span class="t"><span class="g add" aria-hidden="true">+</span>추가 1</span><span class="t"><span class="g mod" aria-hidden="true">~</span>수정 3</span>',sub:['<span class="tip" tabindex="0" data-tip="끝난 뒤 실제로 달라진 행. 같은 행을 두 번 바꿔도 1행입니다.">순변경 4행</span>','<span class="tip" tabindex="0" data-tip="발동 = 묶음마다 일어난 그대로의 횟수. 순서가 아니라 개수입니다.">발동 12개 중 6개가 행을 바꿈</span>','1.2초','경고 없음'],net:4,summary:"UPDATE 1건 · 테이블 4개 · 4행 (추가 1 · 수정 3)",short:"4행 (추가 1 · 수정 3)",meta:"pv_20261112_dc819fb8 · 기준선 2026-11-12 14:27 · 롤백 뒤 남은 변경 없음"},
+  drift:{head:'<span class="t">테이블 1개</span><span class="t"><span class="g mod" aria-hidden="true">~</span>수정 1</span>',sub:['순변경 1행','경고 없음'],net:1,summary:"",short:"",meta:"기준선 2026-11-12 14:27"}
+};
+
+/* ---------- 상태 ---------- */
+var S={state:"dm2",theme:"light",zero:false,all:false,open:{},focus:null,confirm:false,conds:false,reb:null,timer:null};
+var STATES=["dm1","dm2","rej","applied","drift","empty"];
+function parseHash(){var h=location.hash.replace(/^#/,"");var o={};h.split("&").forEach(function(p){var a=p.split("=");if(a[0])o[a[0]]=a[1]});return o}
+function setHash(){try{history.replaceState(null,"","#state="+S.state+"&theme="+S.theme)}catch(e){}}
+function initOpen(){S.open={};S.all=false;var T=TREE[S.state];if(T)T.open.forEach(function(i){S.open[i]=true})}
+
+/* ---------- 트리 평탄화 ---------- */
+function allNodes(n,out){(n.children||n.kids||[]).forEach(function(c){out.push(c);allNodes(c,out)});return out}
+function zeroTotal(T){return allNodes(T,[]).filter(function(n){return n.t==="zero"}).length}
+function flat(n,anc,last,out,inf){
+  var kids=(n.children||[]).filter(function(c){return c.t!=="zero"||S.zero});
+  var tail=anc.map(function(a){return a.last?"   ":(a.inf?"┆  ":"│  ")}).join("");
+  var isInf=(n.t==="tbl"&&n.conf==="c")?false:true;
+  var pfx=tail+(last?"└":"├")+(isInf?"┄ ":"─ ");
+  out.push({n:n,pfx:pfx,inf:isInf});
+  kids.forEach(function(c,i){flat(c,anc.concat([{last:last,inf:isInf}]),i===kids.length-1,out)});
+}
+function rowsFor(T){
+  var out=[];var kids=T.kids.filter(function(c){return c.t!=="zero"||S.zero});
+  kids.forEach(function(c,i){flat(c,[],i===kids.length-1,out)});
+  return out;
+}
+function shortName(s){return s.replace(/^.*\./,"")}
+function isOpen(n){return S.all||S.open[n.id]}
+
+function diffHTML(n,ind,inf){
+  var h='<div class="diff" style="--ind:'+ind+'"><div class="dl'+(inf?" inf":"")+'">';
+  if(n.fk)h+='<div class="dm">'+esc(n.fk)+'</div>';
+  n.diff.forEach(function(d){
+    if(d.t==="sep"){h+='<div class="dr sep"></div>';return}
+    if(d.t==="note"){h+='<div class="dr note">'+esc(d.v)+'</div>';return}
+    var s=d.t==="del"?"−":d.t==="add"?"+":"";
+    h+='<div class="dr '+d.t+'"><span class="s" aria-hidden="true">'+s+'</span><span class="kk">'+(d.t==="del"?'<span class="sr">이전 </span>':d.t==="add"?'<span class="sr">이후 </span>':"")+esc(d.k)+'</span><span class="vv">'+esc(d.v)+(d.tag?'<span class="tag">'+esc(d.tag)+'</span>':"")+'</span></div>';
+  });
+  return h+'</div></div>';
+}
+function hiddenZ(n){return S.zero?0:(n.children||[]).filter(function(c){return c.t==="zero"}).length}
+
+function itemHTML(r,idx){
+  var n=r.n,x=n.t==="tbl"&&n.diff&&n.diff.length,open=x&&isOpen(n);
+  var ind=r.pfx.length+2;
+  var tab=(S.focus?S.focus===n.id:idx===0)?0:-1;
+  var attrs='class="item" role="treeitem" id="it-'+n.id+'" data-id="'+n.id+'" tabindex="'+tab+'"'+(x?' data-x="1" aria-expanded="'+(open?"true":"false")+'"':"");
+  var sign="",scls="",nm="",nt="";
+  var car='<span class="car" aria-hidden="true">'+(x?(open?"▾":"▸"):"")+"</span>";
+  var pf='<span class="pf" aria-hidden="true">'+esc(r.pfx)+"</span>";
+  if(n.t==="tbl"){
+    sign=n.sign==="add"?"+":n.sign==="del"?"−":"~";scls=n.merged?"merged":n.sign;
+    nm=pf+car+'<b>'+esc(n.name)+'</b><span class="vb">'+n.verb+" "+n.n+"행"+(n.merged?" · 순변경에 합쳐짐":"")+'</span>';
+    nt='<span><i class="'+(n.conf==="c"?"cf":"ci")+'"></i>'+esc(n.via)+" · "+(n.conf==="c"?"확실":"추론")+'</span>';
+  }else if(n.t==="zero"){
+    sign="0";scls="zero";
+    nm=pf+car+esc(n.name)+'<span class="vb">UPDATE 0행</span>';
+    nt='<span><i class="ci"></i>'+esc(n.via)+" · 추론</span>";
+  }else if(n.t==="trg"){
+    var hz=hiddenZ(n);
+    nm=pf+car+'<span class="'+(n.obs?"":"un")+'"><span class="trg">트리거</span><code>'+esc(n.name)+'</code></span>'+(hz?'<button class="chip" data-act="zero" aria-label="0행 쓰기 '+hz+'건 보이기">0행 쓰기 '+hz+'건 숨김</button>':"");
+    nt='<span><i class="ci"></i>발동 · 추론</span><span class="m">'+(n.obs?"관측됨":"관측 안 됨")+'</span>';
+  }
+  var h='<div '+attrs+'><div class="row'+(n.t==="zero"?" zero":"")+'"><span class="sg '+scls+'" aria-hidden="true">'+sign+'</span><span class="nm">'+nm+'</span><span class="nt">'+nt+'</span></div>';
+  if(open)h+=diffHTML(n,ind,r.inf);
+  return h+"</div>";
+}
+
+/* ---------- 조각 ---------- */
+function sbHTML(){
+  var b=S.reb&&!S.reb.done;
+  return '<details class="sb"><summary><span class="dot'+(b?" build":"")+'"></span><span>AW_Origin → AW_Sandbox · '+(b?"기준선 만드는 중":"준비됨")+'</span></summary><div class="pop"><dl>'
+   +'<dt>기준선</dt><dd>2026-11-12 14:27 · 테이블 71개 · 제외 0</dd>'
+   +'<dt>환경 지문</dt><dd>원본과 일치</dd>'
+   +'<dt>SQL Server</dt><dd>16.0.4175.1 Enterprise Edition (64-bit) · 호환 수준 160</dd>'
+   +'<dt>정렬</dt><dd>SQL_Latin1_General_CP1_CI_AS</dd>'
+   +'<dt>트리거</dt><dd>중첩 1 · 재귀 OFF</dd>'
+   +'<dt>잠금</dt><dd>없음</dd><dt>행 이미지 상한</dt><dd>100,000</dd></dl></div></details>';
+}
+function kw(line){return esc(line).replace(/\b(DELETE|FROM|WHERE|UPDATE|SET|DROP|TABLE|INSERT|EXEC)\b/g,'<span class="k">$1</span>')}
+function editorHTML(){
+  var st=S.state==="empty"?"dm2":S.state;var L=SQL[st];var rej=S.state==="rej";
+  var h='<div class="ed"><div class="lines" role="group" aria-label="SQL 편집기 (목업, 읽기 전용)">';
+  L.forEach(function(l,i){
+    var bad=rej&&i===1;
+    var t=bad?'<span class="sq">'+kw(l.slice(0,11))+'</span>'+kw(l.slice(11)):kw(l);
+    h+='<div class="ln'+(bad?" err":"")+'" id="ln'+(i+1)+'"'+(bad?' tabindex="0" aria-label="2행, 거부된 문장"':"")+'><span class="no">'+(bad?"✕":(i+1))+'</span><code>'+t+'</code></div>';
+  });
+  h+='</div><div class="edact">';
+  var dis=rej||S.state==="applied";
+  h+='<button class="btn" id="run"'+(dis?' disabled title="'+(rej?"거부된 문장이 있어 실행할 수 없습니다":"샌드박스 기준선을 만드는 동안 미리보기할 수 없습니다")+'"':"")+'>미리보기<kbd>Ctrl+Enter</kbd></button></div></div>';
+  return h;
+}
+function toolbarHTML(T){
+  var z=zeroTotal(T);
+  return '<div class="bar"><span class="lg"><span><i class="cf"></i>확실</span><span><i class="ci"></i>추론(트리거로 인한 변경)</span></span><span class="sp"></span>'
+   +(z?'<button class="tb" data-act="zero" aria-pressed="'+S.zero+'">0행 쓰기 '+z+'건 '+(S.zero?"숨기기":"보이기")+' (z)</button>':"")
+   +'<button class="tb" data-act="all" aria-pressed="'+S.all+'">'+(S.all?"모두 접기":"모두 펼치기")+' (e)</button></div>';
+}
+function docHTML(st){
+  var T=TREE[st],V=VERDICT[st];
+  var h='<h1 class="verdict">'+V.head+'</h1><div class="sub">'+V.sub.map(function(s){return "<span>"+s+"</span>"}).join("")+'</div>';
+  h+=toolbarHTML(T);
+  var rows=rowsFor(T);
+  h+='<div class="tree" role="tree" aria-label="변경 전파 트리"><div class="item" role="treeitem" style="display:block" tabindex="-1" aria-label="'+esc(T.root)+'"><div class="row" style="min-height:28px"><span class="sg" aria-hidden="true"></span><span class="nm"><b style="font-family:var(--font)">'+esc(T.root)+'</b></span><span class="nt"></span></div></div>';
+  rows.forEach(function(r,i){h+=itemHTML(r,i)});
+  h+='</div>';
+  h+='<div class="foot"><span>'+esc(V.meta)+'</span>'+(st==="dm2"?'<details><summary>단계별 시간</summary><div class="stg">analyze 25 · execute 679 · readLog 247 · reread 86 · netDiff 148 · resolve 37 · serialize 12 (ms)</div></details>':"")+'</div>';
+  return h;
+}
+function applyHTML(st){
+  var V=VERDICT[st];var bad=COND.filter(function(c){return !c[1]});
+  var h='<section class="apply" aria-label="적용 명령"><h2><span class="ps" aria-hidden="true">$</span>적용 명령</h2>';
+  if(S.confirm){
+    h+='<div class="confirm" role="alertdialog" aria-labelledby="cf-t" aria-describedby="cf-d"><h3 id="cf-t">AW_Origin에 커밋합니다</h3><p id="cf-d">'+esc(V.summary)+'. 커밋 뒤 샌드박스 기준선을 다시 만들어 이 미리보기는 끝납니다.</p>'
+     +'<label for="cf-in">확인하려면 <code>apply</code> 입력<input id="cf-in" autocomplete="off" spellcheck="false"></label>'
+     +'<div class="crow"><button class="btn pri" id="cf-ok" disabled>원본에 적용</button><button class="btn ghost" id="cf-no">돌아가기<kbd>Esc</kbd></button><span class="hint" id="cf-h">apply를 입력하면 켜집니다</span></div></div>';
+  }else{
+    h+='<div class="cs">'+(bad.length?'<span class="ok" style="color:var(--del)">✕</span><span>조건 '+bad.length+'개 미충족 · '+esc(bad[0][0])+'</span>':'<span class="ok">✓</span><span>조건 7개 모두 충족 · 남은 30분</span>')
+     +'<button class="lk" data-act="conds" aria-expanded="'+(S.conds||bad.length>0)+'">조건 보기</button></div>';
+    if(S.conds||bad.length)h+='<ul class="cl">'+COND.map(function(c){return '<li class="'+(c[1]?"":"no")+'">'+esc(c[0])+'</li>'}).join("")+'</ul>';
+    h+='<div class="go"><button class="btn pri" id="apply"'+(bad.length?" disabled":"")+'>원본에 적용<kbd>Ctrl+Shift+Enter</kbd></button><span class="what">AW_Origin ← <code>'+esc(V.short)+'</code></span><span class="sp"></span><button class="btn ghost" id="cancel">미리보기 취소</button></div>';
+  }
+  return h+"</section>";
+}
+function rejHTML(){
+  return '<div class="body"><section class="err" role="alert"><p class="loc">2행 1–11열 · REJECT_DDL</p><h2>2행의 DROP TABLE은 미리보기할 수 없습니다</h2><p>DDL은 미리보기할 수 없습니다. 스키마를 바꾸면 트랜잭션 제약과 DDL 트리거 반응이 달라집니다.</p><p class="fix">2행을 지우거나 DML로 바꾸세요. 1행(DELETE)은 통과했습니다. 아무것도 실행하지 않았고, 이 SQL은 적용할 수 없습니다.</p><button class="btn" id="goto2">2행으로 이동</button></section></div>';
+}
+function rebHTML(){
+  var d=S.reb&&S.reb.done;
+  return '<div class="sec"><h3>다음</h3><div class="cs"><span id="rebmsg">'+(d?"샌드박스 기준선이 준비됐습니다.":"샌드박스 기준선을 다시 만드는 중 (약 8초)")+'</span>'+(d?"":'<span class="pg" aria-hidden="true"><i id="pb"></i></span>')+'</div>'
+   +'<div class="go"><button class="btn pri" id="newprev"'+(d?"":" disabled")+'>새 미리보기</button>'+(d?"":'<span class="what">기준선이 준비되면 켜집니다</span>')+'</div></div>';
+}
+function appliedHTML(){
+  var rows=[["mod","Person.Person","수정"],["add","Production.TransactionHistory","추가"],["mod","Sales.SalesOrderDetail","수정"],["mod","Sales.SalesOrderHeader","수정"]];
+  var h='<div class="body"><h1 class="verdict"><span class="t"><span class="g okv" aria-hidden="true">✓</span>원본에 적용됨</span></h1><div class="sub"><span>2026-11-18 09:39:21</span><span>2.73초</span><span>비교 방식 SNAPSHOT_NETDIFF</span></div>';
+  h+='<div class="sec"><h3>건수 대조 (미리보기 → 실제)</h3><div class="cmp">';
+  rows.forEach(function(r){h+='<div class="r"><span class="sg '+r[0]+'" aria-hidden="true">'+(r[0]==="add"?"+":"~")+'</span><span>'+r[1]+'</span><span>'+r[2]+'</span><span class="ar">1 → 1</span><span class="okv">✓ 일치</span></div>'});
+  h+='<div class="tot">건수 일치 4 = 4행</div></div></div>';
+  h+='<div class="sec"><h3>IDENTITY 짝</h3><div class="mono" style="font-size:13.5px">Production.TransactionHistory.TransactionID <span style="color:var(--ink2)">미리보기</span> 213443 → <span style="color:var(--ink2)">실제</span> 213443 <span class="tag">같은 값</span></div></div>';
+  h+='<div class="sec"><h3>비교에서 제외한 열</h3><div class="mono" style="font-size:13.5px;line-height:1.9">Production.TransactionHistory.TransactionID<span class="tag">예상값</span><br>Production.TransactionHistory.TransactionDate<span class="tag">예상값</span><br>Production.TransactionHistory.ModifiedDate<span class="tag">예상값</span></div></div>';
+  h+='<div class="foot"><details><summary>단계별 시간</summary><div class="stg">snapshot 398 · drift 6 · execute 175 · netDiff 2144 · commit 6 (ms)</div></details></div>';
+  h+='<section class="apply" aria-label="다음 행동">'+rebHTML().replace('<div class="sec"><h3>다음</h3>','<div><h2 style="margin:0 0 10px;font-size:15px">다음</h2>')+'</section></div>';
+  return h;
+}
+function driftEnd(){
+  return '<section class="warnb" role="alert"><h2>적용하지 않았습니다: 원본이 미리보기 뒤에 바뀌었습니다</h2><p style="margin:0 0 6px">원본의 이전 행 1건이 달라 실행하지 않고 롤백했습니다.</p>'
+   +'<div class="dr ctx" style="grid-template-columns:22px 1fr"><span></span><span class="kk">Production.Product · ProductID 680 · ListPrice</span></div>'
+   +'<div class="dr del" style="grid-template-columns:22px 70px 1fr"><span class="s">−</span><span class="kk">예상</span><span class="vv">1431.5000</span></div>'
+   +'<div class="dr add" style="grid-template-columns:22px 70px 1fr"><span class="s">+</span><span class="kk">실제</span><span class="vv">1431.5100</span></div>'
+   +'<div class="go"><button class="btn pri" id="refresh">샌드박스 새로 고침</button><span class="tag" title="브리프에서 정한 다음 행동이지만 현재 API 존재 여부는 확인하지 못했습니다">제안(현재 API 없음)</span><span class="what">새로 고친 뒤 다시 미리보기하세요</span></div></section>';
+}
+
+/* ---------- 렌더 ---------- */
+function render(focusId){
+  var st=S.state,h=editorHTML();
+  if(st==="rej")h+=rejHTML();
+  else if(st==="applied")h+=appliedHTML();
+  else if(st==="empty")h+='<div class="body"><div class="empty"><h2>미리보기 없음</h2><p style="margin:0 0 12px">SQL을 쓰고 미리보기를 실행하세요.</p><button class="btn pri" id="run2">미리보기<kbd>Ctrl+Enter</kbd></button></div></div>';
+  else if(st==="drift")h+='<div class="body">'+docHTML("drift")+driftEnd()+'</div>';
+  else h+='<div class="body">'+docHTML(st)+applyHTML(st)+'</div>';
+  $("#app").innerHTML=h;
+  $("#sbwrap").innerHTML=sbHTML();
+  var t=$("#theme");t.textContent=S.theme==="dark"?"밝은 테마":"어두운 테마";t.setAttribute("aria-pressed",S.theme==="dark");
+  document.documentElement.setAttribute("data-theme",S.theme);
+  Array.prototype.forEach.call(document.querySelectorAll(".bot .sw button"),function(b){b.setAttribute("aria-pressed",b.dataset.s===st)});
+  setHash();
+  if(focusId){var e=document.getElementById("it-"+focusId);if(e)e.focus()}
+}
+function go(st,msg){
+  S.state=st;S.zero=false;S.confirm=false;S.conds=false;S.focus=null;initOpen();
+  if(st!=="applied"){stopReb()}else if(!S.reb){startReb()}
+  render();
+  var m={dm1:"미리보기 완료. 테이블 3개 · 4행 삭제",dm2:"미리보기 완료. 테이블 4개 · 추가 1 · 수정 3",rej:"거부됨. 2행의 DROP TABLE은 미리보기할 수 없습니다",applied:"원본에 적용했습니다. 건수 일치 4 = 4행",drift:"미리보기 완료. 적용하지 않았습니다: 원본이 바뀌었습니다",empty:"미리보기를 취소했습니다"};
+  live(msg||m[st]);
+}
+function startReb(){
+  stopReb();S.reb={t0:Date.now(),done:false};
+  S.timer=setInterval(function(){
+    var p=Math.min(1,(Date.now()-S.reb.t0)/8000),pb=$("#pb");if(pb)pb.style.width=(p*100)+"%";
+    if(p>=1){S.reb.done=true;clearInterval(S.timer);S.timer=null;if(S.state==="applied")render();else{$("#sbwrap").innerHTML=sbHTML()}live("샌드박스 기준선이 준비됐습니다. 새 미리보기를 실행할 수 있습니다")}
+  },100);
+}
+function stopReb(){if(S.timer){clearInterval(S.timer);S.timer=null}S.reb=null}
+
+/* ---------- 이벤트 ---------- */
+function items(){return Array.prototype.slice.call(document.querySelectorAll(".tree .item[data-id]"))}
+function moveFocus(d){
+  var it=items();if(!it.length)return;
+  var i=it.indexOf(document.activeElement.closest?document.activeElement.closest(".item[data-id]"):null);
+  i=i<0?(d>0?0:it.length-1):Math.max(0,Math.min(it.length-1,i+d));
+  it.forEach(function(e){e.tabIndex=-1});it[i].tabIndex=0;it[i].focus();S.focus=it[i].dataset.id;
+}
+function toggleItem(id){
+  var f=findNode(id);if(!f||!f.diff)return;
+  if(S.all){S.all=false;allNodes(TREE[S.state],[]).forEach(function(n){if(n.diff)S.open[n.id]=true})}
+  S.open[id]=!S.open[id];S.focus=id;render(id);
+}
+function findNode(id){var T=TREE[S.state];if(!T)return null;return allNodes(T,[]).filter(function(n){return n.id===id})[0]}
+function toggleZero(){var T=TREE[S.state];if(!T)return;S.zero=!S.zero;var fid=S.focus;render(fid);live(S.zero?"0행 쓰기 "+zeroTotal(T)+"건을 보입니다":"0행 쓰기를 숨깁니다")}
+function toggleAll(){if(!TREE[S.state])return;S.all=!S.all;if(!S.all)S.open={};render(S.focus);live(S.all?"모두 펼침":"모두 접음")}
+function openConfirm(){
+  if(!(S.state==="dm1"||S.state==="dm2"))return;
+  S.confirm=true;render();var i=$("#cf-in");if(i)i.focus();live("적용 확인 단계. apply를 입력하세요")
+}
+function runPreview(){
+  if(S.state==="rej"){live("거부됨. 2행의 DROP TABLE은 미리보기할 수 없습니다");return}
+  if(S.state==="applied"){live("기준선을 만드는 동안 미리보기할 수 없습니다");return}
+  live("미리보기 실행 중");var s=S.state==="empty"?"dm2":S.state;
+  setTimeout(function(){go(s)},350);
+}
+document.addEventListener("click",function(e){
+  var t=e.target;
+  var act=t.closest&&t.closest("[data-act]");
+  if(act){
+    var a=act.dataset.act;e.stopPropagation();
+    if(a==="zero")toggleZero();else if(a==="all")toggleAll();else if(a==="conds"){S.conds=!S.conds;render();var b=$('[data-act="conds"]');if(b)b.focus()}
+    return;
+  }
+  var sw=t.closest&&t.closest(".bot .sw button");if(sw){go(sw.dataset.s);return}
+  var it=t.closest&&t.closest(".item[data-x]");if(it&&!t.closest(".diff")){toggleItem(it.dataset.id);return}
+  var id=t.id||(t.closest("button")||{}).id;
+  if(id==="theme"){S.theme=S.theme==="dark"?"light":"dark";render(S.focus);live(S.theme==="dark"?"어두운 테마":"밝은 테마")}
+  else if(id==="run"||id==="run2")runPreview();
+  else if(id==="apply")openConfirm();
+  else if(id==="cancel")go("empty");
+  else if(id==="cf-no"){S.confirm=false;render();var b=$("#apply");if(b)b.focus()}
+  else if(id==="cf-ok"){var i=$("#cf-in");if(i&&i.value==="apply")go("applied")}
+  else if(id==="goto2"){var l=$("#ln2");if(l)l.focus()}
+  else if(id==="newprev"){stopReb();go("dm2","새 미리보기를 실행했습니다")}
+  else if(id==="refresh"){live("샌드박스 새로 고침 중");go("drift","샌드박스를 새로 고쳤습니다. 다시 미리보기하세요")}
+});
+document.addEventListener("input",function(e){
+  if(e.target.id==="cf-in"){var ok=e.target.value==="apply";$("#cf-ok").disabled=!ok;$("#cf-h").textContent=ok?"켜졌습니다. 원본에 적용을 누르세요":"apply를 입력하면 켜집니다"}
+});
+document.addEventListener("keydown",function(e){
+  var t=e.target,typing=t.tagName==="INPUT"||t.tagName==="TEXTAREA";
+  if(e.key==="Escape"){if(S.confirm){e.preventDefault();S.confirm=false;render();var b=$("#apply");if(b)b.focus()}return}
+  if(e.ctrlKey&&e.key==="Enter"){e.preventDefault();if(e.shiftKey)openConfirm();else runPreview();return}
+  if(typing&&e.key==="Enter"&&t.id==="cf-in"){e.preventDefault();if(t.value==="apply")go("applied");return}
+  if(typing||e.ctrlKey||e.metaKey||e.altKey)return;
+  var onBtn=t.closest&&t.closest("button,summary,a");
+  if(e.key==="j"||(e.key==="ArrowDown"&&t.closest&&t.closest(".tree"))){e.preventDefault();moveFocus(1)}
+  else if(e.key==="k"||(e.key==="ArrowUp"&&t.closest&&t.closest(".tree"))){e.preventDefault();moveFocus(-1)}
+  else if(e.key==="z"){toggleZero()}
+  else if(e.key==="e"){toggleAll()}
+  else if((e.key==="Enter"||e.key===" ")&&!onBtn){var it=t.closest&&t.closest(".item[data-x]");if(it){e.preventDefault();toggleItem(it.dataset.id)}}
+});
+window.addEventListener("hashchange",function(){var h=parseHash();if(h.theme==="dark"||h.theme==="light")S.theme=h.theme;if(STATES.indexOf(h.state)>=0&&h.state!==S.state)go(h.state);else render()});
+
+/* 시작 */
+(function(){var h=parseHash();if(h.theme==="dark"||h.theme==="light")S.theme=h.theme;var st=STATES.indexOf(h.state)>=0?h.state:"dm2";S.state=st;initOpen();if(st==="applied")startReb();render()})();
+})();
+</script>
+</body>
+</html>

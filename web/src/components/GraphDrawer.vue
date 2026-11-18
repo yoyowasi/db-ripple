@@ -1,3 +1,8 @@
+<script lang="ts">
+// 모듈 범위: 서랍이 다시 마운트돼도 남는 값. 마지막으로 초점을 옮긴 drawerFocusTick.
+let lastFocusedTick = 0
+</script>
+
 <script setup lang="ts">
 // 선택한 묶음 상세 서랍(목업 v6). 제목·원인·확신도·플래그와 이 묶음 행 미리보기(처음 20행).
 // 서랍을 여는 동작(store.drawerFocusTick)일 때만 제목으로 포커스한다. 다른 곳에서 묶음만 바꿀 때는 포커스를 건드리지 않는다.
@@ -91,8 +96,15 @@ function focusHeading(): void {
   if (a instanceof HTMLElement && a !== document.body && !a.closest('.gd')) opener = a
   void nextTick(() => heading.value?.focus())
 }
-onMounted(focusHeading)
-watch(() => store.drawerFocusTick, focusHeading)
+// 서랍은 그래프 탭 안에 있어 탭을 오갈 때마다 다시 마운트된다. 초점은 "서랍을 여는 동작"(drawerFocusTick이 바뀜) 때만 옮긴다.
+onMounted(() => {
+  if (store.drawerFocusTick !== lastFocusedTick) focusOnOpen()
+})
+watch(() => store.drawerFocusTick, focusOnOpen)
+function focusOnOpen(): void {
+  lastFocusedTick = store.drawerFocusTick
+  focusHeading()
+}
 onBeforeUnmount(() => ctrl?.abort())
 
 function close(): void {
@@ -108,6 +120,8 @@ function close(): void {
 }
 function showRows(): void {
   store.setResultTab('rows')
+  // 서랍은 그래프 탭과 함께 사라지므로 초점을 [발동 묶음] 탭으로 옮긴다.
+  void nextTick(() => document.getElementById('res-tab-rows')?.focus())
 }
 </script>
 
@@ -177,7 +191,7 @@ function showRows(): void {
     </section>
 
     <div class="acts">
-      <button type="button" class="btn btn-sm" @click="showRows()">행 변경 탭에서 보기</button>
+      <button type="button" class="btn btn-sm" @click="showRows()">발동 묶음에서 보기</button>
     </div>
   </div>
 </template>

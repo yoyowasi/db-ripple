@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>db-ripple 목업 4 · 노트북</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E8EBEE; --cell:#FFFFFF; --in:#F4F5F7;
+  --ink:#161B22; --ink2:#444C57; --ink3:#5B636E;
+  --line:#CDD2D9; --line2:#7A838E;
+  --add:#11713F; --add-bg:#E1F2E8;
+  --mod:#8A5300; --mod-bg:#FAEFD6;
+  --del:#B3261E; --del-bg:#FBE4E2;
+  --accent:#1D3FA8; --on-accent:#FFFFFF; --accent-bg:#E6EBFA;
+  --kw:#1D3FA8; --num:#8A5300;
+  --focus:#1D3FA8;
+  --sans:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+  --serif:"Noto Serif KR","Batang","AppleMyungjo",Georgia,serif;
+  --mono:"JetBrains Mono",Consolas,"D2Coding","Malgun Gothic",monospace;
+}
+:root[data-theme="dark"]{
+  --bg:#0F1216; --cell:#181C22; --in:#12161B;
+  --ink:#E7EAEE; --ink2:#B4BBC4; --ink3:#9AA2AD;
+  --line:#2B323B; --line2:#7C8692;
+  --add:#62D192; --add-bg:#143726;
+  --mod:#F2B65E; --mod-bg:#3B2D10;
+  --del:#FF918A; --del-bg:#432220;
+  --accent:#8FA8FF; --on-accent:#0A1230; --accent-bg:#1E2744;
+  --kw:#8FA8FF; --num:#F2B65E;
+  --focus:#A9BCFF;
+}
+*{box-sizing:border-box}
+html{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:3px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mono{font-family:var(--mono)}
+
+/* ---- 상단: 아주 얇게 ---- */
+.top{height:48px;border-bottom:1px solid var(--line);background:var(--cell)}
+.top-in{max-width:880px;margin:0 auto;padding:0 16px;height:100%;display:flex;align-items:center;gap:12px}
+.brand{font-weight:700;letter-spacing:-.01em;font-size:16px}
+.grow{flex:1}
+.tbtn{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:1px solid var(--line2);border-radius:5px;background:transparent;font-size:13px;color:var(--ink2)}
+.tbtn:hover{background:var(--in)}
+.tbtn svg{width:16px;height:16px}
+kbd{font:12px var(--mono);border:1px solid var(--line2);border-radius:3px;padding:0 5px;color:var(--ink2)}
+
+/* ---- 샌드박스 여백 표시 ---- */
+.rail{position:fixed;left:18px;top:64px;z-index:20}
+.rail-btn{display:flex;align-items:center;gap:8px;border:0;background:transparent;padding:8px;border-radius:20px;text-align:left}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--add);flex:none}
+.rail.building .rail-btn{background:var(--mod-bg);border:1px solid var(--mod);padding:8px 12px 8px 10px;align-items:flex-start;max-width:170px;border-radius:8px}
+.rail.building .dot{background:var(--mod);margin-top:6px;animation:pulse 1.2s ease-in-out infinite}
+.rail-txt{display:none;font-size:13px;line-height:1.4;color:var(--mod);font-weight:500}
+.rail.building .rail-txt{display:block}
+@keyframes pulse{50%{opacity:.35}}
+.pop{display:none;position:absolute;left:0;top:100%;width:310px;background:var(--cell);border:1px solid var(--line2);border-radius:6px;padding:14px 16px;font-size:13px}
+.rail.open .pop{display:block}
+.pop h2{margin:0 0 8px;font-size:14px}
+.pop dl{margin:0;display:grid;grid-template-columns:74px 1fr;gap:4px 10px}
+.pop dt{color:var(--ink3)} .pop dd{margin:0;overflow-wrap:anywhere}
+
+/* ---- 문서 ---- */
+.page{max-width:880px;margin:0 auto;padding:8px 16px 200px}
+.cell{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px;margin-top:16px}
+.gut{font:12px var(--mono);color:var(--ink3);text-align:right;padding-top:13px}
+.card{background:var(--cell);border:1px solid var(--line);border-radius:6px;position:relative}
+.cell.latest>.card{border-color:var(--line2)}
+.cell.result>.card{border-left:4px solid var(--add)}
+.cell.result.warn>.card{border-left-color:var(--mod)}
+
+.in{background:var(--in);border-bottom:1px solid var(--line);border-radius:6px 6px 0 0;padding:10px 0 6px}
+.code{font:14px/1.75 var(--mono)}
+.ln{display:grid;grid-template-columns:44px minmax(0,1fr);position:relative}
+.ln .n{color:var(--ink3);text-align:right;padding-right:12px;user-select:none;font-size:12px}
+.ln .t{white-space:pre-wrap;overflow-wrap:anywhere;padding-right:16px}
+.kw{color:var(--kw);font-weight:600}.nm2{color:var(--num)}
+.ln.bad{background:var(--del-bg)}
+.ln.bad .n{color:var(--del);font-weight:700}
+.ln.ok .n::before{content:"✓ ";color:var(--add)}
+.ln.bad .n::before{content:"✕ ";color:var(--del)}
+.sq{text-decoration:underline wavy var(--del);text-underline-offset:4px}
+.diag{margin:4px 16px 8px 44px;border-left:3px solid var(--del);background:var(--cell);padding:10px 14px;font:13px/1.6 var(--sans);border-radius:0 4px 4px 0;color:var(--ink)}
+.diag b{color:var(--del)}
+.diag code{font:12px var(--mono);color:var(--ink2)}
+.in-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 16px 4px 44px}
+.ghost{border:1px solid var(--line2);background:transparent;border-radius:5px;height:30px;padding:0 10px;font-size:13px;color:var(--ink2)}
+.ghost:hover:not([aria-disabled="true"]){background:var(--cell)}
+.ghost[aria-disabled="true"]{border-style:dashed;cursor:help}
+.sug{font-size:12px;border:1px dashed var(--line2);border-radius:3px;padding:0 6px;color:var(--ink3);margin-left:6px}
+.btn{border:0;border-radius:5px;background:var(--accent);color:var(--on-accent);font-weight:700;height:34px;padding:0 16px;font-size:14px}
+.btn:disabled{background:transparent;border:1px solid var(--line2);color:var(--ink3);cursor:not-allowed}
+.btn.ghost-b{background:transparent;color:var(--ink);border:1px solid var(--line2);font-weight:500}
+textarea.sql{display:block;width:calc(100% - 32px);margin:0 16px;min-height:76px;resize:vertical;border:1px solid var(--line2);border-radius:5px;background:var(--cell);color:var(--ink);font:14px/1.7 var(--mono);padding:8px 12px}
+textarea.sql::placeholder{color:var(--ink3)}
+.empty .in{border-bottom:0;border-radius:6px;background:var(--cell);padding:12px 0 12px}
+.empty .in-act{padding-left:16px;justify-content:space-between}
+.why{font-size:13px;color:var(--ink3)}
+
+/* ---- 결과 ---- */
+.out{padding:14px 20px 0}
+.status{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:13px;color:var(--ink2)}
+.status .okk{color:var(--add);font-weight:700}
+details.fold>summary{cursor:pointer;color:var(--ink2);font-size:13px;list-style:none;display:inline-flex;align-items:center;gap:6px;min-height:28px}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::before{content:"";width:6px;height:6px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .12s;margin-right:2px}
+details.fold[open]>summary::before{transform:rotate(45deg)}
+.steps{margin:4px 0 8px;font:12px/1.8 var(--mono);color:var(--ink2);display:flex;flex-wrap:wrap;gap:0 16px}
+.verdict{font:700 32px/1.25 var(--serif);margin:12px 0 2px;display:flex;flex-wrap:wrap;gap:4px 28px;align-items:baseline;letter-spacing:-.02em}
+.vp.add{color:var(--add)}.vp.mod{color:var(--mod)}.vp.del{color:var(--del)}
+.g{display:inline-grid;place-items:center;width:1.05em;height:1.05em;margin-right:.3em;border:2px solid currentColor;border-radius:3px;font:700 .62em/1 var(--mono);font-style:normal;vertical-align:.12em}
+.g.zero{border-style:dashed;opacity:.7}
+.vsub{font-size:13px;color:var(--ink3);margin:0 0 14px}
+
+.sec{margin-top:6px;border-top:1px solid var(--line);padding-top:6px}
+.sec-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sec-h .leg{font-size:12px;color:var(--ink3)}
+.zbtn{border:1px solid var(--line2);background:transparent;border-radius:4px;font-size:12px;padding:2px 8px;color:var(--ink2);height:26px}
+.tree,.tree ul{list-style:none;margin:0;padding:0}
+.tree ul{padding-left:6px}
+.tree li{position:relative;padding-left:20px}
+.tree li::before{content:"";position:absolute;left:5px;top:0;bottom:0;border-left:1.5px solid var(--line2)}
+.tree li:last-child::before{bottom:auto;height:15px}
+.tree li::after{content:"";position:absolute;left:5px;top:15px;width:13px;border-top:1.5px solid var(--line2)}
+.tree li.inf::before,.tree li.inf::after{border-style:dashed}
+.tree>li{padding-left:0}.tree>li::before,.tree>li::after{display:none}
+.nd{display:flex;align-items:center;gap:8px;min-height:30px;font-size:14px}
+.nd .nm{font:13px var(--mono);overflow-wrap:anywhere}
+.nd .opw{font-size:13px;color:var(--ink2)}
+.nd .via{margin-left:auto;font-size:12px;color:var(--ink3);white-space:nowrap}
+.nd .badge{font-size:12px;border-radius:3px;padding:0 6px;white-space:nowrap}
+.badge.inf{border:1px dashed var(--line2);color:var(--ink2)}
+.badge.obs{border:1px solid var(--line2);color:var(--ink2)}
+.badge.unobs{border:1px dashed var(--line2);color:var(--ink3)}
+.nd.unobs .nm,.nd.unobs .ico{opacity:.7}
+.nd.unobs .nm{font-style:italic}
+.nd .ico{font:12px var(--mono);color:var(--ink3);border:1px solid var(--line2);border-radius:3px;padding:0 4px}
+.fk{font:11.5px var(--mono);color:var(--ink3);padding:0 0 4px 0;overflow-wrap:anywhere}
+.stmt{font:13px var(--mono);color:var(--ink2)}
+.g-add{color:var(--add)}.g-mod{color:var(--mod)}.g-del{color:var(--del)}.g-zero{color:var(--ink3)}
+.tree:not(.showzero) li.zero{display:none}
+.nd .g{font-size:13px;margin:0;width:18px;height:18px}
+
+.tlist{margin-top:4px}
+.tlist details{border-top:1px solid var(--line)}
+.tlist summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:24px minmax(0,1fr) auto 18px;gap:10px;align-items:center;min-height:46px;padding:4px 0}
+.tlist summary::-webkit-details-marker{display:none}
+.tlist summary .nm{font:14px var(--mono);overflow-wrap:anywhere}
+.tlist summary .cnt{font-weight:700;font-size:15px}
+.tlist summary .why2{font-size:13px;color:var(--ink3);text-align:right}
+.tlist summary::after{content:"";grid-column:4;grid-row:1;width:7px;height:7px;border-right:2px solid var(--ink3);border-bottom:2px solid var(--ink3);transform:rotate(-45deg);transition:transform .12s;justify-self:center}
+.tlist details[open]>summary::after{transform:rotate(45deg)}
+.tlist .g{font-size:14px;margin:0;width:20px;height:20px}
+.rows{padding:2px 0 14px 34px}
+.rowk{font:12.5px var(--mono);color:var(--ink2);margin:8px 0 4px}
+table.v{border-collapse:collapse;width:100%;font-size:13.5px}
+table.v th{font-weight:500;text-align:left;color:var(--ink3);font-size:12.5px;padding:3px 10px 3px 0;border-bottom:1px solid var(--line)}
+table.v td{padding:5px 10px 5px 0;border-bottom:1px solid var(--line);vertical-align:top;font-family:var(--mono);font-size:13px}
+table.v td:first-child{color:var(--ink2)}
+.from{color:var(--del)}.to{color:var(--add)}
+.tag{font:11.5px var(--sans);border:1px solid var(--line2);border-radius:3px;padding:0 5px;color:var(--ink2);margin-left:6px;white-space:nowrap}
+.tag.vol{border-style:dashed}
+.mid{display:block;font:12px var(--sans);color:var(--ink3);margin-top:2px}
+
+/* ---- 적용 막대: 가장 최근 적용 가능한 셀에만, 화면 아래에 붙음 ---- */
+.bar{position:sticky;bottom:0;z-index:5;margin:14px -20px 0;padding:14px 20px;background:var(--cell);border-top:2px solid var(--ink);border-radius:0 0 5px 5px;display:flex;align-items:center;gap:20px;justify-content:space-between;flex-wrap:wrap}
+.ab-what{min-width:260px;flex:1}
+.ab-what b{display:block;font-size:15px}
+.ab-what .sum{font:600 18px var(--serif)}
+.ab-cond{font-size:13px;color:var(--ink2);margin-top:4px;position:relative}
+.ab-cond button.c{border:0;background:transparent;padding:0;color:var(--add);font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.condl{position:absolute;left:0;bottom:calc(100% + 8px);width:340px;background:var(--cell);border:1px solid var(--line2);border-radius:6px;padding:10px 14px;list-style:none;margin:0;font-size:13px}
+.condl li{display:flex;gap:8px;padding:2px 0}
+.condl li::before{content:"✓";color:var(--add);font-weight:700}
+.condl li.bad::before{content:"✕";color:var(--del)}
+.condl small{color:var(--ink3);margin-left:auto}
+.ab-btns{display:flex;gap:10px;align-items:center}
+.quiet{border:0;background:transparent;color:var(--ink2);text-decoration:underline;text-underline-offset:3px;font-size:13px;height:34px;padding:0 6px}
+.btn-apply{height:46px;padding:0 26px;font-size:17px;border-radius:6px}
+.bar.confirm{border-top-color:var(--del)}
+.bar.confirm .ab-what b{color:var(--del)}
+
+/* ---- 지난 결과(접힘) ---- */
+.sumrow{display:grid;grid-template-columns:18px minmax(0,1fr) auto auto;gap:12px;align-items:center;width:100%;min-height:46px;padding:6px 14px;border:0;background:transparent;text-align:left}
+.sumrow .sq1{font:13px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2)}
+.sumrow .v1{font-size:13px;color:var(--ink2);white-space:nowrap}
+.chev{width:7px;height:7px;border-right:2px solid var(--ink3);border-bottom:2px solid var(--ink3);transform:rotate(-45deg);transition:transform .12s;justify-self:center}
+.sumrow[aria-expanded="true"] .chev{transform:rotate(45deg)}
+.pill{font-size:12px;border:1px solid var(--line2);border-radius:10px;padding:0 9px;color:var(--ink2);white-space:nowrap;background:var(--in)}
+.pill.ok{border-color:var(--add);color:var(--add);background:var(--add-bg);font-weight:700}
+.pill.warn{border-color:var(--mod);color:var(--mod);background:var(--mod-bg);font-weight:700}
+.stale-note{display:flex;gap:12px;flex-wrap:wrap;align-items:center;padding:10px 0 14px;font-size:13px;color:var(--ink2);border-top:1px solid var(--line);margin-top:10px}
+.cell.stale .card{background:var(--bg);border-style:dashed;border-color:var(--line2)}
+.cell.stale .card .full{background:var(--cell)}
+.cell.stale .in{border-radius:0}
+.cell.stale .verdict{font-size:24px}
+
+/* ---- 적용 결과 셀 ---- */
+.rtitle{font:700 26px/1.3 var(--serif);margin:0;letter-spacing:-.01em}
+.rtitle.ok{color:var(--add)}.rtitle.warn{color:var(--mod)}
+.rmeta{font-size:13px;color:var(--ink3);margin:2px 0 10px}
+table.cmp{border-collapse:collapse;width:100%;max-width:560px;margin:8px 0}
+table.cmp th{font-weight:500;color:var(--ink3);font-size:12.5px;text-align:left;border-bottom:1px solid var(--line2);padding:3px 12px 3px 0}
+table.cmp td{padding:6px 12px 6px 0;border-bottom:1px solid var(--line);font-size:14px}
+table.cmp td.nm{font:13.5px var(--mono)}
+table.cmp td.eq{font-weight:700;color:var(--add)}
+.rline{font-size:13.5px;color:var(--ink2);margin:6px 0}
+.rline code{font:13px var(--mono)}
+.base{margin:14px -20px 0;padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.base .bt{font-size:14px;min-width:200px}
+.prog{flex:1;min-width:140px;height:6px;background:var(--in);border:1px solid var(--line2);border-radius:3px;overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--mod);transition:width 1s linear}
+.base.done .prog i{background:var(--add);width:100%}
+.drift-t{width:100%;max-width:620px;border-collapse:collapse;margin:8px 0;font-size:13.5px}
+.drift-t th{font-weight:500;color:var(--ink3);font-size:12.5px;text-align:left;border-bottom:1px solid var(--line2);padding:3px 12px 3px 0}
+.drift-t td{padding:6px 12px 6px 0;font:13px var(--mono);border-bottom:1px solid var(--line)}
+
+/* ---- 팔레트 ---- */
+dialog{border:1px solid var(--line2);border-radius:8px;background:var(--cell);color:var(--ink);padding:0;width:min(520px,92vw);margin-top:12vh}
+dialog::backdrop{background:rgba(10,12,16,.5)}
+.pal input{width:100%;border:0;border-bottom:1px solid var(--line2);background:transparent;color:var(--ink);font:15px var(--sans);padding:14px 16px;border-radius:8px 8px 0 0}
+.pal ul{list-style:none;margin:0;padding:6px;max-height:300px;overflow:auto}
+.pal li button{width:100%;text-align:left;border:0;background:transparent;padding:8px 10px;border-radius:4px;font:13.5px var(--mono);display:flex;justify-content:space-between}
+.pal li button:hover,.pal li button:focus-visible{background:var(--accent-bg)}
+.pal .hint{font-size:12px;color:var(--ink3);padding:8px 16px;border-top:1px solid var(--line)}
+
+/* ---- 목업 전환기 / 토스트 ---- */
+.switch{position:fixed;right:10px;top:64px;z-index:30;display:flex;flex-direction:column;gap:4px;font-size:12px;opacity:.9}
+.switch span{color:var(--ink3);font-size:11px;text-align:center}
+.switch button{border:1px solid var(--line2);background:var(--cell);border-radius:4px;padding:2px 8px;font:12px var(--mono);height:26px;color:var(--ink2)}
+.switch button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+@media (max-width:1179px){
+  .switch{position:static;flex-direction:row;justify-content:flex-end;padding:4px 16px;align-items:center;background:var(--bg)}
+}
+#toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:6px;font-size:13px;z-index:50;display:none;max-width:90vw}
+#toast.on{display:block}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="switch" role="group" aria-label="목업 상태 전환">
+  <span>목업 상태</span>
+  <button data-st="dm1">dm1</button><button data-st="dm2">dm2</button><button data-st="rej">rej</button><button data-st="applied">applied</button><button data-st="drift">drift</button>
+  <button id="themeBtn" aria-label="테마 전환">밝음/어두움</button>
+</div>
+
+<div id="rail" class="rail"></div>
+
+<header class="top"><div class="top-in">
+  <span class="brand">db-ripple</span><span class="grow"></span>
+  <button class="tbtn" id="palBtn" aria-haspopup="dialog">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+    테이블 찾기 <kbd>Ctrl K</kbd></button>
+  <button class="tbtn" data-act="settings" aria-label="설정"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="2.3"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg></button>
+</div></header>
+
+<main class="page" id="doc" aria-label="미리보기 노트북"></main>
+
+<dialog id="pal" class="pal" aria-label="테이블 찾기">
+  <input id="palIn" type="text" placeholder="테이블 이름 (예: SalesOrder)" aria-label="테이블 이름 검색" autocomplete="off">
+  <ul id="palList"></ul>
+  <div class="hint">고르면 마지막 빈 셀에 이름이 들어갑니다 · 수집 71개 중 목업에 쓰는 9개만 표시</div>
+</dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="live" class="sr" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+var STATES=["dm1","dm2","rej","applied","drift"];
+var G={add:"+",mod:"~",del:"−",zero:"0"};
+var OPW={add:"추가",mod:"수정",del:"삭제"};
+
+/* ---------- 데이터(브리프 §4 그대로) ---------- */
+var SQL={
+  dm1:"DELETE FROM Sales.SalesOrderHeader WHERE SalesOrderID = 43697;",
+  dm2:"UPDATE Sales.SalesOrderDetail SET OrderQty = OrderQty + 1 WHERE SalesOrderDetailID = 52;",
+  drift:"UPDATE Production.Product SET ListPrice = ListPrice + 1.00 WHERE ProductID = 680;",
+  rej:"DELETE FROM Sales.SalesOrderHeader WHERE SalesOrderID = 43697;\nDROP TABLE Sales.Store;"
+};
+function T(name,op,via,conf,ch,extra){var o={k:"table",name:name,op:op,via:via,conf:conf,children:ch||[]};if(extra)for(var k in extra)o[k]=extra[k];return o;}
+function TR(name,obs,ch){return {k:"trig",name:name,obs:obs,via:"트리거 발동",conf:"i",children:ch||[]};}
+var C={
+ dm1:{id:"dm1",ms:"1.6초",verdict:{tables:3,parts:[["del","4행 삭제"]]},sub:"순변경 기준",
+  tree:[T("Sales.SalesOrderHeader","del","직접","c",[
+     T("Sales.SalesOrderDetail","del","FK 연쇄","c",[
+        TR("Sales.iduSalesOrderDetail",true,[
+          T("Sales.SalesOrderHeader","zero","쓰기","i",[TR("Sales.uSalesOrderHeader",false)]),
+          T("Person.Person","zero","쓰기","i",[TR("Person.iuPerson",false)])
+        ])
+     ],{fk:"FK_SalesOrderDetail_SalesOrderHeader_SalesOrderID"}),
+     T("Sales.SalesOrderHeaderSalesReason","del","FK 연쇄","c",[],{fk:"FK_SalesOrderHeaderSalesReason_SalesOrderHeader_SalesOrderID"})
+  ])],
+  tables:[
+   {name:"Sales.SalesOrderHeader",op:"del",n:1,why:"직접",rows:[{key:"SalesOrderID 43697",cols:[["SalesOrderID","43697"],["CustomerID","21768"],["Status","5"]]}]},
+   {name:"Sales.SalesOrderDetail",op:"del",n:1,why:"FK 연쇄",rows:[{key:"SalesOrderID 43697 · SalesOrderDetailID 353",cols:[["SalesOrderID","43697"],["SalesOrderDetailID","353"]]}]},
+   {name:"Sales.SalesOrderHeaderSalesReason",op:"del",n:2,why:"FK 연쇄",rows:[
+     {key:"SalesOrderID 43697 · SalesReasonID 5",cols:[["SalesOrderID","43697"],["SalesReasonID","5"]]},
+     {key:"SalesOrderID 43697 · SalesReasonID 9",cols:[["SalesOrderID","43697"],["SalesReasonID","9"]]}]}
+  ],
+  steps:null,pv:null},
+ dm2:{id:"dm2",ms:"1.2초",verdict:{tables:4,parts:[["add","추가 1"],["mod","수정 3"]]},sub:"순변경 4행 · 발동 12건 중 6건이 행을 바꿈",
+  tree:[T("Sales.SalesOrderDetail","mod","직접","c",[
+     TR("Sales.iduSalesOrderDetail",true,[
+       T("Production.TransactionHistory","add","쓰기","i"),
+       T("Person.Person","mod","쓰기","i",[TR("Person.iuPerson",false,[T("Person.Person","zero","쓰기","i"),T("Person.Person","zero","쓰기","i")])]),
+       T("Sales.SalesOrderHeader","mod","쓰기","i",[TR("Sales.uSalesOrderHeader",true,[
+            T("Sales.SalesOrderHeader","mod","쓰기","i"),T("Sales.SalesPerson","zero","쓰기","i"),T("Sales.SalesTerritory","zero","쓰기","i")])]),
+       T("Person.Person","mod","쓰기","i",[TR("Person.iuPerson",false,[T("Person.Person","zero","쓰기","i"),T("Person.Person","zero","쓰기","i")])])
+     ])
+  ])],
+  tables:[
+   {name:"Sales.SalesOrderDetail",op:"mod",n:1,why:"직접",rows:[{key:"SalesOrderID 43663 · SalesOrderDetailID 52",cols:[["OrderQty","1","2"],["LineTotal","419.458900","838.917800","파생"]]}]},
+   {name:"Production.TransactionHistory",op:"add",n:1,why:"트리거 1건",inf:true,rows:[{key:"새 행",cols:[["TransactionID",null,"213443","예상값 · IDENTITY"],["ProductID",null,"760"],["ReferenceOrderID",null,"43663"],["ReferenceOrderLineID",null,"52"],["TransactionDate",null,"2026-11-12T14:28:38.997","예상값"],["TransactionType",null,"S"],["Quantity",null,"2"],["ActualCost",null,"419.4589"],["ModifiedDate",null,"2026-11-12T14:28:38.997","예상값"]]}]},
+   {name:"Person.Person",op:"mod",n:1,why:"트리거 2건 · 같은 행을 두 번 바꿈",inf:true,rows:[{key:"BusinessEntityID 483",cols:[["Demographics 의 TotalPurchaseYTD","-4416.2024","-3996.7435","XML 열","중간값 -4206.2024"]]}]},
+   {name:"Sales.SalesOrderHeader",op:"mod",n:1,why:"트리거 2건 · 같은 행을 두 번 바꿈",inf:true,rows:[{key:"SalesOrderID 43663",cols:[["RevisionNumber","10","11"],["SubTotal","419.4589","838.9178"],["TotalDue","472.3108","891.7697","파생"]]}]}
+  ],
+  steps:[["analyze","25ms"],["execute","679"],["readLog","247"],["reread","86"],["netDiff","148"],["resolve","37"],["serialize","12"]],pv:"pv_20261112_dc819fb8"},
+ drift:{id:"drift",ms:"",verdict:{tables:1,parts:[["mod","수정 1"]]},sub:"순변경 기준",
+  tree:[T("Production.Product","mod","직접","c")],
+  tables:[{name:"Production.Product",op:"mod",n:1,why:"직접",rows:[{key:"ProductID 680",cols:[["ListPrice","1431.5000","1432.5000"]]}]}],steps:null,pv:null}
+};
+var CONDS=[["미리보기 정상",""],["환경 지문 일치","원본과 같음"],["30분 안","남은 30분"],["SQL이 미리보기 뒤 바뀌지 않음",""],["잔여 변경 확인 성공","롤백 뒤 남은 변경 없음"],["샌드박스 준비됨",""],["다른 작업 잠금 없음",""]];
+var TABLES=["Sales.SalesOrderHeader","Sales.SalesOrderDetail","Sales.SalesOrderHeaderSalesReason","Sales.SalesPerson","Sales.SalesTerritory","Sales.Store","Person.Person","Production.Product","Production.TransactionHistory"];
+
+/* ---------- 헬퍼 ---------- */
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function hl(line){
+  return esc(line).replace(/(\b(?:DELETE|FROM|WHERE|UPDATE|SET|DROP|TABLE)\b)|(\b\d+(?:\.\d+)?\b)/g,function(m,a,b){return a?'<span class="kw">'+a+'</span>':'<span class="nm2">'+b+'</span>';});
+}
+function gl(op,cls){return '<i class="g g-'+op+'" aria-hidden="true">'+G[op]+'</i>';}
+function sqlBlock(id,rej){
+  var lines=SQL[id].split("\n");
+  var h='<div class="code" role="group" aria-label="SQL 입력">';
+  lines.forEach(function(l,i){
+    if(rej){
+      if(i===1){
+        h+='<div class="ln bad" id="ln2"><span class="n" aria-label="2행 오류">2</span><span class="t"><span class="sq">DROP TABLE </span>Sales.Store;</span></div>';
+        h+='<div class="diag" id="diag" role="alert"><b>2행 1~11열 · 거부됨</b> <code>REJECT_DDL</code><br>DDL은 미리보기할 수 없습니다. 스키마를 바꾸면 트랜잭션 제약과 DDL 트리거 반응이 달라집니다.</div>';
+      } else h+='<div class="ln ok"><span class="n" aria-label="1행 통과">1</span><span class="t">'+hl(l)+'</span></div>';
+    } else h+='<div class="ln"><span class="n">'+(i+1)+'</span><span class="t">'+hl(l)+'</span></div>';
+  });
+  return h+'</div>';
+}
+function verdictHTML(c){
+  return '<p class="verdict" aria-label="판정"><span>테이블 '+c.verdict.tables+'개</span>'+
+    c.verdict.parts.map(function(p){return '<span class="vp '+p[0]+'">'+gl(p[0])+p[1]+'</span>';}).join("")+'</p><p class="vsub">'+c.sub+'</p>';
+}
+function countZero(ns){var n=0;ns.forEach(function(x){if(x.op==="zero")n++;else n+=countZero(x.children||[]);});return n;}
+function treeLi(n){
+  var inf=n.conf==="i";
+  var h='<li class="'+(n.op==="zero"?"zero ":"")+(inf?"inf":"cer")+'"><div class="nd'+(n.obs===false?" unobs":"")+'">';
+  if(n.k==="trig"){
+    h+='<span class="ico" aria-hidden="true">ƒ</span><span class="nm">'+n.name+'</span>';
+    h+=n.obs?'<span class="badge obs">관측됨</span>':'<span class="badge unobs" title="정적 분석상 불렸을 수 있으나 감사 로그에 흔적이 없음">관측 안 됨</span>';
+  } else {
+    h+=gl(n.op)+'<span class="nm">'+n.name+'</span><span class="opw">'+(n.op==="zero"?"0행":OPW[n.op])+'</span>';
+  }
+  h+='<span class="via">'+n.via+'</span>';
+  h+=inf?'<span class="badge inf" title="트리거가 쓴 변경의 귀속은 추론입니다">추론</span>':'<span class="badge obs" title="FK 연쇄·직접 실행은 확실">확실</span>';
+  h+='</div>';
+  if(n.fk)h+='<div class="fk">'+n.fk+'</div>';
+  if(n.children&&n.children.length)h+='<ul>'+n.children.map(treeLi).join("")+'</ul>';
+  return h+'</li>';
+}
+function treeHTML(c,open){
+  var z=countZero(c.tree);
+  return '<details class="fold sec"'+(open?' open':'')+'><summary>전파 경로</summary>'+
+   '<div class="sec-h"><span class="leg">실선은 확실, 파선은 추론</span>'+(z?'<button class="zbtn" data-act="zero" aria-pressed="false">0행 쓰기 '+z+'건 보기</button>':'')+'</div>'+
+   '<ul class="tree" style="margin-top:6px"><li class="cer"><div class="nd"><span class="stmt">SQL 문장</span></div><ul>'+c.tree.map(treeLi).join("")+'</ul></li></ul></details>';
+}
+function tablesHTML(c){
+  var h='<div class="tlist sec" role="list" aria-label="테이블별 순변경" style="margin-top:10px">';
+  c.tables.forEach(function(t){
+    h+='<details role="listitem"><summary>'+gl(t.op)+'<span class="nm">'+t.name+'</span><span><span class="cnt g-'+t.op+'">'+OPW[t.op]+' '+t.n+'</span> <span class="why2">'+(t.inf?'<span class="badge inf">추론</span> ':'')+t.why+'</span></span><span></span></summary><div class="rows">';
+    t.rows.forEach(function(r){
+      h+='<div class="rowk">'+r.key+'</div><table class="v"><thead><tr><th scope="col">열</th><th scope="col">이전</th><th scope="col">이후</th></tr></thead><tbody>';
+      r.cols.forEach(function(k){
+        var from=k[1],to=(t.op==="del")?null:k[2],tags="";
+        if(t.op==="del"){from=k[1];}
+        if(k[3])tags+='<span class="tag'+(/예상값/.test(k[3])?' vol':'')+'">'+k[3]+'</span>';
+        h+='<tr><td>'+k[0]+tags+'</td><td class="from">'+(from==null?'<span aria-label="없음">—</span>':from)+'</td><td class="to">'+(to==null?'<span aria-label="없음">—</span>':to)+(k[4]?'<span class="mid">'+k[4]+'</span>':'')+'</td></tr>';
+      });
+      h+='</tbody></table>';
+    });
+    h+='</div></details>';
+  });
+  return h+'</div>';
+}
+function statusHTML(c){
+  var h='<div class="status"><span class="okk">미리보기 정상</span>'+(c.ms?'<span>'+c.ms+'</span>':'')+'<span>롤백 뒤 남은 변경 없음</span>';
+  if(c.steps){
+    h+='<details class="fold"><summary>세부</summary><div class="steps"><span>'+c.pv+'</span>'+c.steps.map(function(s){return '<span>'+s[0]+' '+s[1]+'</span>';}).join("")+'</div></details>';
+  }
+  return h+'</div>';
+}
+function summaryText(c){return '테이블 '+c.verdict.tables+'개 · '+c.verdict.parts.map(function(p){return p[1];}).join(" · ");}
+
+/* 적용 막대 */
+function barHTML(c,confirming){
+  var s=summaryText(c);
+  if(confirming){
+    return '<div class="bar confirm" id="bar-'+c.id+'" role="group" aria-label="적용 확인"><div class="ab-what"><b>원본 AW_Origin에 커밋합니다</b><span class="sum">'+s+'</span></div>'+
+     '<div class="ab-btns"><button class="btn ghost-b" data-act="back" data-id="'+c.id+'">돌아가기</button><button class="btn btn-apply" data-act="confirm" data-id="'+c.id+'" id="confirmBtn">적용 확정</button></div></div>';
+  }
+  return '<div class="bar" id="bar-'+c.id+'" role="group" aria-label="원본에 적용"><div class="ab-what"><b>원본 AW_Origin에 적용할 변경</b><span class="sum">'+s+'</span>'+
+    '<div class="ab-cond"><button class="c" data-act="cond" aria-expanded="false" aria-controls="cl-'+c.id+'">적용 조건 7개 모두 충족</button> · 남은 30분'+
+    '<ul class="condl" id="cl-'+c.id+'" hidden>'+CONDS.map(function(x){return '<li>'+x[0]+(x[1]?'<small>'+x[1]+'</small>':'')+'</li>';}).join("")+'</ul></div></div>'+
+    '<div class="ab-btns"><button class="quiet" data-act="discard">미리보기 취소</button><button class="btn btn-apply" data-act="apply" data-id="'+c.id+'">원본에 적용</button></div></div>';
+}
+
+/* 셀 */
+function inputActs(id,extra){
+  return '<div class="in-act"><button class="ghost" data-act="reuse" data-id="'+id+'">SQL 복사해 다시 쓰기</button>'+(extra||"")+'</div>';
+}
+var COMPARE='<button class="ghost" aria-disabled="true" data-act="compare" title="두 미리보기 결과를 나란히 비교하는 기능. 현재 API에는 없습니다.">최신 셀과 결과 비교<span class="sug">제안(현재 API 없음)</span></button>';
+function latestCell(c,num){
+  return '<section class="cell latest" aria-label="셀 '+num+'"><div class="gut">'+num+'</div><div class="card"><div class="in">'+sqlBlock(c.id)+inputActs(c.id)+'</div>'+
+   '<div class="out">'+statusHTML(c)+verdictHTML(c)+treeHTML(c,true)+tablesHTML(c)+barHTML(c,false)+'</div></div></section>';
+}
+function collapsedCell(c,num,pillCls,pillText,note,withCompare){
+  var id="full-"+c.id;
+  return '<section class="cell stale" aria-label="셀 '+num+'"><div class="gut">'+num+'</div><div class="card">'+
+   '<button class="sumrow" data-act="expand" aria-expanded="false" aria-controls="'+id+'"><span class="chev"></span><span class="sq1">'+esc(SQL[c.id])+'</span><span class="v1">'+summaryText(c)+'</span><span class="pill '+pillCls+'">'+pillText+'</span></button>'+
+   '<div class="full" id="'+id+'" hidden><div class="in">'+sqlBlock(c.id)+inputActs(c.id,withCompare?COMPARE:"")+'</div><div class="out">'+statusHTML(c)+verdictHTML(c)+treeHTML(c,false)+tablesHTML(c)+
+   '<div class="stale-note">'+note+'</div></div></div></div></section>';
+}
+function emptyCell(num,blocked){
+  return '<section class="cell empty latest" aria-label="셀 '+num+'"><div class="gut">'+num+'</div><div class="card"><div class="in">'+
+   '<textarea class="sql" id="newSql" aria-label="새 SQL" placeholder="SQL을 입력하세요 (DELETE · UPDATE · INSERT · EXEC)" spellcheck="false"></textarea>'+
+   '<div class="in-act"><span class="why" id="newWhy">'+(blocked?'기준선 만드는 중 · 끝나면 미리보기 가능':'Ctrl+Enter로 미리보기')+'</span><button class="btn" data-act="run" id="runBtn"'+(blocked?' disabled':'')+'>미리보기</button></div></div></div></section>';
+}
+function rejCell(){
+  return '<section class="cell latest" aria-label="셀 1"><div class="gut">1</div><div class="card"><div class="in">'+sqlBlock("rej",true)+
+   '<div class="in-act"><button class="ghost" data-act="gotoerr">2행으로 이동</button><span class="grow"></span><button class="btn" id="runBtn" disabled aria-describedby="diag">미리보기</button></div></div></div></section>';
+}
+function appliedCell(){
+  return '<section class="cell result" aria-label="적용 결과"><div class="gut" aria-hidden="true">↳</div><div class="card"><div class="out" style="padding-bottom:0">'+
+   '<h2 class="rtitle ok">원본에 적용됨 · 건수 일치 4 = 4행</h2><p class="rmeta">2026-11-18 09:39:21 · 2.73초 · SNAPSHOT_NETDIFF</p>'+
+   '<table class="cmp"><caption class="sr">미리보기와 실제 건수 대조</caption><thead><tr><th scope="col">테이블</th><th scope="col">미리보기</th><th scope="col">실제</th></tr></thead><tbody>'+
+   [["Person.Person","mod","수정 1"],["Production.TransactionHistory","add","추가 1"],["Sales.SalesOrderDetail","mod","수정 1"],["Sales.SalesOrderHeader","mod","수정 1"]].map(function(r){
+     return '<tr><td class="nm">'+r[0]+'</td><td>'+gl(r[1])+" "+r[2]+'</td><td class="eq">'+r[2]+' ✓</td></tr>';}).join("")+'</tbody></table>'+
+   '<p class="rline">IDENTITY 짝 · <code>TransactionHistory.TransactionID</code> 미리보기 213443 → 실제 213443 (같은 값)</p>'+
+   '<p class="rline">비교에서 제외(예상값) · <code>TransactionID</code> <code>TransactionDate</code> <code>ModifiedDate</code></p>'+
+   '<details class="fold"><summary>단계별 소요</summary><div class="steps"><span>snapshot 398ms</span><span>drift 6</span><span>execute 175</span><span>netDiff 2144</span><span>commit 6</span></div></details>'+
+   '<div class="base" id="base"><span class="bt" data-base-text>샌드박스 기준선 다시 만드는 중 · 약 8초</span><span class="prog" role="progressbar" aria-label="기준선 재생성" aria-valuemin="0" aria-valuemax="8" aria-valuenow="0" data-base-prog><i></i></span><button class="btn" data-act="focusnew">다음 SQL 쓰기</button></div>'+
+   '</div></div></section>';
+}
+function driftCell(){
+  return '<section class="cell result warn" aria-label="적용 결과"><div class="gut" aria-hidden="true">↳</div><div class="card"><div class="out" style="padding-bottom:0">'+
+   '<h2 class="rtitle warn">적용하지 않음 · 원본이 바뀌었습니다</h2><p class="rmeta">미리보기 뒤 원본의 이전 행 1건이 바뀌어, 실행하지 않고 롤백했습니다. 원본은 그대로입니다.</p>'+
+   '<table class="drift-t"><caption class="sr">달라진 행</caption><thead><tr><th scope="col">테이블</th><th scope="col">행</th><th scope="col">열</th><th scope="col">예상</th><th scope="col">실제</th></tr></thead><tbody><tr><td>Production.Product</td><td>ProductID 680</td><td>ListPrice</td><td class="from">1431.5000</td><td class="to">1431.5100</td></tr></tbody></table>'+
+   '<div class="base" style="margin-top:12px"><span class="bt">샌드박스를 새로 고친 뒤 다시 미리보기</span><span class="grow" style="flex:1"></span><button class="btn" data-act="refresh">샌드박스 새로 고침</button></div></div></div></section>';
+}
+
+/* ---------- 화면 ---------- */
+var st="dm2",theme="light",baseLeft=8,timer=null,palTarget=null;
+function railHTML(){
+  var b=(st==="applied"&&baseLeft>0);
+  return '<button class="rail-btn" id="railBtn" aria-expanded="false" aria-controls="pop" aria-label="'+(b?'샌드박스 기준선 만드는 중':'샌드박스 정상')+'"><span class="dot"></span><span class="rail-txt" data-base-rail>기준선 만드는 중<br>약 '+baseLeft+'초</span></button>'+
+   '<div class="pop" id="pop"><h2>'+(b?'샌드박스 · 기준선 만드는 중':'샌드박스 · 준비됨')+'</h2><dl><dt>원본</dt><dd class="mono">AW_Origin</dd><dt>샌드박스</dt><dd class="mono">AW_Sandbox</dd><dt>기준선</dt><dd>2026-11-12 14:27 · 수집 테이블 71개 · 제외 0</dd><dt>환경 지문</dt><dd>원본과 일치 · SQL Server 16.0.4175.1 Enterprise Edition (64-bit) · 호환 수준 160 · SQL_Latin1_General_CP1_CI_AS · 트리거 중첩 1·재귀 OFF</dd><dt>잠금</dt><dd>없음</dd><dt>행 이미지</dt><dd>상한 100,000</dd></dl></div>';
+}
+function render(){
+  var h="";
+  if(st==="dm1"){h=latestCell(C.dm1,1)+emptyCell(2,false);}
+  else if(st==="dm2"){h=collapsedCell(C.dm1,1,"","지난 결과","지난 결과 · 더 최근 미리보기가 있어 적용할 수 없습니다. 30분이 지나거나 기준선이 바뀐 결과도 같습니다.",true)+latestCell(C.dm2,2)+emptyCell(3,false);}
+  else if(st==="rej"){h=rejCell();}
+  else if(st==="applied"){
+    h=collapsedCell(C.dm1,1,"","지난 결과","지난 결과 · 기준선이 새로 만들어져 적용할 수 없습니다.",false)+
+      collapsedCell(C.dm2,2,"ok","적용됨","원본에 적용됨 · 아래 적용 결과 참고.",false)+appliedCell()+emptyCell(3,baseLeft>0);
+  } else if(st==="drift"){
+    h=collapsedCell(C.drift,1,"warn","적용 안 됨","원본이 바뀌어 적용하지 않았습니다.",false)+driftCell()+emptyCell(2,false);
+  }
+  document.getElementById("doc").innerHTML=h;
+  document.getElementById("rail").className="rail"+((st==="applied"&&baseLeft>0)?" building":"");
+  document.getElementById("rail").innerHTML=railHTML();
+  // drift/applied: 결과 셀은 펼쳐서 보이게 두고, 접힌 셀은 요약만
+  Array.prototype.forEach.call(document.querySelectorAll(".switch [data-st]"),function(b){b.setAttribute("aria-pressed",String(b.dataset.st===st));});
+  document.title="db-ripple 목업 4 · 노트북 ("+st+")";
+}
+function setState(s,silent){
+  if(STATES.indexOf(s)<0)s="dm2";
+  st=s;clearInterval(timer);
+  if(s==="applied"){baseLeft=8;timer=setInterval(tick,1000);}
+  render();
+  if(!silent)say("상태 "+s+" 로 전환했습니다.");
+}
+function tick(){
+  baseLeft--;
+  var done=baseLeft<=0;if(done){baseLeft=0;clearInterval(timer);}
+  var base=document.getElementById("base");
+  if(base){
+    base.classList.toggle("done",done);
+    var t=base.querySelector("[data-base-text]");t.textContent=done?"샌드박스 기준선 준비됨 · 새 미리보기 가능":"샌드박스 기준선 다시 만드는 중 · 약 "+baseLeft+"초";
+    var p=base.querySelector("[data-base-prog]");p.setAttribute("aria-valuenow",8-baseLeft);p.firstChild.style.width=((8-baseLeft)/8*100)+"%";
+  }
+  var rail=document.getElementById("rail");rail.className="rail"+(done?"":" building");
+  var rt=rail.querySelector("[data-base-rail]");if(rt)rt.innerHTML="기준선 만드는 중<br>약 "+baseLeft+"초";
+  var rb=document.getElementById("railBtn");if(rb)rb.setAttribute("aria-label",done?"샌드박스 정상":"샌드박스 기준선 만드는 중");
+  var run=document.getElementById("runBtn");if(run&&done){run.disabled=false;var w=document.getElementById("newWhy");if(w)w.textContent="Ctrl+Enter로 미리보기";say("기준선이 준비되었습니다. 새 미리보기를 할 수 있습니다.");}
+}
+function say(m){document.getElementById("live").textContent="";setTimeout(function(){document.getElementById("live").textContent=m;},30);}
+var tt;function toast(m){var t=document.getElementById("toast");t.textContent=m;t.className="on";clearTimeout(tt);tt=setTimeout(function(){t.className="";},3200);}
+
+/* ---------- 이벤트 ---------- */
+document.addEventListener("click",function(e){
+  var rb=e.target.closest("#railBtn");
+  var rail=document.getElementById("rail");
+  if(rb){var o=rail.classList.toggle("open");rb.setAttribute("aria-expanded",String(o));return;}
+  if(rail.classList.contains("open")&&!e.target.closest("#pop")){rail.classList.remove("open");var b2=document.getElementById("railBtn");if(b2)b2.setAttribute("aria-expanded","false");}
+  var sw=e.target.closest("[data-st]");
+  if(sw){location.hash="state="+sw.dataset.st+"&theme="+theme;return;}
+  if(e.target.closest("#themeBtn")){location.hash="state="+st+"&theme="+(theme==="dark"?"light":"dark");return;}
+  if(e.target.closest("#palBtn")){openPal();return;}
+  var a=e.target.closest("[data-act]");if(!a)return;
+  var act=a.dataset.act,id=a.dataset.id;
+  if(act==="expand"){var open=a.getAttribute("aria-expanded")==="true";a.setAttribute("aria-expanded",String(!open));document.getElementById(a.getAttribute("aria-controls")).hidden=open;}
+  else if(act==="zero"){var tree=a.closest("details").querySelector(".tree");var on=tree.classList.toggle("showzero");a.setAttribute("aria-pressed",String(on));var n=a.textContent.match(/\d+/)[0];a.textContent=on?"0행 쓰기 "+n+"건 숨기기":"0행 쓰기 "+n+"건 보기";}
+  else if(act==="cond"){var l=document.getElementById(a.getAttribute("aria-controls"));var x=l.hidden;l.hidden=!x;a.setAttribute("aria-expanded",String(x));}
+  else if(act==="apply"){swapBar(id,true);}
+  else if(act==="back"){swapBar(id,false);var b=document.querySelector("#bar-"+id+" [data-act=apply]");if(b)b.focus();}
+  else if(act==="confirm"){
+    if(id==="dm2"){location.hash="state=applied&theme="+theme;}
+    else toast("목업: 이 시연의 적용 결과 화면은 dm2 기준입니다. dm2에서 시연하세요.");
+  }
+  else if(act==="discard"){toast("목업: 미리보기를 취소하면 이 셀은 지난 결과가 됩니다.");}
+  else if(act==="reuse"){var ta=document.getElementById("newSql");if(ta){ta.value=SQL[id];ta.focus();ta.scrollIntoView({block:"center"});say("SQL을 새 셀에 복사했습니다. WHERE를 고쳐 다시 미리보기 하세요.");}}
+  else if(act==="compare"){toast("제안(현재 API 없음): 두 셀의 순변경을 나란히 비교");}
+  else if(act==="run"){toast("목업: 실제 실행은 없습니다. 상단 전환기로 상태를 보세요.");}
+  else if(act==="focusnew"){var t2=document.getElementById("newSql");if(t2){t2.focus();t2.scrollIntoView({block:"center"});}}
+  else if(act==="gotoerr"){var l2=document.getElementById("ln2");if(l2){l2.scrollIntoView({block:"center"});document.getElementById("diag").focus&&0;}say("2행: DDL은 미리보기할 수 없습니다.");}
+  else if(act==="refresh"){toast("목업: 샌드박스를 새로 고치는 중");}
+  else if(act==="settings"){toast("목업: 설정 화면은 기존 것을 그대로 씁니다.");}
+});
+function swapBar(id,confirming){
+  var cur=document.getElementById("bar-"+id);var c=C[id];
+  var tmp=document.createElement("div");tmp.innerHTML=barHTML(c,confirming);cur.replaceWith(tmp.firstChild);
+  if(confirming){var cb=document.getElementById("confirmBtn");cb.focus();say("한 번 더 확인합니다. 원본 AW_Origin에 커밋합니다. "+summaryText(c));}
+}
+document.addEventListener("keydown",function(e){
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openPal();return;}
+  if((e.ctrlKey||e.metaKey)&&e.key==="Enter"&&e.target.id==="newSql"){e.preventDefault();toast("목업: 실제 실행은 없습니다.");}
+  if(e.key==="Escape"){
+    var cf=document.querySelector(".bar.confirm");if(cf){var id=cf.id.replace("bar-","");swapBar(id,false);var b=document.querySelector("#bar-"+id+" [data-act=apply]");if(b)b.focus();}
+    var rail=document.getElementById("rail");if(rail.classList.contains("open")){rail.classList.remove("open");document.getElementById("railBtn").focus();}
+  }
+});
+
+/* 테이블 찾기 */
+var pal=document.getElementById("pal"),palIn=document.getElementById("palIn"),palList=document.getElementById("palList");
+function fillPal(){var q=palIn.value.toLowerCase();palList.innerHTML=TABLES.filter(function(t){return t.toLowerCase().indexOf(q)>=0;}).map(function(t){return '<li><button data-t="'+t+'"><span>'+t+'</span></button></li>';}).join("")||'<li class="hint" style="padding:10px 12px;font-size:13px;color:var(--ink3)">일치하는 테이블이 없습니다</li>';}
+function openPal(){palIn.value="";fillPal();if(pal.showModal)pal.showModal();else pal.setAttribute("open","");palIn.focus();}
+palIn.addEventListener("input",fillPal);
+palIn.addEventListener("keydown",function(e){if(e.key==="ArrowDown"){var b=palList.querySelector("button");if(b){e.preventDefault();b.focus();}}if(e.key==="Enter"){var b2=palList.querySelector("button");if(b2)b2.click();}});
+palList.addEventListener("keydown",function(e){var b=document.activeElement;var li=b.closest&&b.closest("li");if(!li)return;
+  if(e.key==="ArrowDown"&&li.nextElementSibling){e.preventDefault();li.nextElementSibling.querySelector("button").focus();}
+  if(e.key==="ArrowUp"){e.preventDefault();if(li.previousElementSibling)li.previousElementSibling.querySelector("button").focus();else palIn.focus();}});
+palList.addEventListener("click",function(e){var b=e.target.closest("button[data-t]");if(!b)return;var ta=document.getElementById("newSql");
+  pal.close();
+  if(ta){var p=ta.selectionStart||0,v=ta.value;ta.value=v.slice(0,p)+b.dataset.t+v.slice(ta.selectionEnd||p);ta.focus();ta.selectionStart=ta.selectionEnd=p+b.dataset.t.length;say(b.dataset.t+" 을(를) 빈 셀에 넣었습니다.");}
+  else toast("빈 셀이 없는 상태입니다.");});
+
+/* 해시 */
+function applyHash(){
+  var p=new URLSearchParams(location.hash.replace(/^#/,""));
+  var s=p.get("state")||"dm2",t=p.get("theme")||"light";
+  theme=(t==="dark")?"dark":"light";
+  document.documentElement.setAttribute("data-theme",theme);
+  setState(s,false);
+}
+window.addEventListener("hashchange",applyHash);
+applyHash();
+})();
+</script>
+</body>
+</html>
