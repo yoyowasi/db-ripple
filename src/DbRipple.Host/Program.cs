@@ -99,7 +99,9 @@ builder.Services.AddDbRippleApi();
 if (exeMode) builder.Services.AddLaunchSession();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ITriggerAnalyzer, TriggerAnalyzer>();
-builder.Services.AddSingleton<IBatchAnalyzer, BatchAnalyzer>();
+// 문장 분석기는 DB 종류마다 다르다(2026-11-18): 현재 묶음의 것을 쓰고, 묶음이 없으면 SQL Server 분석기(기준선이 없어 어차피 503).
+builder.Services.AddSingleton<BatchAnalyzer>();
+builder.Services.AddTransient<IBatchAnalyzer>(sp => sp.GetRequiredService<EngineHolder>().Current?.Analyzer ?? sp.GetRequiredService<BatchAnalyzer>());
 builder.Services.AddSingleton<INetDiffer, NetDiffer>();
 builder.Services.AddSingleton<IChangeCollector, ChangeCollector>();
 builder.Services.AddSingleton<ICausalResolver, CausalResolver>();
@@ -131,12 +133,23 @@ var app = builder.Build();
 
 var engines = app.Services.GetRequiredService<EngineHolder>();
 var settings = app.Services.GetRequiredService<ProfileSettingsService>();
-var startProfile = env is not null
-    ? new RuntimeProfile(env.Connections, env.OriginDb, env.SandboxDb, cfg["SnapshotDb"] ?? "AW_Sandbox_base", env.Backup)
-    : settings.Initialize();
-if (settings.LoadWarning is { } loadWarning) app.Logger.LogWarning("설정: {Warning}", loadWarning);
-if (startProfile is not null) engines.Start(startProfile);
-else app.Logger.LogWarning("연결 설정이 없습니다. 화면의 설정에서 원본·샌드박스 연결을 저장하세요(저장 위치 {DataDir}).", dataDir);
+// DB 종류(2026-11-18): DBRIPPLE_ENGINE(우선) 또는 DbRipple:Engine. Postgres면 DBRIPPLE_PG_CONNECTION과 DbRipple:Pg 절로만 구성한다(설정 화면 저장 대상 아님).
+// 설정 화면에서 SQL Server 연결을 저장하면 그 묶음으로 바뀐다(사용자가 고른 동작).
+var engineKind = Environment.GetEnvironmentVariable("DBRIPPLE_ENGINE") ?? cfg["Engine"] ?? "SqlServer";
+if (string.Equals(engineKind, "Postgres", StringComparison.OrdinalIgnoreCase) || string.Equals(engineKind, "PostgreSQL", StringComparison.OrdinalIgnoreCase))
+{
+    _ = settings.Initialize(); // 설정 화면 표시용 상태만 읽는다(SQL Server 묶음은 만들지 않음)
+    engines.Start(CreatePgEngine(app.Services));
+}
+else
+{
+    var startProfile = env is not null
+        ? new RuntimeProfile(env.Connections, env.OriginDb, env.SandboxDb, cfg["SnapshotDb"] ?? "AW_Sandbox_base", env.Backup)
+        : settings.Initialize();
+    if (settings.LoadWarning is { } loadWarning) app.Logger.LogWarning("설정: {Warning}", loadWarning);
+    if (startProfile is not null) engines.Start(startProfile);
+    else app.Logger.LogWarning("연결 설정이 없습니다. 화면의 설정에서 원본·샌드박스 연결을 저장하세요(저장 위치 {DataDir}).", dataDir);
+}
 app.Logger.LogInformation("DbRipple {Mode} 모드, 데이터 {DataDir}, 매니페스트 {Manifest}, 미리보기 저장소 {Store}",
     exeMode ? "실행 파일" : "개발", dataDir, manifestPath, previewStoreDir);
 
@@ -218,7 +231,8 @@ Engine CreateEngine(IServiceProvider sp, RuntimeProfile profile)
         },
         sp.GetRequiredService<ITriggerAnalyzer>(), clock);
     var executor = new PreviewExecutor(profile.Connections.Sandbox.ConnectionString, sp.GetRequiredService<ExecutionSettings>(), sp.GetRequiredService<INetDiffer>());
-    var pipeline = ActivatorUtilities.CreateInstance<PreviewPipeline>(sp, sandbox, (IPreviewExecutor)executor);
+    var analyzer = sp.GetRequiredService<BatchAnalyzer>();
+    var pipeline = ActivatorUtilities.CreateInstance<PreviewPipeline>(sp, sandbox, (IPreviewExecutor)executor, (IBatchAnalyzer)analyzer);
     // 3주차: /catalog/schema(AD8), [적용](C15, AD6·AD7·AD10).
     var catalog = new CatalogSchemaProvider(sandbox, profile.Connections.Sandbox.ConnectionString);
     var d = new ApplySettings();
@@ -234,8 +248,34 @@ Engine CreateEngine(IServiceProvider sp, RuntimeProfile profile)
         ForceKeyset = cfg.GetValue("ForceKeyset", d.ForceKeyset), // 테스트·데모 전용(§5.3 KEYSET 경로 확인)
     };
     var apply = new ApplyService(profile.Connections.Origin, applySettings, sp.GetRequiredService<IPreviewStore>(), sandbox,
-        sp.GetRequiredService<IBatchAnalyzer>(), sp.GetRequiredService<IStatementRunner>(), sp.GetRequiredService<INetDiffer>(), clock);
-    return new Engine(profile, sandbox, pipeline, catalog, apply);
+        analyzer, sp.GetRequiredService<IStatementRunner>(), sp.GetRequiredService<INetDiffer>(), clock);
+    return new Engine(profile, sandbox, pipeline, catalog, apply, analyzer);
+}
+
+// PostgreSQL 최소판 묶음(docs/superpowers/specs/2026-11-18-postgres-preview-minimal.md): 미리보기만, [적용]은 501.
+Engine CreatePgEngine(IServiceProvider sp)
+{
+    var connection = Environment.GetEnvironmentVariable("DBRIPPLE_PG_CONNECTION");
+    if (string.IsNullOrWhiteSpace(connection))
+        throw new InvalidOperationException("DBRIPPLE_ENGINE=Postgres인데 DBRIPPLE_PG_CONNECTION이 없습니다(관리용 DB postgres에 붙는 Npgsql 연결 문자열).");
+    var options = new DbRipple.Postgres.PgOptions
+    {
+        ServerConnectionString = connection,
+        // SQL Server 기본값(AW_Origin 등)과 섞이지 않게 Pg 절을 따로 쓴다. 환경 변수로는 DbRipple__Pg__OriginDb.
+        OriginDb = cfg["Pg:OriginDb"] is { Length: > 0 } origin ? origin
+            : throw new InvalidOperationException("DbRipple:Pg:OriginDb 없음(PostgreSQL 원본 DB 이름, 환경 변수 DbRipple__Pg__OriginDb)"),
+        SandboxDb = cfg["Pg:SandboxDb"] is { Length: > 0 } sandboxDb ? sandboxDb : cfg["Pg:OriginDb"] + "_dbr_sandbox",
+        PreviewRole = cfg["Pg:PreviewRole"] is { Length: > 0 } role ? role : "dbr_preview",
+        CommandTimeoutSeconds = cfg.GetValue("Pg:CommandTimeoutSeconds", 60),
+        Log = m => sp.GetRequiredService<ILoggerFactory>().CreateLogger("DbRipple.Baseline").LogInformation("{Step}", m),
+    };
+    options.Validate();
+    var sandbox = new DbRipple.Postgres.PgSandboxManager(options, sp.GetRequiredService<TimeProvider>());
+    var analyzer = new DbRipple.Postgres.PgBatchAnalyzer();
+    var pipeline = ActivatorUtilities.CreateInstance<PreviewPipeline>(sp, (ISandboxManager)sandbox,
+        (IPreviewExecutor)new DbRipple.Postgres.PgPreviewExecutor(options), (IBatchAnalyzer)analyzer);
+    var catalog = new CatalogSchemaProvider(sandbox, new DbRipple.Postgres.PgColumnTypeSource());
+    return new Engine(null, sandbox, pipeline, catalog, new DbRipple.Postgres.PgApplyNotSupported(), analyzer);
 }
 
 SplitBackupSettings SplitBackup(ContractBackup backup)

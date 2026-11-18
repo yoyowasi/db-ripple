@@ -23,7 +23,8 @@ const CONDITIONS: { key: Exclude<GateCondition, 'other'>; label: string; onlyWhe
 
 export function gateItems(gate: GateResult, hasPreview: boolean): GateItem[] {
   // 미리보기가 없으면 다른 조건은 판단할 수 없다. 이유만 보인다.
-  if (!hasPreview) return gate.reasons.map((r) => ({ label: r, ok: false, why: [] }))
+  // PostgreSQL 최소판도 같다: 나머지 조건은 판정하지 않았으므로 통과로 보이면 안 된다.
+  if (!hasPreview || gate.failures.some((f) => f.condition === 'engine')) return gate.reasons.map((r) => ({ label: r, ok: false, why: [] }))
 
   const items: GateItem[] = CONDITIONS.filter((c) => !c.onlyWhenFailing || gate.failures.some((f) => f.condition === c.key)).map((c) => {
     const why = gate.failures.filter((f) => f.condition === c.key).map((f) => f.text)

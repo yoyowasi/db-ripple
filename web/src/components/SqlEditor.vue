@@ -2,7 +2,7 @@
 // C1 쿼리 편집기. CodeMirror 6 을 Vue 래퍼 없이 onMounted 에서 직접 마운트한다.
 import { autocompletion, completionKeymap } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
-import { MSSQL, sql } from '@codemirror/lang-sql'
+import { MSSQL, PostgreSQL, sql } from '@codemirror/lang-sql'
 import { HighlightStyle, bracketMatching, indentOnInput, syntaxHighlighting } from '@codemirror/language'
 import { lintGutter, linter, setDiagnostics } from '@codemirror/lint'
 import { Compartment, EditorState } from '@codemirror/state'
@@ -24,6 +24,8 @@ const props = defineProps<{
   schema: CatalogSchema | null
   diagnostics: Diagnostic[]
   readonly?: boolean
+  /** 'postgres'면 PostgreSQL 문법·기본 스키마 public. 없으면 SQL Server(dbo). */
+  engine?: 'postgres'
 }>()
 
 const emit = defineEmits<{
@@ -71,9 +73,10 @@ const theme = EditorView.theme({
 })
 
 function sqlExtension(schema: CatalogSchema | null) {
-  const c = schemaToCompletion(schema)
+  const pg = props.engine === 'postgres'
+  const c = schemaToCompletion(schema, pg ? 'public' : 'dbo')
   return sql({
-    dialect: MSSQL,
+    dialect: pg ? PostgreSQL : MSSQL,
     schema: c.schema,
     defaultSchema: c.defaultSchema,
     upperCaseKeywords: true,
@@ -141,10 +144,10 @@ watch(
   },
 )
 
-// 스키마가 바뀌면(baselineAt 변경) 자동완성만 갈아 끼운다.
+// 스키마(baselineAt 변경)나 DB 종류가 바뀌면 문법·자동완성만 갈아 끼운다.
 watch(
-  () => props.schema,
-  (s) => view?.dispatch({ effects: sqlCompartment.reconfigure(sqlExtension(s)) }),
+  () => [props.schema, props.engine] as const,
+  ([s]) => view?.dispatch({ effects: sqlCompartment.reconfigure(sqlExtension(s)) }),
 )
 
 watch(() => props.readonly, (r) => view?.dispatch({ effects: editableCompartment.reconfigure(EditorView.editable.of(!r)) }))

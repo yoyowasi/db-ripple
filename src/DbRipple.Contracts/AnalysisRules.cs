@@ -129,6 +129,12 @@ public static class AnalysisRules
     /// </summary>
     public const string WarnProcNondeterministicReturn = "WARN_PROC_NONDETERMINISTIC_RETURN";
 
+    /// <summary>
+    /// PostgreSQL 최소판(2026-11-18): 미리보기만 되고 [적용]·프로시저 호출은 없다. 문장은 첫 낱말·대상 테이블만 판정하고(완전한 파서 아님),
+    /// 문장 안 사용자 함수 호출과 트리거 본문은 정규식 수준으로만 본다. 스크립트마다 한 번 낸다.
+    /// </summary>
+    public const string WarnPgMinimalScope = "WARN_PG_MINIMAL_SCOPE";
+
     /// <summary>거부 규칙 전체.</summary>
     public static IReadOnlyList<string> AllRejects { get; } =
     [
@@ -146,5 +152,6 @@ public static class AnalysisRules
         WarnTopWithoutOrder, WarnNondeterministicFunction, WarnAuditNotLast, WarnTriggerDynamicSql,
         WarnProcNestedTransaction, WarnProcRollback, WarnProcCatchSwallows, WarnProcXactStateCheck, WarnProcCursor, WarnProcTempTable,
         WarnProcTableVariable, WarnProcResultSet, WarnProcNondeterministicWrite, WarnProcNondeterministicReturn,
+        WarnPgMinimalScope,
     ];
 }

@@ -1,0 +1,54 @@
+# PostgreSQL 미리보기 최소판
+
+사용자가 2026-11-18 "PostgreSQL은 지원해야 한다(MSSQL은 잘 안 쓴다)"며 최소판을 지금 시작하라고 했다. 같은 날 RAM이 부족해 컨테이너 실측·빌드는 뒤로 미루고 코드부터 쓴다(학습 규칙 L21). 이 문서의 "확인 필요"는 SP22(`spikes/sql/sp22_10_pg_capture.sql`)로 실측한 뒤 고친다.
+
+## 범위
+
+- **한다:** PostgreSQL 18 한 서버(원본과 샌드박스가 같은 서버)에서 INSERT·UPDATE·DELETE 미리보기. 원인 트리(직접·FK 연쇄·트리거), 행 비교, 문장별 결과.
+- **안 한다:** [원본에 적용], 프로시저·함수 호출(`CALL`, `DO`), Split(원격 원본), 설정 화면에서 PostgreSQL 연결 저장(환경 변수로만), 롤백 뒤 남은 변경 검사.
+- 화면은 지금 것을 그대로 쓴다. 엔진이 PostgreSQL이면 [원본에 적용]을 끄고 이유를 보이며, 편집기 방언을 PostgreSQL로 바꾼다.
+
+## 경계(코드 조사 2026-11-18)
+
+미리보기 흐름(`PreviewPipeline`), 변경 묶기(`ChangeCollector`), 원인 귀속(`CausalResolver`), 저장소·API·화면은 DB와 무관하다. PostgreSQL 구현은 새 프로젝트 `src/DbRipple.Postgres`(Npgsql)에 두고 아래 자리에 꽂는다.
+
+| 자리 | SQL Server | PostgreSQL 최소판 |
+|---|---|---|
+| `ISandboxManager` | BACKUP/RESTORE, DB 스냅샷 | `CREATE DATABASE 샌드박스 TEMPLATE 원본`, 감사 설치, 카탈로그·지문·매니페스트 |
+| `IBatchAnalyzer` | ScriptDom | 문장 나누기(따옴표·`$태그$`·주석 인식) + 첫 낱말로 허용/거부 + 대상 테이블 |
+| `ITriggerAnalyzer` 결과 | ScriptDom 정적 분석 | 트리거 함수 본문(`prosrc`)에서 INSERT INTO·UPDATE·DELETE FROM 대상을 찾는 보수적 분석, `EXECUTE`가 있으면 동적 SQL |
+| `IPreviewExecutor` | T-SQL 실행 봉투 | Npgsql 트랜잭션 봉투, 감사 읽기, 감사 이미지로 최종 차이, ROLLBACK |
+| `IColumnTypeSource` | sys.columns | `format_type` |
+| `IApplyService` | ApplyService | 지원 안 함(501) |
+| 조립 | `CreateEngine` | 엔진 설정이 `Postgres`면 위 구현으로 조립 |
+
+`IBatchAnalyzer`는 지금 DI 싱글턴이라 `/api/analyze`가 늘 SQL Server 분석기를 쓴다. 엔진 묶음(`Engine`)에 분석기를 넣고 DI는 엔진에서 꺼내게 바꾼다.
+
+## 결정
+
+1. **샌드박스 복제는 TEMPLATE.** 원본에 다른 연결이 있으면 PostgreSQL이 복제를 거절한다(SQLSTATE 55006). 도구는 남의 세션을 끊지 않고 그 오류를 그대로 보인다. 기준 시각은 복제가 끝난 시각이다. 기준 비교용 스냅샷 DB는 만들지 않는다(PostgreSQL은 DB 사이 조회가 안 된다). 새로 고침은 `DROP DATABASE 샌드박스 WITH (FORCE)`(PostgreSQL 13 이상) 뒤 다시 복제한다. 지우는 것은 **도구가 만든 DB뿐**이다: 복제 직후 DB 주석(`COMMENT ON DATABASE`)으로 소유 표시를 남기고, 같은 이름의 DB가 이미 있는데 그 주석이 없으면 지우지 않고 오류로 끝낸다. 시스템 DB 이름(`postgres`, `template0/1`)과 원본과 같은 이름은 받지 않는다. 매니페스트·기준 시각·원본 이름은 샌드박스의 `dbr_audit.meta`에 둔다(Host를 다시 켜면 거기서 읽는다).
+2. **감사 수집은 문장 단위 AFTER 트리거 + 전이 테이블.** 테이블마다 INSERT·UPDATE·DELETE 트리거 3개(`zzz_dbr_audit_i|u|d`, `REFERENCING ... TABLE`). PostgreSQL은 같은 종류 트리거를 이름순으로 부르므로 `zzz_` 접두로 마지막에 돈다. 이름이 더 뒤인 사용자 트리거가 있으면 매니페스트에 NONE으로 적는다. 감사 저장소는 샌드박스의 `dbr_audit` 스키마(순번 시퀀스, 헤더, 행 이미지, meta). 감사 함수는 `SECURITY DEFINER`(미리보기 역할은 감사 스키마에 권한이 없다). 깊이는 `pg_trigger_depth()`. 키는 수집기와 같은 규칙(`TableKey.Choose`: PK → NOT NULL UNIQUE 인덱스 ID 순 → ROW). 파티션 테이블·파티션은 최소판에서 제외(매니페스트 excluded). 문장 단위 트리거는 0행이어도 돌므로 **깊이 2 이상의 0행 묶음은 기록하지 않는다**(FK 연쇄가 부모 행마다 빈 자식 문장을 돌릴 수 있음). **확인 필요(SP22):** 연쇄 행의 깊이 값, 연쇄 문장이 부모 행마다 나뉘는지, 감사 기록 순서(전위/후위).
+3. **실행 봉투.** 전용 연결(풀링 끔) `BEGIN` → 문장마다 `SET LOCAL ROLE dbr_preview` → 실행·행 수 → `RESET ROLE` → 경계(그 트랜잭션 안 헤더 순번 최댓값) → 감사 읽기 → 최종 차이 → `ROLLBACK`. 오류가 나면 PostgreSQL 트랜잭션은 중단되므로 그 문장 뒤는 not_run, 수집·최종 차이는 비운다. PostgreSQL 트리거 함수는 COMMIT할 수 없어 롤백 뒤 남은 변경 검사는 하지 않는다(시퀀스 값 소비는 남는다). 오류 문맥에 사용자 PL/pgSQL 함수가 있으면 `trigger_blocked`, `dbr_audit.*` 함수면 도구 오류(`failed`), 그 밖은 `failed`. SQLSTATE는 메시지 앞에 붙이고 오류 번호는 0. **주의:** 연결 사용자가 superuser면 `SET ROLE`은 보안 경계가 아니다(`set_config('role', …)`로 되돌릴 수 있음). 그래서 문장 안 `set_config` 등을 거부하지만, 사용자 함수 안까지는 막지 못한다. 연결 사용자는 superuser가 아닌 계정(CREATEDB·CREATEROLE)을 권장한다.
+4. **최종 차이는 감사 이미지로(순수 계산 `ImageNetDiff`).** 묶음마다 DELETED 이미지를 −1, INSERTED 이미지를 +1로 (키, 행 문자열)마다 더한다. 전이 테이블은 그 문장이 지우고 넣은 행 그대로라 **더하는 순서와 상관없이 "최종 − 처음"이 남는다**(트리거 안에서 같은 행을 다시 고쳐 기록 순서가 실제 순서와 달라도 맞음). 키마다 남은 −1·+1이 하나씩이면 UPDATED, 하나만이면 DELETED/INSERTED, 키 없는 테이블은 다중집합. 이미지 상한을 넘어 KEYS로 바뀐 테이블은 이 방법을 못 쓰므로, before는 트랜잭션 밖 새 연결(확정된 기준선), after는 트랜잭션 안에서 감사에 나온 키만 다시 읽는다(키 없는 테이블은 전체 다중집합 비교, 느린 길). 감사 밖 테이블·롤백 뒤 남은 변경은 보지 못한다. 이 한계는 분석 경고(`WARN_PG_MINIMAL_SCOPE`)로 매 미리보기에 남긴다.
+5. **FK 연쇄 깊이 보정(순수 계산 `PgFkDepth`).** PostgreSQL은 ON DELETE/UPDATE 동작을 부모의 행 단위 RI 트리거에서 자식에 대한 별도 문장으로 실행해, 자식 묶음이 부모보다 한 단계 깊게 기록된다. 기존 원인 판정(FkJudge H2)은 FK 연쇄 자식이 부모와 같은 깊이라고 보므로, 실행기가 감사 헤더를 넘기기 전에 맞춘다: 후위 순서(수집기 Bracket과 같은 규칙)로 부모 묶음을 찾고(없으면 앞쪽에서), 자식 테이블→부모 테이블 FK의 동작이 연산과 맞으면(DELETE→CASCADE 삭제, DELETE→SET NULL/DEFAULT 수정, UPDATE→CASCADE/SET NULL/DEFAULT 수정) 그 자식과 아래 전체를 한 단계 올린다. 부모 테이블에 같은 이벤트로 자식에 쓸 수 있는(또는 쓰기 대상 모름) 사용자 트리거가 있으면 출처가 모호하므로 올리지 않는다. 문장 경계는 넘지 않는다. **SP22 결과에 따라 고칠 수 있다.**
+6. **값 문자열.** 감사는 `to_jsonb` 뒤 `->>`로 열마다 문자열(NULL은 JSON null)을 담는다. 계약 규칙(모든 값은 문자열, NULL은 null)과 같고, 같은 함수라 같은 값은 같은 문자열이다. 숫자는 jsonb 원문, 불리언 `true`/`false`, 시각은 ISO(`T` 구분).
+7. **문장 분석(`PgSqlLexer` + `PgBatchAnalyzer`).** 문장 나누기는 `'…'`(E'…' 포함), `"…"`, `$태그$…$태그$`, `--`, 중첩 `/* */`를 인식하고 닫히지 않으면 `REJECT_PARSE_ERROR`. 허용: `INSERT INTO`, `UPDATE [ONLY]`, `DELETE FROM [ONLY]`. 스키마를 생략한 대상은 `public`에서만 찾는다(샌드박스는 원본 DB의 search_path 설정을 물려받지 않음). 거부 규칙 ID는 기존 것을 다시 쓴다: `REJECT_TRUNCATE`, `REJECT_MERGE`, `REJECT_EXEC`(CALL·DO·EXECUTE), `REJECT_TRANSACTION_CONTROL`, `REJECT_SET_OPTION`(SET·RESET), `REJECT_DDL`, `REJECT_BULK_INSERT`(COPY), `REJECT_SELECT_INTO`, `REJECT_ADMIN_COMMAND`(VACUUM 등 + `set_config`·백엔드 종료·`pg_sleep`·advisory lock·`query_to_xml` 류처럼 SQL 문자열을 실행하는 함수), `REJECT_EXTERNAL_ROWSET`(`dblink*`·파일 읽기·`lo_import/export`), `REJECT_NOT_ALLOWED`(SELECT·WITH 등), `REJECT_TARGET_NOT_USER_TABLE`(없음·시스템·파티션), `REJECT_CAPTURE_STORE`(dbr_audit). 도달하는 트리거(직접 대상 + FK 연쇄 + 트리거 쓰기 대상)에 외부 부작용(`pg_notify`·dblink·COPY·신뢰하지 않는 언어 등)이 있으면 `REJECT_TRIGGER_EXTERNAL_EFFECT`, 동적·모름은 `WARN_TRIGGER_DYNAMIC_SQL`, 감사 순서 NONE은 `WARN_AUDIT_NOT_LAST`. 새 규칙은 경고 하나 `WARN_PG_MINIMAL_SCOPE`(스크립트마다 한 번).
+8. **트리거 분석은 보수적으로(`PgTriggerAnalyzer`).** 주석·문자열을 지운 함수 본문에서 INSERT INTO·UPDATE … SET·DELETE FROM 대상을 찾는다. 동적 SQL(`EXECUTE`), plpgsql·sql 밖의 언어, 이름을 풀 수 없는 대상이 있으면 `WriteTargetsUnknown`. 신뢰하지 않는 언어(plpython3u 등)는 외부 부작용으로 둔다. 트리거 원인은 지금처럼 `inferred`.
+9. **지문.** 한 서버라 원본·샌드박스 지문은 늘 같다(`FingerprintMatch = true`). 값: 서버 버전, "PostgreSQL", 주버전, DB 정렬(나머지 SQL Server 항목은 고정값).
+10. **객체 ID.** PostgreSQL oid(uint32)를 int로 넣는다. 2^31을 넘으면 기준선 구축을 실패로 끝낸다(사용자 객체 oid는 보통 16384부터라 실제로는 거의 없음).
+11. **엔진 선택.** `DbRipple:Engine` = `SqlServer`(기본) | `Postgres`, 환경 변수 `DBRIPPLE_ENGINE`이 우선. PostgreSQL 서버 연결은 `DBRIPPLE_PG_CONNECTION`(관리용 DB `postgres`에 붙는 Npgsql 연결 문자열). 원본·샌드박스 DB 이름은 SQL Server 기본값(AW_Origin)과 섞이지 않게 `DbRipple:Pg:OriginDb`(필수, 환경 변수 `DbRipple__Pg__OriginDb`)·`DbRipple:Pg:SandboxDb`(기본 `원본_dbr_sandbox`), 소문자·숫자·밑줄만. 선택: `Pg:PreviewRole`(기본 `dbr_preview`), `Pg:CommandTimeoutSeconds`(기본 60). 설정 화면에서 SQL Server 연결을 저장하면 그 묶음으로 바뀐다.
+12. **API·화면.** `SandboxStatus.engine`(PostgreSQL이면 `"postgres"`, SQL Server는 필드 없음 — 기존 JSON 모양 유지)을 더한다. 문장 분석기는 엔진 묶음(`Engine.Analyzer`)에서 꺼낸다. [적용] API는 501. 화면은 엔진이 postgres면 편집기 문법을 PostgreSQL(기본 스키마 public)로, [원본에 적용]은 "PostgreSQL 최소판은 [적용]을 지원하지 않습니다" 한 줄로 끈다.
+
+## 구현 파일(2026-11-18, 빌드·실행 전)
+
+- `src/DbRipple.Postgres/`: `PgOptions`(설정·식별자), `PgCatalogReader`, `PgCapture`(감사 설치 SQL·매니페스트), `PgTriggerAnalyzer`, `PgSqlLexer`, `PgBatchAnalyzer`, `ImageNetDiff`, `PgFkDepth`, `PgPreviewExecutor`, `PgSandboxManager`, `PgStubs`(형식 재료·[적용] 501).
+- Host: `Engine`에 `Analyzer`, `CreatePgEngine`, `IBatchAnalyzer`는 현재 묶음에서. Contracts: `SandboxStatus.Engine`, `AnalysisRules.WarnPgMinimalScope`(경고 목록 테스트 14 → 15).
+- web: `types.ts` engine, `SqlEditor` 문법, `applyGate`·`gateItems`.
+- 테스트: `tests/DbRipple.Postgres.Tests/PgPureTests.cs`(DB 없음).
+
+## 검증(RAM이 넉넉할 때)
+
+1. SP22 실측: 위 "확인 필요" 3가지와 TEMPLATE 복제, 0행 문장·0행 연쇄의 트리거 발동.
+2. `dotnet build`, 기존 단위 테스트(회귀 없음), 새 단위 테스트(문장 나누기·분류, 감사 이미지 최종 차이 — DB 없음).
+3. PostgreSQL DB 테스트(`DBRIPPLE_PG_CONNECTION`이 있을 때만): SP22 스키마로 3단 연쇄 DELETE, SET NULL, 트리거 사슬 UPDATE가 원인 트리에서 직접·FK 연쇄·트리거로 나오는지.
+4. 화면: 시험 데이터 대신 Host + PostgreSQL 컨테이너로 미리보기 한 번(내장 브라우저).

@@ -18,7 +18,7 @@ export interface GateInput {
 }
 
 /** 화면의 조건 목록 한 줄에 대응하는 키. 'other'는 목록 밖 이유(이미 지워짐·이미 적용 시도·처리 중 등). */
-export type GateCondition = 'preview' | 'fingerprint' | 'window' | 'sql' | 'residual' | 'sandbox' | 'lock' | 'origin' | 'other'
+export type GateCondition = 'preview' | 'fingerprint' | 'window' | 'sql' | 'residual' | 'sandbox' | 'lock' | 'origin' | 'engine' | 'other'
 
 export interface GateFailure {
   condition: GateCondition
@@ -47,6 +47,12 @@ export function evaluateApplyGate(i: GateInput): GateResult {
     remainingMs,
   })
   const p = i.preview
+
+  // PostgreSQL 최소판(2026-11-18)은 [적용]이 없다(서버 501). 다른 조건은 따질 필요가 없어 이 이유 하나만 보인다.
+  if (i.sandbox?.engine === 'postgres') {
+    fail('engine', 'PostgreSQL 최소판은 [적용]을 지원하지 않습니다. 미리보기만 됩니다.')
+    return result(null)
+  }
 
   if (!p) {
     fail('preview', '미리보기가 없습니다. 먼저 [미리보기]를 실행하세요.')

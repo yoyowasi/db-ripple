@@ -18,6 +18,7 @@
     <ProjectReference Include="..\DbRipple.Diff\DbRipple.Diff.csproj" />
     <ProjectReference Include="..\DbRipple.Attribution\DbRipple.Attribution.csproj" />
     <ProjectReference Include="..\DbRipple.Apply\DbRipple.Apply.csproj" />
+    <ProjectReference Include="..\DbRipple.Postgres\DbRipple.Postgres.csproj" />
   </ItemGroup>
 
 </Project>

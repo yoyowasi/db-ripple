@@ -96,6 +96,8 @@ export interface SandboxStatus {
   originReachable?: boolean
   /** 샌드박스 인스턴스 설정 경고(xp_cmdshell 등 위험 설정 켜짐, 연결된 서버 있음). 막지 않는다. 옛 응답에는 없다. */
   instanceWarnings?: string[]
+  /** DB 엔진. SQL Server는 빠진다. 'postgres'면 PostgreSQL 최소판(미리보기만, [적용] 없음). */
+  engine?: 'postgres'
 }
 // POST /api/sandbox/refresh → 202, 본문 없음(Location: /api/sandbox)
 

@@ -278,6 +278,7 @@ const emptyState = computed(() => {
               :schema="sandbox.schema"
               :diagnostics="store.diagnostics"
               :readonly="store.running || store.applying"
+              :engine="sandbox.status?.engine"
               @update:model-value="store.setSql"
               @run="run"
             />

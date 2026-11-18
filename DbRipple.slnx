@@ -19,6 +19,7 @@
     <Project Path="src/DbRipple.Diff/DbRipple.Diff.csproj" />
     <Project Path="src/DbRipple.Execution/DbRipple.Execution.csproj" />
     <Project Path="src/DbRipple.Host/DbRipple.Host.csproj" />
+    <Project Path="src/DbRipple.Postgres/DbRipple.Postgres.csproj" />
     <Project Path="src/DbRipple.Preview/DbRipple.Preview.csproj" />
   </Folder>
   <Folder Name="/tests/">
@@ -30,6 +31,7 @@
     <Project Path="tests/DbRipple.Diff.Tests/DbRipple.Diff.Tests.csproj" />
     <Project Path="tests/DbRipple.Execution.Tests/DbRipple.Execution.Tests.csproj" />
     <Project Path="tests/DbRipple.Integration.Tests/DbRipple.Integration.Tests.csproj" />
+    <Project Path="tests/DbRipple.Postgres.Tests/DbRipple.Postgres.Tests.csproj" />
     <Project Path="tests/DbRipple.TestSupport/DbRipple.TestSupport.csproj" />
     <Project Path="tests/DbRipple.TestSupport.Tests/DbRipple.TestSupport.Tests.csproj" />
   </Folder>
