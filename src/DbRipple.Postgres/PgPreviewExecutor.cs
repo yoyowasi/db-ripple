@@ -111,10 +111,9 @@ public sealed class PgPreviewExecutor(PgOptions options) : IPreviewExecutor
         }
 
         sw.Restart();
-        var rawHeaders = await ReadHeadersAsync(conn, tx, boundary0, ct);
+        // SP22: FK 연쇄 헤더는 연쇄를 시작한 문장과 같은 깊이로 기록된다.
+        var headers = await ReadHeadersAsync(conn, tx, boundary0, ct);
         var imageRows = await ReadImagesAsync(conn, tx, boundary0, ct);
-        var highs = executions.Where(e => e.Boundary is not null).Select(e => e.Boundary!.Value).ToList();
-        var headers = PgFkDepth.Normalize(rawHeaders, highs, baseline.Catalog, baseline.Triggers);
         timings = timings with { ReadLog = sw.ElapsedMilliseconds };
 
         sw.Restart();

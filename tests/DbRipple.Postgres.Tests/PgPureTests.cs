@@ -1,7 +1,9 @@
+using DbRipple.Attribution;
 using DbRipple.Contracts;
 using DbRipple.Core.Baseline;
 using DbRipple.Core.Capture;
 using DbRipple.Core.Catalog;
+using DbRipple.Execution;
 
 namespace DbRipple.Postgres.Tests;
 
@@ -274,41 +276,67 @@ public class PgPureTests
         Assert.Equal(new[] { Note }, r.Unresolved);
     }
 
-    // ---------------- FK 연쇄 깊이 보정 ----------------
+    // ---------------- 감사 묶음 귀속 ----------------
 
     [Fact]
-    public void Cascade_children_are_lifted_to_the_parent_depth_in_post_order()
+    public void Cascade_inside_a_user_trigger_keeps_its_depth_and_parent()
     {
-        // DELETE parent → CASCADE child → CASCADE grandchild, SET NULL note. 후위: 손자(3), 자식(2), 메모(2), 부모(1).
-        var raw = new[]
+        // SP22 추가 실측: parent(3)의 AFTER DELETE 트리거가 parent(2)를 지운다.
+        // 안쪽 FK 연쇄는 안쪽 parent 뒤 같은 깊이로 기록되고 바깥 parent가 그 다음에 기록된다.
+        var ctx = Ctx([Trig("s.parent", "t_nested", [ChangeOperation.Delete], writes: ["s.parent"])]);
+        var analysis = Analyze("DELETE FROM s.parent WHERE id = 3", ctx);
+        var headers = new[]
         {
-            H(1, Grand, ChangeOperation.Delete, 3),
-            H(2, Child, ChangeOperation.Delete, 2),
-            H(3, Note, ChangeOperation.Update, 2),
-            H(4, Parent, ChangeOperation.Delete, 1),
+            H(1, Parent, ChangeOperation.Delete, 2) with { DeletedCount = 1 },
+            H(2, Child, ChangeOperation.Delete, 2) with { DeletedCount = 1 },
+            H(3, Note, ChangeOperation.Update, 2) with { DeletedCount = 1, InsertedCount = 1 },
+            H(4, Grand, ChangeOperation.Delete, 2),
+            H(5, Parent, ChangeOperation.Delete) with { DeletedCount = 1 },
+            H(6, Child, ChangeOperation.Delete),
+            H(7, Note, ChangeOperation.Update),
         };
-        var n = PgFkDepth.Normalize(raw, [4], Catalog(), []);
-        Assert.All(n, h => Assert.Equal(1, h.NestLevel));
-    }
+        var images = new[]
+        {
+            I(1, ImageKind.Deleted, """{"id":"2"}""", """{"id":"2","name":"p2"}"""),
+            I(2, ImageKind.Deleted, """{"id":"20"}""", """{"id":"20","parent_id":"2"}"""),
+            I(3, ImageKind.Deleted, """{"id":"1002"}""", """{"id":"1002","parent_id":"2"}"""),
+            I(3, ImageKind.Inserted, """{"id":"1002"}""", """{"id":"1002","parent_id":null}"""),
+            I(5, ImageKind.Deleted, """{"id":"3"}""", """{"id":"3","name":"p3-no-children"}"""),
+        };
+        var statement = new StatementResult
+        {
+            Index = 1, Batch = 1, Position = 1, Target = "s.parent", Kind = ChangeOperation.Delete,
+            Span = Assert.Single(analysis.Statements).Span, Status = StatementStatus.Ok, RowsAffected = 1,
+        };
+        var net = ImageNetDiff.Compute(headers, images, Tables()).Changes;
+        var raw = new RawCapture
+        {
+            Status = PreviewStatus.Ok,
+            Executions = [new StatementExecution { Result = statement, Boundary = 7, ModeAfter = ImageMode.Full }],
+            Boundary0 = 0, Headers = headers, Images = images,
+            NetChanges = net, SandboxDirty = false,
+            Capture = new CaptureInfo { ImageCount = images.Length, Cap = 100, Truncated = false, ManifestVersion = ctx.Manifest.Version },
+            Timings = new ExecutionTimings(),
+        };
+        var result = new CausalResolver().Resolve(new ResolveInput
+        {
+            Statements = [statement], Collected = new ChangeCollector().Collect(raw, analysis, ctx), Net = net, Baseline = ctx,
+        }).Model;
 
-    [Fact]
-    public void Trigger_child_keeps_its_depth_and_ambiguous_parent_trigger_blocks_the_lift()
-    {
-        // 부모 테이블 DELETE 트리거가 자식에 쓸 수 있으면 FK인지 트리거인지 모호하므로 깊이를 그대로 둔다.
-        var raw = new[] { H(1, Child, ChangeOperation.Delete, 2), H(2, Parent, ChangeOperation.Delete, 1) };
-        var n = PgFkDepth.Normalize(raw, [2], Catalog(), [Trig("s.parent", "t_del", [ChangeOperation.Delete], writes: ["s.child"])]);
-        Assert.Equal(2, n[0].NestLevel);
-        // FK가 없는 쌍(메모 INSERT)은 트리거 자식이다.
-        var other = PgFkDepth.Normalize([H(1, Note, ChangeOperation.Insert, 2), H(2, Parent, ChangeOperation.Update, 1)], [2], Catalog(), []);
-        Assert.Equal(2, other[0].NestLevel);
-    }
-
-    [Fact]
-    public void Depth_lift_does_not_cross_statement_boundaries()
-    {
-        var raw = new[] { H(1, Parent, ChangeOperation.Delete, 1), H(2, Child, ChangeOperation.Delete, 2) };
-        var n = PgFkDepth.Normalize(raw, [1, 2], Catalog(), []);
-        Assert.Equal(2, n[1].NestLevel);
+        var direct = Assert.Single(result.Firings, f => f.Cause?.Kind == CauseKind.Direct);
+        var nested = Assert.Single(result.Firings, f => f.Cause?.Kind == CauseKind.Trigger);
+        Assert.Equal(direct.Id, nested.Cause?.ParentFiringId);
+        var cascade = Assert.Single(result.Firings, f => f.Cause?.Kind == CauseKind.FkCascade);
+        var setNull = Assert.Single(result.Firings, f => f.Cause?.Kind == CauseKind.FkSetNull);
+        Assert.All(new[] { cascade, setNull }, f =>
+        {
+            Assert.Equal(2, f.Depth);
+            Assert.Equal(nested.Id, f.Cause?.ParentFiringId);
+        });
+        var emptyCascade = Assert.Single(result.Firings, f => f.Table == "s.grandchild");
+        Assert.Equal(2, emptyCascade.Depth);
+        Assert.Equal(0, emptyCascade.RowCount);
+        Assert.DoesNotContain(result.NetChanges, n => n.Table == "s.grandchild");
     }
 
     // ---------------- 오류 분류·트리거 분석 ----------------

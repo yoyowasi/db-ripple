@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- PostgreSQL 최소판 순수 테스트(DB 없이): 문장 나누기·판별, 이미지 최종 차이, FK 연쇄 깊이 보정, 오류 분류. -->
+  <!-- PostgreSQL 최소판 순수 테스트(DB 없이): 문장 판별, 이미지 최종 차이, 감사 묶음 귀속, 오류 분류. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -20,6 +20,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\DbRipple.Attribution\DbRipple.Attribution.csproj" />
+    <ProjectReference Include="..\..\src\DbRipple.Execution\DbRipple.Execution.csproj" />
     <ProjectReference Include="..\..\src\DbRipple.Postgres\DbRipple.Postgres.csproj" />
   </ItemGroup>
 

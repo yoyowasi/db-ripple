@@ -8,8 +8,7 @@ namespace DbRipple.Postgres;
 /// 테이블마다 문장 단위 AFTER 트리거 3개(전이 테이블)를 단다. 트리거 인자로 키 열 이름을 넘겨 key_json을 만든다(ROW 키면 인자 없음).
 /// 값은 to_jsonb 뒤 ->>로 문자열(NULL은 JSON null)이라 계약 규칙(값은 모두 문자열)과 같다. key_json은 json(순서 보존)이라
 /// UPDATE의 old/new 키 문자열을 그대로 비교할 수 있다(수집기 PairUpdate).
-/// 문장 단위 트리거는 0행이어도 돈다. FK 연쇄는 부모 행마다 자식 문장을 돌릴 수 있어 빈 묶음이 쌓이므로, 깊이 2 이상의 0행 묶음은 기록하지 않는다
-/// (직접 문장의 0행 묶음은 문장 경계를 위해 남긴다. SP22에서 확인할 것).
+/// 문장 단위 트리거는 0행이어도 돈다(SP22 B·C). 중첩된 0행 문장도 사용자 문장 트리거의 쓰기 문맥이 될 수 있으므로 헤더를 남긴다.
 /// </summary>
 public static class PgCapture
 {
@@ -42,7 +41,6 @@ public static class PgCapture
         DECLARE s bigint := nextval('dbr_audit.capture_seq'); fm boolean := dbr_audit.full_mode(); n bigint;
         BEGIN
           SELECT count(*) INTO n FROM dbr_new;
-          IF n = 0 AND pg_trigger_depth() > 1 THEN RETURN NULL; END IF;
           INSERT INTO dbr_audit.header VALUES (s, TG_RELID, TG_TABLE_SCHEMA, TG_TABLE_NAME, 'I', n, 0, pg_trigger_depth(), CASE WHEN fm THEN 'FULL' ELSE 'KEYS' END);
           INSERT INTO dbr_audit.row_image
             SELECT s, 'INSERTED', row_number() OVER (), dbr_audit.key_of(to_jsonb(x), TG_ARGV), CASE WHEN fm THEN dbr_audit.row_of(to_jsonb(x)) END FROM dbr_new x;
@@ -53,7 +51,6 @@ public static class PgCapture
         BEGIN
           SELECT count(*) INTO ni FROM dbr_new;
           SELECT count(*) INTO nd FROM dbr_old;
-          IF ni = 0 AND nd = 0 AND pg_trigger_depth() > 1 THEN RETURN NULL; END IF;
           INSERT INTO dbr_audit.header VALUES (s, TG_RELID, TG_TABLE_SCHEMA, TG_TABLE_NAME, 'U', ni, nd, pg_trigger_depth(), CASE WHEN fm THEN 'FULL' ELSE 'KEYS' END);
           INSERT INTO dbr_audit.row_image
             SELECT s, 'DELETED', row_number() OVER (), dbr_audit.key_of(to_jsonb(x), TG_ARGV), CASE WHEN fm THEN dbr_audit.row_of(to_jsonb(x)) END FROM dbr_old x;
@@ -65,7 +62,6 @@ public static class PgCapture
         DECLARE s bigint := nextval('dbr_audit.capture_seq'); fm boolean := dbr_audit.full_mode(); n bigint;
         BEGIN
           SELECT count(*) INTO n FROM dbr_old;
-          IF n = 0 AND pg_trigger_depth() > 1 THEN RETURN NULL; END IF;
           INSERT INTO dbr_audit.header VALUES (s, TG_RELID, TG_TABLE_SCHEMA, TG_TABLE_NAME, 'D', 0, n, pg_trigger_depth(), CASE WHEN fm THEN 'FULL' ELSE 'KEYS' END);
           INSERT INTO dbr_audit.row_image
             SELECT s, 'DELETED', row_number() OVER (), dbr_audit.key_of(to_jsonb(x), TG_ARGV), CASE WHEN fm THEN dbr_audit.row_of(to_jsonb(x)) END FROM dbr_old x;
