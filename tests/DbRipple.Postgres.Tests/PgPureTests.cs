@@ -367,4 +367,34 @@ public class PgPureTests
         Assert.Equal(16384, PgNames.ObjectId(16384u, "t"));
         Assert.Throws<InvalidOperationException>(() => PgNames.ObjectId(3_000_000_000u, "t"));
     }
+
+    // ---------------- 상태의 실패 이유(2026-11-18) ----------------
+
+    [Fact]
+    public async Task Error_status_carries_the_failure_reason_without_the_password()
+    {
+        // 잘못된 원본 이름은 연결 전에 검사에서 멈추므로 DB 없이 error 상태를 만든다.
+        var sbx = new PgSandboxManager(new PgOptions
+        {
+            ServerConnectionString = "Host=127.0.0.1;Port=1;Username=u;Password=secret-pw-123",
+            OriginDb = "Bad-Name",
+            SandboxDb = "s_box",
+        }, TimeProvider.System);
+        var status = await sbx.GetStatusAsync(default);
+        Assert.Equal(SandboxState.Error, status.State);
+        Assert.Equal(PgSandboxManager.EngineName, status.Engine);
+        Assert.Contains("원본 DB", status.LastError);
+        Assert.DoesNotContain("secret-pw-123", status.LastError);
+        Assert.Equal(sbx.LastError, status.LastError);
+    }
+
+    [Fact]
+    public void Last_error_is_omitted_from_json_unless_present()
+    {
+        var ok = new SandboxStatus { State = SandboxState.Ready, FingerprintMatch = true, Locked = false };
+        Assert.DoesNotContain("lastError", System.Text.Json.JsonSerializer.Serialize(ok, ContractJson.Options));
+        var bad = ok with { State = SandboxState.Error, LastError = "x" };
+        using var doc = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(bad, ContractJson.Options));
+        Assert.Equal("x", doc.RootElement.GetProperty("lastError").GetString());
+    }
 }

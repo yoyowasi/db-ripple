@@ -104,6 +104,11 @@ public sealed record SandboxStatus
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? Engine { get; init; }
+    /// <summary>
+    /// error 상태의 원인(마지막 구축·읽기 실패, 비밀번호는 가림). error가 아니면 null이라 JSON에서 빠진다(2026-11-18, 예 PostgreSQL 원본에 연결이 있어 TEMPLATE 복제 거절).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? LastError { get; init; }
 }
 
 /// <summary>

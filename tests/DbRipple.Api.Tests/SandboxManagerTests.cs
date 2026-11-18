@@ -121,6 +121,7 @@ public sealed class SandboxManagerTests : IClassFixture<SandboxManagerTests.Fixt
         Assert.Equal(ConflictReason.NoBaseline, noBaseline.Reason);
         Assert.NotNull(sbx.LastError);
         Assert.DoesNotContain("Password", sbx.LastError, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(sbx.LastError, status.LastError); // 상태 API로도 실패 이유를 보낸다(2026-11-18)
     }
 
     [SqlFact]
@@ -246,14 +247,17 @@ public sealed class SandboxManagerTests : IClassFixture<SandboxManagerTests.Fixt
         var status = await bad.GetStatusAsync(default);
         Assert.Equal(SandboxState.Error, status.State);
         Assert.NotNull(bad.LastError);
+        Assert.Equal(bad.LastError, status.LastError);
         await Assert.ThrowsAsync<PreviewConflictException>(() => bad.GetContextAsync(default));
         Assert.False((await bad.GetStatusAsync(default)).Locked);
         await using (await bad.AcquirePreviewLockAsync(default)) { } // 실패한 재구축이 잠금을 쥐고 있지 않다
 
         var good = NewManager(new CountingTriggerAnalyzer());
         await good.RefreshAsync(default);
-        Assert.Equal(SandboxState.Ready, (await good.GetStatusAsync(default)).State);
+        var goodStatus = await good.GetStatusAsync(default);
+        Assert.Equal(SandboxState.Ready, goodStatus.State);
         Assert.Null(good.LastError);
+        Assert.Null(goodStatus.LastError);
     }
 
     [SqlFact]

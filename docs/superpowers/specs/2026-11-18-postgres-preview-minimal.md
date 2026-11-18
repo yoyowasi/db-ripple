@@ -37,7 +37,7 @@
 9. **지문.** 한 서버라 원본·샌드박스 지문은 늘 같다(`FingerprintMatch = true`). 값: 서버 버전, "PostgreSQL", 주버전, DB 정렬(나머지 SQL Server 항목은 고정값).
 10. **객체 ID.** PostgreSQL oid(uint32)를 int로 넣는다. 2^31을 넘으면 기준선 구축을 실패로 끝낸다(사용자 객체 oid는 보통 16384부터라 실제로는 거의 없음).
 11. **엔진 선택.** `DbRipple:Engine` = `SqlServer`(기본) | `Postgres`, 환경 변수 `DBRIPPLE_ENGINE`이 우선. PostgreSQL 서버 연결은 `DBRIPPLE_PG_CONNECTION`(관리용 DB `postgres`에 붙는 Npgsql 연결 문자열). 원본·샌드박스 DB 이름은 SQL Server 기본값(AW_Origin)과 섞이지 않게 `DbRipple:Pg:OriginDb`(필수, 환경 변수 `DbRipple__Pg__OriginDb`)·`DbRipple:Pg:SandboxDb`(기본 `원본_dbr_sandbox`), 소문자·숫자·밑줄만. 선택: `Pg:PreviewRole`(기본 `dbr_preview`), `Pg:CommandTimeoutSeconds`(기본 60). 설정 화면에서 SQL Server 연결을 저장하면 그 묶음으로 바뀐다.
-12. **API·화면.** `SandboxStatus.engine`(PostgreSQL이면 `"postgres"`, SQL Server는 필드 없음 — 기존 JSON 모양 유지)을 더한다. 문장 분석기는 엔진 묶음(`Engine.Analyzer`)에서 꺼낸다. [적용] API는 501. 화면은 엔진이 postgres면 편집기 문법을 PostgreSQL(기본 스키마 public)로, [원본에 적용]은 "PostgreSQL 최소판은 [적용]을 지원하지 않습니다" 한 줄로 끈다.
+12. **API·화면.** `SandboxStatus.engine`(PostgreSQL이면 `"postgres"`, SQL Server는 필드 없음 — 기존 JSON 모양 유지)을 더한다. 문장 분석기는 엔진 묶음(`Engine.Analyzer`)에서 꺼낸다. [적용] API는 501. 화면은 엔진이 postgres면 편집기 문법을 PostgreSQL(기본 스키마 public)로, [원본에 적용]은 "PostgreSQL 최소판은 [적용]을 지원하지 않습니다" 한 줄로 끈다. 2026-11-18 추가: `SandboxStatus.lastError`(error 상태일 때만, 비밀번호 가림)로 새로 고침 실패 이유(예 원본 연결 때문의 55006)를 보내고, 상단 샌드박스 상태 칩을 열면 "실패 이유"로 보인다(SQL Server도 같음).
 
 ## 구현 파일
 

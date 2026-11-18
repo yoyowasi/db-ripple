@@ -36,8 +36,11 @@ const refreshBlocked = computed(() => busy.value || !!st.value?.locked)
 const fingerprintText = computed(() => {
   const f = preview.preview?.baseline.fingerprint
   if (!f) return null
+  if (st.value?.engine === 'postgres') return `PostgreSQL ${f.productVersion} · ${f.collation}`
   return `SQL Server ${f.productVersion} · ${f.edition} · 호환성 수준 ${f.compatibilityLevel} · ${f.collation}`
 })
+/** 오류 상태의 원인(서버가 error일 때만 보낸다). */
+const lastError = computed(() => (st.value?.state === 'error' ? (st.value.lastError ?? null) : null))
 
 const modeLabel = computed(() => (st.value?.mode === 'split' ? '분리' : st.value?.mode === 'single_server' ? '한 서버' : null))
 const modeTitle = computed(() =>
@@ -103,6 +106,10 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDoc))
           <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
         </summary>
         <div class="pop">
+          <template v-if="lastError">
+            <h3>실패 이유</h3>
+            <p class="bad why">{{ lastError }}</p>
+          </template>
           <dl>
             <template v-if="modeLabel">
               <dt>연결</dt>
@@ -278,6 +285,15 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDoc))
 .bad {
   color: var(--err);
   font-weight: 600;
+}
+/* 실패 이유는 서버 메시지라 길 수 있다: 줄바꿈을 살리고 긴 낱말도 접는다. */
+.why {
+  margin: 0 0 10px;
+  font-weight: 500;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 160px;
+  overflow: auto;
 }
 .err {
   color: var(--err);
