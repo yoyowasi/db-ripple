@@ -108,11 +108,50 @@ PreviewPipeline의 `resolve` 시간 = C11 `ChangeCollector.Collect` + C13 `Causa
 
 **개선 후보(구현 안 함):**
 
-1. **지워진 키만 나온 키는 재조회하지 않기(효과 클 가능성, 결정 필요).** `ApplyRereads`는 재조회 행이 없으면(`RowJson` null) 건너뛰고(477줄), 있으면 그 키 그룹의 마지막 행 변경에 after가 있을 때만 쓴다(490·499줄). 그룹 키는 `AfterKeyJson ?? KeyJson`이고 after가 있는 행 상태의 그룹 키는 INSERTED 이미지의 keyJson이다(ChangeCollector 311·328줄). 그래서 어느 FULL 헤더의 INSERTED 이미지에도 나오지 않은 키(DELETE 전용 키)는 재조회 결과가 C11 결과를 바꿀 수 없다(코드 읽기로 낸 결론, 실행 확인 안 함). CL20이면 재조회 키가 5N → 2N(ChildLog만)으로 줄고, 비싼 쪽으로 의심되는 지워진 행 조회가 모두 빠진다. 다만 `RawCapture.Rereads`(C10 계약 출력)가 줄고, 설계 문서 C10의 "수집된 키를 재조회" 범위가 바뀌며, 판단 근거가 C11(다른 담당) 내부 규칙에 기대므로 설계 결정과 C11 담당 확인이 먼저다.
+1. **지워진 키만 나온 키는 재조회하지 않기(효과 클 가능성, 결정 필요). → 2026-11-18 구현함(6.1).** `ApplyRereads`는 재조회 행이 없으면(`RowJson` null) 건너뛰고(477줄), 있으면 그 키 그룹의 마지막 행 변경에 after가 있을 때만 쓴다(490·499줄). 그룹 키는 `AfterKeyJson ?? KeyJson`이고 after가 있는 행 상태의 그룹 키는 INSERTED 이미지의 keyJson이다(ChangeCollector 311·328줄). 그래서 어느 FULL 헤더의 INSERTED 이미지에도 나오지 않은 키(DELETE 전용 키)는 재조회 결과가 C11 결과를 바꿀 수 없다(코드 읽기로 낸 결론, 실행 확인 안 함). CL20이면 재조회 키가 5N → 2N(ChildLog만)으로 줄고, 비싼 쪽으로 의심되는 지워진 행 조회가 모두 빠진다. 다만 `RawCapture.Rereads`(C10 계약 출력)가 줄고, 설계 문서 C10의 "수집된 키를 재조회" 범위가 바뀌며, 판단 근거가 C11(다른 담당) 내부 규칙에 기대므로 설계 결정과 C11 담당 확인이 먼저다.
 2. **키를 임시 테이블로 한 번에 보내고 테이블마다 질의 1번.** SqlBulkCopy로 `#keys(ord, keyJson)`에 넣고 한 번 조인하면 OPENJSON 고정 추정(50행) 대신 실제 행 수로 계획을 세운다. SQL이 바뀌므로 결과 문자열이 같은지 DB 테스트로 확인해야 한다.
 3. **청크 크기 1천 → 5천~1만.** 왕복 수가 1/5~1/10. 실험의 청크별 시간이 왕복 비용 위주일 때만 의미가 있다(위 실측으로는 왕복 비용이 작아 보인다).
 
 reread 코드는 바꾸지 않았다(DB로 효과를 잴 수 없고, 1안은 계약·설계 범위 변경).
+
+### 6.1 1안 구현함(2026-11-18, 브랜치 `perf/reread-skip-deleted`, main 2e96564 기준)
+
+클라우드 실측(2026-11-17)에서 지운 행 키 재조회가 빈 Parent·Child에 키마다 Clustered Index Scan을 반복한다고 확인돼 1안을 구현했다. 2·3안은 하지 않았다. 설계 반영: `docs/architecture.md` §5.2 7, D3 대조 1.
+
+**규칙(`RereadSql.Plan`):** 후보는 전과 같다(FULL 묶음 행 이미지 keyJson, 키 있는 테이블, 테이블마다 서수 중복 제거). 그 가운데 같은 테이블(object_id)의 INSERTED 이미지(FULL·KEYS 묶음 모두)에 나온 키만 읽는다. 서수로 먼저 찾고, 못 찾으면 접어서(후행 공백 제거·대문자·숫자는 decimal 정규형, Attribution `ValueComparer`의 대소문자 무시 쪽과 같은 규칙) 다시 본다. 생략한 키 수는 `RawCapture.RereadSkippedKeys`(추가 필드, 0이면 JSON에서 빠짐)에 남긴다. 남은 키의 SQL·청크(1천)는 그대로다.
+
+**출력이 바뀌지 않는 근거(코드, main 2e96564 줄 번호):**
+
+- 재조회 행을 읽는 곳은 `ChangeCollector.Collect` 91줄 → `ApplyRereads`뿐이다. `PreviewPipeline.cs` 119줄은 시간만 옮기고, `PreviewRecord`(124~130줄)·API·평가 하네스(`eval/`)·web은 `Rereads`를 읽지 않는다. 테스트에서는 `CascadeLabTests.cs` 91줄(CL08 `cl08.Acct {"id":1}`, UPDATE 키라 남음)과 픽스처 30개 `raw.json`이 쓴다.
+- `ApplyRereads` 469~472줄: 묶음 키 = `AfterKeyJson ?? KeyJson`(서수 사전). 477줄: 재조회 행이 null이거나 그 (테이블, 키) 묶음이 없으면 건너뜀. 490줄(순서 확정): 마지막 행 변경에 after가 없으면 건너뜀. 499~500줄(순서 미정): after 있는 대표가 없으면 건너뜀. 둘 다 `Replace`·차이 추가 전에 끝난다.
+- after가 있는 행 변경은 `ToRow`(311~313·328줄)에서 `d.After`(INSERTED 이미지)가 있고 그 rowJson이 있을 때만 생기며, 그 행의 `AfterKeyJson`은 INSERTED 이미지의 keyJson이다. 키 없는 테이블(keyJson null)은 470줄에서 빠지고 재조회도 안 한다. 그래서 어떤 INSERTED 이미지에도 서수로 나오지 않은 키의 묶음에는 after가 있는 행 변경이 없고, 그 키의 재조회 값(행이 있든 없든)은 C11 출력을 바꿀 수 없다. 재조회 행끼리는 (테이블, 키)가 서로 달라 서로 영향을 주지 않는다.
+- 오케스트레이터가 짚은 경로: DELETE 뒤 감사된 재INSERT(다른 문장·트리거) → INSERTED가 있어 남김. PK를 바꾼 UPDATE → 새 키는 INSERTED라 남기고, 옛 키(SINGLE_ROW·BY_UNIQUE는 새 키 묶음에 들어감, UNPAIRED 옛 키 행은 after 없음)만 생략. 감사가 놓친 재삽입 → 전에도 재조회 값이 위 477·490·499줄에서 버려졌고 최종 차이 잔차로 잡혔다(바뀌지 않음). 대소문자·후행 공백만 다른 키 → 접기로 남김(서수 규칙보다 넓음). KEYS 묶음 INSERTED에만 나온 키 → 남김(넓음). KEYS 묶음 키는 전처럼 후보가 아니다. 행 이미지 상한·KEYS 전환(`PreviewExecutor` 실행 반복)은 건드리지 않았다.
+
+**검증(DB 없음):**
+
+| 검사 | 명령 | 결과 |
+|---|---|---|
+| 빌드 | `dotnet build DbRipple.slnx -warnaserror` | 경고 0, 오류 0 |
+| 테스트 | `dotnet test DbRipple.slnx` | 실패 0. Execution 112 통과(새 42: 합성 9, 픽스처 이론 30, CL20 키 수 2, JSON 1), Attribution 162, Api 133 등. DB 테스트는 연결 환경 변수가 없어 건너뜀 |
+| 동일성(합성) | `RereadPlanTests.cs` `CollectorTests.Reread_*` | DELETE만, DELETE 뒤 재INSERT(다른 문장·트리거), 트리거 연쇄 DELETE, PK 변경(SINGLE_ROW·BY_UNIQUE·UNPAIRED·맞바꾸기), 대소문자·후행 공백, 테이블별, KEYS 모드, 순서 미정(Q14), 키 없는 테이블. DB 상태 3가지(행 없음, 모든 키에 감사 after와 다른 행 = 감사 밖 재삽입 가정, 마지막 after)마다 전체 재조회와 생략 재조회의 `Collect` JSON이 같다 |
+| 동일성(실DB 픽스처) | `RereadPlanFixtureTests` | CascadeLab 픽스처 30개: 픽스처 `rereads` = 기준 구현(바꾸기 전 키 고르기). 위 DB 상태 3가지마다 전체 재조회와 생략 재조회의 `Collect`가 같고, 기록된 실제 재조회 값에서 생략한 키를 뺀 입력의 `Collect`가 `collect.json`과 같다 |
+| 키 수 | 같은 파일 | CL20 픽스처(N = 2) 10 → 4(생략 6), CL20 모양 N = 1천 5천 → 2천(생략 3천) |
+| 검사의 힘 | 규칙을 일부러 틀리게 바꿔 실행(커밋 안 함) | 픽스처 CL08a·CL08b·CL10·CL12b·CL20b와 합성 6개가 "Collect 결과가 다름"으로 실패 |
+| 계획 비용 | 임시 측정(커밋 안 함), Release, N = 10만 CL20 모양 | `Plan` 약 95ms(바꾸기 전 키 고르기 128~228ms). 서수로 먼저 찾아 CL20·CL20b는 접기를 하지 않는다 |
+
+증거 범위: 정적·단위(픽스처는 실DB에서 만든 원자료). DB 실행·M5·평가는 하지 않았다.
+
+**Codex 클라우드 DB 재측정(요청):** 이 브랜치에서 아래를 이전과 같은 방식으로 돌린다.
+
+```
+pwsh -NoProfile -File scripts/home-test.ps1 -Date cloud-20261118   # CI와 같은 기본(빌드·DB 테스트·30사례×3회 평가·N1), summary PASS
+. ./scripts/env.ps1
+dotnet run --project eval/DbRipple.Eval.Cli -c Release -- m5 --cases CL20,CL20b --sizes 10000,50000,100000 --repeat 5 --warmup 1 --out logs/eval-m5
+DBR_WRITE_FIXTURES=1 dotnet test tests/DbRipple.Execution.Tests --filter "FullyQualifiedName~CascadeLabTests|FullyQualifiedName~Week3EngineTests"
+git diff --stat -- tests/fixtures/capture
+```
+
+기대: (1) CL20 재조회 키 = ChildLog 2N(1만/5만/10만에서 2만/10만/20만, 전 5N). M5 CSV에는 키 수 열이 없으므로 키 수는 (5)의 CL20 픽스처(N = 2)로 본다. (2) CL20 reread p50이 기준값 4,693/22,905/47,784ms보다 크게 준다. 남는 것은 행이 있는 ChildLog Seek이고 CL20b(행이 남는 UPDATE, 10만 15만 키 957ms)의 키당 비용을 대면 10만에서 1~3초 안팎(추정). total p50도 그만큼 준다. (3) CL20b reread·execute, CL20 execute·resolve는 같은 수준. (4) 기본 평가 M1~M4와 기준선 공통 지표가 같다(CI 기본 평가와 같은 기준). (5) 픽스처를 다시 쓰면 `raw.json`의 `rereads`가 줄고 `rereadSkippedKeys`가 생긴다(CL20: `rereads` 4개 모두 `cl20.ChildLog`, `rereadSkippedKeys` 6). `collect.json`은 바뀌지 않아야 한다. 바뀐 파일이 있으면 main(2e96564)에서 같은 명령을 돌려 환경 차이(captureSeq·object_id 등)인지 먼저 가른다. 이 픽스처 변경은 커밋하지 않는다(생략 전 `rereads`가 동일성 테스트의 기준이다).
 
 ## 7. Codex 클라우드 DB 재측정
 

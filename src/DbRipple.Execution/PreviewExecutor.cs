@@ -259,7 +259,7 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
             timings.ReadLog = sw.ElapsedMilliseconds;
 
             sw.Restart();
-            var rereads = await RereadAsync(conn, headers, imageRows, tables, ct);
+            var (rereads, rereadSkipped) = await RereadAsync(conn, headers, imageRows, tables, ct);
             timings.Reread = sw.ElapsedMilliseconds;
 
             sw.Restart();
@@ -293,6 +293,7 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
                 Headers = headers,
                 Images = imageRows,
                 Rereads = rereads,
+                RereadSkippedKeys = rereadSkipped,
                 NetChanges = net,
                 SandboxDirty = dirty,
                 Capture = new CaptureInfo { ImageCount = imageCount, Cap = cap, Truncated = truncated, ManifestVersion = baseline.Manifest.Version },
@@ -480,25 +481,16 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
     }
 
     /// <summary>
-    /// 재조회(D3 대조 1): FULL 묶음에 나온 키(키 있는 테이블)의 현재 행을 감사 트리거와 같은 식(Core AuditValueExpressions)으로 FOR JSON한다.
-    /// KEYS 묶음의 키는 비교할 감사 after가 없으므로 읽지 않는다(상한 이내로 비용을 묶는다).
+    /// 재조회(D3 대조 1): FULL 묶음에 나온 키(키 있는 테이블) 가운데 INSERTED 이미지에도 나온 키의 현재 행을 감사 트리거와 같은 식(Core AuditValueExpressions)으로 FOR JSON한다.
+    /// KEYS 묶음의 키는 비교할 감사 after가 없으므로 읽지 않는다(상한 이내로 비용을 묶는다). DELETE로만 나온 키도 비교할 after가 없어 읽지 않고 개수만 남긴다(RereadSql.Plan, 2026-11-18).
     /// </summary>
-    static async Task<IReadOnlyList<RereadRow>> RereadAsync(SqlConnection conn, IReadOnlyList<AuditHeaderRow> headers, IReadOnlyList<AuditRowImageRow> images,
+    static async Task<(IReadOnlyList<RereadRow> Rows, long Skipped)> RereadAsync(SqlConnection conn, IReadOnlyList<AuditHeaderRow> headers, IReadOnlyList<AuditRowImageRow> images,
         IReadOnlyList<TableInfo> tables, CancellationToken ct)
     {
-        var byId = tables.ToDictionary(t => t.ObjectId);
-        var full = headers.Where(h => h.ImageMode == ImageMode.Full).ToDictionary(h => h.CaptureSeq, h => h.TableObjectId);
-        var keysByTable = images.Where(i => i.KeyJson is not null && full.ContainsKey(i.CaptureSeq))
-            .GroupBy(i => full[i.CaptureSeq])
-            .Where(g => byId.ContainsKey(g.Key))
-            .OrderBy(g => byId[g.Key].DisplayName, StringComparer.Ordinal);
+        var plan = RereadSql.Plan(headers, images, tables);
         var result = new List<RereadRow>();
-        foreach (var g in keysByTable)
+        foreach (var (table, sql, keys) in plan.Tables)
         {
-            var table = byId[g.Key];
-            var keys = g.Select(i => i.KeyJson!).Distinct(StringComparer.Ordinal).ToList();
-            var sql = RereadSql.For(table);
-            if (sql is null) continue;
             foreach (var chunk in keys.Chunk(1000))
             {
                 await using var cmd = new SqlCommand(sql, conn);
@@ -510,7 +502,7 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
                     result.Add(new RereadRow { Table = table.DisplayName, KeyJson = chunk[i], RowJson = found.GetValueOrDefault(i) });
             }
         }
-        return result;
+        return (result, plan.Skipped);
     }
 
     static async Task ExecAsync(SqlConnection conn, string sql, CancellationToken ct, params (string Name, object Value)[] ps)
