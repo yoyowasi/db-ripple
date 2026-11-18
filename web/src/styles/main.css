@@ -1,5 +1,5 @@
 /*
- * 전역 토큰과 공용 클래스. 색 원본은 docs/mockups/a-workbench-v6.html 의 :root / [data-theme=dark].
+ * 전역 토큰과 공용 클래스. 바탕·강조 색은 docs/mockups/r2/3-compare.html, 연산·그래프 색은 a-workbench-v6.html 에서 왔다.
  * 테마는 <html data-theme="light|dark">(lib/theme.ts)가 정한다. 반경은 --r(4px) 한 단계.
  *
  * 토큰 이름
@@ -14,31 +14,32 @@
  *  문장 알약   --st-bg --st-s --st-fg --st-fg2 --st-verb
  *  간선 종류   --k-fk --k-fires --k-direct --k-call --k-blocked
  *  코드 색     --code-kw --code-num --code-cm
- *  메뉴 줄     --menu-bg --menu-fg --menu-fg-strong --menu-ctl --menu-focus (두 테마 같은 값)
+ *  메뉴 줄     --menu-bg --menu-fg --menu-fg-strong --menu-ctl --menu-focus (테마별 값)
  *  옛 이름     --bg-elev --bg-sunken --fg-muted --border --radius --gutter --sans --accent-soft --info --info-bg
  *              --changed-bg --volatile(-bg) --derived(-bg) --cm-*  → 새 토큰의 별칭. 2단계에서 컴포넌트를 옮기면 지운다.
  */
 :root {
   color-scheme: light;
-  --ui: 'IBM Plex Sans KR', 'Malgun Gothic', 'Segoe UI', sans-serif;
+  --ui: 'Pretendard Variable', Pretendard, 'Malgun Gothic', 'Segoe UI', sans-serif;
   --mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, 'D2Coding', monospace;
   --fs: 13px;
   --r: 4px;
   --gx: 14px;
-  --menu-h: 28px;
+  --menu-h: 40px;
   --m-in: 150ms;
   --m-out: 120ms;
   --m-press: 90ms;
   --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
 
-  --bg: #e6ebee;
-  --panel: #fbfcfc;
-  --sunk: #eef2f4;
-  --fg: #14212a;
-  --muted: #4f5f6b;
-  --line: #c7d1d7;
-  --ctl: #6f828e;
-  --accent: #00697a;
+  /* 바탕·글자·강조는 docs/mockups/r2/3-compare.html(2026-11-18 확정 시안). 연산 색(삭제·수정·추가)은 그래프와 맞추려고 그대로 둔다. */
+  --bg: #eceef2;
+  --panel: #fff;
+  --sunk: #f5f6f8;
+  --fg: #141a24;
+  --muted: #556074;
+  --line: #d3d8e0;
+  --ctl: #838c9e;
+  --accent: #12345a;
   --accent-fg: #fff;
   --ok: #0f6e3a;
   --ok-bg: #dff3e7;
@@ -51,39 +52,45 @@
   --add-bg: #d6f0de;
   --add-fg: #12603a;
   --chg-bg: #ffe8a0;
+  /* 연산 표시 칩(흰 글자) · 없는 쪽 빗금 */
+  --del-mk: #c2301f;
+  --add-mk: #1d7a47;
+  --chg-mk: #85500a;
+  --hatch: #dfe3ea;
   --bg-fk: #dde8fb;
   --bg-trg: #fde9cc;
   --nd: #fff;
   --nd-s: #6f828e;
-  --nd-stmt: #e3f1f4;
-  --nd-stmt-s: #00697a;
+  --nd-stmt: #e5edfb;
+  --nd-stmt-s: #12345a;
   --nd-trig: #fff2d8;
   --nd-proc: #dff3e7;
   --nd-proc-s: #0f6e3a;
   --nd-t: #14212a;
   --nd-t2: #4f5f6b;
-  --halo: #fbfcfc;
-  --st-bg: #14212a;
-  --st-s: #14212a;
-  --st-fg: #f2f7f9;
-  --st-fg2: #c5d5dd;
-  --st-verb: #7fd8e2;
+  --halo: #fff;
+  --st-bg: #141a24;
+  --st-s: #141a24;
+  --st-fg: #f2f4f8;
+  --st-fg2: #c3cad6;
+  --st-verb: #a9c6ff;
   --k-fk: #1456c8;
   --k-fires: #a15000;
   --k-direct: #445560;
   --k-call: #0f6e3a;
   --k-blocked: #b3261e;
-  --tick: #8d9fab;
-  --code-kw: #0a55b5;
-  --code-num: #a63f00;
-  --code-cm: #5f707c;
-  --sel: rgba(0, 105, 122, 0.22);
+  --tick: #9aa3b2;
+  --code-kw: #1b4fa8;
+  --code-num: #9a4a00;
+  --code-cm: #6a7386;
+  --sel: rgba(26, 107, 224, 0.18);
 
-  --menu-bg: #14212a;
-  --menu-fg: #d4e0e7;
-  --menu-fg-strong: #fff;
-  --menu-ctl: #8aa3b3;
-  --menu-focus: #7fd8e2;
+  /* 메뉴 줄: 시안처럼 밝은 띠(테마를 따른다) */
+  --menu-bg: #fff;
+  --menu-fg: #434d60;
+  --menu-fg-strong: #141a24;
+  --menu-ctl: #838c9e;
+  --menu-focus: #1a6be0;
 
   /* 옛 이름(별칭) */
   --bg-elev: var(--panel);
@@ -109,15 +116,15 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #091116;
-  --panel: #0f1a21;
-  --sunk: #15232b;
-  --fg: #dce8ee;
-  --muted: #8da2af;
-  --line: #25363f;
-  --ctl: #6a8394;
-  --accent: #3cc8d6;
-  --accent-fg: #031f24;
+  --bg: #0f1218;
+  --panel: #181c25;
+  --sunk: #1e2330;
+  --fg: #e8ebf1;
+  --muted: #9aa3b5;
+  --line: #2d3444;
+  --ctl: #6b758a;
+  --accent: #a9c6ff;
+  --accent-fg: #0a1426;
   --ok: #5fd391;
   --ok-bg: #123626;
   --warn: #f2b95a;
@@ -129,33 +136,43 @@
   --add-bg: #12402b;
   --add-fg: #86e6ad;
   --chg-bg: #4b4010;
+  --del-mk: #ff7b6b;
+  --add-mk: #5fcf8c;
+  --chg-mk: #f2b95a;
+  --hatch: #232a38;
   --bg-fk: #18305a;
   --bg-trg: #3b2b10;
-  --nd: #142531;
-  --nd-s: #6a8394;
-  --nd-stmt: #0e3a41;
-  --nd-stmt-s: #3cc8d6;
+  --nd: #1e2330;
+  --nd-s: #6b758a;
+  --nd-stmt: #1f2b45;
+  --nd-stmt-s: #a9c6ff;
   --nd-trig: #3a2c12;
   --nd-proc: #0f3a2b;
   --nd-proc-s: #5fd391;
   --nd-t: #e8f1f5;
   --nd-t2: #9bb0bc;
-  --halo: #0f1a21;
-  --st-bg: #0e3a41;
-  --st-s: #3cc8d6;
-  --st-fg: #f2f7f9;
-  --st-fg2: #c5d5dd;
-  --st-verb: #7fd8e2;
-  --k-fk: #6aa8ff;
+  --halo: #181c25;
+  --st-bg: #1f2b45;
+  --st-s: #7fb0ff;
+  --st-fg: #f2f4f8;
+  --st-fg2: #c3cad6;
+  --st-verb: #a9c6ff;
+  --k-fk: #7fb0ff;
   --k-fires: #ffb454;
-  --k-direct: #9fb1bc;
-  --k-call: #3cc8d6;
+  --k-direct: #9aa3b5;
+  --k-call: #5fd391;
   --k-blocked: #ff8b90;
-  --tick: #46606f;
-  --code-kw: #7db4ff;
-  --code-num: #ffb27a;
-  --code-cm: #7f93a2;
-  --sel: rgba(60, 200, 214, 0.28);
+  --tick: #4a5366;
+  --code-kw: #8fb6ff;
+  --code-num: #f0b36a;
+  --code-cm: #8b94a6;
+  --sel: rgba(127, 176, 255, 0.25);
+
+  --menu-bg: #181c25;
+  --menu-fg: #b3bccb;
+  --menu-fg-strong: #e8ebf1;
+  --menu-ctl: #6b758a;
+  --menu-focus: #7fb0ff;
 }
 
 *,
@@ -431,6 +448,7 @@ select:hover {
 }
 .banner > div,
 .banner > span {
+  flex: 1;
   min-width: 0;
 }
 .banner strong,

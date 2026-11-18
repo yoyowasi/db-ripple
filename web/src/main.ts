@@ -5,6 +5,7 @@ import '@vue-flow/core/dist/style.css'
 import App from './App.vue'
 import { router } from './router'
 import { syncAgThemeMode } from './lib/theme'
+import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css'
 import './styles/fonts.css'
 import './styles/main.css'
 

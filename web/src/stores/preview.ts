@@ -22,8 +22,8 @@ import { displayOrder } from '../lib/summary'
 import { useSandboxStore } from './sandbox'
 
 // AdventureWorks(공개 샘플) 주문 상세 수량 변경. 트리거 연쇄가 보이는 시연용 기본 문장이다.
-/** 결과 영역 탭 */
-export type ResultTab = 'graph' | 'rows'
+/** 아래 창 보기: 좌우 행 비교(기본) | 발동 묶음(DiffGrid) | 전파 그래프 */
+export type ResultTab = 'compare' | 'rows' | 'graph'
 
 export const SAMPLE_SQL = `UPDATE Sales.SalesOrderDetail
 SET OrderQty = OrderQty + 1
@@ -63,8 +63,10 @@ export const usePreviewStore = defineStore('preview', () => {
   const selectedFiringId = ref<string | null>(null)
   const view = ref<RowView>('event')
   const showZeroRows = ref(false)
-  /** 결과 영역에서 보이는 탭(전파 그래프 | 행 변경) */
-  const resultTab = ref<ResultTab>('graph')
+  /** 아래 창에서 보이는 보기 */
+  const resultTab = ref<ResultTab>('compare')
+  /** 비교표에서 고른 테이블 "스키마.테이블". 묶음을 고르면 그 묶음의 테이블로 따라간다. */
+  const selectedTable = ref<string | null>(null)
   /** 결과 영역 오른쪽 서랍(선택한 묶음 상세)이 열렸는가 */
   const drawerOpen = ref(false)
   /** 서랍을 여는 동작(selectFiring openDrawer: true)마다 1 늘어난다. 서랍은 이때만 제목으로 포커스를 옮긴다. */
@@ -144,7 +146,19 @@ export const usePreviewStore = defineStore('preview', () => {
     consumed.value = false
     needsWeakConsent.value = false
     selectedFiringId.value = null
+    selectedTable.value = null
     drawerOpen.value = false
+  }
+
+  /** 적용을 마친(또는 시도한) 결과를 닫고 다음 미리보기를 쓸 수 있게 비운다. 서버에는 아무것도 보내지 않는다. */
+  function dismissResult(): void {
+    clearResult()
+    runError.value = null
+    runAborted.value = false
+  }
+
+  function selectTable(table: string | null): void {
+    selectedTable.value = table
   }
 
   // ---- 화면 선택(그래프·서랍·레일·행 변경이 공유) ----
@@ -152,6 +166,8 @@ export const usePreviewStore = defineStore('preview', () => {
   /** 묶음을 고른다. openDrawer를 주면 서랍도 함께 열거나 닫는다(id가 null이면 늘 닫는다). */
   function selectFiring(id: string | null, opts: { openDrawer?: boolean } = {}): void {
     selectedFiringId.value = id
+    const t = id ? preview.value?.firings.find((f) => f.id === id)?.table : undefined
+    if (t) selectedTable.value = t
     if (id === null) drawerOpen.value = false
     else if (opts.openDrawer !== undefined) {
       drawerOpen.value = opts.openDrawer
@@ -186,7 +202,9 @@ export const usePreviewStore = defineStore('preview', () => {
       preview.value = res
       previewSql.value = text
       view.value = 'event'
-      selectedFiringId.value = firstFiringId(res)
+      const first = firstFiringId(res)
+      selectedFiringId.value = first
+      selectedTable.value = res.firings.find((f) => f.id === first)?.table ?? null
     } catch (e) {
       if (isAbortError(e)) {
         runAborted.value = true
@@ -281,6 +299,9 @@ export const usePreviewStore = defineStore('preview', () => {
     view,
     showZeroRows,
     resultTab,
+    selectedTable,
+    selectTable,
+    dismissResult,
     drawerOpen,
     drawerFocusTick,
     hoveredTable,

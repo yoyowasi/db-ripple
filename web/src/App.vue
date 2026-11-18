@@ -34,15 +34,20 @@ onBeforeUnmount(() => sandbox.stop())
   <a class="skip-link" href="#main">본문으로 건너뛰기</a>
   <h1 class="sr-only">db-ripple 영향 미리보기 워크벤치</h1>
   <nav class="menu" aria-label="메뉴 막대">
-    <RouterLink to="/" class="logo">db-ripple</RouterLink>
+    <RouterLink to="/" class="logo">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.5" /><circle cx="12" cy="12" r="6.5" /><circle cx="12" cy="12" r="10.5" stroke-dasharray="3 3" /></svg>
+      db-ripple
+    </RouterLink>
+    <!-- 홈 화면의 샌드박스 상태(SandboxBar)가 여기로 Teleport 한다 -->
+    <div id="menu-slot" class="menu-slot"></div>
     <details class="help">
       <summary>도움말</summary>
       <div class="help-body">
         <p>SQL(INSERT·UPDATE·DELETE)을 샌드박스에서 실행해 어떤 테이블의 몇 행이 바뀌는지 미리 보고, 같으면 원본에 적용합니다.</p>
         <ul>
           <li><kbd>Ctrl+Enter</kbd> 미리보기 실행</li>
+          <li>바뀌는 테이블 목록은 위아래 화살표로 옮기고 Enter로 고릅니다. 아래 창이 그 테이블의 행을 "지금 | 적용 후"로 보입니다.</li>
           <li>구분선은 끌거나, 초점을 둔 뒤 화살표·Home·End 키로 크기를 바꿉니다.</li>
-          <li>탭은 좌우 화살표로 옮깁니다.</li>
         </ul>
       </div>
     </details>
@@ -66,10 +71,15 @@ onBeforeUnmount(() => sandbox.stop())
   align-items: center;
   gap: 18px;
   height: var(--menu-h);
-  padding: 0 var(--gx);
+  padding: 0 16px;
   background: var(--menu-bg);
+  border-bottom: 1px solid var(--line);
   color: var(--menu-fg);
   font-size: 12px;
+}
+.menu-slot {
+  min-width: 0;
+  margin-right: auto;
 }
 .menu :focus-visible {
   outline-color: var(--menu-focus);
@@ -88,9 +98,23 @@ onBeforeUnmount(() => sandbox.stop())
   text-decoration: underline;
 }
 .menu .logo {
-  margin-right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: 4px;
   color: var(--menu-fg-strong);
-  font: 700 13px var(--mono);
+  font: 700 14px var(--ui);
+  letter-spacing: -0.01em;
+}
+.menu .logo svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+.menu .logo circle:first-child {
+  fill: currentColor;
 }
 .help {
   position: relative;
@@ -124,7 +148,7 @@ kbd {
   font: 12px var(--mono);
 }
 .menu-end {
-  margin-left: auto;
+  margin-left: 0;
 }
 .page-main {
   padding: var(--gx);

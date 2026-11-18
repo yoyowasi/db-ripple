@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 레일 맨 아래 접이식 "자세히": 미리보기 id·SQL 지문·만든 시각, 환경 지문, 수집 범위, 단계별 소요, 결과 JSON 내보내기.
+// 미리보기 상세("미리보기 정상 · n초 ▾"를 누르면 열리는 칸, 처음부터 펼침): 미리보기 id·SQL 지문·만든 시각, 환경 지문, 수집 범위, 단계별 소요, 결과 JSON 내보내기.
 import { computed } from 'vue'
 import { exportUrl } from '../../api/client'
 import type { PreviewResult } from '../../api/types'
@@ -15,7 +15,7 @@ const timings = computed(() => Object.entries(props.preview.timingsMs))
 </script>
 
 <template>
-  <details class="more">
+  <details class="more" open>
     <summary>자세히</summary>
 
     <h3>미리보기</h3>
