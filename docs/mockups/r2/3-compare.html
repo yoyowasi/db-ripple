@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>db-ripple · 비교</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#eceef2; --panel:#ffffff; --panel2:#f5f6f8; --ink:#141a24; --ink2:#434d60; --ink3:#596377;
+  --line:#d3d8e0; --line2:#838c9e; --act:#12345a; --actink:#ffffff; --act-hover:#0b2540;
+  --del-bg:#fbe2de; --del-fg:#97190d; --del-mk:#c2301f;
+  --add-bg:#d9f1e2; --add-fg:#12623a; --add-mk:#1d8a4f;
+  --chg-bg:#dce8fb; --chg-fg:#18479a; --chg-mk:#2762c6;
+  --vol-bg:#ffeec2; --vol-fg:#6b4400;
+  --sel:#e5edfb; --hatch:#dfe3ea; --focus:#1a6be0;
+  --err-bg:#fdeae7; --err-fg:#98180c; --ok-fg:#12623a;
+  --sql-kw:#1b4fa8; --sql-num:#9a4a00; --sql-id:#141a24;
+  --font:"Pretendard Variable",Pretendard,"Malgun Gothic","맑은 고딕",system-ui,sans-serif;
+  --mono:"JetBrains Mono",Consolas,"D2Coding","Malgun Gothic",monospace;
+}
+:root[data-theme="dark"]{
+  --bg:#0f1218; --panel:#181c25; --panel2:#1e2330; --ink:#e8ebf1; --ink2:#b3bccb; --ink3:#9099ab;
+  --line:#2d3444; --line2:#6b758a; --act:#a9c6ff; --actink:#0a1426; --act-hover:#c4d8ff;
+  --del-bg:#3b1b1b; --del-fg:#ffa398; --del-mk:#ff7b6b;
+  --add-bg:#143120; --add-fg:#86dba6; --add-mk:#5fcf8c;
+  --chg-bg:#18294a; --chg-fg:#a5c6ff; --chg-mk:#7fb0ff;
+  --vol-bg:#3c2d0c; --vol-fg:#f2c867;
+  --sel:#1f2b45; --hatch:#232a38; --focus:#7fb0ff;
+  --err-bg:#3a1a18; --err-fg:#ffa398; --ok-fg:#86dba6;
+  --sql-kw:#8fb6ff; --sql-num:#f0b36a; --sql-id:#e8ebf1;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--font);min-height:100vh;display:flex;flex-direction:column;font-feature-settings:"tnum"}
+.mono{font-family:var(--mono)}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* 상단 띠: 정상일 때는 조용하게 */
+.top{display:flex;align-items:center;gap:16px;height:40px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:-.01em}
+.dbpair{font:12.5px var(--mono);color:var(--ink2)}
+.stat{display:inline-flex;align-items:center;gap:6px;background:none;border:0;padding:4px 6px;border-radius:4px;color:var(--ink2);font-size:13px}
+.stat:hover{background:var(--panel2)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--add-mk);display:inline-block}
+.dot.busy{background:var(--vol-fg);animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.spacer{flex:1}
+.popwrap{position:relative;display:inline-block}
+.pop{position:absolute;z-index:30;top:calc(100% + 6px);left:0;min-width:280px;background:var(--panel);border:1px solid var(--line2);border-radius:6px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.18);font-size:13px}
+.pop[hidden]{display:none}
+.pop.right{left:auto;right:0}
+.pop dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 14px}
+.pop dt{color:var(--ink3)} .pop dd{margin:0;font-family:var(--mono);font-size:12.5px}
+.pop ul{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+
+main{flex:1;padding:12px 16px 56px;display:flex;flex-direction:column;gap:12px;min-width:0}
+
+/* 맨 위: SQL 띠 + 동기화 영역 */
+.band{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:6px;min-width:0}
+.sqlbox .bar{display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--line);min-height:38px}
+.btn{border:1px solid var(--line2);background:var(--panel);border-radius:4px;padding:4px 10px;font-size:13px;line-height:1.4}
+.btn:hover:not(:disabled){background:var(--panel2)}
+.btn:disabled{color:var(--ink3);border-color:var(--line);cursor:not-allowed}
+.btn.ghost{border-color:transparent;color:var(--ink2)}
+.btn.ghost:hover{border-color:var(--line)}
+kbd{font:11.5px var(--mono);border:1px solid var(--line2);border-radius:3px;padding:0 4px;color:var(--ink2)}
+.meta{color:var(--ink2);font-size:13px;display:flex;align-items:center;gap:10px}
+.code{display:grid;grid-template-columns:36px 1fr;font:13.5px/22px var(--mono);padding:6px 0}
+.code .ln{color:var(--ink3);text-align:right;padding-right:10px;user-select:none}
+.code .ln.bad{color:var(--err-fg);font-weight:700;box-shadow:inset 3px 0 var(--del-mk)}
+.code .tx{padding:0 12px;white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.code .tx.bad .sq{text-decoration:underline wavy var(--del-mk);text-underline-offset:4px}
+.kw{color:var(--sql-kw);font-weight:500}.nu{color:var(--sql-num)}
+.sqlbox.collapsed .code > :nth-child(n+3){display:none}
+.sqlbox.collapsed .code .tx{opacity:.8}
+.sqlbox.done .code{opacity:.65}
+
+.sync{padding:12px;display:flex;flex-direction:column;gap:10px;border-top:3px solid var(--act)}
+.sync.fail{border-top-color:var(--del-mk)}
+.sync.okk{border-top-color:var(--add-mk)}
+.apply{width:100%;min-height:54px;background:var(--act);color:var(--actink);border:1px solid var(--act);border-radius:5px;font-size:16px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.25}
+.apply small{font-size:12.5px;font-weight:500;opacity:.92}
+.apply:hover:not(:disabled){background:var(--act-hover)}
+.apply:disabled{background:var(--panel2);color:var(--ink3);border-color:var(--line2);cursor:not-allowed}
+.condrow{display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--ink2)}
+.condrow .stat{padding:2px 4px;margin-left:-4px;font-size:13px}
+.ck{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:var(--add-bg);color:var(--add-fg);font-size:11px;font-weight:800;margin-right:6px}
+.ck.no{background:var(--del-bg);color:var(--del-fg)}
+.pop li{display:flex;align-items:center}
+.res{display:grid;gap:4px}
+.res b{font-size:15px}
+.res .t{color:var(--ink2);font-size:13px}
+.prog{height:6px;border-radius:3px;background:var(--hatch);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--chg-mk);animation:fill 8s linear forwards}
+@keyframes fill{to{width:100%}}
+.badge{display:inline-block;font-size:11.5px;line-height:1.5;padding:0 6px;border-radius:3px;border:1px dashed var(--line2);color:var(--ink2);white-space:nowrap;font-weight:500}
+.badge.vol{background:var(--vol-bg);color:var(--vol-fg);border:1px solid transparent}
+.badge.drv{border:1px solid var(--line2)}
+
+/* 비교 대상 목록 그리드 */
+.gridbox{overflow:hidden}
+.grid{width:100%;border-collapse:collapse;table-layout:fixed}
+.grid th,.grid td{padding:0 12px;text-align:left;font-weight:400;height:44px;border-bottom:1px solid var(--line);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grid thead th{height:34px;font-size:12.5px;color:var(--ink2);background:var(--panel2);font-weight:600}
+.grid .n{text-align:right;width:84px;font-variant-numeric:tabular-nums;font-size:15px}
+.grid thead .n{font-size:12.5px}
+.grid tr.total td,.grid tr.total th{height:54px;background:var(--panel2);border-bottom:2px solid var(--ink);font-size:16px;font-weight:700}
+.grid tr.total .n{font-size:18px}
+.grid tbody tr.item{cursor:pointer}
+.grid tbody tr.item:hover{background:var(--panel2)}
+.grid tbody tr.item[aria-selected="true"]{background:var(--sel);box-shadow:inset 4px 0 var(--chg-mk)}
+.grid tbody tr.item:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.tn{font-weight:600}.tn .sc{color:var(--ink3);font-weight:400}
+.v-del{color:var(--del-fg);font-weight:700}.v-add{color:var(--add-fg);font-weight:700}.v-chg{color:var(--chg-fg);font-weight:700}
+.zero{color:var(--ink3)}
+.cause{font-size:13px;color:var(--ink2);display:flex;align-items:center;gap:8px}
+.cause .ty{font-weight:600;color:var(--ink)}
+.cause code{font:12px var(--mono);color:var(--ink2);overflow:hidden;text-overflow:ellipsis}
+.conf{display:inline-flex;align-items:center;gap:8px;font-size:13px}
+.conf svg{width:30px;height:8px;overflow:visible}
+.conf.inf{color:var(--ink2)}
+.same td{background:var(--panel)}
+.same button{background:none;border:0;display:flex;align-items:center;gap:8px;width:100%;height:40px;padding:0;color:var(--ink2);font-size:13px;text-align:left}
+.same .chev{display:inline-block;transition:transform .12s}
+.same button[aria-expanded="true"] .chev{transform:rotate(90deg)}
+.samelist{padding:6px 12px 10px 32px;border-bottom:1px solid var(--line);background:var(--panel)}
+.samelist table{border-collapse:collapse;font-size:13px}
+.samelist td{padding:3px 24px 3px 0;border:0;height:auto}
+.obs-no{border:1px dashed var(--line2);border-radius:3px;padding:0 5px;color:var(--ink3);font-size:12px}
+.legend{display:flex;gap:16px;align-items:center;font-weight:400}
+
+/* 좌우 비교 창 */
+.cmpbox{display:flex;flex-direction:column;min-height:0}
+.cmphead{display:flex;align-items:flex-start;gap:16px;padding:12px 14px 10px;border-bottom:1px solid var(--line)}
+.cmphead h2{margin:0;font-size:17px;letter-spacing:-.01em}
+.cmphead .sub{color:var(--ink2);font-size:13px;margin-top:2px}
+.path{list-style:none;margin:8px 0 0;padding:0;display:flex;align-items:center;flex-wrap:wrap;gap:0;font-size:13px}
+.path li{display:flex;align-items:center}
+.nd{border:1px solid var(--line2);border-radius:4px;padding:2px 8px;background:var(--panel);white-space:nowrap}
+.nd.stmt{background:var(--ink);color:var(--panel);border-color:var(--ink);font-weight:600}
+.nd.self{border:2px solid var(--chg-mk);font-weight:700}
+.nd.trg{font-family:var(--mono);font-size:12px}
+.nd.noobs{border-style:dashed;color:var(--ink3)}
+.lk{display:inline-flex;flex-direction:column;align-items:center;min-width:44px;position:relative;padding:0 2px}
+.lk i{display:block;width:100%;border-top:2px solid var(--ink2)}
+.lk.inf i{border-top:2px dashed var(--ink2)}
+.lk em{font-style:normal;font-size:10.5px;color:var(--ink3);position:absolute;top:-14px;white-space:nowrap}
+.pathrows{display:grid;gap:10px}
+.pathnote{font-size:12.5px;color:var(--ink2);margin-top:4px}
+.cmpscroll{overflow:auto;max-height:calc(100vh - 470px);min-height:220px}
+.cmp{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:13.5px}
+.cmp thead th{position:sticky;top:0;z-index:2;background:var(--panel2);text-align:left;padding:7px 12px;font-size:13px;border-bottom:1px solid var(--line2)}
+.cmp thead th small{color:var(--ink3);font-weight:400;margin-left:6px}
+.cmp td{padding:5px 12px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+.cmp td.mk{width:30px;padding:5px 0 5px 12px;text-align:center;font-weight:800;color:var(--ink3)}
+.cmp td.nm{width:230px;color:var(--ink2)}
+.cmp td.v{font-family:var(--mono);font-size:13px}
+.cmp td.r{border-left:2px solid var(--line2)}
+.cmp th.r{border-left:2px solid var(--line2)}
+.cmp tr.rec td{background:var(--panel2);font-weight:600;padding:6px 12px;border-bottom:1px solid var(--line2)}
+.cmp tr.rec .op{display:inline-block;min-width:44px;text-align:center;border-radius:3px;padding:0 6px;margin-right:8px;font-size:12.5px;color:#fff}
+.op.del{background:var(--del-mk)}.op.add{background:var(--add-mk)}.op.mod{background:var(--chg-mk)}
+:root[data-theme="dark"] .cmp tr.rec .op{color:#0a1020}
+.cmp td.absent{background:repeating-linear-gradient(135deg,var(--hatch) 0 6px,transparent 6px 12px);color:var(--ink3);font-family:var(--font);font-size:12.5px}
+.cmp td.del{background:var(--del-bg);color:var(--del-fg)}
+.cmp td.add{background:var(--add-bg);color:var(--add-fg)}
+.cmp td.chg{background:var(--chg-bg);color:var(--chg-fg);font-weight:700}
+.cmp td.key{color:var(--ink2)}
+.cmp tr.more td{color:var(--ink3);font-size:12.5px;padding:4px 12px}
+.cmp .note{display:block;font:12px var(--font);color:var(--ink2);font-weight:400;margin-top:2px}
+.keyic{font-size:11px;color:var(--ink3);margin-left:6px}
+
+/* 에러 / 결과 영역 */
+.errbox{border-left:4px solid var(--del-mk);padding:14px 18px 16px;background:var(--panel)}
+.errbox h2{margin:0 0 4px;font-size:17px;color:var(--err-fg);display:flex;align-items:center;gap:8px}
+.errbox p{margin:0 0 12px;max-width:68ch;font-size:15px}
+.stmts{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:6px;max-width:760px}
+.stmts li{display:grid;grid-template-columns:90px 1fr auto;gap:10px;align-items:center;padding:6px 10px;border:1px solid var(--line);border-radius:4px;font-size:13px}
+.stmts li.bad{border-color:var(--del-mk);background:var(--err-bg)}
+.stmts code{font:12.5px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.recon td.n{font-size:15px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pad{padding:12px 14px}
+.pad h3{margin:0 0 8px;font-size:14px}
+.bars{display:grid;gap:6px;font-size:13px}
+.bars div{display:grid;grid-template-columns:76px 1fr 60px;gap:10px;align-items:center}
+.bars i{display:block;height:10px;background:var(--chg-mk);border-radius:2px;min-width:2px}
+.bars span.v{text-align:right;font-family:var(--mono);font-size:12.5px;color:var(--ink2)}
+.xl{list-style:none;margin:0;padding:0;display:grid;gap:6px;font:13px var(--mono)}
+
+/* 목업 상태 전환기 */
+.mockbar{position:fixed;right:10px;bottom:8px;z-index:50;display:flex;gap:6px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:3px 4px;font-size:12px;opacity:.88}
+.mockbar:hover,.mockbar:focus-within{opacity:1}
+.mockbar span{color:var(--ink3);padding:0 4px}
+.mockbar button{border:0;background:none;padding:2px 7px;border-radius:3px;font-size:12px;color:var(--ink2)}
+.mockbar button[aria-pressed="true"]{background:var(--act);color:var(--actink)}
+
+dialog{border:1px solid var(--line2);border-radius:8px;padding:0;background:var(--panel);color:var(--ink);width:min(520px,92vw)}
+dialog::backdrop{background:rgba(8,12,20,.55)}
+dialog h2{margin:0;padding:16px 20px 4px;font-size:18px}
+dialog .body{padding:6px 20px 14px}
+dialog table{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0}
+dialog td{padding:6px 0;border-bottom:1px solid var(--line)}
+dialog td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+dialog .foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px 16px;border-top:1px solid var(--line)}
+dialog .sum{font-weight:700;font-size:15px}
+dialog .warn{color:var(--ink2);font-size:13px;margin:6px 0 0}
+
+@media (max-width:1180px){.band{grid-template-columns:minmax(0,1fr) 300px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.prog i{width:100%}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10" cy="10" r="2.2" fill="currentColor" stroke="none"/><path d="M5.2 10a4.8 4.8 0 0 1 4.8-4.8M14.8 10a4.8 4.8 0 0 1-4.8 4.8"/><path d="M2.2 10A7.8 7.8 0 0 1 10 2.2M17.8 10A7.8 7.8 0 0 1 10 17.8" stroke-dasharray="2.5 2.5"/></svg>
+    db-ripple
+  </div>
+  <span class="dbpair">AW_Origin → AW_Sandbox</span>
+  <div class="popwrap">
+    <button class="stat" data-pop="envpop" aria-expanded="false"><span class="dot" aria-hidden="true"></span>샌드박스 준비됨<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+    <div class="pop" id="envpop" hidden role="dialog" aria-label="샌드박스 상세">
+      <dl>
+        <dt>기준선</dt><dd>2026-11-12 14:27</dd>
+        <dt>수집 테이블</dt><dd>71개 · 제외 0</dd>
+        <dt>환경 지문</dt><dd>원본과 일치</dd>
+        <dt>SQL Server</dt><dd>16.0.4175.1 Enterprise (64-bit)</dd>
+        <dt>호환 수준</dt><dd>160</dd>
+        <dt>정렬</dt><dd>SQL_Latin1_General_CP1_CI_AS</dd>
+        <dt>트리거</dt><dd>중첩 1 · 재귀 OFF</dd>
+        <dt>잠금</dt><dd>없음</dd>
+        <dt>행 이미지 상한</dt><dd>100,000</dd>
+      </dl>
+    </div>
+  </div>
+  <span class="spacer"></span>
+</header>
+
+<main id="main"></main>
+
+<div class="mockbar" role="group" aria-label="목업 상태">
+  <span>목업</span>
+  <button data-st="dm1" aria-pressed="false">dm1</button>
+  <button data-st="dm2" aria-pressed="false">dm2</button>
+  <button data-st="rej" aria-pressed="false">rej</button>
+  <button data-st="applied" aria-pressed="false">applied</button>
+  <button data-st="drift" aria-pressed="false">drift</button>
+  <span>|</span>
+  <button id="themeBtn" aria-pressed="false">어두운 테마</button>
+</div>
+
+<dialog id="confirm" aria-labelledby="cfTitle">
+  <h2 id="cfTitle">원본에 적용할까요?</h2>
+  <div class="body" id="cfBody"></div>
+  <div class="foot">
+    <button class="btn" id="cfCancel" autofocus>취소</button>
+    <button class="apply" id="cfOk" style="width:auto;min-height:0;padding:7px 16px;font-size:14px;flex-direction:row"></button>
+  </div>
+</dialog>
+
+<div id="live" class="sr" aria-live="polite"></div>
+
+<script>
+/* ---------- 데이터(브리프 그대로) ---------- */
+const FK_HDR = 'FK_SalesOrderDetail_SalesOrderHeader_SalesOrderID';
+const FK_RSN = 'FK_SalesOrderHeaderSalesReason_SalesOrderHeader_SalesOrderID';
+const K = (n,l,r)=>({n,k:1,l,r});
+const F = (n,l,r,o={})=>Object.assign({n,l,r},o);
+
+const SQL = {
+  dm1: [`<span class="kw">DELETE FROM</span> Sales.SalesOrderHeader <span class="kw">WHERE</span> SalesOrderID = <span class="nu">43697</span>;`],
+  dm2: [`<span class="kw">UPDATE</span> Sales.SalesOrderDetail <span class="kw">SET</span> OrderQty = OrderQty + <span class="nu">1</span> <span class="kw">WHERE</span> SalesOrderDetailID = <span class="nu">52</span>;`],
+  rej: [`<span class="kw">DELETE FROM</span> Sales.SalesOrderHeader <span class="kw">WHERE</span> SalesOrderID = <span class="nu">43697</span>;`,
+        `<span class="sq"><span class="kw">DROP TABLE </span></span>Sales.Store;`],
+  drift:[`<span class="kw">UPDATE</span> Production.Product <span class="kw">SET</span> ListPrice = ListPrice + <span class="nu">1.00</span> <span class="kw">WHERE</span> ProductID = <span class="nu">680</span>;`]
+};
+SQL.applied = SQL.dm2;
+
+const ST = {
+ dm1:{
+  ms:'1.6초', stages:null, tables:3, sum:{del:4,mod:0,add:0}, event:'0행 쓰기 2건',
+  items:[
+   {id:'h', sc:'Sales.', nm:'SalesOrderHeader', d:1,m:0,a:0, cause:{ty:'직접'}, conf:'c', opLabel:'삭제 1행',
+    paths:[[{t:'stmt',x:'문장'},{t:'self',x:'이 테이블',lk:'c'}]],
+    recs:[{id:'SalesOrderID 43697',op:'del',f:[K('SalesOrderID',43697),F('CustomerID',21768),F('Status',5)]}]},
+   {id:'d', sc:'Sales.', nm:'SalesOrderDetail', d:1,m:0,a:0, cause:{ty:'FK CASCADE',fk:FK_HDR}, conf:'c', opLabel:'삭제 1행',
+    paths:[[{t:'stmt',x:'문장'},{t:'tbl',x:'SalesOrderHeader',lk:'c'},{t:'self',x:'이 테이블',lk:'c',lb:'FK CASCADE'}]],
+    recs:[{id:'SalesOrderID 43697, SalesOrderDetailID 353',op:'del',f:[K('SalesOrderID',43697),K('SalesOrderDetailID',353)]}]},
+   {id:'r', sc:'Sales.', nm:'SalesOrderHeaderSalesReason', d:2,m:0,a:0, cause:{ty:'FK CASCADE',fk:FK_RSN}, conf:'c', opLabel:'삭제 2행',
+    paths:[[{t:'stmt',x:'문장'},{t:'tbl',x:'SalesOrderHeader',lk:'c'},{t:'self',x:'이 테이블',lk:'c',lb:'FK CASCADE'}]],
+    recs:[{id:'SalesOrderID 43697, SalesReasonID 5',op:'del',f:[K('SalesOrderID',43697),K('SalesReasonID',5)]},
+          {id:'SalesOrderID 43697, SalesReasonID 9',op:'del',f:[K('SalesOrderID',43697),K('SalesReasonID',9)]}]}
+  ],
+  same:{n:68, zero:[
+    ['Sales.SalesOrderHeader','uSalesOrderHeader',false,1],
+    ['Person.Person','iuPerson',false,1]], zn:2},
+  tree:{k:'stmt',x:'DELETE Sales.SalesOrderHeader (문장)',c:[
+    {k:'direct',x:'Sales.SalesOrderHeader 1행 삭제',cf:'c',c:[
+      {k:'fk',x:'FK CASCADE · 일치 1 · '+FK_HDR,cf:'c',c:[
+        {k:'tbl',x:'Sales.SalesOrderDetail 1행 삭제',cf:'c',c:[
+          {k:'trg',x:'트리거 Sales.iduSalesOrderDetail',obs:true,cf:'i',c:[
+            {k:'w',x:'Sales.SalesOrderHeader UPDATE 0행',zero:1,cf:'i',c:[{k:'trg',x:'트리거 Sales.uSalesOrderHeader',obs:false,cf:'i'}]},
+            {k:'w',x:'Person.Person UPDATE 0행',zero:1,cf:'i',c:[{k:'trg',x:'트리거 Person.iuPerson',obs:false,cf:'i'}]}]}]}]},
+      {k:'fk',x:'FK CASCADE · 일치 2 · '+FK_RSN,cf:'c',c:[
+        {k:'tbl',x:'Sales.SalesOrderHeaderSalesReason 2행 삭제',cf:'c'}]}]}]}
+ },
+ dm2:{
+  ms:'1.2초', stages:[['analyze',25],['execute',679],['readLog',247],['reread',86],['netDiff',148],['resolve',37],['serialize',12]], pid:'pv_20261112_dc819fb8',
+  tables:4, sum:{del:0,mod:3,add:1}, event:'발동 12 · 행 변경 6 · 0행 쓰기 6',
+  items:[
+   {id:'d', sc:'Sales.', nm:'SalesOrderDetail', d:0,m:1,a:0, cause:{ty:'직접'}, conf:'c', opLabel:'수정 1행',
+    paths:[[{t:'stmt',x:'문장'},{t:'self',x:'이 테이블',lk:'c'}]],
+    recs:[{id:'SalesOrderID 43663, SalesOrderDetailID 52',op:'mod',f:[K('SalesOrderID',43663,43663),K('SalesOrderDetailID',52,52),
+      F('OrderQty','1','2'),F('LineTotal','419.458900','838.917800',{tag:'drv'})]}]},
+   {id:'t', sc:'Production.', nm:'TransactionHistory', d:0,m:0,a:1, cause:{ty:'트리거',trg:'iduSalesOrderDetail',obs:true}, conf:'i', opLabel:'추가 1행',
+    paths:[[{t:'stmt',x:'문장'},{t:'tbl',x:'SalesOrderDetail',lk:'c'},{t:'trg',x:'트리거 iduSalesOrderDetail',lk:'i'},{t:'self',x:'이 테이블',lk:'i',lb:'쓰기'}]],
+    recs:[{id:'TransactionID 213443',op:'add',f:[
+      K('TransactionID',null,'213443'),F('ProductID',null,'760'),F('ReferenceOrderID',null,'43663'),F('ReferenceOrderLineID',null,'52'),
+      F('TransactionDate',null,'2026-11-12T14:28:38.997',{tag:'vol'}),F('TransactionType',null,'S'),F('Quantity',null,'2'),F('ActualCost',null,'419.4589'),
+      F('ModifiedDate',null,'2026-11-12T14:28:38.997',{tag:'vol'})]}],
+    volKey:'TransactionID'},
+   {id:'p', sc:'Person.', nm:'Person', d:0,m:1,a:0, cause:{ty:'트리거',trg:'iduSalesOrderDetail',n:2,obs:true,twice:1}, conf:'i', opLabel:'수정 1행',
+    paths:[[{t:'stmt',x:'문장'},{t:'tbl',x:'SalesOrderDetail',lk:'c'},{t:'trg',x:'트리거 iduSalesOrderDetail',lk:'i'},{t:'self',x:'이 테이블',lk:'i',lb:'쓰기 ×2'}]],
+    note:'같은 행을 두 번 바꿔서 순변경은 1행입니다.',
+    recs:[{id:'BusinessEntityID 483',op:'mod',f:[K('BusinessEntityID',483,483),
+      F('Demographics (XML) · TotalPurchaseYTD','-4416.2024','-3996.7435',{note:'중간값 -4206.2024'})]}]},
+   {id:'o', sc:'Sales.', nm:'SalesOrderHeader', d:0,m:1,a:0, cause:{ty:'트리거',trg:'iduSalesOrderDetail → uSalesOrderHeader',n:2,obs:true,twice:1}, conf:'i', opLabel:'수정 1행',
+    paths:[[{t:'stmt',x:'문장'},{t:'tbl',x:'SalesOrderDetail',lk:'c'},{t:'trg',x:'트리거 iduSalesOrderDetail',lk:'i'},{t:'self',x:'이 테이블',lk:'i',lb:'쓰기'}],
+           [{t:'stmt',x:'문장'},{t:'tbl',x:'SalesOrderDetail',lk:'c'},{t:'trg',x:'트리거 iduSalesOrderDetail',lk:'i'},{t:'tbl',x:'SalesOrderHeader',lk:'i',lb:'쓰기'},{t:'trg',x:'트리거 uSalesOrderHeader',lk:'i'},{t:'self',x:'이 테이블',lk:'i',lb:'쓰기'}]],
+    note:'같은 행을 두 번 바꿔서 순변경은 1행입니다.',
+    recs:[{id:'SalesOrderID 43663',op:'mod',f:[K('SalesOrderID',43663,43663),
+      F('RevisionNumber','10','11'),F('SubTotal','419.4589','838.9178'),F('TotalDue','472.3108','891.7697',{tag:'drv'})]}]}
+  ],
+  same:{n:67, zero:[
+    ['Person.Person','iuPerson',false,4],
+    ['Sales.SalesPerson','uSalesOrderHeader',true,1],
+    ['Sales.SalesTerritory','uSalesOrderHeader',true,1]], zn:6},
+  tree:{k:'stmt',x:'UPDATE Sales.SalesOrderDetail (문장)',c:[
+    {k:'direct',x:'Sales.SalesOrderDetail 1행 수정',cf:'c',c:[
+      {k:'trg',x:'트리거 Sales.iduSalesOrderDetail',obs:true,cf:'i',c:[
+        {k:'w',x:'Production.TransactionHistory 1행 추가',cf:'i'},
+        {k:'w',x:'Person.Person 1행 수정',cf:'i',c:[{k:'trg',x:'트리거 Person.iuPerson',obs:false,cf:'i',c:[{k:'w',x:'Person.Person 0행',zero:1,cf:'i'},{k:'w',x:'Person.Person 0행',zero:1,cf:'i'}]}]},
+        {k:'w',x:'Sales.SalesOrderHeader 1행 수정',cf:'i',c:[{k:'trg',x:'트리거 Sales.uSalesOrderHeader',obs:true,cf:'i',c:[
+          {k:'w',x:'Sales.SalesOrderHeader 1행 수정',cf:'i'},{k:'w',x:'Sales.SalesPerson 0행',zero:1,cf:'i'},{k:'w',x:'Sales.SalesTerritory 0행',zero:1,cf:'i'}]}]},
+        {k:'w',x:'Person.Person 1행 수정',cf:'i',c:[{k:'trg',x:'트리거 Person.iuPerson',obs:false,cf:'i',c:[{k:'w',x:'Person.Person 0행',zero:1,cf:'i'},{k:'w',x:'Person.Person 0행',zero:1,cf:'i'}]}]}]}]}]}
+ }
+};
+
+const LIVE=document.getElementById('live');
+const say=m=>{LIVE.textContent='';setTimeout(()=>LIVE.textContent=m,30)};
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+/* ---------- 조각 ---------- */
+const lineSvg=(inf)=>`<svg viewBox="0 0 30 8" aria-hidden="true"><line x1="0" y1="4" x2="30" y2="4" stroke="currentColor" stroke-width="2.5" ${inf?'stroke-dasharray="5 3.5"':''}/></svg>`;
+const confCell=c=> c==='c'
+  ? `<span class="conf">${lineSvg(0)}확실</span>`
+  : `<span class="conf inf">${lineSvg(1)}추론</span>`;
+const nc=(v,cls,g)=> v? `<span class="${cls}"><span aria-hidden="true">${g}</span>${v}<span class="sr">행</span></span>` : `<span class="zero" aria-label="0">·</span>`;
+const causeCell=c=>{
+  if(c.ty==='직접') return `<span class="cause"><span class="ty">직접</span></span>`;
+  if(c.ty==='FK CASCADE') return `<span class="cause" title="${c.fk}"><span class="ty">FK CASCADE</span><code>${c.fk}</code></span>`;
+  return `<span class="cause"><span class="ty">트리거</span><code>${c.trg}</code>${c.n?`<span class="badge">${c.n}건 · 같은 행 두 번</span>`:''}</span>`;
+};
+const tag=t=> t==='drv'?' <span class="badge drv" title="계산 열">파생</span>' : t==='vol'?' <span class="badge vol" title="적용할 때 달라질 수 있는 값">예상값</span>':'';
+
+const popBtn=(id,label,cls='stat',extra='')=>`<span class="popwrap"><button class="${cls}" data-pop="${id}" aria-expanded="false">${label}<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>${extra}</span>`;
+
+function sqlBox(state,meta){
+  const lines=SQL[state];
+  const bad = state==='rej';
+  return `<section class="box sqlbox ${state==='applied'?'done':''}" id="sqlbox" aria-label="SQL">
+    <div class="bar">
+      <button class="btn ghost" id="colBtn" aria-expanded="true" aria-controls="codeArea" title="SQL 접기 / 펼치기"><span aria-hidden="true">▾</span> SQL</button>
+      <button class="btn" id="runBtn" ${state==='applied'?'disabled':''}>미리보기 실행 <kbd>Ctrl</kbd>+<kbd>Enter</kbd></button>
+      <span class="spacer"></span>
+      <span class="meta">${meta||''}</span>
+    </div>
+    <div class="code" id="codeArea">${lines.map((l,i)=>`<div class="ln ${bad&&i===1?'bad':''}" id="ln${i+1}">${i+1}</div><div class="tx ${bad&&i===1?'bad':''}">${l}</div>`).join('')}</div>
+  </section>`;
+}
+const stagePop=d=>{
+  if(!d.stages) return '';
+  return `<div class="pop right" id="stpop" hidden role="dialog" aria-label="단계별 소요"><dl><dt>미리보기 id</dt><dd>${d.pid}</dd>${d.stages.map(s=>`<dt>${s[0]}</dt><dd>${s[1]}ms</dd>`).join('')}</dl></div>`;
+};
+const COND=[['미리보기 정상',1],['환경 지문 일치',1],['30분 안 · 남은 30분',1],['SQL이 미리보기 뒤 바뀌지 않음',1],['잔여 변경 확인 성공',1],['샌드박스 준비됨',1],['다른 작업 잠금 없음',1]];
+const condPop=`<div class="pop" id="condpop" hidden role="dialog" aria-label="적용 조건 7개"><ul>${COND.map(c=>`<li><span class="ck" aria-hidden="true">✓</span>${c[0]}<span class="sr"> 충족</span></li>`).join('')}</ul></div>`;
+function phrase(s){const p=[];if(s.del)p.push('삭제 '+s.del);if(s.mod)p.push('수정 '+s.mod);if(s.add)p.push('추가 '+s.add);return p.join(' · ')}
+const rows=s=>s.del+s.mod+s.add;
+
+function syncBox(state){
+  if(state==='dm1'||state==='dm2'){
+    const d=ST[state];
+    return `<aside class="box sync" aria-label="원본에 적용">
+      <button class="apply" id="applyBtn">원본에 적용<small>${phrase(d.sum)} · ${rows(d.sum)}행 변경</small></button>
+      <div class="condrow">${popBtn('condpop','조건 7/7 충족','stat',condPop)}<span>남은 30분</span></div>
+    </aside>`;
+  }
+  if(state==='rej'){
+    return `<aside class="box sync fail" aria-label="원본에 적용">
+      <button class="apply" id="applyBtn" disabled aria-describedby="errTitle">원본에 적용<small>오류를 고친 뒤 미리보기</small></button>
+      <div class="condrow"><span>조건 확인 전</span></div>
+    </aside>`;
+  }
+  if(state==='applied'){
+    return `<aside class="box sync okk" aria-label="적용 결과">
+      <div class="res"><b><span class="ck" aria-hidden="true">✓</span>원본에 커밋함</b><span class="t">2026-11-18 09:39:21 · 2.73초</span></div>
+      <div class="res"><span class="t" id="baseTxt"><span class="dot busy" aria-hidden="true"></span> 샌드박스 기준선 다시 만드는 중 · 약 8초</span><div class="prog" aria-hidden="true"><i id="baseBar"></i></div></div>
+      <button class="apply" id="newBtn" disabled>새 미리보기<small id="newSub">기준선을 만드는 동안은 쓸 수 없음</small></button>
+    </aside>`;
+  }
+  return `<aside class="box sync fail" aria-label="적용 결과">
+    <div class="res"><b style="color:var(--err-fg)"><span class="ck no" aria-hidden="true">!</span>적용 안 됨 · 원본이 바뀜</b><span class="t">drift_detected. 실행하지 않고 롤백했습니다.</span></div>
+    <button class="apply" id="refreshBtn">샌드박스 새로 고침<small><span class="badge" style="border-color:currentColor;color:inherit">제안(현재 API 없음)</span> 그 뒤 다시 미리보기</small></button>
+  </aside>`;
+}
+
+/* 경로 한 줄 */
+function pathHtml(paths){
+  return `<div class="pathrows">${paths.map(p=>`<ol class="path" aria-label="전파 경로">${p.map((n,i)=>{
+    const lk = i>0 ? `<li aria-hidden="true"><span class="lk ${n.lk==='i'?'inf':''}">${n.lb?`<em>${n.lb}</em>`:''}<i></i></span></li><li class="sr">${n.lk==='c'?'확실':'추론'}${n.lb?' '+n.lb:''}</li>`:'';
+    return lk+`<li><span class="nd ${n.t} ${n.noobs?'noobs':''}">${esc(n.x)}</span></li>`;
+  }).join('')}</ol>`).join('')}</div>`;
+}
+function treeHtml(n){
+  const cls=n.cf==='i'?'inf':'cer';
+  const obs = n.k==='trg' ? (n.obs?'<span class="badge" style="border-style:solid">관측됨</span>':'<span class="obs-no">관측 안 됨</span>') : '';
+  const conf = n.cf ? `<span class="conf ${n.cf==='i'?'inf':''}" style="font-size:12px">${lineSvg(n.cf==='i')}<span>${n.cf==='i'?'추론':'확실'}</span></span>`:'';
+  return `<li style="margin:3px 0;${n.zero?'opacity:.62':''}"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${conf}<span style="${n.k==='trg'?'font-family:var(--mono);font-size:12.5px':''}">${esc(n.x)}</span>${obs}</div>${n.c?`<ul style="list-style:none;margin:2px 0 0 12px;padding-left:12px;border-left:2px ${n.c[0].cf==='i'?'dashed':'solid'} var(--line2)">${n.c.map(treeHtml).join('')}</ul>`:''}</li>`;
+}
+
+/* 비교 창 */
+function cmpHtml(it){
+  let body='';
+  it.recs.forEach(r=>{
+    const opn={del:'삭제',add:'추가',mod:'수정'}[r.op];
+    body+=`<tr class="rec"><td colspan="4"><span class="op ${r.op}"><span aria-hidden="true">${{del:'−',add:'+',mod:'≠'}[r.op]}</span> ${opn}</span><span class="mono" style="font-weight:500">${r.id}</span>${r.op==='add'?' <span class="note" style="display:inline;margin-left:8px">왼쪽에는 없는 행</span>':r.op==='del'?' <span class="note" style="display:inline;margin-left:8px">오른쪽에는 없는 행</span>':''}</td></tr>`;
+    r.f.forEach(f=>{
+      const changed = r.op==='mod' && f.l!==f.r;
+      let lc='v',rc='v r';
+      if(r.op==='del'){lc+=' del';rc+=' absent'}
+      else if(r.op==='add'){lc+=' absent';rc+=' add'}
+      else if(changed){lc+=' chg';rc+=' chg'}
+      else {lc+=' key';rc+=' key'}
+      const mk = r.op==='del'?'−':r.op==='add'?'+':changed?'≠':'';
+      const mkc = r.op==='del'?'var(--del-mk)':r.op==='add'?'var(--add-mk)':changed?'var(--chg-mk)':'';
+      const lv = r.op==='add' ? '' : (f.l??'');
+      const rv = r.op==='del' ? '없음' : (f.r??'');
+      const lvv = r.op==='mod'||r.op==='del' ? lv : '';
+      body+=`<tr><td class="mk" style="color:${mkc}" aria-label="${mk==='−'?'삭제':mk==='+'?'추가':mk==='≠'?'값 바뀜':'같음'}">${mk}</td>
+        <td class="nm">${esc(f.n)}${f.k?'<span class="keyic">키</span>':''}${tag(f.tag)}</td>
+        <td class="${lc}">${lvv}${r.op==='add'?'<span class="sr">없음</span>':''}</td>
+        <td class="${rc}">${esc(rv)}${f.note?`<span class="note">${f.note}</span>`:''}</td></tr>`;
+    });
+    body+=`<tr class="more"><td></td><td colspan="3">그 밖의 열은 ${r.op==='mod'?'같음':'생략'}</td></tr>`;
+  });
+  return `<div class="cmpscroll" tabindex="0" aria-label="좌우 행 비교"><table class="cmp">
+    <colgroup><col style="width:30px"><col style="width:230px"><col><col></colgroup>
+    <thead><tr><th></th><th>열</th><th>지금 <small>원본 AW_Origin</small></th><th class="r">적용 후 <small>미리보기 결과</small></th></tr></thead>
+    <tbody>${body}</tbody></table></div>`;
+}
+function cmpBox(d,it){
+  return `<section class="box cmpbox" aria-label="행 비교" aria-live="polite" id="cmpbox">
+    <div class="cmphead">
+      <div style="flex:1;min-width:0">
+        <h2><span style="color:var(--ink3);font-weight:500">${it.sc}</span>${it.nm}</h2>
+        ${pathHtml(it.paths)}
+        ${it.note?`<div class="pathnote">${it.note}</div>`:''}
+      </div>
+      ${popBtn('treepop','경로 전체','btn',`<div class="pop right" id="treepop" hidden role="dialog" aria-label="경로 전체" style="min-width:560px;max-height:60vh;overflow:auto"><ul style="list-style:none;margin:0;padding:0">${treeHtml(d.tree)}</ul></div>`)}
+    </div>
+    ${cmpHtml(it)}
+  </section>`;
+}
+function gridBox(d,sel){
+  const s=d.sum;
+  const items=d.items.map((it,i)=>`<tr class="item" tabindex="0" data-i="${i}" aria-selected="${i===sel}">
+    <td class="tn"><span class="sc">${it.sc}</span>${it.nm}</td>
+    <td class="n">${nc(it.d,'v-del','−')}</td><td class="n">${nc(it.m,'v-chg','≠')}</td><td class="n">${nc(it.a,'v-add','+')}</td>
+    <td>${causeCell(it.cause)}</td><td>${confCell(it.conf)}</td></tr>`).join('');
+  const z=d.same.zero.map(z=>`<tr><td>${z[0]}</td><td>UPDATE 0행 × ${z[3]}</td><td><code class="mono" style="font-size:12px">${z[1]}</code> ${z[2]?'<span class="badge" style="border-style:solid">관측됨</span>':'<span class="obs-no">관측 안 됨</span>'}</td></tr>`).join('');
+  return `<section class="box gridbox" aria-label="비교 대상 테이블">
+    <table class="grid" role="grid" id="grid">
+      <colgroup><col style="width:310px"><col style="width:84px"><col style="width:84px"><col style="width:84px"><col><col style="width:116px"></colgroup>
+      <thead><tr><th scope="col">테이블</th><th class="n" scope="col">− 삭제</th><th class="n" scope="col">≠ 수정</th><th class="n" scope="col">+ 추가</th><th scope="col">원인</th>
+        <th scope="col" title="추론은 트리거가 쓴 변경의 귀속입니다">확신도</th></tr></thead>
+      <tbody>
+      <tr class="total"><th scope="row">합계 · 순변경 ${d.tables}개 테이블</th>
+        <td class="n">${nc(s.del,'v-del','−')}</td><td class="n">${nc(s.mod,'v-chg','≠')}</td><td class="n">${nc(s.add,'v-add','+')}</td>
+        <td style="font-size:13px;font-weight:400;color:var(--ink2)">${d.event}</td><td></td></tr>
+      ${items}
+      <tr class="same"><td colspan="6" style="padding:0 12px"><button id="sameBtn" aria-expanded="false" aria-controls="samelist"><span class="chev" aria-hidden="true">▸</span>같음 ${d.same.n}개 테이블 · 0행 쓰기 ${d.same.zn}건</button></td></tr>
+      </tbody>
+    </table>
+    <div class="samelist" id="samelist" hidden>
+      <table><tbody>${z}</tbody></table>
+      <div style="margin-top:8px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink2)">수집 71개 중 나머지는 쓰기 없음
+        <button class="btn" disabled>전체 테이블에서 찾기</button><span class="badge">제안(현재 API 없음)</span></div>
+    </div>
+  </section>`;
+}
+
+/* ---------- 상태별 화면 ---------- */
+let sel=0;
+function render(state){
+  const main=document.getElementById('main');
+  let h='';
+  if(state==='dm1'||state==='dm2'){
+    const d=ST[state];
+    const meta=`<span>미리보기 정상</span>${popBtn('stpop',d.ms,'stat',stagePop(d))}`;
+    h=`<div class="band">${sqlBox(state,meta)}${syncBox(state)}</div>${gridBox(d,sel)}${cmpBox(d,d.items[sel])}`;
+  }else if(state==='rej'){
+    h=`<div class="band">${sqlBox('rej','')}${syncBox('rej')}</div>
+    <section class="box errbox" role="alert">
+      <h2 id="errTitle"><span class="ck no" aria-hidden="true">✕</span>2행 · REJECT_DDL</h2>
+      <p>DDL은 미리보기할 수 없습니다. 스키마를 바꾸면 트랜잭션 제약과 DDL 트리거 반응이 달라집니다.</p>
+      <ul class="stmts" aria-label="문장별 분석">
+        <li><span><span class="ck" aria-hidden="true">✓</span>문장 1</span><code>DELETE FROM Sales.SalesOrderHeader WHERE SalesOrderID = 43697;</code><span>통과</span></li>
+        <li class="bad"><span><span class="ck no" aria-hidden="true">✕</span>문장 2</span><code>DROP TABLE Sales.Store;</code><span>2행 1~11열</span></li>
+      </ul>
+      <button class="btn" id="goLine">2행으로 이동</button>
+    </section>`;
+  }else if(state==='applied'){
+    const d=ST.dm2;
+    const order=[['Person.','Person','수정'],['Production.','TransactionHistory','추가'],['Sales.','SalesOrderDetail','수정'],['Sales.','SalesOrderHeader','수정']];
+    h=`<div class="band">${sqlBox('applied','<span>원본에 적용됨</span>')}${syncBox('applied')}</div>
+    <section class="box gridbox" aria-label="미리보기와 실제 대조">
+      <table class="grid recon"><colgroup><col style="width:310px"><col style="width:110px"><col style="width:110px"><col style="width:110px"><col></colgroup>
+      <thead><tr><th>테이블</th><th>종류</th><th class="n" style="width:110px">미리보기</th><th class="n" style="width:110px">실제</th><th>일치</th></tr></thead>
+      <tbody>
+        <tr class="total"><th scope="row">합계 · 건수 일치</th><td></td><td class="n">4</td><td class="n">4</td><td><span class="v-add"><span class="ck" aria-hidden="true">✓</span>4 = 4행</span></td></tr>
+        ${order.map(o=>`<tr><td class="tn"><span class="sc">${o[0]}</span>${o[1]}</td><td>${o[2]}</td><td class="n">1</td><td class="n">1</td><td><span class="v-add"><span class="ck" aria-hidden="true">✓</span>같음</span></td></tr>`).join('')}
+      </tbody></table>
+    </section>
+    <div class="two">
+      <section class="box pad"><h3>IDENTITY 짝</h3>
+        <table class="cmp" style="table-layout:auto"><thead><tr><th>열</th><th>미리보기</th><th class="r">실제</th></tr></thead>
+        <tbody><tr><td class="nm">Production.TransactionHistory.TransactionID</td><td class="v">213443</td><td class="v r">213443 <span class="badge" style="border-style:solid">같은 값</span></td></tr></tbody></table>
+        <h3 style="margin-top:16px">비교에서 제외 <span class="badge vol">예상값</span></h3>
+        <ul class="xl"><li>TransactionHistory.TransactionID</li><li>TransactionHistory.TransactionDate</li><li>TransactionHistory.ModifiedDate</li></ul>
+      </section>
+      <section class="box pad"><h3>소요 · 비교 방식 <span class="mono" style="font-weight:400;font-size:12px;color:var(--ink2)">SNAPSHOT_NETDIFF</span></h3>
+        <div class="bars">${[['snapshot',398],['drift',6],['execute',175],['netDiff',2144],['commit',6]].map(s=>`<div><span>${s[0]}</span><i style="width:${Math.max(.5,s[1]/2144*100)}%"></i><span class="v">${s[1]}ms</span></div>`).join('')}</div>
+      </section>
+    </div>`;
+  }else{ /* drift */
+    h=`<div class="band">${sqlBox('drift','<span>미리보기 정상 · 수정 1행</span>')}${syncBox('drift')}</div>
+    <section class="box cmpbox" aria-label="원본 비교">
+      <div class="cmphead"><div><h2><span style="color:var(--ink3);font-weight:500">Production.</span>Product</h2>
+        <div class="sub">ProductID 680 · 미리보기 뒤에 원본 이전 행 1건이 바뀜</div></div></div>
+      <table class="cmp"><colgroup><col style="width:30px"><col style="width:230px"><col><col></colgroup>
+      <thead><tr><th></th><th>열</th><th>예상 <small>미리보기가 본 원본</small></th><th class="r">실제 <small>지금 원본</small></th></tr></thead>
+      <tbody>
+        <tr class="rec"><td colspan="4"><span class="op mod"><span aria-hidden="true">≠</span> 불일치</span><span class="mono" style="font-weight:500">ProductID 680</span></td></tr>
+        <tr><td class="mk" style="color:var(--chg-mk)" aria-label="값 바뀜">≠</td><td class="nm">ListPrice</td><td class="v chg">1431.5000</td><td class="v r chg">1431.5100</td></tr>
+        <tr class="more"><td></td><td colspan="3">미리보기가 만든 변경은 ListPrice 1431.5000 → 1432.5000이었고 실행하지 않았습니다.</td></tr>
+      </tbody></table>
+    </section>`;
+  }
+  main.innerHTML=h;
+  bind(state);
+  document.querySelectorAll('[data-st]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.st===state));
+  if(state==='applied') startBaseline();
+}
+
+let baseTimer;
+function startBaseline(){
+  clearTimeout(baseTimer);
+  baseTimer=setTimeout(()=>{
+    const t=document.getElementById('baseTxt'); if(!t) return;
+    t.innerHTML='<span class="dot" aria-hidden="true"></span> 샌드박스 기준선 준비됨';
+    const b=document.getElementById('newBtn'); b.disabled=false; document.getElementById('newSub').textContent='처음부터 다시 미리보기';
+    say('샌드박스 기준선이 준비되었습니다. 새 미리보기를 할 수 있습니다.');
+  },8000);
+}
+
+/* ---------- 상호작용 ---------- */
+function closePops(except){
+  document.querySelectorAll('.pop:not([hidden])').forEach(p=>{ if(p!==except){p.hidden=true;const b=document.querySelector('[data-pop="'+p.id+'"]'); if(b) b.setAttribute('aria-expanded','false');}});
+}
+document.addEventListener('click',e=>{
+  const pb=e.target.closest('[data-pop]');
+  if(pb){
+    const p=document.getElementById(pb.dataset.pop); if(!p) return;
+    const open=p.hidden; closePops(open?p:null); p.hidden=!open; pb.setAttribute('aria-expanded',open); return;
+  }
+  if(!e.target.closest('.pop')) closePops();
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePops(); });
+
+function bind(state){
+  const col=document.getElementById('colBtn');
+  col.onclick=()=>{const b=document.getElementById('sqlbox');const c=b.classList.toggle('collapsed');col.setAttribute('aria-expanded',!c);col.firstElementChild.textContent=c?'▸':'▾'};
+  document.getElementById('runBtn').onclick=()=>say('미리보기를 다시 실행했습니다(목업).');
+  if(state==='dm1'||state==='dm2'){
+    const d=ST[state];
+    const rowsEl=[...document.querySelectorAll('tr.item')];
+    const pick=i=>{
+      sel=i; rowsEl.forEach((r,k)=>r.setAttribute('aria-selected',k===i));
+      const old=document.getElementById('cmpbox'); const tmp=document.createElement('div'); tmp.innerHTML=cmpBox(d,d.items[i]); old.replaceWith(tmp.firstElementChild);
+      say(d.items[i].sc+d.items[i].nm+' 행 비교를 표시합니다. '+d.items[i].opLabel);
+    };
+    rowsEl.forEach((r,i)=>{
+      r.onclick=()=>pick(i);
+      r.onkeydown=e=>{
+        if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(i)}
+        else if(e.key==='ArrowDown'&&rowsEl[i+1]){e.preventDefault();rowsEl[i+1].focus();pick(i+1);rowsEl[i+1].focus()}
+        else if(e.key==='ArrowUp'&&rowsEl[i-1]){e.preventDefault();rowsEl[i-1].focus();pick(i-1);rowsEl[i-1].focus()}
+      };
+    });
+    const sb=document.getElementById('sameBtn'),sl=document.getElementById('samelist');
+    sb.onclick=()=>{const o=sb.getAttribute('aria-expanded')==='true';sb.setAttribute('aria-expanded',!o);sl.hidden=o};
+    document.getElementById('applyBtn').onclick=()=>openConfirm(state);
+  }
+  if(state==='rej'){
+    document.getElementById('goLine').onclick=()=>{const l=document.getElementById('ln2');l.scrollIntoView({block:'center'});l.setAttribute('tabindex','-1');l.focus();say('편집기 2행으로 이동했습니다.')};
+  }
+  if(state==='applied'){
+    document.getElementById('newBtn').onclick=()=>{setState('dm2');say('새 미리보기 화면으로 돌아갑니다(목업).')};
+  }
+  if(state==='drift'){
+    document.getElementById('refreshBtn').onclick=()=>say('샌드박스를 새로 고칩니다(목업, 제안).');
+  }
+}
+
+/* 확인 단계 */
+const dlg=document.getElementById('confirm');
+function openConfirm(state){
+  const d=ST[state];
+  const names={del:'삭제',mod:'수정',add:'추가'};
+  const body=d.items.map(it=>`<tr><td><span class="mono" style="font-size:13px">${it.sc}${it.nm}</span></td><td>${[it.d&&'삭제 '+it.d,it.m&&'수정 '+it.m,it.a&&'추가 '+it.a].filter(Boolean).join('')}</td></tr>`).join('');
+  document.getElementById('cfBody').innerHTML=`<p class="sum" style="margin:6px 0 0">${d.tables}개 테이블 · ${rows(d.sum)}행이 바뀝니다 (${phrase(d.sum)})</p>
+    <table>${body}</table>
+    <p class="warn">원본 AW_Origin에 바로 커밋하며 되돌릴 수 없습니다. 적용 뒤 샌드박스 기준선을 다시 만들고(약 8초) 이 미리보기는 끝납니다.</p>`;
+  document.getElementById('cfOk').textContent=rows(d.sum)+'행 원본에 적용';
+  dlg.showModal();
+}
+document.getElementById('cfCancel').onclick=()=>dlg.close();
+document.getElementById('cfOk').onclick=()=>{dlg.close();setState('applied');say('원본에 적용했습니다. 건수 4 = 4행 일치. 샌드박스 기준선을 다시 만드는 중입니다.')};
+
+/* 상태·테마 해시 */
+function parse(){
+  const p=new URLSearchParams(location.hash.replace(/^#/,''));
+  let s=p.get('state'); if(!['dm1','dm2','rej','applied','drift'].includes(s)) s='dm2';
+  let t=p.get('theme'); if(!['light','dark'].includes(t)) t='light';
+  return {s,t};
+}
+let cur={s:null,t:null};
+function apply(){
+  const {s,t}=parse();
+  document.documentElement.setAttribute('data-theme',t);
+  document.getElementById('themeBtn').setAttribute('aria-pressed',t==='dark');
+  if(s!==cur.s){ cur.s=s; sel=0; closePops(); render(s); }
+  cur.t=t;
+}
+function setState(s){ const {t}=parse(); history.replaceState(null,'','#state='+s+'&theme='+t); apply(); }
+document.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>setState(b.dataset.st));
+document.getElementById('themeBtn').onclick=()=>{const {s,t}=parse(); history.replaceState(null,'','#state='+s+'&theme='+(t==='dark'?'light':'dark')); apply()};
+window.addEventListener('hashchange',apply);
+apply();
+</script>
+</body>
+</html>
