@@ -1,0 +1,70 @@
+{
+  "runId": "actions-20261118-m5",
+  "startedAt": "2026-11-18T00:57:33.4631612\u002B00:00",
+  "suite": "m5",
+  "executeAsUser": "dbr_preview_user",
+  "cases": "CL20,CL20b",
+  "sizes": "10000,50000,100000",
+  "repeat": "5",
+  "warmup": "1",
+  "imageCap": "default",
+  "finishedAt": "2026-11-18T01:03:27.4347464\u002B00:00",
+  "productVersion": "17.0.5035.5",
+  "productLevel": "RTM",
+  "productUpdateLevel": "CU10",
+  "edition": "Enterprise Developer Edition (64-bit)",
+  "engineEdition": 3,
+  "nestedTriggers": 1,
+  "disallowResultsFromTriggers": 0,
+  "sessionOptions": 5432,
+  "serverCpuCount": 4,
+  "serverPhysicalMemoryKb": 4194304,
+  "serverCommittedTargetKb": 3468488,
+  "databases": {
+    "N=10000:dbrt_eval_m5_2c8ff575": {
+      "compatibility_level": "170",
+      "is_recursive_triggers_on": "False",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS",
+      "is_read_committed_snapshot_on": "False",
+      "snapshot_isolation_state_desc": "OFF"
+    },
+    "N=10000:dbrt_eval_m5_2c8ff575_sbx": {
+      "compatibility_level": "170",
+      "is_recursive_triggers_on": "False",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS",
+      "is_read_committed_snapshot_on": "False",
+      "snapshot_isolation_state_desc": "OFF"
+    },
+    "N=50000:dbrt_eval_m5_560a9e6c": {
+      "compatibility_level": "170",
+      "is_recursive_triggers_on": "False",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS",
+      "is_read_committed_snapshot_on": "False",
+      "snapshot_isolation_state_desc": "OFF"
+    },
+    "N=50000:dbrt_eval_m5_560a9e6c_sbx": {
+      "compatibility_level": "170",
+      "is_recursive_triggers_on": "False",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS",
+      "is_read_committed_snapshot_on": "False",
+      "snapshot_isolation_state_desc": "OFF"
+    },
+    "N=100000:dbrt_eval_m5_1a9c50cc": {
+      "compatibility_level": "170",
+      "is_recursive_triggers_on": "False",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS",
+      "is_read_committed_snapshot_on": "False",
+      "snapshot_isolation_state_desc": "OFF"
+    },
+    "N=100000:dbrt_eval_m5_1a9c50cc_sbx": {
+      "compatibility_level": "170",
+      "is_recursive_triggers_on": "False",
+      "collation_name": "SQL_Latin1_General_CP1_CI_AS",
+      "is_read_committed_snapshot_on": "False",
+      "snapshot_isolation_state_desc": "OFF"
+    }
+  },
+  "clientOs": "Ubuntu 26.04.1 LTS",
+  "clientRuntime": ".NET 10.0.15",
+  "clientProcessorCount": 4
+}
