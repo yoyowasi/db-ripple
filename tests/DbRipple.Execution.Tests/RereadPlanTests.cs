@@ -243,11 +243,20 @@ public class RereadPlanFixtureTests
     {
         var (raw, analysis, ctx) = Load(id);
         var tables = RereadEquivalence.Tables(ctx);
-        Assert.Equal(RereadEquivalence.AllKeys(raw, tables), raw.Rereads.Select(r => (r.Table, r.KeyJson)).ToList());
+        var plan = RereadSql.Plan(raw.Headers, raw.Images, tables);
+        // 픽스처는 두 판 다 받는다: 생략 전 실행기로 만든 것(전체 재조회 = 기준 구현)과 DBR_WRITE_FIXTURES로 다시 만든 것(생략 후)
+        var recorded = raw.Rereads.Select(r => (r.Table, r.KeyJson)).ToList();
+        if (raw.RereadSkippedKeys == 0) Assert.Equal(RereadEquivalence.AllKeys(raw, tables), recorded);
+        else
+        {
+            static List<(string, string)> Sorted(IEnumerable<(string Table, string Key)> keys) =>
+                keys.OrderBy(k => k.Table, StringComparer.Ordinal).ThenBy(k => k.Key, StringComparer.Ordinal).Select(k => (k.Table, k.Key)).ToList();
+            Assert.Equal(Sorted(RereadEquivalence.PlanKeys(plan)), Sorted(recorded));
+            Assert.Equal(plan.Skipped, raw.RereadSkippedKeys);
+        }
         RereadEquivalence.AssertSame(raw, analysis, ctx);
 
         // 픽스처에 기록된 실제 재조회 값으로도 같다(생략한 키는 행에서 뺀다)
-        var plan = RereadSql.Plan(raw.Headers, raw.Images, tables);
         var kept = RereadEquivalence.PlanKeys(plan).ToHashSet();
         var skipped = raw with { Rereads = raw.Rereads.Where(r => kept.Contains((r.Table, r.KeyJson))).ToList(), RereadSkippedKeys = plan.Skipped };
         Assert.Equal(File.ReadAllText(Path.Combine(FixtureFiles.Root, id, "collect.json")).TrimEnd(), RereadEquivalence.Json(new ChangeCollector().Collect(skipped, analysis, ctx)));
@@ -257,8 +266,9 @@ public class RereadPlanFixtureTests
     public void Cl20_fixture_rereads_drop_from_5n_to_2n()
     {
         var (raw, _, ctx) = Load("CL20");
-        var plan = RereadSql.Plan(raw.Headers, raw.Images, RereadEquivalence.Tables(ctx));
-        Assert.Equal(10, raw.Rereads.Count); // N = 2: Parent 2 + Child 4 + ChildLog 4
+        var tables = RereadEquivalence.Tables(ctx);
+        var plan = RereadSql.Plan(raw.Headers, raw.Images, tables);
+        Assert.Equal(10, RereadEquivalence.AllKeys(raw, tables).Count); // 생략 전 후보, N = 2: Parent 2 + Child 4 + ChildLog 4(픽스처를 다시 만들어도 같다)
         Assert.Equal((4L, 6L), (plan.KeyCount, plan.Skipped));
         Assert.All(plan.Tables, t => Assert.Equal("cl20.ChildLog", t.Table.DisplayName));
     }
