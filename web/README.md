@@ -1,6 +1,6 @@
 # db-ripple 웹 화면
 
-Vue 3 + Vite + TypeScript + Pinia. 설계: [docs/architecture.md](../docs/architecture.md) §4 C1~C4, §6.3, D6. API 모양: [docs/week3-plan.md](../docs/week3-plan.md) §5.
+Vue 3 + Vite + TypeScript + Pinia. 설계: [docs/architecture.md](../docs/architecture.md) §4 C1~C4, §6.3, D6. API 모양: [docs/week3-plan.md](../docs/week3-plan.md) §5. 화면 배치는 목업 [docs/mockups/r2/3-compare.html](../docs/mockups/r2/3-compare.html)을 바탕으로, 가운데 목록은 테이블 단위 원인 트리로 정했다(2026-11-18. 실제 사용자 테스트가 아니라 사용자 유형 3가지를 가정한 추정 평가와 반박 라운드로 골랐다).
 
 ## 설치와 실행
 
@@ -17,19 +17,24 @@ npm run dev               # 개발 서버 http://localhost:5273
 - 브라우저는 같은 출처의 `/api`만 부른다. Vite 개발 서버가 `/api`를 `http://127.0.0.1:5080`으로 넘기므로 CORS 설정이 없다(`vite.config.ts`).
 - `/sp9`는 개발 서버에서만 열린다(운영 빌드에서 열려면 `VITE_ENABLE_SP9=true`).
 - `package.json`의 버전은 모두 고정이다. 설치 때 존재하지 않는 버전이라는 오류가 나면 `npm view <패키지> versions`로 확인해 가까운 패치로 바꾼다.
+- 글꼴은 npm 패키지로 함께 묶는다(실행 파일의 CSP `font-src 'self'`): 본문 Pretendard Variable(`pretendard`, OFL 1.1, 글자 범위별 조각만 받음), 코드 JetBrains Mono(`@fontsource/jetbrains-mono`).
+- 개발 서버에서 주소에 `?fixture=dm2`처럼 붙이면 서버 없이 실측 시험 데이터로 화면을 연다(`src/dev/`, 운영 빌드에서는 빠진다).
 
 ## 화면 구성(`/`)
 
+![홈 화면: DM2 미리보기, Sales.SalesOrderHeader를 고른 상태](../docs/screens/home-dm2-light.jpg)
+
 | 영역 | 컴포넌트 | 내용 |
 |---|---|---|
-| 위쪽 띠 | `SandboxBar` | 샌드박스 상태(building·ready·dirty·error), 기준 시각, 환경 지문, 잠금, [샌드박스 새로 고침] |
-| C1 편집기 | `SqlEditor` | CodeMirror 6 MSSQL 방언. `/api/catalog/schema`로 스키마·열 자동완성(기준선 `baselineAt`별 캐시). 입력을 멈추면 `/api/analyze`로 분석해 거부·경고 위치를 줄 표시로 보인다. Ctrl+Enter = 미리보기 |
-| C2 그래프 | `PropagationGraph`, `FlowNode`, `RippleEdge` | 노드 6종·간선 7종, dagre 왼쪽 → 오른쪽 배치. 선 모양 = 확신도, 색·라벨 = 종류, 흐린 점선·점선 테두리 = `observed:false`, 라벨 "관측 순서, 보장 안 됨". `0행`·`일부만 수집`·`감사 순서 불확실` 표시. 0행 묶음은 기본 숨김(E23) |
-| C3 그리드 | `DiffGrid` | AG Grid. 발동 보기(event)·최종 차이 보기(net) 전환(E24), 묶음 선택 목록, 서버 페이지(offset·limit). 바뀐 셀 강조("이전 → 이후"), "예상값"·"파생" 뱃지, 키 없는 테이블은 "제거된 행 n개, 추가된 행 m개"(E6) |
-| C4 요약 | `PreviewSummary` | 문장별 결과, 테이블별 건수, 경고, 롤백 뒤 남은 변경, 환경 지문, 수집 범위, "잔여 확인 실패" 배너 |
-| C4 적용 | `ApplyPanel`, `ApplyResultView` | [적용]은 status ok · 환경 지문 일치 · 30분 안 · SQL 불변일 때만 켜지고 꺼지면 이유를 모두 보인다. 누르면 한 번 더 확인한다. [취소]. ApplyResult(드리프트·불일치·IDENTITY 짝·KEYSET 한계·잔여 확인 실패) |
+| 메뉴 줄 | `App.vue`, `SandboxBar` | 로고, 원본 → 샌드박스 DB, 샌드박스 상태 칩 하나(정상이면 조용히, 지문 불일치·기준선 오래됨·원본 연결 안 됨·잠금·인스턴스 경고는 칩 옆에 표시). 칩을 누르면 모드·기준 시각·환경 지문(차단·경고)·수집 범위·원본 연결·잠금·[샌드박스 새로 고침]. 테마 전환. `SandboxBar`는 메뉴 줄의 `#menu-slot`으로 Teleport 한다(홈에서만) |
+| C1 SQL 띠 | `SqlEditor`, `compare/PreviewInfo` | CodeMirror 6 MSSQL 방언. `/api/catalog/schema`로 스키마·열 자동완성(기준선 `baselineAt`별 캐시). 입력을 멈추면 `/api/analyze`로 분석해 거부·경고 위치를 줄 표시로 보인다. Ctrl+Enter = 미리보기. 오른쪽 "미리보기 정상 · n초 ▾"를 누르면 문장별 결과·수집 범위·미리보기 id·환경 지문·단계별 소요·결과 JSON 내보내기 |
+| C4 적용 상자 | `ApplyPanel` | 오른쪽 위. [원본에 적용](바뀌는 건수를 함께), 조건 n/n(status ok · 환경 지문 일치 · 30분 안 · SQL 불변 등, 꺼지면 이유를 모두 보인다), 남은 시간, [미리보기 취소]. 누르면 네이티브 `<dialog>` 모달로 한 번 더 확인한다: 테이블별 건수, 원본 DB 이름 입력, 필요하면 약한 검증(KEYSET_HASH) 동의. 적용 뒤에는 결과 한 줄과 [새 미리보기](새 기준선이 생긴 뒤 켜짐)·[샌드박스 새로 고침] |
+| 원인 트리 | `compare/TableTree`, `compare/PathLine`, `lib/compare.ts` | 테이블당 한 줄, 숫자는 순변경(열 합 = 맨 위 합계). 들여쓰기 = 원인(문장 → 직접·FK 연쇄·프로시저 쓰기 → 트리거 → 테이블). 테이블은 행을 바꾼 묶음 가운데 가장 얕은 깊이 자리에 두고(관측 순서에 기대지 않음), 같은 층은 이름순. 같은 행을 여러 묶음이 바꾸면 [같은 행 n번 ▸]으로 모든 경로를 펼친다. 선 모양 = 확신도, 관측 안 된 트리거는 흐린 줄, 0행 쓰기는 그 트리거 줄의 개수(E23). 위아래 화살표·Enter로 고른다 |
+| 행 비교 | `compare/RowCompare` | 고른 테이블의 최종 차이(net) 행을 서버 페이지로 읽어 "지금(원본) \| 적용 후"로 맞댄다. 수정 행은 키·바뀐 열부터, 추가·삭제 행은 없는 쪽을 빗금으로. "예상값"·"파생" 표시, 이미지에 없는 열은 "수집 안 됨"(NULL과 구분) |
+| C3 발동 묶음 · C2 전파 그래프 | `DiffGrid`, `PropagationGraph`, `FlowNode`, `RippleEdge`, `GraphDrawer` | 아래 창 보조 탭. 발동 묶음: AG Grid, 발동 보기(event)·최종 차이 보기(net) 전환(E24), 묶음 선택 목록, 키 없는 테이블은 "제거된 행 n개, 추가된 행 m개"(E6). 전파 그래프: 노드 6종·간선 7종, dagre 왼쪽 → 오른쪽 배치, 선 모양 = 확신도, `observed:false`는 흐린 점선, 0행 묶음은 기본 숨김. 노드를 누르면 서랍 |
+| 결과 자리 | `ApplyResultView` | 원본에서 실행을 시도한 적용(커밋·드리프트·불일치 롤백)은 트리 자리를 "미리보기 → 실제" 대조표로 바꾼다(IDENTITY 짝·비교 제외 열·KEYSET 한계·잔여 확인 실패). 선행 조건 실패·오류는 알림 칸에 두고 트리는 그대로 |
 
-오류는 ProblemDetails를 `ProblemBanner`로 보인다. 409는 `reason` 5종(LOCKED·BUILDING·NO_BASELINE·FINGERPRINT_MISMATCH·DIRTY)별 문장과 [새로 고침] 단추를, 422는 거부 규칙 ID와 위치를, 503은 연결 끊김 문장을 보인다.
+같은 사실은 한 곳에서만 말한다. 422 거부는 결과 자리의 거부 칸 하나(규칙 ID·위치·문장별 통과/거부, [n행으로 이동]), 409 BUILDING은 빈 결과 칸 하나다. 그 밖의 오류는 ProblemDetails를 `ProblemBanner`로 보인다: 409는 `reason` 5종(LOCKED·BUILDING·NO_BASELINE·FINGERPRINT_MISMATCH·DIRTY)별 문장과 [새로 고침] 단추를, 503은 연결 끊김 문장을. 결과 잘림·잔여 확인 실패·롤백 뒤 남은 변경·경고는 트리 위 알림 칸에 있을 때만 나온다.
 
 ## SP9 측정 화면(`/sp9`)
 
@@ -41,9 +46,10 @@ npm run dev               # 개발 서버 http://localhost:5273
 src/
   api/types.ts         week3-plan.md §5를 손으로 옮긴 타입(유일한 기준은 §5)
   api/client.ts        fetch 래퍼, ApiError, 오류 문장
-  stores/              Pinia: sandbox(상태·스키마 캐시), preview(편집·분석·미리보기·적용)
-  composables/         useRowPage(서버 페이지), useNow
-  lib/                 순수 함수: applyGate, graphModel·graphLayout·graphStyle, gridRows, editorSupport, format, sp9Data
-  components/          위 표의 화면 조각
-  views/               HomeView(/), Sp9View(/sp9)
+  stores/              Pinia: sandbox(상태·스키마 캐시), preview(편집·분석·미리보기·적용, 고른 테이블·아래 창 보기)
+  composables/         useRowPage(서버 페이지), useNow, useSplitter
+  lib/                 순수 함수: compare(테이블별 집계·원인 트리·경로), summary, applyGate, graphModel·graphLayout·graphStyle, gridRows, editorSupport, format, sp9Data
+  components/          위 표의 화면 조각. compare/ = 원인 트리·경로·행 비교·미리보기 상세
+  views/               HomeView(/), SettingsView(/settings), Sp9View(/sp9)
+  dev/                 개발 서버 전용 시험 데이터(?fixture=)
 ```
