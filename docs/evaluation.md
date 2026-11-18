@@ -348,7 +348,11 @@ PR #16(FK 판정의 부모 × 자식 이중 반복 제거) 뒤 Codex 클라우�
 
 - **resolve가 선형에 가까워졌다:** CL20 resolve는 1만→5만 5.17배, 5만→10만 2.29배다(위 실행은 약 16배, 3.5배). 10만 행 resolve는 7.4초다(위 실행 55.7초). 이 열은 수집(C11)과 귀속(C13)을 합친 값이다.
 - **다음 병목은 재조회다:** CL20 10만 행 total 65.5초 중 reread가 47.8초(약 73%)다. 재조회는 키 수에 선형이지만 DELETE 키당 비용이 UPDATE보다 크다.
-- **재조회가 느린 원인(실제 실행 계획):** 한 트랜잭션에서 DELETE 뒤 실제 재조회 SQL을 돌리면, 행이 지워져 빈 Parent·Child 테이블에 대해 Clustered Index Scan이 키마다 다시 실행된다(1천 키 청크에서 실행 1,000회, 논리 읽기 14,001·13,001). 행이 남아 있는 ChildLog는 Seek다. 출처 [reread-plan-summary.csv](test-reports/data/2026-11-17-cloud/reread-plan-summary.csv). 청크 크기만 키워서는 없어지지 않는다. 고칠 후보(지운 키만 나온 키는 재조회하지 않기, Seek 유도, 키를 임시 테이블로 보내 한 번 조인)는 [성능 보고서](test-reports/2026-11-17-large-delete-perf.md) 6절에 있고 아직 구현하지 않았다.
+- **재조회가 느린 원인(실제 실행 계획):** 한 트랜잭션에서 DELETE 뒤 실제 재조회 SQL을 돌리면, 행이 지워져 빈 Parent·Child 테이블에 대해 Clustered Index Scan이 키마다 다시 실행된다(1천 키 청크에서 실행 1,000회, 논리 읽기 14,001·13,001). 행이 남아 있는 ChildLog는 Seek다. [실제 실행 계획 집계](test-reports/data/2026-11-17-cloud/reread-plan-summary.csv)
+
+#### 삭제 전용 키의 재조회 생략 뒤 재측정(2026-11-18)
+
+PR #19 뒤 GitHub Actions에서 같은 M5 명령을 실행했다. CL20 DELETE 10만 행에서 재조회 p50은 이전 클라우드 실행의 47.784초에서 1.461초, 전체 p50은 65.510초에서 17.784초였다. 픽스처의 CL20은 부모 2행에서 재조회 키가 10개에서 4개로 줄었고, `collect.json`은 변경 전후 일치했다. [실행 환경과 크기별 비교](test-reports/2026-11-18-cloud-reread-validation.md)
 
 ### 6.3 측정 전·이후 확인한 항목
 

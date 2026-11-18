@@ -143,6 +143,8 @@ reread 코드는 바꾸지 않았다(DB로 효과를 잴 수 없고, 1안은 계
 
 **Codex 클라우드 DB 재측정(요청):** 이 브랜치에서 아래를 이전과 같은 방식으로 돌린다.
 
+> 2026-11-18 실행 결과와 원자료는 [재조회 최적화 클라우드 검증](2026-11-18-cloud-reread-validation.md)에 있다.
+
 ```
 pwsh -NoProfile -File scripts/home-test.ps1 -Date cloud-20261118   # CI와 같은 기본(빌드·DB 테스트·30사례×3회 평가·N1), summary PASS
 . ./scripts/env.ps1
