@@ -98,6 +98,8 @@ export interface SandboxStatus {
   instanceWarnings?: string[]
   /** DB 엔진. SQL Server는 빠진다. 'postgres'면 PostgreSQL 최소판(미리보기만, [적용] 없음). */
   engine?: 'postgres'
+  /** state가 error일 때만: 마지막 구축·읽기 실패 원인(비밀번호는 가림). */
+  lastError?: string
 }
 // POST /api/sandbox/refresh → 202, 본문 없음(Location: /api/sandbox)
 

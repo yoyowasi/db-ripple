@@ -48,6 +48,8 @@ export const FIXTURE_IDS = [
   'unreachable',
   'mismatch',
   'outside',
+  // PostgreSQL 최소판(2026-11-18): 새로 고침 실패 이유
+  'pgerror',
   'first',
   'settings',
   'env',
@@ -1278,6 +1280,19 @@ export const FIXTURES: Record<FixtureId, Fixture> = {
       fingerprintMatch: false,
       fingerprintMismatches: ['호환성 수준이 다릅니다: 원본 160 · 샌드박스 150', 'RECURSIVE_TRIGGERS 설정이 다릅니다: 원본 OFF · 샌드박스 ON'],
       fingerprintWarnings: ['언어 설정이 다릅니다: 원본 한국어 · 샌드박스 us_english'],
+    },
+  }),
+  pgerror: variant('pgerror', 'PostgreSQL 새로 고침 실패 · 원본에 다른 연결(55006) · 실패 이유 표시', {
+    autoRun: false,
+    sandbox: {
+      state: 'error',
+      baselineAt: null,
+      fingerprintMatch: false,
+      locked: false,
+      manifest: null,
+      engine: 'postgres',
+      lastError:
+        "InvalidOperationException: 원본 DB 'shop'에 다른 연결이 있어 복제하지 못했습니다. TEMPLATE 복제는 원본에 연결이 없어야 합니다. 원본 연결을 닫고 새로 고침하세요(도구는 원본 세션을 끊지 않습니다).",
     },
   }),
   first: variant('first', '첫 실행 · 설정 없음', {

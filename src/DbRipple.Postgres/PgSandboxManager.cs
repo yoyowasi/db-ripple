@@ -40,15 +40,17 @@ public sealed class PgSandboxManager(PgOptions options, TimeProvider clock) : IS
         lock (gate)
         {
             var c = context;
+            var state = building ? SandboxState.Building : c is null ? SandboxState.Error : dirty ? SandboxState.Dirty : SandboxState.Ready;
             return new SandboxStatus
             {
-                State = building ? SandboxState.Building : c is null ? SandboxState.Error : dirty ? SandboxState.Dirty : SandboxState.Ready,
+                State = state,
                 BaselineAt = c?.BackupFinishedAt,
                 FingerprintMatch = c?.FingerprintMatch ?? false,
                 Locked = previewLocked,
                 Manifest = c is null ? null : Summarize(c.Manifest),
                 Origin = c is null ? null : new OriginInfo { Database = c.OriginDb, Login = c.OriginLogin },
                 Engine = EngineName,
+                LastError = state == SandboxState.Error ? this.LastError : null, // 오른쪽은 관리자 속성(마지막 실패 원인)
             };
         }
     }

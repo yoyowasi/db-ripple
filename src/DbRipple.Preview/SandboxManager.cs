@@ -126,6 +126,7 @@ public sealed class SandboxManager(SandboxManagerOptions options, ITriggerAnalyz
                 BaselineStale = stale,
                 OriginReachable = c?.OriginReachable ?? true,
                 InstanceWarnings = c?.InstanceWarnings ?? [],
+                LastError = state == SandboxState.Error ? this.LastError : null, // 오른쪽은 관리자 속성(마지막 실패 원인)
             };
         }
     }
