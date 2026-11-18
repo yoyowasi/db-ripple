@@ -99,6 +99,11 @@ public sealed record SandboxStatus
     public bool OriginReachable { get; init; } = true;
     /// <summary>샌드박스 인스턴스 설정 경고(xp_cmdshell 등 위험 설정 켜짐, 연결된 서버 있음). 막지 않는다. 비어 있으면 [](2026-11-13).</summary>
     public IReadOnlyList<string> InstanceWarnings { get; init; } = [];
+    /// <summary>
+    /// DB 엔진(2026-11-18 PostgreSQL 최소판). SQL Server는 null이라 JSON에서 빠진다(기존 픽스처·계약 모양 유지). PostgreSQL이면 "postgres"(미리보기만, [적용] 없음).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? Engine { get; init; }
 }
 
 /// <summary>

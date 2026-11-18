@@ -5,8 +5,11 @@ using Microsoft.AspNetCore.DataProtection;
 
 namespace DbRipple.Host;
 
-/// <summary>연결에 묶인 서비스 한 벌(설정을 바꾸면 통째로 다시 만든다). 미리보기 저장소·분석기 같은 연결 무관 서비스는 DI 싱글턴을 같이 쓴다.</summary>
-sealed record Engine(RuntimeProfile Profile, ISandboxManager Sandbox, IPreviewPipeline Pipeline, ICatalogSchemaProvider Catalog, IApplyService Apply);
+/// <summary>
+/// 연결에 묶인 서비스 한 벌(설정을 바꾸면 통째로 다시 만든다). 미리보기 저장소 같은 연결 무관 서비스는 DI 싱글턴을 같이 쓴다.
+/// 문장 분석기는 DB 종류마다 다르므로 묶음에 넣는다(2026-11-18 PostgreSQL 최소판). PostgreSQL 묶음은 SQL Server 프로필이 없어 Profile이 null이다.
+/// </summary>
+sealed record Engine(RuntimeProfile? Profile, ISandboxManager Sandbox, IPreviewPipeline Pipeline, ICatalogSchemaProvider Catalog, IApplyService Apply, IBatchAnalyzer Analyzer);
 
 /// <summary>
 /// 현재 서비스 묶음(N4). 시작 때 환경 변수 또는 프로필로 만들고, PUT /api/settings가 <see cref="Switch"/>로 바꾼다.
@@ -24,9 +27,16 @@ sealed class EngineHolder(Func<RuntimeProfile, Engine> factory, ILogger<EngineHo
     /// <summary>시작 때 한 번(재구축 필요 표시 없음).</summary>
     public void Start(RuntimeProfile profile) => current = Create(profile);
 
+    /// <summary>시작 때 한 번, 이미 만든 묶음으로(PostgreSQL: 환경 변수로만 구성).</summary>
+    public void Start(Engine engine)
+    {
+        logger.LogInformation("DbRipple 연결 PostgreSQL 최소판(미리보기만)");
+        current = engine;
+    }
+
     public void EnsureIdle()
     {
-        if (current?.Sandbox is SandboxManager { IsBusy: true })
+        if (current?.Sandbox is SandboxManager { IsBusy: true } or DbRipple.Postgres.PgSandboxManager { IsBusy: true })
             throw new PreviewConflictException(ConflictReason.Locked, "미리보기·적용·기준선 구축 중에는 연결 설정을 바꿀 수 없습니다.");
     }
 

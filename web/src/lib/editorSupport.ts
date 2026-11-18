@@ -16,7 +16,7 @@ export interface SchemaCompletion {
  * 스키마 → { 스키마이름: { 테이블: [열…] } }. "Sales." 뒤에서 테이블, "Sales.SalesOrderDetail." 뒤에서 열이 나온다.
  * 열 설명에는 sqlType과 IDENTITY·계산 열·비결정 표시를 붙인다.
  */
-export function schemaToCompletion(schema: CatalogSchema | null): SchemaCompletion {
+export function schemaToCompletion(schema: CatalogSchema | null, defaultSchemaName = 'dbo'): SchemaCompletion {
   const root: Record<string, Record<string, Completion[]>> = {}
   if (schema) {
     for (const t of schema.tables) {
@@ -34,7 +34,7 @@ export function schemaToCompletion(schema: CatalogSchema | null): SchemaCompleti
   }
   return {
     schema: root as unknown as SqlSchema,
-    defaultSchema: root['dbo'] ? 'dbo' : undefined,
+    defaultSchema: root[defaultSchemaName] ? defaultSchemaName : undefined,
   }
 }
 

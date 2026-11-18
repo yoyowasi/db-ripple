@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- PostgreSQL 미리보기 최소판(docs/superpowers/specs/2026-11-18-postgres-preview-minimal.md). 미리보기만: [적용]·프로시저 호출·Split은 없다.
+       ISandboxManager·IBatchAnalyzer·IPreviewExecutor·IColumnTypeSource 구현을 두고, 조립은 Host가 엔진 설정(Postgres)일 때 한다. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DbRipple.Contracts\DbRipple.Contracts.csproj" />
+    <ProjectReference Include="..\DbRipple.Preview\DbRipple.Preview.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DbRipple.Postgres.Tests" />
+  </ItemGroup>
+
+</Project>

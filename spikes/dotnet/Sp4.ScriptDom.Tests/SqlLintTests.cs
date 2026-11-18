@@ -23,10 +23,13 @@ public class SqlLintTests
             if (!Directory.Exists(full)) continue;
             foreach (var f in Directory.EnumerateFiles(full, "*.sql", SearchOption.AllDirectories))
             {
+                // SP22는 PostgreSQL 스크립트이며 psql에서 검증한다.
+                var relative = Path.GetRelativePath(root!, f);
+                if (relative == Path.Combine("spikes", "sql", "sp22_10_pg_capture.sql")) continue;
                 using var r = new StringReader(SqlcmdToTsql(File.ReadAllText(f)));
                 new TSql170Parser(true).Parse(r, out var e);
                 foreach (var x in e)
-                    errors.Add($"{Path.GetRelativePath(root!, f)} | {x.Line}:{x.Column} {x.Message} | 정적 문법 오류");
+                    errors.Add($"{relative} | {x.Line}:{x.Column} {x.Message} | 정적 문법 오류");
             }
         }
         Assert.True(errors.Count == 0, string.Join("\n", errors));
