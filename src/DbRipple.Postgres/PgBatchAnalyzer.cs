@@ -20,22 +20,42 @@ public sealed class PgBatchAnalyzer : IBatchAnalyzer
     static readonly HashSet<string> Admin = new(StringComparer.Ordinal)
         { "VACUUM", "ANALYZE", "ANALYSE", "CHECKPOINT", "LOCK", "LISTEN", "NOTIFY", "UNLISTEN", "DISCARD", "LOAD", "REFRESH", "CLUSTER", "DEALLOCATE", "FETCH", "MOVE", "CLOSE", "DECLARE" };
 
-    // 문장 안 함수 호출 거부 목록(소문자). 미리보기 역할 전환(SET LOCAL ROLE)은 연결 사용자가 superuser면 set_config('role', …)로 되돌릴 수 있어 막는다.
+    // 문장 안 함수 호출 거부 목록(소문자, 정확한 이름). 미리보기 역할 전환(SET LOCAL ROLE)은 연결 계정과 상관없이
+    // set_config('role', 'none', …)로 되돌릴 수 있으므로 막는다(역할 경계는 이 목록에만 기댄다, 결정 3).
+    // 2026-11-19 보안 검토 보강: 문자열을 SQL로 실행하는 ts_stat·ts_rewrite·connectby(tablefunc), 복제 슬롯 삭제, 서버 로그 기록.
     static readonly HashSet<string> AdminFunctions = new(StringComparer.Ordinal)
     {
         "set_config", "pg_terminate_backend", "pg_cancel_backend", "pg_reload_conf", "pg_rotate_logfile", "pg_switch_wal",
-        "pg_create_restore_point", "pg_backup_start", "pg_backup_stop", "pg_start_backup", "pg_stop_backup", "pg_promote",
-        "pg_logical_emit_message", "pg_notify", "pg_sleep", "pg_sleep_for", "pg_sleep_until",
-        "pg_advisory_lock", "pg_advisory_xact_lock", "pg_advisory_lock_shared", "pg_advisory_xact_lock_shared",
-        "query_to_xml", "query_to_xml_and_xmlschema", "query_to_xmlschema", "cursor_to_xml", "cursor_to_xmlschema",
-        "table_to_xml", "table_to_xml_and_xmlschema", "schema_to_xml", "schema_to_xml_and_xmlschema", "database_to_xml", "database_to_xml_and_xmlschema",
+        "pg_backup_start", "pg_backup_stop", "pg_start_backup", "pg_stop_backup", "pg_promote",
+        "pg_drop_replication_slot", "pg_log_backend_memory_contexts", "pg_log_standby_snapshot",
+        "pg_notify", "pg_sleep", "pg_sleep_for", "pg_sleep_until",
+        "ts_stat", "ts_rewrite", "connectby",
         "lo_unlink", "lo_create", "lo_from_bytea", "lo_put", "txid_current", "pg_current_xact_id",
     };
+    // 접두로 묶은 거부(소문자).
+    static readonly string[] AdminPrefixes =
+    [
+        "pg_advisory", "pg_try_advisory",                                            // advisory lock 전부(잠금·해제·try·shared·xact)
+        "query_to_xml", "cursor_to_xml", "table_to_xml", "schema_to_xml", "database_to_xml", // 질의 문자열·커서·테이블을 실행하는 XML 함수(_xmlschema·_and_xmlschema 포함)
+        "crosstab",                                                                  // tablefunc: 질의 문자열 실행
+        "pg_create_", "pg_copy_", "pg_replication_slot_", "pg_replication_origin_", "pg_logical_", // 복원 지점·복제 슬롯·원점·논리 메시지(롤백되지 않음)
+        "pg_wal_replay_", "pg_stat_reset",                                           // WAL 재생 제어, 통계 초기화(롤백되지 않음)
+    ];
     static readonly HashSet<string> ExternalFunctions = new(StringComparer.Ordinal)
     {
-        "pg_read_file", "pg_read_binary_file", "pg_ls_dir", "pg_stat_file", "pg_file_write", "lo_import", "lo_export",
-        "dblink", "dblink_exec", "dblink_connect", "dblink_send_query", "dblink_open",
+        "pg_stat_file", "pg_current_logfile", "lo_import", "lo_export", "http",
     };
+    static readonly string[] ExternalPrefixes =
+    [
+        "dblink", "http_",               // 원격 연결(dblink), pgsql-http 확장(http_get·http_post·http_set_curlopt 등)
+        "pg_read_", "pg_ls_", "pg_file_", // 서버 파일 읽기·목록(pg_ls_dir·waldir·logdir·tmpdir·archive_statusdir 등)·쓰기(adminpack)
+    ];
+
+    /// <summary>거부 목록 함수의 규칙(없으면 null). 이름은 따옴표 없는 이름이면 소문자로 접은 것, 따옴표 이름이면 그대로다.</summary>
+    internal static string? DeniedFunctionRule(string name) =>
+        AdminFunctions.Contains(name) || AdminPrefixes.Any(p => name.StartsWith(p, StringComparison.Ordinal)) ? AnalysisRules.RejectAdminCommand
+        : ExternalFunctions.Contains(name) || ExternalPrefixes.Any(p => name.StartsWith(p, StringComparison.Ordinal)) ? AnalysisRules.RejectExternalRowset
+        : null;
     static readonly HashSet<string> SystemSchemas = new(StringComparer.Ordinal) { "pg_catalog", "information_schema", "pg_toast" };
 
     public AnalysisResult Analyze(string sql, BaselineContext baseline)
@@ -138,7 +158,7 @@ public sealed class PgBatchAnalyzer : IBatchAnalyzer
                 rejects.Add(Reject(index, span, AnalysisRules.RejectTargetNotUserTable, $"{display}는 감사 수집 대상이 아닙니다({reason ?? "NOT_COVERED"}). 파티션 테이블은 최소판에서 받지 않습니다."));
                 continue;
             }
-            if (DangerousCall(part, tokens) is { } call)
+            if (DangerousCall(part, tokens, schema is null ? targetAt : targetAt + 2) is { } call)
             {
                 rejects.Add(Reject(index, span, call.Rule, $"문장 안 함수 {call.Name}()은(는) 미리보기에서 쓸 수 없습니다."));
                 continue;
@@ -188,10 +208,12 @@ public sealed class PgBatchAnalyzer : IBatchAnalyzer
     /// 거부 목록 함수 호출(이름 바로 뒤 공백만 두고 여는 괄호)을 찾는다. 스키마 한정(pg_catalog.x, "pg_catalog"."x")은 마지막 이름을 본다.
     /// 2026-11-19: 따옴표 식별자("set_config")도 본다(전에는 건너뛰어 거부 목록 전체를 피할 수 있었다).
     /// </summary>
-    internal static (string Name, string Rule)? DangerousCall(PgStatementText st, IReadOnlyList<PgToken> tokens)
+    internal static (string Name, string Rule)? DangerousCall(PgStatementText st, IReadOnlyList<PgToken> tokens, int targetToken = -1)
     {
         for (var i = 0; i + 1 < tokens.Count; i++)
         {
+            // 대상 테이블 이름 뒤 괄호(INSERT INTO s.http_log (…)의 열 목록)는 함수 호출이 아니다. 대상은 카탈로그의 사용자 테이블로 이미 확인했다.
+            if (i == targetToken) continue;
             var t = tokens[i];
             var open = tokens[i + 1];
             if (open.Quoted || open.Text != "(" || (!t.Quoted && t.Text is "." or "(")) continue;
@@ -199,8 +221,7 @@ public sealed class PgBatchAnalyzer : IBatchAnalyzer
             if (!string.IsNullOrWhiteSpace(st.Cleaned[(t.End - st.Start)..(open.Start - st.Start)])) continue;
             // 따옴표 이름은 PostgreSQL에서 대소문자를 구분하므로 그대로 비교한다("SET_CONFIG"는 다른 함수). 따옴표 없는 이름은 소문자로 접는다.
             var name = t.Quoted ? t.Text : t.Text.ToLowerInvariant();
-            if (AdminFunctions.Contains(name)) return (name, AnalysisRules.RejectAdminCommand);
-            if (ExternalFunctions.Contains(name) || name.StartsWith("dblink", StringComparison.Ordinal)) return (name, AnalysisRules.RejectExternalRowset);
+            if (DeniedFunctionRule(name) is { } rule) return (name, rule);
         }
         return null;
     }

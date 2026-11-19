@@ -26,7 +26,8 @@ public static partial class PgTriggerAnalyzer
     private static partial Regex Raises();
 
     // 2026-11-19: 따옴표 이름("pg_notify"(…), "public"."dblink_exec"(…))도 잡는다. 전에는 \b…\s*\(라 따옴표가 끼면 놓쳤다.
-    [GeneratedRegex(@"(?<![\w$])""?(?<f>dblink\w*|pg_notify|lo_import|lo_export|pg_read_file|pg_read_binary_file|pg_file_write|http_\w+)""?\s*\(|\b(?<f>COPY)\b|\b(?<f>NOTIFY)\b", RegexOptions.IgnoreCase)]
+    // pgsql-http는 http_get 류와 단독 http(…) 둘 다(전에는 http_\w+라 http(를 놓쳤다).
+    [GeneratedRegex(@"(?<![\w$])""?(?<f>dblink\w*|pg_notify|lo_import|lo_export|pg_read_file|pg_read_binary_file|pg_file_write|http(?:_\w+)?)""?\s*\(|\b(?<f>COPY)\b|\b(?<f>NOTIFY)\b", RegexOptions.IgnoreCase)]
     private static partial Regex External();
 
     [GeneratedRegex(@"[Uu]&""")]

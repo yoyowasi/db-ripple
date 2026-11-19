@@ -37,8 +37,7 @@ public sealed class PgPreviewExecutor(PgOptions options) : IPreviewExecutor
         StatementStatus? failure = null;
         await using var tx = await conn.BeginTransactionAsync(ct);
         var sw = Stopwatch.StartNew();
-        // 감사 함수가 발동마다 상한을 보도록 상한을 "남은 FULL 예산" 트랜잭션 GUC로 둔다(2026-11-19, 감사 함수가 줄여 간다).
-        await using (var init = new NpgsqlCommand("SELECT set_config('dbr.image_mode', 'FULL', true), set_config('dbr.image_cap', $1, true)", conn, tx)
+        await using (var init = new NpgsqlCommand(BeginSql, conn, tx)
                      { Parameters = { new() { Value = cap.ToString(CultureInfo.InvariantCulture) } } })
             await init.ExecuteNonQueryAsync(ct);
         var boundary0 = await ScalarAsync(conn, tx, "SELECT coalesce(max(capture_seq), 0) FROM dbr_audit.header", ct);
@@ -145,6 +144,14 @@ public sealed class PgPreviewExecutor(PgOptions options) : IPreviewExecutor
             Timings = timings,
         };
     }
+
+    /// <summary>
+    /// 트랜잭션 시작 설정(도구가 실행, set_config(…, true) = SET LOCAL).
+    /// standard_conforming_strings = on: 문장 나누기(PgSqlLexer)는 일반 '…' 안의 백슬래시를 이스케이프로 보지 않으므로 서버도 같게 강제한다(2026-11-19).
+    /// dbr.image_mode·dbr.image_cap: 감사 함수가 발동마다 보는 모드와 "남은 FULL 예산"(감사 함수가 줄여 간다).
+    /// </summary>
+    internal const string BeginSql =
+        "SELECT set_config('standard_conforming_strings', 'on', true), set_config('dbr.image_mode', 'FULL', true), set_config('dbr.image_cap', $1, true)";
 
     internal static string SandboxConnectionString(PgOptions o, string database) =>
         new NpgsqlConnectionStringBuilder(o.ServerConnectionString) { Database = database, Pooling = false }.ConnectionString;

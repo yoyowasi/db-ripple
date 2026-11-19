@@ -11,7 +11,8 @@ namespace DbRipple.Postgres.Tests;
 public class PgPureTests
 {
     // s.parent(id) ← s.child(id, parent_id ON DELETE CASCADE) ← s.grandchild(id, child_id ON DELETE CASCADE), s.note(id, parent_id ON DELETE SET NULL), public.loose(a, b: 키 없음)
-    const int Parent = 100, Child = 101, Grand = 102, Note = 103, Loose = 104;
+    // public.http_log(id, http_status: 키 없음): 거부 목록 접두(http_)와 이름이 겹치는 사용자 테이블(2026-11-19).
+    const int Parent = 100, Child = 101, Grand = 102, Note = 103, Loose = 104, HttpLog = 105;
 
     static DbCatalog Catalog() => new(
         Tables:
@@ -21,6 +22,7 @@ public class PgPureTests
             new(Grand, "s", "grandchild", TemporalType.None, false, "app"),
             new(Note, "s", "note", TemporalType.None, false, "app"),
             new(Loose, "public", "loose", TemporalType.None, false, "app"),
+            new(HttpLog, "public", "http_log", TemporalType.None, false, "app"),
         ],
         Columns:
         [
@@ -29,6 +31,7 @@ public class PgPureTests
             Col(Grand, 1, "id"), Col(Grand, 2, "child_id"),
             Col(Note, 1, "id"), Col(Note, 2, "parent_id", nullable: true),
             Col(Loose, 1, "a", nullable: true), Col(Loose, 2, "b", nullable: true),
+            Col(HttpLog, 1, "id"), Col(HttpLog, 2, "http_status", nullable: true),
         ],
         KeyIndexes:
         [
@@ -200,6 +203,68 @@ public class PgPureTests
     {
         var r = Analyze(sql);
         Assert.True(r.IsAccepted, string.Join(" / ", r.Rejects.Select(d => d.RuleId + " " + d.Message)));
+    }
+
+    // 2026-11-19 보안 검토 보강(F1~F5): 전부터 거부 목록에 없던 함수. 항목마다 하나 이상, 거부 1건·규칙 ID를 단언.
+    [Theory]
+    // F1 문자열을 SQL로 실행(질의 안 함수는 분석기가 못 본다)
+    [InlineData("UPDATE s.parent SET name = (SELECT count(*) FROM ts_stat('SELECT to_tsvector(name) FROM s.parent'))::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = ts_rewrite('a'::tsquery, 'SELECT ''a''::tsquery, ''b''::tsquery')::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = table_to_xmlschema('s.parent', true, true, '')::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("INSERT INTO s.parent SELECT * FROM crosstab('SELECT 1, 2, 3') AS t(id int, name text)", "REJECT_ADMIN_COMMAND")]
+    [InlineData("INSERT INTO s.parent SELECT id, 'x' FROM connectby('s.child', 'id', 'parent_id', '1', 0) AS t(id int, p int, l int)", "REJECT_ADMIN_COMMAND")]
+    // F3 pgsql-http(외부 요청): 정확히 http와 접두 http_
+    [InlineData("UPDATE s.parent SET name = (http(NULL)).content WHERE id = 1", "REJECT_EXTERNAL_ROWSET")]
+    [InlineData("UPDATE s.parent SET name = (public.http_get('http://example.invalid/')).status::text WHERE id = 1", "REJECT_EXTERNAL_ROWSET")]
+    [InlineData("UPDATE s.parent SET name = http_set_curlopt('CURLOPT_TIMEOUT', '1')::text WHERE id = 1", "REJECT_EXTERNAL_ROWSET")]
+    // F4 서버 파일 정보(pg_ls_ 접두·pg_current_logfile: 기존 pg_ls_dir와 같은 외부 행 집합), 복제 슬롯·원점·WAL·통계 초기화(관리 명령)
+    [InlineData("INSERT INTO s.parent SELECT 1, name FROM pg_ls_waldir()", "REJECT_EXTERNAL_ROWSET")]
+    [InlineData("UPDATE s.parent SET name = pg_current_logfile() WHERE id = 1", "REJECT_EXTERNAL_ROWSET")]
+    [InlineData("UPDATE s.parent SET name = pg_file_unlink('x')::text WHERE id = 1", "REJECT_EXTERNAL_ROWSET")]
+    [InlineData("UPDATE s.parent SET name = (pg_create_logical_replication_slot('s', 'pgoutput')).slot_name WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_drop_replication_slot('s')::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = (pg_copy_logical_replication_slot('a', 'b')).slot_name WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = (pg_replication_slot_advance('s', '0/0')).slot_name WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_replication_origin_create('o')::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("INSERT INTO s.parent SELECT 1, data FROM pg_logical_slot_get_changes('s', NULL, NULL)", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_wal_replay_pause()::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_stat_reset()::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_log_backend_memory_contexts(1)::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    // F5 advisory lock 전부(해제·try·shared·xact 포함)
+    [InlineData("UPDATE s.parent SET name = pg_advisory_unlock_all()::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_advisory_unlock_shared(1)::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_try_advisory_lock(1)::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_try_advisory_xact_lock_shared(1)::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    // 5. pg_notify 함수와 NOTIFY·LISTEN 문장은 전부터 거부(확인)
+    [InlineData("UPDATE s.parent SET name = pg_notify('c', 'x')::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("NOTIFY c, 'x'", "REJECT_ADMIN_COMMAND")]
+    [InlineData("LISTEN c", "REJECT_ADMIN_COMMAND")]
+    public void Functions_added_to_the_deny_lists_after_the_security_review_are_rejected(string sql, string rule)
+    {
+        var r = Analyze(sql);
+        Assert.False(r.IsAccepted, sql);
+        Assert.Equal(rule, Assert.Single(r.Rejects).RuleId);
+    }
+
+    [Theory]
+    // 이름이 비슷해도 함수 호출이 아니면 받는다: http_·pg_ls_로 시작하는 열 SET, http_로 시작하는 사용자 테이블의 INSERT 열 목록, 문자열 안 이름.
+    [InlineData("UPDATE public.http_log SET http_status = 200 WHERE id = 1")]
+    [InlineData("INSERT INTO public.http_log (id, http_status) VALUES (1, 200)")]
+    [InlineData("INSERT INTO http_log(id, http_status) VALUES (1, 200)")]
+    [InlineData("UPDATE s.parent SET name = 'http_get(x) pg_ls_dir(y) ts_stat(z)' WHERE id = 1")]
+    [InlineData("DELETE FROM public.http_log WHERE http_status IN (500, 502)")]
+    public void Look_alike_names_that_are_not_calls_stay_accepted(string sql)
+    {
+        var r = Analyze(sql);
+        Assert.True(r.IsAccepted, string.Join(" / ", r.Rejects.Select(d => d.RuleId + " " + d.Message)));
+    }
+
+    [Fact]
+    public void Preview_transaction_forces_standard_conforming_strings_before_user_statements()
+    {
+        // F2: 렉서는 일반 '…'의 백슬래시를 이스케이프로 보지 않는다. 서버도 같게(SET LOCAL과 같음) 문장 실행 전에 강제한다.
+        Assert.Contains("set_config('standard_conforming_strings', 'on', true)", PgPreviewExecutor.BeginSql);
+        Assert.Contains("set_config('dbr.image_cap', $1, true)", PgPreviewExecutor.BeginSql);
     }
 
     [Fact]
@@ -519,11 +584,25 @@ public class PgPureTests
     [InlineData("BEGIN PERFORM \"pg_notify\"('c', 'x'); RETURN NULL; END", "pg_notify")]
     [InlineData("BEGIN PERFORM \"public\".\"dblink_exec\"('c', 'x'); RETURN NULL; END", "dblink_exec")]
     [InlineData("BEGIN PERFORM U&\"pg\\005fnotify\"('c', 'x'); RETURN NULL; END", "U&\"…\" 식별자(해석 안 함)")]
+    // F3: pgsql-http 단독 http(…)와 따옴표 http_post
+    [InlineData("BEGIN PERFORM http(('GET', 'http://example.invalid/', NULL, NULL, NULL)); RETURN NULL; END", "http")]
+    [InlineData("BEGIN PERFORM \"http_post\"('http://example.invalid/', 'b', 'text/plain'); RETURN NULL; END", "http_post")]
     public void Trigger_body_external_call_is_found_even_when_quoted(string body, string expected)
+    {
+        Assert.Contains(expected, TriggerExternal(body));
+    }
+
+    [Fact]
+    public void Trigger_body_column_named_like_an_external_function_is_not_an_effect()
+    {
+        Assert.Empty(TriggerExternal("BEGIN NEW.http_status := 200; NEW.pg_notify_at := now(); RETURN NEW; END"));
+    }
+
+    static IReadOnlyList<string> TriggerExternal(string body)
     {
         var pg = new PgCatalog(Catalog(), [new PgTable(Parent, "s", "parent", "app", 'r', false)],
             [new PgTrigger(900, "t_x", Parent, true, false, false, false, ["DELETE"], "", "s.f", "plpgsql", body)]);
-        Assert.Contains(expected, Assert.Single(PgTriggerAnalyzer.Analyze(pg)).ExternalSideEffects);
+        return Assert.Single(PgTriggerAnalyzer.Analyze(pg)).ExternalSideEffects;
     }
 
     [Fact]
