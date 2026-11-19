@@ -246,12 +246,18 @@ public sealed class PgSandboxManager(PgOptions options, TimeProvider clock) : IS
         await using var cmd = new NpgsqlCommand(sql, conn);
         await using var r = await cmd.ExecuteReaderAsync(ct);
         await r.ReadAsync(ct);
-        var major = r.GetInt32(1);
-        return new Fingerprint(r.GetString(0), "PostgreSQL", major, IsRecursiveTriggersOn: false, NestedTriggers: 1, DisallowResultsFromTriggers: 0, SessionOptions: 0, r.GetString(2))
+        return FingerprintOf(r.GetString(0), r.GetInt32(1), r.GetString(2));
+    }
+
+    /// <summary>
+    /// 지문 값(설계 결정 9). SQL Server 전용 항목은 PostgreSQL 동작에 맞춘 고정값이다.
+    /// PostgreSQL에는 RECURSIVE_TRIGGERS OFF가 없어 트리거가 자기 테이블을 고치면 그 트리거가 다시 돈다. false로 두면 원인 판정이 재귀 발동을 UNEXPLAINED로 남긴다(2026-11-19 통합 테스트).
+    /// </summary>
+    internal static Fingerprint FingerprintOf(string version, int major, string collation) =>
+        new(version, "PostgreSQL", major, IsRecursiveTriggersOn: true, NestedTriggers: 1, DisallowResultsFromTriggers: 0, SessionOptions: 0, collation)
         {
             MajorVersion = major,
         };
-    }
 
     static async Task<bool> DatabaseExistsAsync(NpgsqlConnection admin, string db, CancellationToken ct)
     {
