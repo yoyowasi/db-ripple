@@ -348,4 +348,27 @@ public partial class CollectorTests
         Diff(Assert.Single(other.RereadDifferences), "rc-101-1", ["amt"], false);
         Assert.Null(other.RowChanges.Single(x => x.FiringId == "f-102").After); // KEYS 행은 키만
     }
+
+    [Fact]
+    public void Keys_ancestor_of_full_siblings_still_uses_q14()
+    {
+        // 재귀 트리거 모양: 부모 P(103, d1, KEYS)가 T 키 1을 바꾸고, 그 아래 형제 S1(101)·S2(102)(d2, FULL)도 같은 키를 바꾼다(자식이 먼저 기록되고 예산이 다해 부모부터 KEYS).
+        // P는 S1·S2의 조상이라 그보다 먼저 실행됐으므로 마지막 값은 형제 after 가운데 하나다 → 건너뛰지 않고 Q14(대표 after를 재조회 값으로, 안 맞으면 OrderUndetermined)
+        RawBuilder Shape() => new RawBuilder()
+            .Firing(101, 1, ChangeOperation.Update, 2, deleted: ["{\"id\":1,\"code\":\"a\",\"v\":1,\"amt\":1,\"c\":10}"], inserted: ["{\"id\":1,\"code\":\"a\",\"v\":2,\"amt\":1,\"c\":20}"])
+            .Firing(102, 1, ChangeOperation.Update, 2, deleted: ["{\"id\":1,\"code\":\"a\",\"v\":2,\"amt\":1,\"c\":20}"], inserted: ["{\"id\":1,\"code\":\"a\",\"v\":3,\"amt\":1,\"c\":30}"])
+            .Firing(103, 1, ChangeOperation.Update, 1, deleted: ["{\"id\":1,\"code\":\"a\",\"v\":0,\"amt\":1,\"c\":0}"], inserted: ["{\"id\":1,\"code\":\"a\",\"v\":1,\"amt\":1,\"c\":10}"], keys: true)
+            .EndStatement(103);
+
+        var matched = Collect(Shape().Reread("dbo.T", "{\"id\":1}", "{\"id\":1,\"code\":\"a\",\"v\":3,\"amt\":1,\"c\":30}").Build());
+        Assert.Equal(["f-101:f-103", "f-102:f-103"], matched.ContextLinks.Select(l => l.ChildFiringId + ":" + Assert.Single(l.CandidateParentFiringIds)));
+        Assert.Empty(matched.RereadDifferences); // 모든 열이 S2 after와 맞음
+        Assert.Equal(FinalAfterSource.Reread, matched.RowChanges.Single(x => x.Id == "rc-102-1").FinalAfterSource); // 대표(전위 마지막 FULL)는 재조회 값
+        Assert.Equal(FinalAfterSource.Audit, matched.RowChanges.Single(x => x.Id == "rc-101-1").FinalAfterSource);
+        Assert.Null(matched.RowChanges.Single(x => x.Id == "rc-103-1").After); // KEYS 부모는 키만
+
+        var unmatched = Collect(Shape().Reread("dbo.T", "{\"id\":1}", "{\"id\":1,\"code\":\"a\",\"v\":4,\"amt\":1,\"c\":40}").Build());
+        Diff(Assert.Single(unmatched.RereadDifferences), "rc-102-1", ["v", "c"], true);
+        Assert.Equal(("4", FinalAfterSource.Reread), (unmatched.RowChanges.Single(x => x.Id == "rc-102-1").After!["v"], unmatched.RowChanges.Single(x => x.Id == "rc-102-1").FinalAfterSource));
+    }
 }
