@@ -1,0 +1,10 @@
+{
+  "observationsCurrent": true,
+  "policyMode": "restricted",
+  "policyState": "enforced",
+  "hosts": {
+    "mcr.microsoft.com": true,
+    "centralus.data.mcr.microsoft.com": true,
+    "westus.data.mcr.microsoft.com": false
+  }
+}
