@@ -64,7 +64,8 @@ const timings = computed(() => Object.entries(props.preview.timingsMs))
       <dt>행 이미지</dt>
       <dd>
         {{ formatCount(preview.capture.imageCount) }} / 상한 {{ formatCount(preview.capture.cap) }}
-        <span v-if="preview.capture.truncated" class="chip chip-warn">상한 초과</span>
+        <!-- 2026-11-19부터 트리거가 발동마다 상한을 지켜 이미지 수가 상한 이하라 '상한 초과'는 숫자와 어긋나 보였다 -->
+        <span v-if="preview.capture.truncated" class="chip chip-warn">키만 수집</span>
       </dd>
       <dt>매니페스트</dt>
       <dd>{{ preview.capture.manifestVersion }}</dd>
