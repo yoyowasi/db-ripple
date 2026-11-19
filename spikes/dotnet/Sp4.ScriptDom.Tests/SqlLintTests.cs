@@ -23,9 +23,9 @@ public class SqlLintTests
             if (!Directory.Exists(full)) continue;
             foreach (var f in Directory.EnumerateFiles(full, "*.sql", SearchOption.AllDirectories))
             {
-                // SP22는 PostgreSQL 스크립트이며 psql에서 검증한다.
+                // PostgreSQL 스크립트(파일 이름이 pg_로 시작하거나 _pg_를 포함, 예 sp22_10_pg_capture.sql)는 psql에서 검증한다.
                 var relative = Path.GetRelativePath(root!, f);
-                if (relative == Path.Combine("spikes", "sql", "sp22_10_pg_capture.sql")) continue;
+                if (IsPostgresScript(f)) continue;
                 using var r = new StringReader(SqlcmdToTsql(File.ReadAllText(f)));
                 new TSql170Parser(true).Parse(r, out var e);
                 foreach (var x in e)
@@ -33,6 +33,21 @@ public class SqlLintTests
             }
         }
         Assert.True(errors.Count == 0, string.Join("\n", errors));
+    }
+
+    static bool IsPostgresScript(string path)
+    {
+        var name = Path.GetFileName(path);
+        return name.StartsWith("pg_", StringComparison.OrdinalIgnoreCase) || name.Contains("_pg_", StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Postgres_scripts_are_recognized_by_name()
+    {
+        Assert.True(IsPostgresScript("spikes/sql/sp22_10_pg_capture.sql"));
+        Assert.True(IsPostgresScript("spikes/sql/pg_cascade_measure.sql"));
+        Assert.False(IsPostgresScript("spikes/sql/sp19_00_run.sql"));
+        Assert.False(IsPostgresScript("cascadelab/sql/cl21.sql"));
     }
 
     [Fact]
