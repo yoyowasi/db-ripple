@@ -322,4 +322,30 @@ public partial class CollectorTests
         var d = Assert.Single(unmatched.RereadDifferences);
         Diff(d, "rc-102-1", ["v", "c"], true);
     }
+
+    [Fact]
+    public void Full_and_keys_firings_mixed_in_one_statement()
+    {
+        // 2026-11-19 발동마다 상한: 한 문장 안에서 앞 묶음은 FULL, 뒤 묶음은 KEYS일 수 있다(전에는 문장 사이에서만 바뀜).
+        // 1) 순서를 정할 수 없는 형제(Q14 모양)에서 뒤 형제 102가 KEYS면 그 after를 모르므로 고치지도, 차이를 내지도 않는다.
+        var siblings = Collect(new RawBuilder()
+            .Firing(101, 1, ChangeOperation.Update, 2, deleted: ["{\"id\":1,\"code\":\"a\",\"v\":0,\"amt\":1,\"c\":0}"], inserted: ["{\"id\":1,\"code\":\"a\",\"v\":1,\"amt\":1,\"c\":10}"])
+            .Firing(102, 1, ChangeOperation.Update, 2, deleted: ["{\"id\":1,\"code\":\"a\",\"v\":1,\"amt\":1,\"c\":10}"], inserted: ["{\"id\":1,\"code\":\"a\",\"v\":2,\"amt\":1,\"c\":20}"], keys: true)
+            .Firing(103, 4, ChangeOperation.Update, 1, deleted: ["{\"id\":1}"], inserted: ["{\"id\":1}"], keys: true)
+            .EndStatement(103).Reread("dbo.T", "{\"id\":1}", "{\"id\":1,\"code\":\"a\",\"v\":2,\"amt\":1,\"c\":20}").Build());
+        Assert.Empty(siblings.RereadDifferences); // 예전 규칙대로면 101 after(v=1)와 달라 거짓 차이(v, c)
+        Assert.All(siblings.RowChanges, x => Assert.Equal(FinalAfterSource.Audit, x.FinalAfterSource));
+        Assert.Equal([ImageMode.Full, ImageMode.Keys, ImageMode.Keys], siblings.Firings.OrderBy(f => f.CaptureSeq).Select(f => f.ImageMode));
+        Assert.Equal(["{\"id\":1}"], siblings.RowChanges.Where(x => x.FiringId == "f-102").Select(x => "{\"id\":" + x.Key.Values[0] + "}"));
+
+        // 2) 순서를 정할 수 있는 사슬(CL08a 모양)에서 먼저 기록된 자식 101이 FULL, 부모 102가 KEYS면 전위 마지막(101)의 after로 비교한다.
+        RawBuilder Chain() => new RawBuilder()
+            .Firing(101, 1, ChangeOperation.Update, 2, deleted: ["{\"id\":1,\"code\":\"a\",\"v\":1,\"amt\":1,\"c\":10}"], inserted: ["{\"id\":1,\"code\":\"a\",\"v\":2,\"amt\":1,\"c\":20}"])
+            .Firing(102, 1, ChangeOperation.Update, 1, deleted: ["{\"id\":1,\"code\":\"a\",\"v\":0,\"amt\":1,\"c\":0}"], inserted: ["{\"id\":1,\"code\":\"a\",\"v\":1,\"amt\":1,\"c\":10}"], keys: true)
+            .EndStatement(102);
+        Assert.Empty(Collect(Chain().Reread("dbo.T", "{\"id\":1}", "{\"id\":1,\"code\":\"a\",\"v\":2,\"amt\":1,\"c\":20}").Build()).RereadDifferences);
+        var other = Collect(Chain().Reread("dbo.T", "{\"id\":1}", "{\"id\":1,\"code\":\"a\",\"v\":2,\"amt\":9,\"c\":20}").Build());
+        Diff(Assert.Single(other.RereadDifferences), "rc-101-1", ["amt"], false);
+        Assert.Null(other.RowChanges.Single(x => x.FiringId == "f-102").After); // KEYS 행은 키만
+    }
 }

@@ -30,7 +30,7 @@ public class AuditTriggerGeneratorTests
 
     static TSqlScript Parse(string sql)
     {
-        var parser = new TSql160Parser(initialQuotedIdentifiers: true);
+        var parser = new TSql170Parser(initialQuotedIdentifiers: true); // 분석기(SqlSyntax)와 같은 판
         var fragment = parser.Parse(new StringReader(sql), out var errors);
         Assert.True(errors.Count == 0, string.Join("\n", errors.Select(e => $"{e.Line}:{e.Column} {e.Message}")) + "\n" + sql);
         return (TSqlScript)fragment;
@@ -117,6 +117,48 @@ public class AuditTriggerGeneratorTests
         Assert.Contains("N'[Sales].[SalesOrderHeader]'", sql);
         Assert.Contains("1234", sql);
         Assert.DoesNotContain("JOIN", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Cap_is_checked_per_firing_before_header()
+    {
+        // 2026-11-19 발동마다 상한: AuditControl.cap = 남은 FULL 예산. 헤더보다 먼저 UPDATE 한 문장으로 모드를 정하고 예산을 줄인다(헤더 합을 세지 않음, O(1))
+        var plan = AuditTriggerGenerator.Generate([Orders(), Heap()], Now);
+        foreach (var (table, op) in new[] { ("Sales.SalesOrderHeader", "I"), ("Sales.SalesOrderHeader", "U"), ("Sales.SalesOrderHeader", "D"), ("dbo.Heap", "U") })
+        {
+            var sql = Trigger(plan, table, op);
+            var body = TriggerBody(sql);
+            var capIndex = body.ToList().FindIndex(s => s is IfStatement);
+            var headerIndex = body.ToList().FindIndex(s => s is InsertStatement && Text(sql, s).Contains("audit.AuditHeader"));
+            Assert.True(capIndex >= 0 && capIndex < headerIndex, sql);
+            Assert.Single(body, s => s is IfStatement);
+
+            var guard = (IfStatement)body[capIndex];
+            Assert.Equal("@dbr_mode = 'FULL' AND @dbr_n > 0", Text(sql, guard.Predicate)); // 0행 발동·KEYS는 제어 행을 건드리지 않음
+            Assert.Null(guard.ElseStatement);
+            var update = Assert.IsType<UpdateStatement>(guard.ThenStatement);
+            Assert.Equal("audit.AuditControl", Text(sql, update.UpdateSpecification.Target));
+            Assert.Equal("id = 1 AND mode = 'FULL'", Text(sql, update.UpdateSpecification.WhereClause.SearchCondition));
+            // SET 순서: 변수 → mode → cap. 같으면 FULL이고 예산을 n만큼 줄인다. 넘으면 KEYS, 예산은 그대로
+            Assert.Equal(
+                [
+                    "@dbr_mode = CASE WHEN @dbr_n > cap THEN 'KEYS' ELSE 'FULL' END",
+                    "mode = CASE WHEN @dbr_n > cap THEN 'KEYS' ELSE 'FULL' END",
+                    "cap = CASE WHEN @dbr_n > cap THEN cap ELSE cap - @dbr_n END",
+                ],
+                update.UpdateSpecification.SetClauses.Select(c => Text(sql, c)));
+            Assert.DoesNotContain("AuditHeader", Text(sql, guard)); // 헤더 합을 세지 않는다
+            Assert.DoesNotContain("SUM(", sql);
+
+            // 모드·행 수 변수는 판정 앞에서 정하고, 헤더는 판정한 모드와 같은 행 수를 쓴다
+            var before = string.Join("\n", body.Take(capIndex).Select(s => Text(sql, s)));
+            Assert.Contains("SELECT @dbr_mode = mode FROM audit.AuditControl WHERE id = 1;", before);
+            Assert.Contains("SET @dbr_ins = (SELECT COUNT_BIG(*) FROM inserted);", before);
+            Assert.Contains("SET @dbr_del = (SELECT COUNT_BIG(*) FROM deleted);", before);
+            Assert.Contains("SET @dbr_n = @dbr_ins + @dbr_del;", before);
+            Assert.EndsWith("@dbr_ins, @dbr_del, TRIGGER_NESTLEVEL(), @@TRANCOUNT, @dbr_mode", Text(sql, body[headerIndex]).TrimEnd(';'));
+            Assert.Contains("audit.AuditRowImage", Text(sql, body[^1])); // 마지막 문장은 그대로 이미지 INSERT(발동 행 수)
+        }
     }
 
     [Fact]

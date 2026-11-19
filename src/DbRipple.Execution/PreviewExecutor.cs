@@ -12,9 +12,10 @@ namespace DbRipple.Execution;
 /// connectionString은 서버 연결 문자열(InitialCatalog는 실행기가 baseline.SandboxDb로 바꾼다, 풀링 끔). 값을 로그·예외 메시지에 넣지 않는다.
 /// <para>
 /// 실행 봉투: 전용 연결(풀링 끔) → SET 옵션 고정(XACT_ABORT ON + SqlClient 기본값) → @@OPTIONS 점검 → 실행 사용자 멱등 준비(트랜잭션 밖, Q12)
-/// → T-SQL BEGIN TRAN → 제어 테이블 FULL·상한 → 경계 0 → 문장마다 [EXECUTE AS → 문장(별도 명령) → XACT_STATE·@@TRANCOUNT → (−1이면 ROLLBACK) → REVERT → 경계·이미지 수 → 상한이면 KEYS]
+/// → T-SQL BEGIN TRAN → 제어 테이블 FULL·상한 → 경계 0 → 문장마다 [EXECUTE AS → 문장(별도 명령) → XACT_STATE·@@TRANCOUNT → (−1이면 ROLLBACK) → REVERT → 경계·이미지 수·KEYS 헤더 수 → 상한 판정(CapAfterStatement)]
 /// → 헤더·이미지 읽기 → 재조회 → 최종 차이 → 평가 훅 → ROLLBACK → 확정된 감사 기록 확인(남았으면 SandboxDirty). 실패면 멈추고 롤백 뒤 전체 사용자 테이블을 스냅샷과 비교한다(ResidualCommitted).
 /// 문장마다 CURRENT_TRANSACTION_ID()를 BEGIN TRAN 직후 값과 비교해, 트리거의 "COMMIT; BEGIN TRAN;"으로 트랜잭션이 바뀌었으면 실패 경로로 보낸다(SandboxDirty).
+/// 상한(D8)은 2026-11-19부터 감사 트리거가 발동마다 지킨다(문장 안 전환). 실행기는 그 결과(KEYS 헤더)를 읽어 truncated로 두고, 옛 트리거면 문장 뒤에 바꾼다.
 /// </para>
 /// </summary>
 public sealed class PreviewExecutor(string connectionString, ExecutionSettings settings, INetDiffer netDiffer) : IPreviewExecutor
@@ -98,7 +99,7 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
             await ExecAsync(conn, "BEGIN TRAN;", ct);
             tranOpen = true;
             tranId = await ScalarAsync<long>(conn, "SELECT CURRENT_TRANSACTION_ID();", ct);
-            await ExecAsync(conn, "UPDATE audit.AuditControl SET mode = 'FULL', cap = @cap WHERE id = 1;", ct, ("@cap", cap));
+            await ExecAsync(conn, "UPDATE audit.AuditControl SET mode = 'FULL', cap = @cap WHERE id = 1;", ct, ("@cap", cap)); // cap = 이번 미리보기 FULL 예산(새 트리거가 발동마다 줄임)
             boundary0 = await ScalarAsync<long>(conn, Boundary0Sql, ct);
             var prev = boundary0;
 
@@ -176,13 +177,14 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
                     continue;
                 }
 
-                var (min, max, images) = await BoundaryAsync(conn, prev, ct);
+                var (min, max, images, keysHeaders) = await BoundaryAsync(conn, prev, ct);
                 imageCount += images;
                 var boundary = max ?? prev;
-                if (mode == ImageMode.Full && imageCount > cap)
+                var (nextMode, setKeys) = CapAfterStatement(mode, imageCount, cap, keysHeaders);
+                if (setKeys) await ExecAsync(conn, "UPDATE audit.AuditControl SET mode = 'KEYS' WHERE id = 1;", ct);
+                if (nextMode != mode)
                 {
-                    await ExecAsync(conn, "UPDATE audit.AuditControl SET mode = 'KEYS' WHERE id = 1;", ct);
-                    mode = ImageMode.Keys;
+                    mode = nextMode;
                     truncated = true;
                 }
                 executions.Add(new StatementExecution
@@ -408,18 +410,33 @@ public sealed class PreviewExecutor(string connectionString, ExecutionSettings s
         return (Convert.ToInt32(r.GetValue(0)), r.GetInt32(1), r.IsDBNull(2) ? null : Convert.ToInt64(r.GetValue(2)));
     }
 
-    static async Task<(long? Min, long? Max, long Images)> BoundaryAsync(SqlConnection conn, long prev, CancellationToken ct)
+    /// <summary>
+    /// 문장 뒤 상한 판정(순수, D8). 2026-11-19부터 감사 트리거가 발동마다 상한을 보고 문장 안에서 KEYS로 바꾸므로, 이 문장 범위에 KEYS 헤더가 있으면 KEYS(truncated)다.
+    /// 문장 뒤 누적 이미지 수 조건은 옛 트리거(문장 안 판정 없음)로 설치된 샌드박스 호환으로 남긴다. 그때만 실행기가 제어 테이블을 KEYS로 바꾼다(SetKeys).
+    /// 새 트리거에서는 FULL 이미지 수가 상한을 넘지 않으므로 이 조건은 걸리지 않는다.
+    /// cap은 요청 상한(실행기 지역 값)이다. AuditControl.cap은 새 트리거가 남은 FULL 예산으로 줄여 가므로 실행기는 읽지 않는다(시작 때 쓰기만).
+    /// </summary>
+    public static (ImageMode Mode, bool SetKeys) CapAfterStatement(ImageMode mode, long imageCount, long cap, long keysHeaders)
+    {
+        if (mode != ImageMode.Full) return (mode, false);
+        if (keysHeaders > 0) return (ImageMode.Keys, false);
+        return imageCount > cap ? (ImageMode.Keys, true) : (ImageMode.Full, false);
+    }
+
+    /// <summary>문장 범위(captureSeq &gt; prev)의 순번 최소·최대, rowJson 있는 이미지 수, KEYS 헤더 수.</summary>
+    static async Task<(long? Min, long? Max, long Images, long KeysHeaders)> BoundaryAsync(SqlConnection conn, long prev, CancellationToken ct)
     {
         const string sql = """
             SELECT MIN(captureSeq), MAX(captureSeq),
-                   (SELECT COUNT_BIG(*) FROM audit.AuditRowImage WHERE captureSeq > @prev AND rowJson IS NOT NULL)
+                   (SELECT COUNT_BIG(*) FROM audit.AuditRowImage WHERE captureSeq > @prev AND rowJson IS NOT NULL),
+                   (SELECT COUNT_BIG(*) FROM audit.AuditHeader WHERE captureSeq > @prev AND imageMode = 'KEYS')
             FROM audit.AuditHeader WHERE captureSeq > @prev;
             """;
         await using var cmd = new SqlCommand(sql, conn);
         cmd.Parameters.Add(new SqlParameter("@prev", System.Data.SqlDbType.BigInt) { Value = prev });
         await using var r = await cmd.ExecuteReaderAsync(ct);
         await r.ReadAsync(ct);
-        return (r.IsDBNull(0) ? null : r.GetInt64(0), r.IsDBNull(1) ? null : r.GetInt64(1), r.GetInt64(2));
+        return (r.IsDBNull(0) ? null : r.GetInt64(0), r.IsDBNull(1) ? null : r.GetInt64(1), r.GetInt64(2), r.GetInt64(3));
     }
 
     static async Task<IReadOnlyList<AuditHeaderRow>> ReadHeadersAsync(SqlConnection conn, long boundary0, CancellationToken ct)

@@ -165,6 +165,29 @@ public class AuditInstallIntegrationTests
             Assert.All(keys, i => { Assert.Null(i.Row); Assert.Equal("""{"Id":2}""", i.Key); });
             await RowCountAsync(c, tx, "UPDATE audit.AuditControl SET mode = 'FULL' WHERE id = 1;");
 
+            // 발동마다 상한(2026-11-19). AuditControl.cap은 남은 FULL 예산이고 FULL 발동마다 행 수만큼 준다.
+            await RowCountAsync(c, tx, "UPDATE audit.AuditControl SET cap = 10 WHERE id = 1;");
+            await RowCountAsync(c, tx, "INSERT INTO z.Child (Id, ZooId) VALUES (3, 2), (4, 2);");
+            Assert.Equal(("FULL", 8L), await ControlAsync(c, tx));
+            // 0행 발동은 예산이 0이어도 FULL이고 제어 행(모드·예산)을 바꾸지 않는다
+            await RowCountAsync(c, tx, "UPDATE audit.AuditControl SET cap = 0 WHERE id = 1;");
+            var b8 = await MaxSeqAsync(c, tx);
+            Assert.Equal(0, await RowCountAsync(c, tx, "UPDATE z.Heap SET a = a WHERE 1 = 0;"));
+            Assert.Equal("FULL", Assert.Single(await HeadersAsync(c, tx, b8)).Mode);
+            Assert.Equal(("FULL", 0L), await ControlAsync(c, tx));
+            // FK 연쇄 DELETE 한 문장: 자식 묶음이 먼저 기록되고(연쇄 반대 순서) 2 = 예산이라 FULL(예산 0), 부모 묶음은 1 > 0이라 KEYS(문장 안 전환, 예산 그대로)
+            await RowCountAsync(c, tx, "UPDATE audit.AuditControl SET cap = 2 WHERE id = 1;");
+            var b9 = await MaxSeqAsync(c, tx);
+            Assert.Equal(1, await RowCountAsync(c, tx, "DELETE FROM z.Zoo WHERE Id = 2;")); // 마지막 문장 행 수 그대로
+            Assert.Equal([("[z].[Child]", "D", 2L, "FULL"), ("[z].[Zoo]", "D", 1L, "KEYS")],
+                (await HeadersAsync(c, tx, b9)).Select(h => (h.Table, h.Op, h.Deleted, h.Mode)));
+            Assert.All(await ImagesAsync(c, tx, b9, "[z].[Child]", "D"), i => Assert.NotNull(i.Row));
+            var parent = Assert.Single(await ImagesAsync(c, tx, b9, "[z].[Zoo]", "D"));
+            Assert.Equal("""{"Id":2}""", parent.Key); // KEYS: keyJson 그대로, rowJson NULL
+            Assert.Null(parent.Row);
+            Assert.Equal(("KEYS", 0L), await ControlAsync(c, tx));
+            await RowCountAsync(c, tx, "UPDATE audit.AuditControl SET mode = 'FULL', cap = 100000 WHERE id = 1;");
+
             // 키 없는 테이블: keyJson NULL, 같은 행 2개도 2개 이미지
             var b5 = await MaxSeqAsync(c, tx);
             Assert.Equal(2, await RowCountAsync(c, tx, "INSERT INTO z.Heap (a, b) VALUES (1, N'x'), (1, N'x');"));
@@ -202,6 +225,12 @@ public class AuditInstallIntegrationTests
 
     static async Task<int> RowCountAsync(SqlConnection c, SqlTransaction tx, string dml) =>
         await TestSql.ScalarAsync<int>(c, dml + "\nSELECT @@ROWCOUNT;", tx);
+
+    static async Task<(string Mode, long Cap)> ControlAsync(SqlConnection c, SqlTransaction tx)
+    {
+        var r = Assert.Single(await TestSql.RowsAsync(c, "SELECT mode, cap FROM audit.AuditControl WHERE id = 1;", tx));
+        return ((string)r[0]!, (long)r[1]!);
+    }
 
     static Task<long> MaxSeqAsync(SqlConnection c, SqlTransaction tx) =>
         TestSql.ScalarAsync<long>(c, "SELECT ISNULL(MAX(captureSeq), 0) FROM audit.AuditHeader;", tx);

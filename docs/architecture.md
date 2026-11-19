@@ -256,7 +256,7 @@ flowchart LR
 | C7 | 카탈로그 | 다음을 읽어 기준선마다 캐시한다.<br/>• 테이블, 열·형식, PK·유일 인덱스, 데이터 파일 논리 이름<br/>• FK와 참조 동작(`is_disabled` 포함)<br/>• 트리거(이벤트, AFTER/INSTEAD OF, First/Last, 암호화 여부)<br/>• 트리거 본문 정적 분석(ScriptDom: 쓰기 대상, 동적 SQL, ROLLBACK, 외부 호출)<br/>• 비결정 열(IDENTITY, SEQUENCE 기본값, GETDATE·NEWID 기본값, rowversion, 계산 열) | `GetCatalog(db)` → `Catalog` |
 | C8 | 샌드박스 관리자 | 기준선을 만든다(§5.1: 기존 스냅샷 삭제 → 원본 COPY_ONLY 백업 → RESTORE WITH MOVE → 수집 장치 설치 → 파일별 경로를 지정한 기준 스냅샷). 새로 고침, 환경 지문 비교, 미리보기 1건 잠금, "오염" 표시와 재구축을 맡는다. | `BuildBaseline()`, `Refresh()`, `GetStatus()` → `SandboxStatus` |
 | C9 | 수집 장치 설치기 | 감사 저장소(헤더·행 이미지·제어 테이블, SEQUENCE, §6.2)를 만든다. 테이블·연산별 감사 트리거를 생성하고(형식 변환 규칙 포함) 각각 그 연산의 Last로 지정한다. 감사 저장소에는 IDENTITY 열을 두지 않는다. 수집 범위 매니페스트를 쓴다. | `Install(catalog)` → `CaptureManifest` |
-| C10 | 미리보기 실행기 | 실행 봉투(전용 연결, 풀링 끔, 고정 SET 옵션, 도구 소유 트랜잭션)를 연다. 문장마다 `EXECUTE AS USER` → 실행 → REVERT → 경계·이미지 수 읽기 → 상한 점검(제어 테이블 갱신)을 한다. 롤백 전에 수집 기록을 읽고, 수집된 키 가운데 INSERTED 이미지에 나온 키를 재조회하고(2026-11-18, §5.2 7), 최종 차이를 계산한다. 평가 모드에서는 ROLLBACK 직전에 평가 훅을 같은 연결로 부른다. BEGIN TRAN 직후 수집 순번 최댓값을 읽어 경계 0으로 둔다. 실패하면 전체 사용자 테이블을 대상으로 롤백 뒤 남은 변경을 검사한다. | `Execute(analysis)` → `RawCapture` |
+| C10 | 미리보기 실행기 | 실행 봉투(전용 연결, 풀링 끔, 고정 SET 옵션, 도구 소유 트랜잭션)를 연다. 문장마다 `EXECUTE AS USER` → 실행 → REVERT → 경계·이미지 수·KEYS 헤더 수 읽기 → 상한 판정을 한다(2026-11-19부터 KEYS 전환은 감사 트리거가 발동마다 하고, 실행기는 그 결과를 `truncated`로 반영한다. §5.2 5). 롤백 전에 수집 기록을 읽고, 수집된 키 가운데 INSERTED 이미지에 나온 키를 재조회하고(2026-11-18, §5.2 7), 최종 차이를 계산한다. 평가 모드에서는 ROLLBACK 직전에 평가 훅을 같은 연결로 부른다. BEGIN TRAN 직후 수집 순번 최댓값을 읽어 경계 0으로 둔다. 실패하면 전체 사용자 테이블을 대상으로 롤백 뒤 남은 변경을 검사한다. | `Execute(analysis)` → `RawCapture` |
 | C11 | 변경 수집기 | 헤더와 행 이미지로 변경 묶음을 구성하고, UPDATE 전후 행을 짝짓고, 바뀐 열을 계산하고, 비결정 열을 표시하고, 값을 정규화한다. 재조회 값을 반영한다(§7.2 6단계). | `Collect(raw)` → `Firing[]`, `RowChange[]` |
 | C12 | 최종 차이 계산기 | 스냅샷과 현재 DB의 테이블별 순 변경을 계산한다. PK로 조인하고, 힙은 다중집합으로 비교하고, 형식을 정규화한다. **열린 트랜잭션을 가진 연결을 받아 그 연결에서 계산한다**(미커밋 변경을 보기 위해). 제품 전용이며 평가 오라클과 코드를 공유하지 않는다. | `Diff(connection, liveDb, snapshotDb, tables)` → `NetChange[]` |
 | C13 | 원인 귀속·그래프 조립 | §7의 단계로 부모 찾기, 원인 종류·확신도 판정, 잔차 귀속을 하고 그래프 DTO를 만든다. | `Resolve(firings, net, catalog, manifest)` → `CausalModel`, `GraphDto` |
@@ -330,7 +330,7 @@ sequenceDiagram
   loop 문장마다
     PE->>SBX: EXECUTE AS USER, 문장 실행(별도 명령), REVERT
     SBX-->>PE: 영향 행 수, 오류
-    PE->>SBX: 수집 순번 최댓값·이미지 수 읽기, 상한이면 KEYS로 전환
+    PE->>SBX: 수집 순번 최댓값·이미지 수·KEYS 헤더 수 읽기(KEYS 전환은 감사 트리거가 발동마다)
   end
   PE->>SBX: 헤더·행 이미지 읽기, 수집된 키 재조회(INSERTED에 나온 키)
   PE->>ND: 같은 연결로 최종 차이(AW_Sandbox 대 AW_Sandbox_base)
@@ -358,6 +358,11 @@ sequenceDiagram
      마지막 결과 집합에서 반환값과 트랜잭션 수 변화(`dbr_dtc`)를, 그 앞 결과 집합 수에서 `resultSetCount`를 읽는다. `rowsAffected`는 늘 null이다(A9: EXECUTE는 이전 @@ROWCOUNT를 유지). 문장 뒤 `@@TRANCOUNT`·트랜잭션 ID·`dbr_dtc`·266으로 판정한다(`StatementRunner.ExecTransactionAnomaly`). 정상이 아니면 failed, `isToolFault = false`이고 문구는 사실만 적는다: "프로시저가 트랜잭션 수를 바꿈(ROLLBACK 또는 짝 없는 COMMIT): …", "…: 짝 없는 COMMIT(감싼 BEGIN TRAN만 닫혀 도구 트랜잭션은 확정되지 않음)" 등. 미리보기 실행기는 롤백 뒤 남은 변경이 없음을 확인했을 때만 "프로시저가 트랜잭션을 롤백함"으로 쓰고, 남은 변경이 있으면 "일부 변경이 확정됨"을 덧붙여 샌드박스를 다시 만든다. 266이 XACT_ABORT ON에서 일괄 처리를 끊는지, 감싼 겹의 `@@TRANCOUNT` 값은 SP11·SP13·SP14 뒤 재검토한다. 근거: `src/DbRipple.Analysis/ExecSqlBuilder.cs`, `src/DbRipple.Contracts/Analysis.cs`(`ProcedurePlan`), `src/DbRipple.Execution/StatementRunner.cs`, `PreviewExecutor.cs`.
 4. 문장 실행 중 오류가 나면 거기서 멈추고, 트랜잭션이 남아 있으면 ROLLBACK한다. 결과 상태는 `failed`다. 트리거가 거부한 경우(A22)는 `trigger_blocked`다. 두 경우 모두 롤백 뒤 같은 연결에서 전체 사용자 테이블(감사 스키마 제외)을 기준 스냅샷과 비교한다. 범위는 §5.3 `SNAPSHOT_NETDIFF`와 같다. 감사 기록이 함께 롤백되어 범위를 좁히는 데 쓸 수 없기 때문이다. 트랜잭션 밖에서 확정된 변경(예: 트리거 CATCH 블록이 쓴 오류 로그 행)이 나오면 "롤백 뒤 남은 변경"으로 결과에 보인다. 그 테이블의 감사 트리거도 자동 커밋으로 감사 행을 남기므로 샌드박스를 "오염"으로 표시한다. 이 변경은 [적용] 때 원본에도 똑같이 생길 수 있다.
 5. 수집 이미지 수가 상한을 넘으면 제어 테이블을 `KEYS`로 바꾼다. 그 뒤 묶음은 헤더와 키만 남긴다. 결과 상태는 `truncated`이고, 테이블별 정확한 건수는 최종 차이로 계산한다(D8).
+   - **2026-11-19 발동마다 상한:** 전에는 실행기가 문장이 끝난 뒤 이미지 수를 보고 다음 문장부터 KEYS로 바꿔서, 한 문장짜리 대량 변경(부모 N행 DELETE + FK 연쇄)은 `truncated`인데도 이미지가 모두 FULL로 쌓였다(SQL Server M5 CL20 5만 행: 상한 10만에 행 이미지 25만, [evaluation.md §6.2](evaluation.md#62-m5-응답-시간). PostgreSQL 10만 행: [보고서](test-reports/2026-11-19-ci-split-b1.md)). 이제 제어 테이블 `cap`은 이번 미리보기에서 남은 FULL 이미지 예산이다(실행기가 시작 때 요청 상한으로 둔다). 감사 트리거는 FULL이고 이번 발동 행 수 n(inserted + deleted) > 0일 때, n > 예산이면 이번 발동부터 KEYS로 쓰고 제어 테이블을 KEYS로 바꾸며, 아니면(같음 포함) FULL로 쓰고 예산을 n만큼 줄인다(0행 발동은 제어 행을 바꾸지 않음). 판정과 갱신은 `UPDATE audit.AuditControl` 한 문장이고(SET 목록 변수 → mode → cap, 각 식은 갱신 전 값만 참조), 헤더를 쓰기 전에 정해 헤더 `imageMode`에 실제 모드를 남긴다. 그래서 한 문장 안에서도 앞 묶음은 FULL, 뒤 묶음은 KEYS일 수 있다. FK 연쇄는 연쇄 반대 순서(자식 먼저)로 기록되므로 자식 묶음이 FULL, 부모 묶음이 KEYS가 되는 쪽이다(CL01 픽스처 순서).
+   - 실행기는 문장 뒤 경계 읽기에서 그 문장 범위에 KEYS 헤더가 있으면 KEYS·`truncated`로 둔다. `truncated`는 "상한 때문에 KEYS로 기록한 묶음이 하나라도 있음"이다. 문장 뒤 누적 이미지 수 조건은 옛 트리거로 설치된 샌드박스 호환으로 남겼다. 결과 JSON 모양은 그대로다.
+   - 헤더나 이미지 테이블을 세지 않아 발동마다 O(1)이다. 처음 안(FULL 헤더 합을 발동마다 세기)은 루프를 도는 프로시저 EXEC(한 행 UPDATE 10만 번)에서 발동 수 제곱 비용이라 버렸다(2026-11-19 오케스트레이터 결정). 예산은 미리보기 트랜잭션 안에서만 줄고 ROLLBACK으로 되돌아가며, 실행기의 `imageCount > cap` 비교는 요청 상한(지역 값)을 쓰므로 줄어든 `cap`을 읽지 않는다. 트리거의 제어 테이블 UPDATE는 기존 감사 INSERT와 같은 소유권 체인(dbo 소유 트리거 → dbo 소유 `audit`, SP10)으로 DML 전용 실행 사용자 문맥에서도 된다.
+   - 감사 저장소 테이블 구조는 바뀌지 않고 트리거 SQL만 바뀐다. **이미 만든 샌드박스는 새로 고침(기준선 재구축)하기 전까지 옛 트리거라 지금처럼 문장 사이에서만 바뀐다.**
+   - 근거: `src/DbRipple.Core/Capture/AuditTriggerGenerator.cs`(`AppendCapCheck`), `src/DbRipple.Execution/PreviewExecutor.cs`(`CapAfterStatement`, `BoundaryAsync`), `src/DbRipple.Execution/ChangeCollector.cs`(순서를 정할 수 없는 재조회에서 KEYS 행이 있으면 고치지 않음). DB 테스트(`AuditInstallIntegrationTests`, `CascadeLabTests.Cap_switches_to_keys_inside_one_cascade_statement`)는 CI에서 돈다.
 6. 롤백 전에 읽은 원자료만으로 결과를 만든다. 롤백한 뒤에는 샌드박스 상태를 다시 보지 않는다(4의 실패 검사는 예외).
 7. **재조회 범위(2026-11-18, 큰 DELETE 성능, D3 대조 1):** 후보는 전과 같이 FULL 묶음 행 이미지의 keyJson(키 있는 테이블, 테이블마다 중복 제거)이고, 그 가운데 같은 테이블의 INSERTED 이미지(FULL·KEYS 묶음 모두)에 나온 키만 읽는다. DELETE로만 나온 키(지운 행, PK를 바꾼 UPDATE의 옛 키)는 읽지 않고 그 개수를 `RawCapture.RereadSkippedKeys`(진단, 0이면 JSON에서 빠짐)에 남긴다. 남은 키의 재조회 SQL은 그대로다.
    - 근거: C11은 재조회 행을 (테이블, keyJson 서수 일치) 묶음에 대고, 그 묶음에 after가 있는 행 변경이 없으면 버린다(§7.2 6단계, `ChangeCollector.ApplyRereads`). after가 있는 행 변경의 묶음 키는 INSERTED 이미지의 keyJson이므로, 생략한 키의 재조회 값은 C11 출력(묶음·행 변경·before/after·재조회 차이)을 바꿀 수 없다. 감사 밖 경로로 다시 생긴 행은 전에도 재조회가 아니라 최종 차이(대조 2)의 잔차로 잡혔다. 재조회 행을 읽는 곳은 C11뿐이다(파이프라인은 시간만, 저장소·평가 하네스·API는 읽지 않는다).
@@ -499,11 +504,11 @@ sequenceDiagram
 | AuditRowImage | `captureSeq`, `imageKind`, `ordinal` | 헤더 순번, DELETED 또는 INSERTED, 묶음 안 일련번호(순서 의미 없음) |
 | | `keyJson` | 키 열 JSON. 키 없는 테이블(ROW)은 null |
 | | `rowJson` | 행 전체 JSON(§6.1). KEYS 모드에서는 null |
-| AuditControl | `mode`, `cap` | 1행. FULL 또는 KEYS, 이미지 상한. 실행기가 문장 사이에 같은 트랜잭션 안에서 갱신한다. |
+| AuditControl | `mode`, `cap` | 1행. FULL 또는 KEYS, `cap`은 남은 FULL 예산(트리거가 발동마다 줄임, 2026-11-19). 실행기가 BEGIN TRAN 직후 FULL·요청 상한으로 둔다. 감사 트리거가 FULL 발동마다 같은 트랜잭션 안에서 행 수만큼 `cap`을 줄이고, 행 수가 남은 예산보다 크면 그 발동부터 KEYS로 바꾼다(§5.2 5). 옛 트리거 샌드박스에서는 `cap`이 줄지 않고 실행기가 문장 사이에 KEYS로 바꾼다. |
 
 **저장 형식(v1.3, 2026-11-06 C9 첫판에서 고정):** 스키마 `audit`(소유자 dbo), 순번 `audit.CaptureSeq`(bigint SEQUENCE), `imageKind` 값은 `'DELETED'`·`'INSERTED'`, AuditRowImage 기본 키는 (`captureSeq`, `imageKind`, `ordinal`)이고 FK는 두지 않는다. AuditControl은 `id = 1` 한 행만 허용한다.
 
-**감사 트리거의 마지막 문장:** 마지막 INSERT는 발동 행 수와 같은 행 수를 남긴다. INSERT·UPDATE는 inserted 쪽, DELETE는 deleted 쪽 이미지가 마지막이다. KEYS 모드에서도 키 이미지로 같은 행 수를 남기고, 키 없는 테이블은 keyJson·rowJson이 모두 null인 행으로 남긴다. 상한 판정에 쓰는 이미지 수는 rowJson이 있는 행만 센다(UPDATE 한 행은 deleted·inserted로 2).
+**감사 트리거의 마지막 문장:** 마지막 INSERT는 발동 행 수와 같은 행 수를 남긴다. INSERT·UPDATE는 inserted 쪽, DELETE는 deleted 쪽 이미지가 마지막이다. KEYS 모드에서도 키 이미지로 같은 행 수를 남기고, 키 없는 테이블은 keyJson·rowJson이 모두 null인 행으로 남긴다. 상한 판정에 쓰는 이미지 수는 rowJson이 있는 행만 센다(UPDATE 한 행은 deleted·inserted로 2). **2026-11-19:** 트리거의 발동마다 판정은 발동 행 수 `insertedCount + deletedCount`를 남은 예산(`AuditControl.cap`)에서 뺀다(같은 셈법, rowJson 열이 없는 테이블의 FULL 묶음도 건수에 든다). 판정과 제어 테이블 UPDATE는 헤더 INSERT 앞이고 마지막 문장은 그대로 이미지 INSERT라, 문장 뒤 행 수는 바뀌지 않는다.
 
 **PreviewResult (최상위)**
 
@@ -1299,9 +1304,9 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 **세부**
 
 - 상한은 행 이미지 기본 100,000건이고 설정할 수 있다. 이미지 수는 §6.2의 셈법(UPDATE 한 행 = 2)을 따른다.
-- 실행기가 문장 경계마다 누적 이미지 수를 세고, 넘으면 같은 트랜잭션 안에서 제어 테이블을 `KEYS`로 바꾼다. 그 뒤 묶음은 헤더와 키만 남긴다. 이미 수집된 이미지는 "부분"으로 표시한다.
+- 실행기가 문장 경계마다 누적 이미지 수를 세고, 넘으면 같은 트랜잭션 안에서 제어 테이블을 `KEYS`로 바꾼다. 그 뒤 묶음은 헤더와 키만 남긴다. 이미 수집된 이미지는 "부분"으로 표시한다. **2026-11-19:** 전환은 감사 트리거가 발동마다 한다(§5.2 5). 실행기의 문장 사이 전환은 옛 트리거 샌드박스 호환으로만 남았다.
 - 키 없는 테이블은 KEYS 모드에서 keyJson·rowJson이 모두 null인 행을 발동 행 수만큼 남긴다(§6.2). 화면에는 건수만 보인다.
-- 한 문장이 혼자 상한을 크게 넘는 경우는 그 문장의 이미지가 모두 수집된 뒤에야 알 수 있다. 수집 비용은 M5로 재고, 필요하면 상한을 낮춘다.
+- ~~한 문장이 혼자 상한을 크게 넘는 경우는 그 문장의 이미지가 모두 수집된 뒤에야 알 수 있다.~~ 2026-11-19부터 한 문장 안에서도 상한을 넘는 발동부터 KEYS다(FULL 이미지 수 ≤ 상한). 남은 비용은 상한 이하 FULL 이미지·키 이미지 수집과 FULL 발동마다 제어 행 UPDATE 한 번(O(1))이다. 수집 비용은 M5로 재고, 필요하면 상한을 낮춘다.
 - 그래프는 발동 단위다. 노드가 200개를 넘으면 같은 테이블·연산·깊이를 `group`으로 접는다.
 - 그리드는 페이지 단위로 읽는다. 모든 결과에 단계별 시간을 기록한다(M5).
 - 응답 목표 초안은 1천 행 3초, 1만 행 10초 안이다(추정). M5로 보정한다.

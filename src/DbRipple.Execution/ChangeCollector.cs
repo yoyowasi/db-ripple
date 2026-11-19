@@ -21,7 +21,8 @@ namespace DbRipple.Execution;
 /// <item><b>최종 after</b>(§7.2 6단계 v1.3): 트리거 문맥 트리(ContextLinks 첫 후보)를 문장 순 → 묶음 전위 순(형제는 captureSeq 순)으로 훑어 그 행을 마지막으로 바꾼 묶음의 after를 재조회와 비교한다.
 /// 그 행의 마지막 문장 안 묶음들이 한 사슬(앞 묶음이 뒤 묶음의 조상, 경로의 링크가 모두 후보 1개)이 아니면 순서를 정할 수 없다(형제 순서 observed_only).</item>
 /// <item><b>Q14</b>: 순서를 정할 수 없으면 전위 순서상 마지막 행 변경(after가 있는 것)을 대표로 after를 재조회 값으로 바꾸고(REREAD), 어떤 묶음 after와도 값이 맞지 않는 열이 있을 때만
-/// RereadDifference(OrderUndetermined = true)를 낸다. 순서를 정할 수 있으면 다른 열이 있을 때만 낸다. 재조회 행이 없거나(그 뒤 삭제) 마지막 행 변경에 after가 없으면(DELETE, UNPAIRED 옛 키, KEYS) 고치지 않는다(최종 차이 잔차로 넘김).</item>
+/// RereadDifference(OrderUndetermined = true)를 낸다. 순서를 정할 수 있으면 다른 열이 있을 때만 낸다. 재조회 행이 없거나(그 뒤 삭제) 마지막 행 변경에 after가 없으면(DELETE, UNPAIRED 옛 키, KEYS) 고치지 않는다(최종 차이 잔차로 넘김).
+/// 순서를 정할 수 없는데 그 행에 KEYS 묶음 행이 있어도 고치지 않는다(2026-11-19: 상한이 발동마다라 한 문장 안에 FULL·KEYS가 섞인다).</item>
 /// </list>
 /// </summary>
 public sealed class ChangeCollector : IChangeCollector
@@ -495,6 +496,9 @@ public sealed class ChangeCollector : IChangeCollector
             }
             else
             {
+                // 2026-11-19 발동마다 상한: 한 문장 안에 FULL·KEYS 묶음이 섞일 수 있다. KEYS 행 after는 모르므로 순서를 정할 수 없으면 고치지 않는다
+                // (전에는 KEYS가 문장 사이에서만 시작돼 이런 묶음은 마지막 문장이 모두 KEYS였고, 대표가 없어 건너뛰었다. 같은 결과를 지킨다).
+                if (group.Any(x => x.Node.Firing.ImageMode == ImageMode.Keys)) continue;
                 var withAfter = group.Where(x => x.Row.Change.After is not null).ToList();
                 var rep = inLast.LastOrDefault(x => x.Row.Change.After is not null);
                 if (rep.Node is null) continue;
