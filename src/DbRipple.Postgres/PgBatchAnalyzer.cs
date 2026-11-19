@@ -20,8 +20,8 @@ public sealed class PgBatchAnalyzer : IBatchAnalyzer
     static readonly HashSet<string> Admin = new(StringComparer.Ordinal)
         { "VACUUM", "ANALYZE", "ANALYSE", "CHECKPOINT", "LOCK", "LISTEN", "NOTIFY", "UNLISTEN", "DISCARD", "LOAD", "REFRESH", "CLUSTER", "DEALLOCATE", "FETCH", "MOVE", "CLOSE", "DECLARE" };
 
-    // 문장 안 함수 호출 거부 목록(소문자, 정확한 이름). 미리보기 역할 전환(SET LOCAL ROLE)은 연결 계정과 상관없이
-    // set_config('role', 'none', …)로 되돌릴 수 있으므로 막는다(역할 경계는 이 목록에만 기댄다, 결정 3).
+    // 문장 안 함수 호출 거부 목록(소문자, 정확한 이름). 2026-11-19부터 역할 경계는 서버가 지킨다(문장은 미리보기 역할로 로그인한 연결에서 돌아
+    // set_config('role', 'none', …)이 연결 계정으로 돌아가지 않는다, 결정 3). 이 목록은 2차 방어이고, 롤백되지 않는 부작용(세션 종료·잠금·파일)을 막는다.
     // 2026-11-19 보안 검토 보강: 문자열을 SQL로 실행하는 ts_stat·ts_rewrite·connectby(tablefunc), 복제 슬롯 삭제, 서버 로그 기록.
     static readonly HashSet<string> AdminFunctions = new(StringComparer.Ordinal)
     {

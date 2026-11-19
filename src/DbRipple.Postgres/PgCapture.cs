@@ -92,8 +92,21 @@ public static class PgCapture
             SELECT s, 'DELETED', row_number() OVER (), dbr_audit.key_of(to_jsonb(x), TG_ARGV), CASE WHEN fm THEN dbr_audit.row_of(to_jsonb(x)) END FROM dbr_old x;
           RETURN NULL;
         END $f$;
-        {(previewRole is null ? "" : $"REVOKE ALL ON SCHEMA dbr_audit FROM {PgNames.Quote(previewRole)};")}
+        REVOKE EXECUTE ON FUNCTION dbr_audit.full_for(bigint), dbr_audit.full_mode() FROM PUBLIC;
+        {(previewRole is null ? "" : PreviewAuditGrants(previewRole))}
         """;
+
+    /// <summary>
+    /// 미리보기 역할의 감사 저장소 권한(2026-11-19 결정 3): 스키마 USAGE와 헤더·행 이미지 SELECT만. 쓰기(INSERT·UPDATE·DELETE·TRUNCATE)·시퀀스·meta 권한은 없다.
+    /// 실행기는 미리보기 역할 연결의 같은 트랜잭션에서 감사 행을 읽는다(SECURITY DEFINER 읽기 함수 대신). 막아야 할 것은 감사 위조·삭제(쓰기)이고,
+    /// 보이는 감사 행은 MVCC로 이번 트랜잭션 것뿐이다(미리보기는 늘 ROLLBACK, 구축은 감사 행을 커밋하지 않음).
+    /// key_of·row_of는 KEYS 재조회가 쓰므로 PUBLIC 기본 EXECUTE를 둔다. capture_* 트리거 함수는 트리거 밖에서 부를 수 없다.
+    /// </summary>
+    static string PreviewAuditGrants(string previewRole)
+    {
+        var r = PgNames.Quote(previewRole);
+        return $"GRANT USAGE ON SCHEMA dbr_audit TO {r};\nGRANT SELECT ON dbr_audit.header, dbr_audit.row_image TO {r};";
+    }
 
     /// <summary>설치 계획: 테이블별 트리거 SQL과 매니페스트(설계 결정 2).</summary>
     public static (IReadOnlyList<string> Statements, CaptureManifest Manifest) Plan(PgCatalog pg, DateTimeOffset at)
@@ -147,16 +160,18 @@ public static class PgCapture
     }
 
     /// <summary>
-    /// 미리보기 역할(비 superuser): 사용자 스키마·테이블·시퀀스에 DML 권한만 준다. 역할은 클러스터 전역이라 없을 때만 만든다.
-    /// 연결 사용자가 SET ROLE 할 수 있게 그 역할의 구성원으로 넣는다(superuser면 필요 없지만 해가 없다).
+    /// 미리보기 역할(2026-11-19 결정 3): LOGIN, 비 superuser, 비밀번호 없음(실행기가 연결마다 정했다가 지운다), 다른 역할의 구성원으로 넣지 않는다.
+    /// 역할은 클러스터 전역이라 없을 때만 만들고, 옛 구조(NOLOGIN)면 LOGIN으로 바꾼다. 샌드박스에만 CONNECT와 사용자 스키마·테이블·시퀀스 DML 권한을 준다(원본에는 아무것도 주지 않는다).
+    /// 예전처럼 연결 계정을 이 역할의 구성원으로 넣지 않는다(SET ROLE을 쓰지 않음). 안전한지는 이어서 PgPreviewLogin.RequireSafeAsync가 본다.
+    /// ALTER ROLE에 NOSUPERUSER를 쓰지 않는 것은 superuser가 아닌 계정은 그 속성을 적기만 해도 거절되기 때문이다.
     /// </summary>
-    public static IReadOnlyList<string> PreviewRoleSql(string role, IEnumerable<string> schemas)
+    public static IReadOnlyList<string> PreviewRoleSql(string role, string sandboxDb, IEnumerable<string> schemas)
     {
         var r = PgNames.Quote(role);
         var list = new List<string>
         {
-            $"DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = {PgNames.Literal(role)}) THEN CREATE ROLE {r} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE; END IF; END $$",
-            $"GRANT {r} TO CURRENT_USER",
+            $"DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = {PgNames.Literal(role)}) THEN CREATE ROLE {r} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE; ELSE ALTER ROLE {r} LOGIN PASSWORD NULL; END IF; END $$",
+            $"GRANT CONNECT ON DATABASE {PgNames.Quote(sandboxDb)} TO {r}",
         };
         foreach (var s in schemas.Distinct(StringComparer.Ordinal))
         {

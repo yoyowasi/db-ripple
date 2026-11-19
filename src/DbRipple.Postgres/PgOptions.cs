@@ -11,7 +11,11 @@ public sealed record PgOptions
     public required string OriginDb { get; init; }
     /// <summary>샌드박스 DB 이름(원본을 TEMPLATE으로 복제한다).</summary>
     public required string SandboxDb { get; init; }
-    /// <summary>사용자 문장을 실행할 역할(비 superuser, 사용자 테이블 DML 권한만). null이면 연결 사용자 그대로 실행한다.</summary>
+    /// <summary>
+    /// 사용자 문장을 실행할 LOGIN 역할(비 superuser, 다른 역할의 구성원 아님, 사용자 테이블 DML 권한만, 2026-11-19 결정 3).
+    /// 실행기는 이 역할로 직접 로그인하고 비밀번호는 연결마다 무작위로 정했다가 바로 지운다(PgPreviewLogin).
+    /// null이면 연결 계정 그대로 실행한다(권한 경계 없음, 테스트 전용).
+    /// </summary>
     public string? PreviewRole { get; init; } = "dbr_preview";
     /// <summary>문장별 명령 시간 제한(초).</summary>
     public int CommandTimeoutSeconds { get; init; } = 60;
@@ -27,6 +31,9 @@ public sealed record PgOptions
         if (string.Equals(OriginDb, SandboxDb, StringComparison.Ordinal))
             throw new InvalidOperationException("원본과 샌드박스 DB 이름이 같습니다.");
     }
+
+    /// <summary>연결 계정의 관리용 DB 연결(풀링 끔). 기준선 구축과 미리보기 역할 비밀번호 설정에 쓴다.</summary>
+    internal string AdminConnectionString() => new Npgsql.NpgsqlConnectionStringBuilder(ServerConnectionString) { Pooling = false }.ConnectionString;
 }
 
 /// <summary>PostgreSQL 식별자 도우미.</summary>

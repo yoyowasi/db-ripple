@@ -65,14 +65,30 @@ public sealed class PgIntegrationTests(ITestOutputHelper output)
         CREATE TRIGGER t_node_bump AFTER UPDATE ON s.node FOR EACH ROW EXECUTE FUNCTION s.bump();
         """;
 
-    // 미리보기 역할 경계(설계 결정 3): 열 기본값이 문장을 실행한 역할(current_user)과 연결 계정(session_user)을 남긴다.
-    // 실행기가 SET LOCAL ROLE을 빠뜨리면 who가 연결 계정이 된다. 다른 테스트의 기대 행 값이 바뀌지 않게 새로 고침 테스트에만 둔다.
+    // 미리보기 역할 경계(설계 결정 3, 2026-11-19): 열 기본값이 문장을 실행한 역할(current_user)과 로그인 역할(session_user)을 남긴다.
+    // 둘 다 미리보기 역할이어야 한다(연결 계정이 아니라 미리보기 역할로 로그인). 다른 테스트의 기대 행 값이 바뀌지 않게 새로 고침 테스트에만 둔다.
+    // s.escape_role(): 분석기가 보지 못하는 사용자 함수 본문에서 set_config('role', 'none', true)(= RESET ROLE)로 session user 권한으로 돌아간 뒤
+    // 연결 계정만 할 수 있는 일(감사 헤더 지우기, 연결 계정이 감사 표 소유자)을 해 본다. 결과는 "current_user audit_delete=결과"이고
+    // 결과는 성공이면 deleted, 실패면 SQLSTATE(42501 = 권한 없음)다. 옛 실행기(SET LOCAL ROLE)였다면 연결 계정·deleted가 된다.
     const string RoleProbe = """
         CREATE TABLE s.role_probe (id int PRIMARY KEY, who text DEFAULT current_user, sess text DEFAULT session_user);
+        CREATE FUNCTION s.escape_role() RETURNS text LANGUAGE plpgsql AS $$
+        DECLARE r text;
+        BEGIN
+          PERFORM set_config('role', 'none', true);
+          BEGIN
+            DELETE FROM dbr_audit.header;
+            r := 'deleted';
+          EXCEPTION WHEN OTHERS THEN
+            r := SQLSTATE;
+          END;
+          RETURN current_user || ' audit_delete=' || r;
+        END $$;
         """;
 
     /// <summary>
-    /// (a) 비 superuser 새로 고침: TEMPLATE 복제, 감사 설치, 소유 표시, 미리보기 역할, 문장이 미리보기 역할로 도는지(SET LOCAL ROLE),
+    /// (a) 비 superuser 새로 고침: TEMPLATE 복제, 감사 설치, 소유 표시, 미리보기 역할(LOGIN, 다른 역할의 구성원 아님, 감사 표는 읽기만, 원본 권한 없음),
+    /// 문장이 미리보기 역할로 로그인한 연결에서 도는지, 사용자 함수 안에서 역할을 되돌려도 연결 계정 권한을 얻지 못하는지(2026-11-19 결정 3),
     /// Host 재시작(meta 읽기), 두 번째 새로 고침(DROP … WITH (FORCE)).
     /// </summary>
     [PgFact]
@@ -102,20 +118,45 @@ public sealed class PgIntegrationTests(ITestOutputHelper output)
                 $"auditTriggers={await PgTestDb.CountAsync(conn, "SELECT count(*) FROM pg_trigger WHERE left(tgname, 14) = 'zzz_dbr_audit_'")}",
                 $"metaOwner={await PgTestDb.ScalarAsync(conn, "SELECT v FROM dbr_audit.meta WHERE k = 'owner'")}",
                 $"metaOrigin={await PgTestDb.ScalarAsync(conn, "SELECT v FROM dbr_audit.meta WHERE k = 'origin_db'")}",
+                $"metaRole={await PgTestDb.ScalarAsync(conn, "SELECT v FROM dbr_audit.meta WHERE k = 'preview_role'")}",
                 $"dbComment={await PgTestDb.ScalarAsync(conn, "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = current_database()")}",
                 $"roleSuper={await PgTestDb.ScalarAsync(conn, "SELECT rolsuper FROM pg_roles WHERE rolname = $1", env.Role)}",
-                $"roleMember={await PgTestDb.ScalarAsync(conn, "SELECT pg_has_role(current_user, $1, 'MEMBER')", env.Role)}",
+                $"roleLogin={await PgTestDb.ScalarAsync(conn, "SELECT rolcanlogin FROM pg_roles WHERE rolname = $1", env.Role)}",
+                // 미리보기 역할은 어떤 역할(미리 정의된 pg_* 포함)의 구성원도 아니다: SET ROLE로 연결 계정이 될 수 없다.
+                $"roleMemberOf={await PgTestDb.CountAsync(conn, "SELECT count(*) FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member WHERE r.rolname = $1", env.Role)}",
+                $"sandboxConnect={await PgTestDb.ScalarAsync(conn, "SELECT has_database_privilege($1, current_database(), 'CONNECT')", env.Role)}",
+                // 감사 표는 읽기만(쓰기·비우기 없음), 순번 시퀀스와 meta는 권한 없음.
+                $"auditRead={await PgTestDb.ScalarAsync(conn, "SELECT has_table_privilege($1, 'dbr_audit.header', 'SELECT') AND has_table_privilege($1, 'dbr_audit.row_image', 'SELECT')", env.Role)}",
+                $"auditWrite={await PgTestDb.ScalarAsync(conn, "SELECT has_table_privilege($1, 'dbr_audit.header', 'INSERT, UPDATE, DELETE, TRUNCATE') OR has_table_privilege($1, 'dbr_audit.row_image', 'INSERT, UPDATE, DELETE, TRUNCATE') OR has_table_privilege($1, 'dbr_audit.meta', 'SELECT, INSERT, UPDATE, DELETE') OR has_sequence_privilege($1, 'dbr_audit.capture_seq', 'USAGE, SELECT, UPDATE')", env.Role)}",
                 $"auditHeaders={await PgTestDb.CountAsync(conn, "SELECT count(*) FROM dbr_audit.header")}");
             // 감사 트리거 = 테이블 8 × (I·U·D) 3.
             PgAssert.Same(string.Join("\n",
-                "auditTriggers=24", "metaOwner=db-ripple", $"metaOrigin={env.Origin}", $"dbComment={PgSandboxManager.OwnerComment}",
-                "roleSuper=False", "roleMember=True", "auditHeaders=0"), facts, "샌드박스 안 감사 설치·소유 표시·미리보기 역할");
+                "auditTriggers=24", "metaOwner=db-ripple", $"metaOrigin={env.Origin}", $"metaRole=login:{env.Role}", $"dbComment={PgSandboxManager.OwnerComment}",
+                "roleSuper=False", "roleLogin=True", "roleMemberOf=0", "sandboxConnect=True", "auditRead=True", "auditWrite=False", "auditHeaders=0"),
+                facts, "샌드박스 안 감사 설치·소유 표시·미리보기 역할");
         }
+        // 원본에는 미리보기 역할 권한을 주지 않는다: 원본 DB·스키마·테이블 ACL에 그 역할 항목이 없다(CONNECT는 PUBLIC 기본값이라 원본을 바꾸지 않는 한 남는다).
+        const string originAclSql = """
+            WITH r AS (SELECT oid FROM pg_roles WHERE rolname = $1)
+            SELECT (SELECT count(*) FROM pg_class c CROSS JOIN LATERAL aclexplode(c.relacl) a WHERE a.grantee = (SELECT oid FROM r))
+                 + (SELECT count(*) FROM pg_namespace n CROSS JOIN LATERAL aclexplode(n.nspacl) a WHERE a.grantee = (SELECT oid FROM r))
+                 + (SELECT count(*) FROM pg_database d CROSS JOIN LATERAL aclexplode(d.datacl) a WHERE d.datname = current_database() AND a.grantee = (SELECT oid FROM r))
+            """;
+        await using (var conn = await PgTestDb.OpenAsync(env.Origin))
+            PgAssert.Same("originAcl=0", $"originAcl={await PgTestDb.CountAsync(conn, originAclSql, env.Role)}", "원본의 미리보기 역할 권한");
 
-        // 문장은 미리보기 역할로 돈다(SET LOCAL ROLE): 기본값 current_user = 미리보기 역할, session_user = 연결 계정.
-        var probe = await env.PreviewAsync(env.Pipeline(sbx), "INSERT INTO s.role_probe (id) VALUES (1)");
-        PgAssert.SameLines([$"s.role_probe Inserted x1 key(PK:id=1) before- after{{id=1,sess={PgTestDb.User},who={env.Role}}} changed[]"],
-            PgFormat.NetLines(probe.NetChanges), $"INSERT 미리보기의 실행 역할(기대 who = 미리보기 역할 {env.Role}, sess = 연결 계정 {PgTestDb.User})");
+        // 문장은 미리보기 역할로 로그인한 연결에서 돈다: 기본값 current_user·session_user 모두 미리보기 역할.
+        var pipeline = env.Pipeline(sbx);
+        var probe = await env.PreviewAsync(pipeline, "INSERT INTO s.role_probe (id) VALUES (1)");
+        PgAssert.SameLines([$"s.role_probe Inserted x1 key(PK:id=1) before- after{{id=1,sess={env.Role},who={env.Role}}} changed[]"],
+            PgFormat.NetLines(probe.NetChanges), $"INSERT 미리보기의 실행 역할(기대 who·sess = 미리보기 역할 {env.Role}, 연결 계정 {PgTestDb.User}이 아님)");
+
+        // 역할 경계는 서버가 지킨다: 사용자 함수 안 set_config('role', 'none', true) 뒤에도 미리보기 역할이고 감사 헤더를 지우지 못한다(42501).
+        // 분석기는 함수 본문을 보지 않으므로 이 문장을 받는다(분석기 거부 목록은 2차 방어).
+        var escape = await env.PreviewAsync(pipeline, "INSERT INTO s.role_probe (id, who) VALUES (2, s.escape_role())");
+        PgAssert.SameLines([$"s.role_probe Inserted x1 key(PK:id=2) before- after{{id=2,sess={env.Role},who={env.Role} audit_delete=42501}} changed[]"],
+            PgFormat.NetLines(escape.NetChanges), $"사용자 함수 안 역할 되돌리기 뒤 실행 역할·감사 삭제 결과(기대 {env.Role}·42501, 연결 계정 {PgTestDb.User}·deleted가 아님)");
+        PgAssert.Same("s.role_probe Insert d1 n1 Direct Certain parent=- []", PgFormat.Firings(escape.Result.Firings), "역할 되돌리기 미리보기의 감사 묶음(지워지지 않음)");
         await using (var conn = await PgTestDb.OpenAsync(env.Sandbox))
             PgAssert.Same("role_probe=0", $"role_probe={await PgTestDb.CountAsync(conn, "SELECT count(*) FROM s.role_probe")}", "역할 확인 미리보기 뒤 샌드박스(롤백)");
 
