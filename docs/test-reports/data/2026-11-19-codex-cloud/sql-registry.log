@@ -1,0 +1,33 @@
+mssql-manifest.json
+245f6b1c8903edae52cb20fa31419cefcde1a49938bb8c3447099011fc871ca3  mssql-manifest.json
+query= HTTP=200 HTTP=307 redirect=westus.data.mcr.microsoft.com
+query=?redirect=false HTTP=200 HTTP=307 redirect=westus.data.mcr.microsoft.com
+mssql-origin-manifest.json
+e10cd49443c94dbdcb7a050987db22ff4d8c87052ac53768abe1ed848d3fcef6  mssql-origin-manifest.json
+query= HTTP=200 HTTP=307 redirect=westus.data.mcr.microsoft.com
+query=?redirect=false HTTP=200 HTTP=307 redirect=westus.data.mcr.microsoft.com
+
+SQL Server 2025 config and layer GET
+sha256:f634a44c5d75eac1a13cc81a3dd9021b2c4517db552bac3eda7215bc9722f12b 200 200
+curl: (56) CONNECT tunnel failed, response 403
+GET 000
+sha256:901cdc4e17f138ba0a37f601f17d1b39cd76521be8f1f12604c9ade132f4ce2e 200 200
+curl: (56) CONNECT tunnel failed, response 403
+GET 000
+sha256:38f1ecc8aacee83d05a320f30984d9c2e7ee6b6f59d2fcd0e170795da1305a6b 200 200
+curl: (56) CONNECT tunnel failed, response 403
+GET 000
+sha256:0f034a9edca79b3da40c653dbbb5a211ccfd76cba1c4ed8da2a9114bd10206c1 200 200
+curl: (56) CONNECT tunnel failed, response 403
+GET 000
+
+Alternate Microsoft APT package downloads
+curl: (56) CONNECT tunnel failed, response 403
+HTTP 000
+curl: (56) CONNECT tunnel failed, response 403
+HTTP 000
+Docker Hub v2 401
+
+Central US CDN config request
+centralus config GET 403
+AuthenticationFailed

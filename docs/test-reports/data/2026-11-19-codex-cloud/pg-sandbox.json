@@ -1,0 +1,83 @@
+[
+  {
+    "parent_rows": 10000,
+    "status": {
+      "state": "ready",
+      "baselineAt": "2026-11-19T00:22:22.3427604+00:00",
+      "fingerprintMatch": true,
+      "locked": false,
+      "manifest": {
+        "coveredTables": 3,
+        "excludedTables": 0,
+        "auditNotLast": 0
+      },
+      "mode": "single_server",
+      "origin": {
+        "server": null,
+        "database": "cascade_10000",
+        "login": "postgres",
+        "isSysadmin": null
+      },
+      "fingerprintWarnings": [],
+      "fingerprintMismatches": [],
+      "baselineStale": false,
+      "originReachable": true,
+      "instanceWarnings": [],
+      "engine": "postgres"
+    }
+  },
+  {
+    "parent_rows": 50000,
+    "status": {
+      "state": "ready",
+      "baselineAt": "2026-11-19T00:22:49.6113529+00:00",
+      "fingerprintMatch": true,
+      "locked": false,
+      "manifest": {
+        "coveredTables": 3,
+        "excludedTables": 0,
+        "auditNotLast": 0
+      },
+      "mode": "single_server",
+      "origin": {
+        "server": null,
+        "database": "cascade_50000",
+        "login": "postgres",
+        "isSysadmin": null
+      },
+      "fingerprintWarnings": [],
+      "fingerprintMismatches": [],
+      "baselineStale": false,
+      "originReachable": true,
+      "instanceWarnings": [],
+      "engine": "postgres"
+    }
+  },
+  {
+    "parent_rows": 100000,
+    "status": {
+      "state": "ready",
+      "baselineAt": "2026-11-19T00:25:13.6781889+00:00",
+      "fingerprintMatch": true,
+      "locked": false,
+      "manifest": {
+        "coveredTables": 3,
+        "excludedTables": 0,
+        "auditNotLast": 0
+      },
+      "mode": "single_server",
+      "origin": {
+        "server": null,
+        "database": "cascade_100000",
+        "login": "postgres",
+        "isSysadmin": null
+      },
+      "fingerprintWarnings": [],
+      "fingerprintMismatches": [],
+      "baselineStale": false,
+      "originReachable": true,
+      "instanceWarnings": [],
+      "engine": "postgres"
+    }
+  }
+]

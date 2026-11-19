@@ -1,0 +1,18 @@
+ sql Pulling
+ 901cdc4e17f1 Pulling fs layer
+ 38f1ecc8aace Pulling fs layer
+ 0f034a9edca7 Pulling fs layer
+ 901cdc4e17f1 Retrying in 5 seconds
+ 38f1ecc8aace Downloading
+ 38f1ecc8aace Retrying in 5 seconds
+ 0f034a9edca7 Retrying in 5 seconds
+ 901cdc4e17f1 Retrying in 4 seconds
+ 38f1ecc8aace Retrying in 4 seconds
+ 0f034a9edca7 Retrying in 4 seconds
+ 901cdc4e17f1 Retrying in 3 seconds
+ 38f1ecc8aace Retrying in 3 seconds
+ 0f034a9edca7 Retrying in 3 seconds
+ 901cdc4e17f1 Retrying in 2 seconds
+ 38f1ecc8aace Retrying in 2 seconds
+ 0f034a9edca7 Retrying in 2 seconds
+error pulling image configuration: download failed after attempts=6: Forbidden

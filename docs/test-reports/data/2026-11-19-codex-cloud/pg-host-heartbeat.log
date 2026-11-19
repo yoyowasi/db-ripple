@@ -1,0 +1,2 @@
+55:      As of "11/19/2026 00:23:36 +00:00", the heartbeat has been running for "00:00:01.0274778" which is longer than "00:00:01". This could be caused by thread pool starvation.
+56-info: Microsoft.Hosting.Lifetime[0]

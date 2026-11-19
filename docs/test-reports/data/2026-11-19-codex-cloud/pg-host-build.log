@@ -1,0 +1,19 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  DbRipple.Core -> /workspace/db-ripple/src/DbRipple.Core/bin/Debug/net10.0/DbRipple.Core.dll
+  DbRipple.Contracts -> /workspace/db-ripple/src/DbRipple.Contracts/bin/Debug/net10.0/DbRipple.Contracts.dll
+  DbRipple.Api -> /workspace/db-ripple/src/DbRipple.Api/bin/Debug/net10.0/DbRipple.Api.dll
+  DbRipple.Preview -> /workspace/db-ripple/src/DbRipple.Preview/bin/Debug/net10.0/DbRipple.Preview.dll
+  DbRipple.Apply -> /workspace/db-ripple/src/DbRipple.Apply/bin/Debug/net10.0/DbRipple.Apply.dll
+  DbRipple.Attribution -> /workspace/db-ripple/src/DbRipple.Attribution/bin/Debug/net10.0/DbRipple.Attribution.dll
+  DbRipple.Postgres -> /workspace/db-ripple/src/DbRipple.Postgres/bin/Debug/net10.0/DbRipple.Postgres.dll
+  DbRipple.Diff -> /workspace/db-ripple/src/DbRipple.Diff/bin/Debug/net10.0/DbRipple.Diff.dll
+  DbRipple.Execution -> /workspace/db-ripple/src/DbRipple.Execution/bin/Debug/net10.0/DbRipple.Execution.dll
+  DbRipple.Analysis -> /workspace/db-ripple/src/DbRipple.Analysis/bin/Debug/net10.0/DbRipple.Analysis.dll
+  DbRipple.Host -> /workspace/db-ripple/src/DbRipple.Host/bin/Debug/net10.0/DbRipple.Host.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:07.85
