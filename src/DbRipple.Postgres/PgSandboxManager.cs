@@ -159,17 +159,22 @@ public sealed class PgSandboxManager(PgOptions options, TimeProvider clock) : IS
         await using (var tx = await conn.BeginTransactionAsync(ct))
         {
             if (Options.PreviewRole is { } role)
-                foreach (var sql in PgCapture.PreviewRoleSql(role, pg.Tables.Select(t => t.Schema)))
+            {
+                foreach (var sql in PgCapture.PreviewRoleSql(role, Options.SandboxDb, pg.Tables.Select(t => t.Schema)))
                     await Step(conn, sql, ct, tx);
+                // 남이 미리 만든 같은 이름의 역할이 다른 역할의 구성원이거나 특권 속성·소유 객체가 있으면 경계가 아니므로 구축을 실패로 끝낸다.
+                await PgPreviewLogin.RequireSafeAsync(conn, tx, role, ct);
+            }
             await Step(conn, PgCapture.StoreSql(Options.PreviewRole), ct, tx);
             foreach (var sql in statements) await Step(conn, sql, ct, tx);
             await using (var meta = new NpgsqlCommand(
-                "INSERT INTO dbr_audit.meta (k, v) VALUES ('owner', $1), ('baseline_at', $2), ('manifest', $3), ('origin_db', $4)", conn, tx))
+                "INSERT INTO dbr_audit.meta (k, v) VALUES ('owner', $1), ('baseline_at', $2), ('manifest', $3), ('origin_db', $4), ('preview_role', $5)", conn, tx))
             {
                 meta.Parameters.Add(new() { Value = OwnerMark });
                 meta.Parameters.Add(new() { Value = at.ToString("O") });
                 meta.Parameters.Add(new() { Value = JsonSerializer.Serialize(manifest, Json) });
                 meta.Parameters.Add(new() { Value = Options.OriginDb });
+                meta.Parameters.Add(new() { Value = PreviewRoleMark(Options.PreviewRole) });
                 await meta.ExecuteNonQueryAsync(ct);
             }
             await tx.CommitAsync(ct);
@@ -216,6 +221,8 @@ public sealed class PgSandboxManager(PgOptions options, TimeProvider clock) : IS
             throw new InvalidOperationException("샌드박스에 db-ripple 기준선 정보가 없습니다. 새로 고침으로 구축하세요.");
         if (meta.GetValueOrDefault("origin_db") != Options.OriginDb)
             throw new InvalidOperationException("샌드박스가 다른 원본 DB로 만들어졌습니다. 새로 고침으로 다시 구축하세요.");
+        if (meta.GetValueOrDefault("preview_role") != PreviewRoleMark(Options.PreviewRole))
+            throw new InvalidOperationException("샌드박스의 미리보기 역할 구성이 지금 설정과 다릅니다(2026-11-19 로그인 역할 분리 전에 만들었거나 Pg:PreviewRole이 바뀜). 새로 고침으로 다시 구축하세요.");
         var manifest = JsonSerializer.Deserialize<CaptureManifest>(manifestJson, Json) ?? throw new InvalidDataException("매니페스트를 읽을 수 없습니다");
         var pg = await PgCatalogReader.ReadAsync(conn, ct);
         return await ContextAsync(conn, pg, manifest, DateTimeOffset.Parse(atText, System.Globalization.CultureInfo.InvariantCulture), ct);
@@ -299,7 +306,13 @@ public sealed class PgSandboxManager(PgOptions options, TimeProvider clock) : IS
         return line.Length <= 120 ? line : line[..120];
     }
 
-    string Admin() => new NpgsqlConnectionStringBuilder(Options.ServerConnectionString) { Pooling = false }.ConnectionString;
+    string Admin() => Options.AdminConnectionString();
+
+    /// <summary>
+    /// meta 'preview_role' 값: 이 샌드박스를 어떤 미리보기 역할 구성으로 만들었는지. "login:역할"(2026-11-19 LOGIN 역할), 역할 없음은 "none".
+    /// 옛 샌드박스(NOLOGIN 역할 + SET ROLE)에는 이 키가 없어 다시 구축하게 한다(감사 표 SELECT 권한도 없다).
+    /// </summary>
+    internal static string PreviewRoleMark(string? role) => role is null ? "none" : "login:" + role;
 
     /// <summary>표시용 로그인 이름(비밀값 없음).</summary>
     public static string? LoginOf(string connectionString)

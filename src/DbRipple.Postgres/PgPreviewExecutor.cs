@@ -7,8 +7,9 @@ using Npgsql;
 namespace DbRipple.Postgres;
 
 /// <summary>
-/// PostgreSQL 미리보기 실행기(설계 결정 3·4). 전용 연결(풀링 끔)에서 BEGIN → 문장마다 SET LOCAL ROLE(미리보기 역할) → 실행 → RESET ROLE → 경계 읽기,
-/// 마지막에 감사 헤더·행 이미지를 읽고 최종 차이를 이미지로 계산한 뒤 ROLLBACK한다.
+/// PostgreSQL 미리보기 실행기(설계 결정 3·4). 미리보기 역할로 직접 로그인한 전용 연결(풀링 끔, PgPreviewLogin)에서 BEGIN → 문장 실행 → 경계 읽기,
+/// 마지막에 감사 헤더·행 이미지를 읽고 최종 차이를 이미지로 계산한 뒤 ROLLBACK한다. 감사 읽기도 같은 연결(감사 표 SELECT만 있음)에서 한다.
+/// 2026-11-19부터 SET LOCAL ROLE을 쓰지 않는다: session user가 미리보기 역할이라 문장 안에서 역할을 되돌려도 연결 계정 권한이 되지 않는다.
 /// 이미지 상한(2026-11-19): 시작 때 dbr.image_cap GUC(남은 FULL 예산)를 두면 감사 함수가 발동마다 예산을 줄이고, 모자라면 KEYS로 바꾼다(한 문장 안에서도).
 /// 실행기는 문장 뒤 그 범위에 KEYS 헤더가 있으면 truncated로 적는다(SwitchesToKeys).
 /// PostgreSQL 트리거 함수는 COMMIT할 수 없고 오류가 나면 트랜잭션 전체가 중단되므로, 실패하면 ROLLBACK만 하고 남은 변경 검사는 하지 않는다(시퀀스 값 소비는 남는다).
@@ -22,12 +23,7 @@ public sealed class PgPreviewExecutor(PgOptions options) : IPreviewExecutor
         var cap = previewOptions.ImageCap ?? PreviewOptions.DefaultImageCap;
         var tables = baseline.Catalog.ToCaptureInput().ToDictionary(t => t.ObjectId);
 
-        await using var conn = new NpgsqlConnection(SandboxConnectionString(options, options.SandboxDb));
-        try { await conn.OpenAsync(ct); }
-        catch (Exception ex) when (ex is NpgsqlException or System.Net.Sockets.SocketException)
-        {
-            throw new SandboxUnavailableException("샌드박스에 연결하지 못했습니다.", ex);
-        }
+        await using var conn = await PgPreviewLogin.OpenAsync(options, ct);
 
         var executions = new List<StatementExecution>();
         var timings = new ExecutionTimings();
@@ -54,10 +50,8 @@ public sealed class PgPreviewExecutor(PgOptions options) : IPreviewExecutor
             NpgsqlException? error = null;
             try
             {
-                if (options.PreviewRole is { } role) await ExecAsync(conn, tx, "SET LOCAL ROLE " + PgNames.Quote(role), ct);
                 await using var cmd = new NpgsqlCommand(st.Sql, conn, tx) { CommandTimeout = options.CommandTimeoutSeconds };
                 rows = await cmd.ExecuteNonQueryAsync(ct);
-                if (options.PreviewRole is not null) await ExecAsync(conn, tx, "RESET ROLE", ct);
             }
             catch (NpgsqlException ex) when (!ct.IsCancellationRequested)
             {
@@ -270,14 +264,14 @@ public sealed class PgPreviewExecutor(PgOptions options) : IPreviewExecutor
 
     /// <summary>
     /// 이미지 상한을 넘어 KEYS로 바뀐 테이블의 최종 차이: before는 트랜잭션 밖 새 연결(확정된 기준선 상태), after는 이 트랜잭션에서 읽는다.
+    /// before 연결도 미리보기 역할로 로그인한다(2026-11-19): 사용자 테이블을 읽는 SQL은 모두 미리보기 역할로 돌고, 미리보기 중 연결 계정은 역할 비밀번호만 다룬다.
     /// 키 있는 테이블은 감사에 나온 키만, 키 없는 테이블은 전체 행 다중집합을 비교한다(상한을 넘은 경우에만 가는 느린 길).
     /// </summary>
     async Task<IReadOnlyList<NetChange>> RereadNetAsync(
         NpgsqlConnection conn, NpgsqlTransaction tx, IReadOnlyList<TableInfo> tables, IReadOnlyList<AuditRowImageRow> images,
         IReadOnlyList<AuditHeaderRow> headers, CancellationToken ct)
     {
-        await using var before = new NpgsqlConnection(SandboxConnectionString(options, options.SandboxDb));
-        await before.OpenAsync(ct);
+        await using var before = await PgPreviewLogin.OpenAsync(options, ct);
         var result = new List<NetChange>();
         foreach (var t in tables)
         {

@@ -641,4 +641,77 @@ public class PgPureTests
         using var doc = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(bad, ContractJson.Options));
         Assert.Equal("x", doc.RootElement.GetProperty("lastError").GetString());
     }
+
+    // ---------------- 미리보기 역할 로그인(2026-11-19 결정 3) ----------------
+
+    [Fact]
+    public void Scram_verifier_matches_the_rfc_7677_example()
+    {
+        // RFC 7677 예제(비밀번호 pencil, salt W22ZaJ0SNY7soEsUEjb6gQ==, 4096회). 기대값은 파이썬 hashlib·hmac으로 따로 계산했고,
+        // 그 ServerKey로 만든 서버 서명이 RFC의 v=6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4=와 같음을 확인했다.
+        Assert.Equal(
+            "SCRAM-SHA-256$4096:W22ZaJ0SNY7soEsUEjb6gQ==$WG5d8oPm3OtcPnkdi4Uo7BkeZkBFzpcXkuLmtbsT4qY=:wfPLwcE6nTWhTAmQ7tl2KeoiWGPlZqQxSrmfPwDl2dU=",
+            PgPreviewLogin.ScramVerifier("pencil", Convert.FromBase64String("W22ZaJ0SNY7soEsUEjb6gQ=="), 4096));
+    }
+
+    [Fact]
+    public void Preview_role_must_be_a_login_role_that_is_not_a_member_of_any_role()
+    {
+        var safe = new PgPreviewLogin.RoleFacts(CanLogin: true, Super: false, CreateDb: false, CreateRole: false, Replication: false, BypassRls: false, MemberOf: 0, Owns: 0);
+        Assert.Empty(PgPreviewLogin.Problems(safe));
+        Assert.Equal(new[] { "역할이 없음" }, PgPreviewLogin.Problems(null));
+        Assert.Equal(new[] { "LOGIN이 아님(2026-11-19 이전 구조)" }, PgPreviewLogin.Problems(safe with { CanLogin = false }));
+        Assert.Equal(new[] { "다른 역할의 구성원(1)" }, PgPreviewLogin.Problems(safe with { MemberOf = 1 }));
+        Assert.Equal(new[] { "객체 소유(2)" }, PgPreviewLogin.Problems(safe with { Owns = 2 }));
+        Assert.Equal(new[] { "SUPERUSER", "CREATEDB", "CREATEROLE", "REPLICATION", "BYPASSRLS" },
+            PgPreviewLogin.Problems(safe with { Super = true, CreateDb = true, CreateRole = true, Replication = true, BypassRls = true }));
+        // 구성원·소유는 공유 카탈로그로 센다(미리 정의된 pg_* 역할 구성원도 포함, 어느 DB의 소유 객체든).
+        Assert.Contains("pg_auth_members m WHERE m.member = r.oid", PgPreviewLogin.RoleFactsSql);
+        Assert.Contains("d.deptype = 'o'", PgPreviewLogin.RoleFactsSql);
+    }
+
+    [Fact]
+    public void Preview_role_sql_makes_a_login_role_without_membership_and_grants_only_on_the_sandbox()
+    {
+        var sql = string.Join("\n", PgCapture.PreviewRoleSql("dbr_preview", "o_sbx", ["s", "s", "app"]));
+        Assert.Contains("CREATE ROLE \"dbr_preview\" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE;", sql);
+        Assert.Contains("ELSE ALTER ROLE \"dbr_preview\" LOGIN PASSWORD NULL;", sql); // 옛 NOLOGIN 역할을 바꾸고 남은 비밀번호를 지운다
+        Assert.DoesNotContain("NOLOGIN", sql);
+        Assert.DoesNotContain("PASSWORD '", sql);                                        // 비밀번호는 구축 때 두지 않는다
+        Assert.DoesNotContain("TO CURRENT_USER", sql);                                   // 연결 계정을 구성원으로 넣지 않는다(SET ROLE 안 씀)
+        Assert.Contains("GRANT CONNECT ON DATABASE \"o_sbx\" TO \"dbr_preview\"", sql);
+        Assert.Single(PgCapture.PreviewRoleSql("r", "o_sbx", ["s", "s"]), x => x.StartsWith("GRANT USAGE ON SCHEMA \"s\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Preview_role_reads_but_cannot_write_the_audit_store()
+    {
+        var sql = PgCapture.StoreSql("dbr_preview");
+        Assert.Contains("GRANT USAGE ON SCHEMA dbr_audit TO \"dbr_preview\";", sql);
+        Assert.Contains("GRANT SELECT ON dbr_audit.header, dbr_audit.row_image TO \"dbr_preview\";", sql);
+        Assert.Contains("REVOKE EXECUTE ON FUNCTION dbr_audit.full_for(bigint), dbr_audit.full_mode() FROM PUBLIC;", sql);
+        var grants = sql.Split('\n').Where(l => l.TrimStart().StartsWith("GRANT", StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, grants.Count);
+        Assert.DoesNotContain(grants, g => g.Contains("INSERT", StringComparison.Ordinal) || g.Contains("UPDATE", StringComparison.Ordinal)
+                                           || g.Contains("DELETE", StringComparison.Ordinal) || g.Contains("meta", StringComparison.Ordinal)
+                                           || g.Contains("SEQUENCE", StringComparison.Ordinal));
+        Assert.DoesNotContain("GRANT", PgCapture.StoreSql(null));
+    }
+
+    [Fact]
+    public void Preview_login_keeps_the_server_settings_and_replaces_only_user_password_and_database()
+    {
+        var o = new PgOptions
+        {
+            ServerConnectionString = "Host=db.local;Port=5433;Database=postgres;Username=admin;Password=admin-pw;SSL Mode=Require;Passfile=/x/.pgpass",
+            OriginDb = "o",
+            SandboxDb = "o_sbx",
+        };
+        var b = new Npgsql.NpgsqlConnectionStringBuilder(PgPreviewLogin.LoginConnectionString(o, "dbr_preview", "p1"));
+        Assert.Equal("db.local|5433|o_sbx|dbr_preview|p1|False|Require|-",
+            $"{b.Host}|{b.Port}|{b.Database}|{b.Username}|{b.Password}|{b.Pooling}|{b.SslMode}|{b.Passfile ?? "-"}");
+        // 새 구조 표시: 옛 샌드박스(키 없음)와 역할 설정이 바뀐 샌드박스는 다시 구축하게 한다.
+        Assert.Equal("login:dbr_preview", PgSandboxManager.PreviewRoleMark("dbr_preview"));
+        Assert.Equal("none", PgSandboxManager.PreviewRoleMark(null));
+    }
 }
