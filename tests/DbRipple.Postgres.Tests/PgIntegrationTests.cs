@@ -65,11 +65,20 @@ public sealed class PgIntegrationTests(ITestOutputHelper output)
         CREATE TRIGGER t_node_bump AFTER UPDATE ON s.node FOR EACH ROW EXECUTE FUNCTION s.bump();
         """;
 
-    /// <summary>(a) 비 superuser 새로 고침: TEMPLATE 복제, 감사 설치, 소유 표시, 미리보기 역할, Host 재시작(meta 읽기), 두 번째 새로 고침(DROP … WITH (FORCE)).</summary>
+    // 미리보기 역할 경계(설계 결정 3): 열 기본값이 문장을 실행한 역할(current_user)과 연결 계정(session_user)을 남긴다.
+    // 실행기가 SET LOCAL ROLE을 빠뜨리면 who가 연결 계정이 된다. 다른 테스트의 기대 행 값이 바뀌지 않게 새로 고침 테스트에만 둔다.
+    const string RoleProbe = """
+        CREATE TABLE s.role_probe (id int PRIMARY KEY, who text DEFAULT current_user, sess text DEFAULT session_user);
+        """;
+
+    /// <summary>
+    /// (a) 비 superuser 새로 고침: TEMPLATE 복제, 감사 설치, 소유 표시, 미리보기 역할, 문장이 미리보기 역할로 도는지(SET LOCAL ROLE),
+    /// Host 재시작(meta 읽기), 두 번째 새로 고침(DROP … WITH (FORCE)).
+    /// </summary>
     [PgFact]
-    public async Task Refresh_as_non_superuser_builds_a_ready_postgres_sandbox()
+    public async Task Refresh_as_non_superuser_builds_a_ready_sandbox_and_runs_statements_as_the_preview_role()
     {
-        await using var env = await PgEnv.CreateAsync("refresh", output, Sp22);
+        await using var env = await PgEnv.CreateAsync("refresh", output, Sp22, RoleProbe);
         var sbx = env.NewManager();
 
         // 아직 샌드박스가 없으면 error와 그 이유(LoadExisting 경로).
@@ -78,9 +87,9 @@ public sealed class PgIntegrationTests(ITestOutputHelper output)
             throw PgAssert.Fail($"새로 고침 전 상태 기대 Error(샌드박스 {env.Sandbox} 없음), 실제 {PgFormat.Status(missing)}");
 
         var st = await env.RefreshReadyAsync(sbx);
-        // 감사 대상 7개 = SP22 업무 테이블 수(클라우드 보고서 "감사 대상 7개").
+        // 감사 대상 8개 = SP22 업무 테이블 7개(클라우드 보고서 "감사 대상 7개") + 역할 확인용 s.role_probe.
         PgAssert.Same(
-            $"state=Ready engine=postgres covered=7 excluded=0 auditNotLast=0 fingerprintMatch=True locked=False lastError=- origin={env.Origin} login={PgTestDb.User}",
+            $"state=Ready engine=postgres covered=8 excluded=0 auditNotLast=0 fingerprintMatch=True locked=False lastError=- origin={env.Origin} login={PgTestDb.User}",
             PgFormat.Status(st), "새로 고침 뒤 상태");
         if (st.BaselineAt is null) throw PgAssert.Fail("새로 고침 뒤 BaselineAt이 null");
 
@@ -97,11 +106,18 @@ public sealed class PgIntegrationTests(ITestOutputHelper output)
                 $"roleSuper={await PgTestDb.ScalarAsync(conn, "SELECT rolsuper FROM pg_roles WHERE rolname = $1", env.Role)}",
                 $"roleMember={await PgTestDb.ScalarAsync(conn, "SELECT pg_has_role(current_user, $1, 'MEMBER')", env.Role)}",
                 $"auditHeaders={await PgTestDb.CountAsync(conn, "SELECT count(*) FROM dbr_audit.header")}");
-            // 감사 트리거 = 테이블 7 × (I·U·D) 3.
+            // 감사 트리거 = 테이블 8 × (I·U·D) 3.
             PgAssert.Same(string.Join("\n",
-                "auditTriggers=21", "metaOwner=db-ripple", $"metaOrigin={env.Origin}", $"dbComment={PgSandboxManager.OwnerComment}",
+                "auditTriggers=24", "metaOwner=db-ripple", $"metaOrigin={env.Origin}", $"dbComment={PgSandboxManager.OwnerComment}",
                 "roleSuper=False", "roleMember=True", "auditHeaders=0"), facts, "샌드박스 안 감사 설치·소유 표시·미리보기 역할");
         }
+
+        // 문장은 미리보기 역할로 돈다(SET LOCAL ROLE): 기본값 current_user = 미리보기 역할, session_user = 연결 계정.
+        var probe = await env.PreviewAsync(env.Pipeline(sbx), "INSERT INTO s.role_probe (id) VALUES (1)");
+        PgAssert.SameLines([$"s.role_probe Inserted x1 key(PK:id=1) before- after{{id=1,sess={PgTestDb.User},who={env.Role}}} changed[]"],
+            PgFormat.NetLines(probe.NetChanges), $"INSERT 미리보기의 실행 역할(기대 who = 미리보기 역할 {env.Role}, sess = 연결 계정 {PgTestDb.User})");
+        await using (var conn = await PgTestDb.OpenAsync(env.Sandbox))
+            PgAssert.Same("role_probe=0", $"role_probe={await PgTestDb.CountAsync(conn, "SELECT count(*) FROM s.role_probe")}", "역할 확인 미리보기 뒤 샌드박스(롤백)");
 
         // Host를 다시 켠 것과 같다: 새 관리자는 dbr_audit.meta에서 기준선을 읽는다.
         var reloaded = await env.NewManager().GetStatusAsync(CancellationToken.None);

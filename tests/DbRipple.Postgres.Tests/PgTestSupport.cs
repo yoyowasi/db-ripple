@@ -142,7 +142,8 @@ sealed class PgEnv : IAsyncDisposable
         }
     }
 
-    // 설계 결정 3의 권장 구성(비 superuser + CREATEDB·CREATEROLE)을 확인한다. superuser면 SET ROLE 경계를 시험하지 못한다.
+    // 연결 계정이 설계 결정 3의 권장 구성(비 superuser + CREATEDB·CREATEROLE)인지만 본다.
+    // 문장이 미리보기 역할로 도는지(SET LOCAL ROLE)는 새로 고침 테스트의 s.role_probe INSERT 미리보기가 확인한다.
     static async Task RequireNonSuperuserAsync(NpgsqlConnection admin, ITestOutputHelper output)
     {
         await using var cmd = new NpgsqlCommand(

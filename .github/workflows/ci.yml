@@ -215,7 +215,7 @@ jobs:
       postgres:
         image: postgres:${{ matrix.pg }}
         env:
-          # 컨테이너 기동에만 쓰는 임시 값. 첫 단계에서 실행마다 무작위 값으로 바꾸고 로그에서 가린다(저장소 secret 안 씀).
+          # 컨테이너 기동에만 쓰는 임시 값. 첫 단계(checkout 전)에서 실행마다 무작위 값으로 바꾸고 로그에서 가린다(저장소 secret 안 씀).
           POSTGRES_PASSWORD: bootstrap-only-rotated-in-first-step
         ports:
           - 5432/tcp
@@ -226,15 +226,7 @@ jobs:
           --health-timeout 5s
           --health-retries 24
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-      - uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config', '**/packages.lock.json', '**/Directory.Packages.props') }}
-          restore-keys: nuget-${{ runner.os }}-
+      # checkout·.NET 준비보다 먼저 바꿔 기동용 임시 비밀번호가 유효한 시간을 줄인다(docker·openssl·psql만 쓰고 저장소 파일은 필요 없음).
       - name: superuser 비밀번호 바꾸기·비 superuser 계정 만들기 (실행마다 무작위, 로그에서 가림)
         shell: bash
         env:
@@ -259,9 +251,18 @@ jobs:
             echo "SELECT rolname, rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = 'dbr_it';"
           } | psql -X -v ON_ERROR_STOP=1
           echo "DBRIPPLE_PG_TEST_CONNECTION=Host=127.0.0.1;Port=$PG_PORT;Database=postgres;Username=dbr_it;Password=$IT_PW;Timeout=30" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config', '**/packages.lock.json', '**/Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
       - name: 빌드 (경고를 오류로)
         run: dotnet build tests/DbRipple.Postgres.Tests -warnaserror
-      - name: PostgreSQL 통합 테스트 (전체 통과·미실행 0이어야 통과)
+      - name: PostgreSQL 통합 테스트 (전체 통과·건너뜀 0·통합 6건 이상 통과여야 통과)
         shell: pwsh
         run: |
           $out = Join-Path $env:RUNNER_TEMP 'pg-trx'
@@ -271,10 +272,42 @@ jobs:
           if (-not (Test-Path -LiteralPath $trx)) { "TRX 없음(종료 코드 $code)"; exit 1 }
           [xml]$x = Get-Content -LiteralPath $trx -Raw
           $c = $x.TestRun.ResultSummary.Counters
-          "PostgreSQL ${{ matrix.pg }} 테스트: 전체 $($c.total), 통과 $($c.passed), 실패 $($c.failed), 미실행 $($c.notExecuted)"
+          # xunit Skip은 notExecuted에 잡히지 않을 수 있어 건너뜀은 전체 − 통과 − 실패로 센다.
+          $skipped = [int]$c.total - [int]$c.passed - [int]$c.failed
+          $integration = @(@($x.TestRun.Results.UnitTestResult) | Where-Object { $_.testName -like '*PgIntegrationTests*' })
+          $integrationPassed = @($integration | Where-Object { $_.outcome -eq 'Passed' }).Count
+          "PostgreSQL ${{ matrix.pg }} 테스트: 전체 $($c.total), 통과 $($c.passed), 실패 $($c.failed), 건너뜀 $skipped, 미실행 $($c.notExecuted), PgIntegrationTests 통과 $integrationPassed/$($integration.Count)"
+          foreach ($r in $integration) { "  $($r.outcome) $($r.testName)" }
           if ($code -ne 0) { exit $code }
-          # 연결 변수가 빠지면 PgFact가 조용히 건너뛰므로, 건너뜀이 있으면 실패로 본다(의도적 Skip 없음).
-          if ([int]$c.notExecuted -ne 0 -or [int]$c.total -ne [int]$c.passed) { exit 1 }
+          # 연결 변수가 빠지면 PgFact가 조용히 건너뛰므로 건너뜀이 하나라도 있으면 실패다(의도적 Skip 없음).
+          if ([int]$c.total -le 0 -or $skipped -ne 0 -or [int]$c.notExecuted -ne 0 -or [int]$c.total -ne [int]$c.passed) { exit 1 }
+          # 통합 테스트가 이름으로 실제 통과했는지(PgFact 6건).
+          if ($integrationPassed -lt 6) { "PgIntegrationTests 통과 $integrationPassed건(기대 6건 이상)"; exit 1 }
+      - name: 테스트 DB·역할 정리 확인 (접두 dbr_it_가 0개여야 통과)
+        if: always()
+        shell: bash
+        env:
+          PG_PORT: ${{ job.services.postgres.ports['5432'] }}
+        run: |
+          set -euo pipefail
+          if [ ! -f "$RUNNER_TEMP/pg-secrets.env" ]; then echo "비밀번호 파일 없음(첫 단계 실패): 확인하지 않음"; exit 0; fi
+          . "$RUNNER_TEMP/pg-secrets.env"
+          export PGHOST=127.0.0.1 PGPORT="$PG_PORT" PGUSER=postgres PGDATABASE=postgres PGPASSWORD="$SU_PW" PGCONNECT_TIMEOUT=10
+          # superuser로 본다. 테스트 계정 dbr_it 자신은 접두 dbr_it_에 맞지 않는다(LIKE의 \_는 밑줄 그대로).
+          LEFTOVER="$(psql -X -At -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT 'database ' || datname FROM pg_database WHERE datname LIKE 'dbr\_it\_%'
+          UNION ALL
+          SELECT 'role ' || rolname FROM pg_roles WHERE rolname LIKE 'dbr\_it\_%'
+          ORDER BY 1;
+          SQL
+          )"
+          COUNT=0
+          [ -z "$LEFTOVER" ] || COUNT="$(printf '%s\n' "$LEFTOVER" | wc -l)"
+          echo "남은 테스트 DB·역할: $COUNT개"
+          if [ "$COUNT" -ne 0 ]; then
+            printf '%s\n' "$LEFTOVER"
+            exit 1
+          fi
       - name: 진단 자료 정리 (비밀번호가 들어간 파일은 올리지 않는다)
         if: always()
         shell: bash
