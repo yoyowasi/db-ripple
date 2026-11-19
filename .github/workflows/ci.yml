@@ -9,6 +9,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      eval_repeat:
+        # 2026-11-19: B1 포함 20회 같은 정식 평가를 CI에서 돌리려고 둔다(기준선 logs/eval/eval-20261112-143835도 20회). PR·push는 늘 3회.
+        description: "db 잡 home-test 기본 실행의 평가 반복 횟수(-EvalRepeat, 1~50)"
+        required: false
+        default: "3"
 
 permissions:
   contents: read
@@ -106,7 +112,8 @@ jobs:
   db:
     name: DB 테스트 (SQL Server 2025 CU10 컨테이너)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # 수동 실행은 평가 반복을 늘릴 수 있어 시간을 넉넉히 둔다.
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && 150 || 60 }}
     # PR·main 모두 기본 실행(Build·Tests·Eval·N1)과 EXEC 포함 실행(Eval·N1)을 돈다(2026-11-16 측정: 둘 합쳐 약 10분).
     steps:
       - uses: actions/checkout@v4
@@ -141,8 +148,13 @@ jobs:
         shell: pwsh
         env:
           DBRIPPLE_RUN_SP7: "1"
+          # 입력값은 스크립트에 직접 넣지 않고 환경 변수로 받아 숫자로 검사한다.
+          EVAL_REPEAT: ${{ inputs.eval_repeat || '3' }}
         run: |
-          ./scripts/home-test.ps1 -Date ci
+          $repeat = 0
+          if (-not [int]::TryParse($env:EVAL_REPEAT, [ref]$repeat) -or $repeat -lt 1 -or $repeat -gt 50) { "eval_repeat는 1~50 정수여야 함: '$env:EVAL_REPEAT'"; exit 1 }
+          "평가 반복: $repeat회"
+          ./scripts/home-test.ps1 -Date ci -EvalRepeat $repeat
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           # home-test는 WARN에도 0으로 끝난다. 기본 30사례 평가의 지표가 기준선과 달라지면 WARN이므로 여기서 막는다.
           $s = Get-Content -LiteralPath logs/home-test/ci/summary.json -Raw | ConvertFrom-Json
