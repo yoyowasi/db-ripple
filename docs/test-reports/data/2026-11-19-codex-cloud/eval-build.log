@@ -1,0 +1,18 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  DbRipple.Core -> /workspace/db-ripple/src/DbRipple.Core/bin/Release/net10.0/DbRipple.Core.dll
+  DbRipple.Contracts -> /workspace/db-ripple/src/DbRipple.Contracts/bin/Release/net10.0/DbRipple.Contracts.dll
+  DbRipple.Eval -> /workspace/db-ripple/eval/DbRipple.Eval/bin/Release/net10.0/DbRipple.Eval.dll
+  DbRipple.Execution -> /workspace/db-ripple/src/DbRipple.Execution/bin/Release/net10.0/DbRipple.Execution.dll
+  DbRipple.Analysis -> /workspace/db-ripple/src/DbRipple.Analysis/bin/Release/net10.0/DbRipple.Analysis.dll
+  DbRipple.Preview -> /workspace/db-ripple/src/DbRipple.Preview/bin/Release/net10.0/DbRipple.Preview.dll
+  DbRipple.Attribution -> /workspace/db-ripple/src/DbRipple.Attribution/bin/Release/net10.0/DbRipple.Attribution.dll
+  DbRipple.Diff -> /workspace/db-ripple/src/DbRipple.Diff/bin/Release/net10.0/DbRipple.Diff.dll
+  DbRipple.TestSupport -> /workspace/db-ripple/tests/DbRipple.TestSupport/bin/Release/net10.0/DbRipple.TestSupport.dll
+  DbRipple.Eval.Cli -> /workspace/db-ripple/eval/DbRipple.Eval.Cli/bin/Release/net10.0/DbRipple.Eval.Cli.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:41.48

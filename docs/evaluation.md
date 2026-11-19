@@ -362,8 +362,9 @@ PR #19 뒤 GitHub Actions에서 같은 M5 명령을 실행했다. CL20 DELETE 10
 | SP8 AW DM1·DM2·DM3 실제 전파 | **확인함(2026-11-12)**: DM1 주문 43697, DM2 상세 52, DM3 직원 1. DM2의 SalesYTD는 회계 기간 불일치로 늘 0행 | [spikes/SP8.md](spikes/SP8.md), `spikes/logs/sp8-*.log`(AW_Origin 읽기 전용) |
 | [적용] 검증 게이트(AW DM1~DM3, DM7) | **확인함(2026-11-12, 전용 원본 사본 `dbrt_e2e_origin`)**: DM1·DM2 `committed`(원본에서 실제 반영을 독립 SQL로 확인), DM3 `precondition_failed`(미리보기 `trigger_blocked`), DM7 `drift_detected`(원본 값 커밋 안 됨). CSRF 403, 동시 요청 409 LOCKED도 확인 | `logs/e2e/host-e2e-2026-11-12.log`, `logs/e2e/sql-*.log` |
 | 누적 구성(초기화 없이 연속 실행, IDENTITY 벌어짐) | 측정 전 | 설계 §10.3 "구성". 하네스 옵션 없음(방법 미정) |
-| 대조군 B1 20회 정식 실행 | 측정 전. 2026-11-16 로컬 3회 값만 있다(§6.1). 2026-11-17 클라우드 20회는 B1 없이(`preview,B0,B2`) 돌렸다 | `cascadelab --systems preview,B0,B1,B2 --repeat 20` |
-| Split 모드(원본 서버 → 내 PC 샌드박스)의 EXEC [적용] | 확인 전. CI는 한 서버 모드만 돈다 | [spikes/SP17.md](spikes/SP17.md) 순서 + EXEC 미리보기·[적용] |
+| 대조군 B1 20회 정식 실행 | 미실행. 2026-11-19 클라우드는 SQL Server 이미지 다운로드 단계에서 중단됐다. B1 로컬 3회는 §6.1에 있다. [클라우드 검증](test-reports/2026-11-19-codex-cloud.md#b-대조군-b1-포함-평가-20회) | `cascadelab --systems preview,B0,B1,B2 --repeat 20` |
+| Split 모드(원본 서버 → 내 PC 샌드박스)의 EXEC [적용] | 미실행. 2026-11-19 클라우드에서 두 SQL Server 이미지의 파일 리디렉션 호스트가 허용 목록에 없었다. [클라우드 검증](test-reports/2026-11-19-codex-cloud.md#a-split-모드-exec-적용) | [spikes/SP17.md](spikes/SP17.md) 순서 + EXEC 미리보기·[적용] |
+| PostgreSQL 18 FK 연쇄 DELETE 미리보기 | **측정함(2026-11-19 클라우드, DB·API)**. 부모 1만·5만·10만 행, 크기별 5회. 부모 10만 행 API p50 26.871초, 순 삭제 50만 행. [측정 보고서](test-reports/2026-11-19-codex-cloud.md#c-postgresql-18-fk-연쇄-delete) | `bash scripts/measure-pg-cascade.sh <새 로그 디렉터리>` |
 | CL21~CL25(EXEC·거부 사례) 평가 실행 | **실행함(2026-11-15 클라우드, 2026-11-16 CI·로컬)**: 37사례 × 3회, 제품·B0·B1·B2, 상태 불일치 0, certain 과신 0/171. 사례 집합이 기준선과 달라 위 지표와 직접 비교하지 않는다 | `.\scripts\home-test.ps1 -IncludeExec`, [test-reports/2026-11-15-cloud-db-validation.md](test-reports/2026-11-15-cloud-db-validation.md), [home-test-plan.md](home-test-plan.md) 5절 |
 | 2026-11-13에 더한 기능(도달 폐포 거부, EXEC 미리보기, KEYSET_HASH, Split)의 DB 확인 | **확인함(2026-11-16)**: 실제 SQL Server 테스트 1195개(CI), [적용] DB 테스트 106개(2026-11-17 EXEC [적용] 추가 뒤 153개, PR #11 CI 실행 44000072102의 Apply DB 테스트 단계), SP11~SP21 실행 | [home-test-plan.md](home-test-plan.md), [spikes/README.md](spikes/README.md) SP11~SP21 |
 

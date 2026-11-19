@@ -1,0 +1,39 @@
+2026-11-19T00:18:21Z
+Linux c53ced03531d 6.18.57 #1 SMP Tue Oct 20 21:56:04 UTC 2026 x86_64 GNU/Linux
+10.0.404
+PowerShell 7.5.5
+Docker version 29.9.2, build a82e528
+Docker server=29.9.2 storage=vfs root=/home/dockerd/.local/share/docker
+3
+               total        used        free      shared  buff/cache   available
+Mem:            9968         611        9486           0          50        9356
+Swap:              0           0           0
+Filesystem      Size  Used Avail Use% Mounted on
+overlay          63G  1.2M   60G   1% /
+tmpfs           4.9G     0  4.9G   0% /dev
+tmpfs           512M   72K  512M   1% /run
+tmpfs           1.0M  4.0K 1020K   1% /run/codex-runtime-secrets
+tmpfs            16M     0   16M   0% /run/lock
+tmpfs            64M     0   64M   0% /dev/tty
+tmpfs           4.9G     0  4.9G   0% /tmp/codex-daemon-1000
+tmpfs           4.9G     0  4.9G   0% /workspace/.git
+tmpfs           4.9G     0  4.9G   0% /workspace/.agents
+tmpfs           4.9G     0  4.9G   0% /workspace/.codex
+tmpfs           4.9G     0  4.9G   0% /workspace/.aws
+tmpfs           4.9G     0  4.9G   0% /tmp/.git
+tmpfs           4.9G     0  4.9G   0% /tmp/.agents
+tmpfs           4.9G     0  4.9G   0% /tmp/.codex
+tmpfs           4.9G     0  4.9G   0% /tmp/.aws
+/sys/fs/cgroup/cpu.max 200000 100000
+/sys/fs/cgroup/memory.max 8589934592
+f48207e0ec82a1ae8dcc0658dc7d142225fadfa6
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+NAME="Debian GNU/Linux"
+VERSION_ID="13"
+VERSION="13 (trixie)"
+VERSION_CODENAME=trixie
+DEBIAN_VERSION_FULL=13.6
+ID=debian
+HOME_URL="https://www.debian.org/"
+SUPPORT_URL="https://www.debian.org/support"
+BUG_REPORT_URL="https://bugs.debian.org/"

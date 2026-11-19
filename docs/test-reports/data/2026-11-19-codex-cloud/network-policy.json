@@ -1,0 +1,16 @@
+{
+  "phase": "running",
+  "connectivity": "connected",
+  "observationsCurrent": true,
+  "policyMode": "restricted",
+  "policyState": "enforced",
+  "additionalAllowedHosts": [
+    "api.github.com",
+    "centralus.data.mcr.microsoft.com"
+  ],
+  "sqlRedirectHostsAllowed": {
+    "centralus.data.mcr.microsoft.com": true,
+    "westus.data.mcr.microsoft.com": false,
+    "pmc-geofence.trafficmanager.net": false
+  }
+}
