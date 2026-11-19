@@ -2,13 +2,26 @@ name: Split EXEC 적용 확인
 
 # Split 모드(원본 sql-origin = SQL Server 2022, 샌드박스 sql = 2025 CU10)에서 저장 프로시저 호출 EXEC의 [적용]을
 # 컨테이너 두 대와 개발 모드 Host API로 끝까지 확인한다(scripts/split-exec-check.ps1, 시나리오 S0~S6, docs/spikes/SP17.md 순서).
-# ci.yml과 별개: 수동 실행과, 이 스크립트·워크플로가 바뀐 PR에서만 돈다.
+# ci.yml과 별개: 수동 실행과, 이 스크립트·워크플로·스크립트가 쓰는 파일·지키려는 제품 코드(EXEC [적용], Split 기준선, Host 설정)가 바뀐 PR에서만 돈다(약 2분).
 on:
   workflow_dispatch:
   pull_request:
     paths:
       - scripts/split-exec-check.ps1
       - .github/workflows/split-exec.yml
+      - spikes/sql/sp_container-run.ps1
+      - spikes/sql/sp17_10_create_limited_login.sql
+      - spikes/sql/sp17_20_origin_fingerprint.sql
+      - scripts/env.ps1
+      - scripts/db-up.ps1
+      - compose.yaml
+      - cascadelab/sql/**
+      - src/DbRipple.Apply/**
+      - src/DbRipple.Contracts/Apply.cs
+      - src/DbRipple.Api/DbRippleApi.cs
+      - src/DbRipple.Core/Baseline/**
+      - src/DbRipple.Preview/SandboxManager.cs
+      - src/DbRipple.Host/**
 
 permissions:
   contents: read
@@ -63,6 +76,7 @@ jobs:
           umask 022
           pwsh -NoProfile -File scripts/split-exec-check.ps1 -OutDir logs/home-test/split-exec
       - name: "진단 로그 정리 (비밀번호가 들어간 파일은 올리지 않는다)"
+        id: scrub
         if: always()
         shell: bash
         run: |
@@ -83,8 +97,9 @@ jobs:
               fi
             done
           fi
+      # 정리 단계가 끝까지 성공했을 때만 결과를 밖으로 낸다(실패했으면 비밀번호가 든 파일이 남았을 수 있다)
       - name: "요약을 실행 요약에 붙이기"
-        if: always()
+        if: always() && steps.scrub.outcome == 'success'
         shell: bash
         run: |
           if [ -f logs/home-test/split-exec/summary.md ]; then
@@ -93,7 +108,7 @@ jobs:
             echo "summary.md 없음(스크립트가 요약 전에 끝났거나, 비밀번호가 들어 있어 지웠음)" >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: "결과 올리기 (요약·API 응답·sqlcmd 로그·Host 로그)"
-        if: always()
+        if: always() && steps.scrub.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: split-exec-results

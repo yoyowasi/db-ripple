@@ -22,6 +22,9 @@
   -BaselineTimeoutSec 기준선 구축(POST /api/sandbox/refresh) 대기 상한(초).
 종료 코드: 0 모두 기대와 같음, 1 하나 이상 다르거나 실행 못 함, 2 준비 단계 실패(시나리오 미실행).
 주의: 원본 컨테이너의 CascadeLab을 지우고 다시 만든다(00-create-databases.sql). 원본 모사 컨테이너에서만 쓴다. 컨테이너는 끄지 않는다(CI 워크플로가 정리).
+      ORIGIN_SQL_SERVER가 127.0.0.1·localhost + 원본 포트(ORIGIN_HOST_PORT, 기본 14334)가 아니거나, 기준선 뒤 /api/sandbox의 origin.server가
+      sql-origin의 @@SERVERNAME과 다르면(또는 origin.login이 dbr_origin_user가 아니면) 시나리오 전에 중단한다(종료 코드 2).
+      끝에서 summary.md를 콘솔에도 찍는다(.env 비밀번호가 들어 있으면 찍지 않음).
 #>
 [CmdletBinding()]
 param(
@@ -116,7 +119,7 @@ function Invoke-ContainerSql {
 }
 
 function Get-Val($Lines, [string]$Kind) {
-    foreach ($l in $Lines) { if ($l -like "VAL|$Kind|*") { return $l.Substring(("VAL|$Kind|").Length) } }
+    foreach ($l in $Lines) { if ($l -clike "VAL|$Kind|*") { return $l.Substring(("VAL|$Kind|").Length) } }
     $null
 }
 
@@ -160,9 +163,9 @@ function Read-OriginState([string]$Tag) {
         Spare = [ordered]@{}; Def = [ordered]@{}; Perms = [System.Collections.Generic.List[string]]::new(); File = $r.Log
     }
     foreach ($line in $r.Lines) {
-        if ($line -notlike 'VAL|*') { continue }
+        if ($line -cnotlike 'VAL|*') { continue }
         $p = $line.Split('|')
-        switch ($p[1]) {
+        switch -CaseSensitive ($p[1]) {
             'Parent' { $s.Parent[$p[2]] = $p[3] }
             'Touch' { $s.Touch[$p[2]] = $p[3] }
             'Spare' { $s.Spare[$p[2]] = $p[3] }
@@ -187,7 +190,7 @@ function Format-State($S) {
 
 function Read-Fingerprint([string]$Tag) {
     $r = Invoke-ContainerSql -File $FingerprintSql -LogName "$Tag.log"
-    [pscustomobject]@{ Ok = ($r.Code -eq 0); Ddl = @($r.Lines | Where-Object { $_ -match '^ddl_' }); Log = $r.Log }
+    [pscustomobject]@{ Ok = ($r.Code -eq 0); Ddl = @($r.Lines | Where-Object { $_ -cmatch '^ddl_' }); Log = $r.Log }
 }
 
 # ---------- 시나리오 기록·단언 ----------
@@ -217,14 +220,14 @@ function Set-Origin($S, $Before, $After) {
 
 function Test-Unchanged($S, $Before, $After) {
     Test-That $S ($Before.Ok -and $After.Ok) '원본 값을 sa로 읽지 못함'
-    Test-That $S ((Format-State $Before) -eq (Format-State $After)) "원본 값이 바뀜: 전 [$(Format-State $Before)] 후 [$(Format-State $After)]"
+    Test-That $S ((Format-State $Before) -ceq (Format-State $After)) "원본 값이 바뀜: 전 [$(Format-State $Before)] 후 [$(Format-State $After)]"
 }
 
 function New-Preview($S, [string]$Tag) {
     $r = Invoke-Api -Method Post -Path '/api/previews' -Body @{ sql = $ExecSql } -SaveAs "$Tag-preview.json"
     $S.evidence.Add("$Tag-preview.json")
     $j = $r.Json
-    if ($r.Code -ne 200 -or $null -eq $j -or $j.status -ne 'ok' -or -not $j.previewId -or -not $j.sqlHash) {
+    if ($r.Code -ne 200 -or $null -eq $j -or $j.status -cne 'ok' -or -not $j.previewId -or -not $j.sqlHash) {
         $what = if ($r.Code -eq 200 -and $j) { "status $($j.status)" } elseif ($j) { "$($j.title) $($j.detail)" } else { $r.Content }
         $S.failures.Add("미리보기 실패(HTTP $($r.Code)): $what")
         return $null
@@ -256,18 +259,19 @@ function Invoke-Apply($S, $Preview, [bool]$AllowKeyset, [string]$Tag) {
     $r
 }
 
+# 계약 값(열거형 문자열)은 대소문자까지 같아야 한다
 function Test-Codes($S, [string[]]$Expected) {
-    $actual = @($S.preconditionFailures | Sort-Object -Unique) -join ','
-    $exp = @($Expected | Sort-Object -Unique) -join ','
-    Test-That $S ($actual -eq $exp) "preconditionFailures 기대 [$exp], 실제 [$($S.preconditionFailures -join ',')]"
+    $actual = @($S.preconditionFailures | Sort-Object -Unique -CaseSensitive) -join ','
+    $exp = @($Expected | Sort-Object -Unique -CaseSensitive) -join ','
+    Test-That $S ($actual -ceq $exp) "preconditionFailures 기대 [$exp], 실제 [$($S.preconditionFailures -join ',')]"
 }
 
 # precondition_failed 공통: HTTP 200(상태 5종 모두 200), 원본 로그인에 CREATE DATABASE가 없어 검증 모드는 KEYSET_HASH로 정해진 뒤 막힌다
 function Test-Precondition($S, [string[]]$Codes) {
     Test-That $S ($S.http -eq 200) "HTTP 기대 200, 실제 $($S.http)"
-    Test-That $S ($S.status -eq 'precondition_failed') "status 기대 precondition_failed, 실제 $($S.status)"
+    Test-That $S ($S.status -ceq 'precondition_failed') "status 기대 precondition_failed, 실제 $($S.status)"
     Test-Codes $S $Codes
-    Test-That $S ($S.verificationMode -eq 'KEYSET_HASH') "verification.mode 기대 KEYSET_HASH, 실제 $($S.verificationMode)"
+    Test-That $S ($S.verificationMode -ceq 'KEYSET_HASH') "verification.mode 기대 KEYSET_HASH, 실제 $($S.verificationMode)"
 }
 
 # ---------- Host ----------
@@ -322,14 +326,14 @@ function Invoke-Refresh([string]$Tag) {
             if ($g.Code -eq 200 -and $null -ne $g.Json) {
                 $status = $g.Json
                 $null = Write-Text "$Tag-sandbox.json" $g.Content
-                if ($status.state -ne 'building') { break }
+                if ($status.state -cne 'building') { break }
             }
             if ($script:HostProc.HasExited) { break }
         }
     }
     $sw.Stop()
     [pscustomobject]@{
-        Ok = ($null -ne $status -and $status.state -eq 'ready')
+        Ok = ($null -ne $status -and $status.state -ceq 'ready')
         Post = $post.Code
         State = $(if ($status) { [string]$status.state } else { $null })
         LastError = $(if ($status) { [string]$status.lastError } else { $null })
@@ -428,7 +432,13 @@ try {
     foreach ($k in @('MSSQL_SA_PASSWORD', 'ORIGIN_SQL_SERVER', 'ORIGIN_SQL_USER', 'ORIGIN_SQL_PASSWORD')) {
         if ([string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable($k))) { throw ".env에 $k 가 없음(값은 출력하지 않음)" }
     }
-    if ($env:ORIGIN_SQL_USER -ne 'dbr_origin_user') { throw "ORIGIN_SQL_USER는 dbr_origin_user여야 함(제한 로그인 시나리오). 지금: $($env:ORIGIN_SQL_USER)" }
+    if ($env:ORIGIN_SQL_USER -cne 'dbr_origin_user') { throw "ORIGIN_SQL_USER는 dbr_origin_user여야 함(제한 로그인 시나리오). 지금: $($env:ORIGIN_SQL_USER)" }
+    # Host의 원본 연결이 이 PC의 원본 모사 컨테이너(compose sql-origin 포트)를 가리켜야 한다. 다른 서버에 [적용]하지 않게 Host를 띄우기 전에 막는다.
+    $originPort = if ($env:ORIGIN_HOST_PORT) { $env:ORIGIN_HOST_PORT.Trim() } else { '14334' }
+    $om = [regex]::Match($env:ORIGIN_SQL_SERVER.Trim(), '^(127\.0\.0\.1|localhost),(\d+)$', [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    if (-not $om.Success -or $om.Groups[2].Value -cne $originPort) {
+        throw "ORIGIN_SQL_SERVER는 127.0.0.1 또는 localhost와 원본 컨테이너 포트($originPort, ORIGIN_HOST_PORT 또는 기본값)여야 함. 지금: $($env:ORIGIN_SQL_SERVER)"
+    }
     . (Join-Path $Root 'scripts/env.ps1') -Split
     $script:Envi['commit'] = $(if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { (Invoke-Native -Exe 'git' -ArgList @('rev-parse', 'HEAD')).Lines -join '' })
     $script:Envi['os'] = [Runtime.InteropServices.RuntimeInformation]::OSDescription
@@ -568,7 +578,14 @@ ORDER BY line;
         $script:BaselineInfo.origin = $st.origin
     }
     if (-not $b.Ok) { throw "기준선 구축 실패: refresh HTTP $($b.Post), state $($b.State), lastError $($b.LastError) ($($b.File), host.out.log, folders-after-baseline.log)" }
-    if ($st.mode -ne 'split') { throw "기준선 mode가 split이 아님: $($st.mode)" }
+    if ($st.mode -cne 'split') { throw "기준선 mode가 split이 아님: $($st.mode)" }
+    # Host가 붙은 원본이 이 컨테이너인지: /api/sandbox의 origin.server(원본 연결로 읽은 @@SERVERNAME)와 sa로 읽은 sql-origin의 @@SERVERNAME
+    $originName = [string]$script:Envi['originServer']
+    if ([string]::IsNullOrEmpty($originName)) { throw '원본 컨테이너의 @@SERVERNAME을 읽지 못함(setup-version-sql-origin.log)' }
+    $apiServer = if ($st.origin) { [string]$st.origin.server } else { '' }
+    if ($apiServer -cne $originName) { throw "Host 원본 서버가 원본 컨테이너가 아님: /api/sandbox origin.server '$apiServer', sql-origin @@SERVERNAME '$originName'" }
+    $apiLogin = if ($st.origin) { [string]$st.origin.login } else { '' }
+    if ($apiLogin -cne 'dbr_origin_user') { throw "Host 원본 로그인이 dbr_origin_user가 아님: /api/sandbox origin.login '$apiLogin'" }
     Write-Step "기준선 ready($($b.Seconds)초, fingerprintMatch $($st.fingerprintMatch))"
 
     # ---------- S0 시작 상태 ----------
@@ -577,7 +594,7 @@ ORDER BY line;
         $o = Read-OriginState 's0-origin'
         Set-Origin $s0 $o $o
         Test-That $s0 $o.Ok '원본 값을 sa로 읽지 못함'
-        Test-That $s0 ((Format-State $o) -eq $StartState) "시작 값이 다름: $(Format-State $o)"
+        Test-That $s0 ((Format-State $o) -ceq $StartState) "시작 값이 다름: $(Format-State $o)"
         Test-That $s0 ($o.Perms.Count -eq 0) "dbr_origin_user에 cl21 권한이 이미 있음: $($o.Perms -join ', ')"
         $s0.notes.Add("정의 해시(sa): $((@($o.Def.Keys) | ForEach-Object { "$_=$($o.Def[$_].Substring(0, [Math]::Min(12, $o.Def[$_].Length)))" }) -join ', ')")
     } catch { Add-Exception $s0 $_ }
@@ -622,7 +639,7 @@ GRANT EXECUTE ON OBJECT::cl21.usp_Inner TO dbr_origin_user;
         $s2.evidence.Add('s2-grant.log')
         if ($r.Code -ne 0) { throw 'GRANT EXECUTE 실패(s2-grant.log)' }
         $before = Read-OriginState 's2-origin-before'
-        Test-That $s2 (($before.Perms -contains 'EXECUTE cl21.usp_Outer') -and ($before.Perms -contains 'EXECUTE cl21.usp_Inner') -and -not ($before.Perms -match 'VIEW DEFINITION')) "준비 조건 다름: 권한 $($before.Perms -join ', ')"
+        Test-That $s2 (($before.Perms -ccontains 'EXECUTE cl21.usp_Outer') -and ($before.Perms -ccontains 'EXECUTE cl21.usp_Inner') -and -not ($before.Perms -cmatch 'VIEW DEFINITION')) "준비 조건 다름: 권한 $($before.Perms -join ', ')"
         $p = New-Preview $s2 's2'
         if ($p) {
             $null = Invoke-Apply $s2 $p $true 's2'
@@ -644,7 +661,7 @@ GRANT VIEW DEFINITION ON SCHEMA::cl21 TO dbr_origin_user;
         $s3.evidence.Add('s3-grant.log')
         if ($r.Code -ne 0) { throw 'GRANT VIEW DEFINITION 실패(s3-grant.log)' }
         $before = Read-OriginState 's3-origin-before'
-        Test-That $s3 ($before.Perms -contains 'VIEW DEFINITION SCHEMA::cl21') "준비 조건 다름: 권한 $($before.Perms -join ', ')"
+        Test-That $s3 ($before.Perms -ccontains 'VIEW DEFINITION SCHEMA::cl21') "준비 조건 다름: 권한 $($before.Perms -join ', ')"
         $p = New-Preview $s3 's3'
         if ($p) {
             $null = Invoke-Apply $s3 $p $false 's3'
@@ -660,6 +677,8 @@ GRANT VIEW DEFINITION ON SCHEMA::cl21 TO dbr_origin_user;
     try {
         Write-Step 'S4'
         $before = Read-OriginState 's4-origin-before'
+        # S2·S3의 권한이 남아 있어야 정의를 읽을 수 있고, 그래야 '못 읽음'이 아니라 '바뀜' 경로를 탄다
+        Test-That $s4 (($before.Perms -ccontains 'EXECUTE cl21.usp_Outer') -and ($before.Perms -ccontains 'EXECUTE cl21.usp_Inner') -and ($before.Perms -ccontains 'VIEW DEFINITION SCHEMA::cl21')) "준비 조건 다름: 권한 $($before.Perms -join ', ')"
         $p = New-Preview $s4 's4'
         if ($p) {
             # 정의를 sa로 읽어 CREATE를 ALTER로 바꾸고 맨 앞에 주석 한 줄을 더한다(본문 동작은 같게). 해시가 그대로면 실패로 본다.
@@ -684,6 +703,15 @@ IF HASHBYTES('SHA2_256', @now) = HASHBYTES('SHA2_256', @old) THROW 50003, N'cl21
             $after = Read-OriginState 's4-origin-after'
             Set-Origin $s4 $before $after
             Test-Precondition $s4 @('PROC_DEFINITION_CHANGED')
+            # 같은 코드가 '못 읽음'에도 나오므로 문구로 경로를 가린다(ApplySteps.cs OriginProcedures.Judge, ApplyService.cs CheckProceduresAsync).
+            # 끝의 마침표까지 보아 바뀐 프로시저가 usp_Outer 하나뿐인지도 본다.
+            $msg = [string]$s4.message
+            foreach ($t in @('기준선 이후 원본에서 프로시저 정의가 바뀜: cl21.usp_Outer.')) {
+                Test-That $s4 ($msg.IndexOf($t, [StringComparison]::Ordinal) -ge 0) "message에 '$t'가 없음"
+            }
+            foreach ($t in @('원본에서 프로시저 정의를 읽지 못해', '원본 프로시저 정보를 읽지 못함')) {
+                Test-That $s4 ($msg.IndexOf($t, [StringComparison]::Ordinal) -lt 0) "message가 '못 읽음' 경로임('$t')"
+            }
             Test-Unchanged $s4 $before $after
         }
     } catch { Add-Exception $s4 $_ }
@@ -712,8 +740,8 @@ IF HASHBYTES('SHA2_256', @now) = HASHBYTES('SHA2_256', @old) THROW 50003, N'cl21
             $after5 = Read-OriginState 's5-origin-after'
             Set-Origin $s5 $before $after5
             Test-That $s5 ($s5.http -eq 200) "HTTP 기대 200, 실제 $($s5.http)"
-            Test-That $s5 ($s5.status -eq 'committed') "status 기대 committed, 실제 $($s5.status)"
-            Test-That $s5 ($s5.verificationMode -eq 'KEYSET_HASH') "verification.mode 기대 KEYSET_HASH, 실제 $($s5.verificationMode)"
+            Test-That $s5 ($s5.status -ceq 'committed') "status 기대 committed, 실제 $($s5.status)"
+            Test-That $s5 ($s5.verificationMode -ceq 'KEYSET_HASH') "verification.mode 기대 KEYSET_HASH, 실제 $($s5.verificationMode)"
             Test-That $s5 (@($s5.mismatches).Count -eq 0) "mismatches 기대 [], 실제 $($s5.mismatches -join '; ')"
             Test-That $s5 (@($s5.preconditionFailures).Count -eq 0) "preconditionFailures 기대 [], 실제 $($s5.preconditionFailures -join ',')"
             $stmt = if ($r.Json) { @($r.Json.statements)[0] } else { $null }
@@ -725,16 +753,16 @@ IF HASHBYTES('SHA2_256', @now) = HASHBYTES('SHA2_256', @old) THROW 50003, N'cl21
                 $s5.notes.Add("limitations $(@($v.limitations).Count)건(s5-apply.json), sandboxRefreshStarted $($r.Json.sandboxRefreshStarted)")
             }
             Test-That $s5 $after5.Ok '원본 값을 sa로 읽지 못함'
-            Test-That $s5 ((Format-Map $after5.Parent) -eq '1=15,2=20') "Parent 기대 1=15,2=20, 실제 $(Format-Map $after5.Parent)"
-            Test-That $s5 ((Format-Map $after5.Touch) -eq '1=1,2=0') "Touch 기대 1=1,2=0, 실제 $(Format-Map $after5.Touch)"
-            Test-That $s5 ($after5.LogRows.Count -eq 1 -and $after5.LogRows[0] -like '*:outer') "Log 기대 'outer' 1행, 실제 $($after5.LogRows -join ',')"
-            Test-That $s5 ((Format-Map $after5.Spare) -eq '100=0') "Spare 기대 100=0, 실제 $(Format-Map $after5.Spare)"
+            Test-That $s5 ((Format-Map $after5.Parent) -ceq '1=15,2=20') "Parent 기대 1=15,2=20, 실제 $(Format-Map $after5.Parent)"
+            Test-That $s5 ((Format-Map $after5.Touch) -ceq '1=1,2=0') "Touch 기대 1=1,2=0, 실제 $(Format-Map $after5.Touch)"
+            Test-That $s5 ($after5.LogRows.Count -eq 1 -and $after5.LogRows[0] -clike '*:outer') "Log 기대 'outer' 1행, 실제 $($after5.LogRows -join ',')"
+            Test-That $s5 ((Format-Map $after5.Spare) -ceq '100=0') "Spare 기대 100=0, 실제 $(Format-Map $after5.Spare)"
         }
         $fpAfter = Read-Fingerprint 's5-fingerprint-after'
         $s5.evidence.Add($fpAfter.Log)
         Test-That $s5 ($fpBefore.Ok -and $fpAfter.Ok -and $fpBefore.Ddl.Count -gt 0) "원본 지문을 읽지 못함(전 $($fpBefore.Ddl.Count)줄, 후 $($fpAfter.Ddl.Count)줄)"
-        $onlyBefore = @($fpBefore.Ddl | Where-Object { $fpAfter.Ddl -notcontains $_ })
-        $onlyAfter = @($fpAfter.Ddl | Where-Object { $fpBefore.Ddl -notcontains $_ })
+        $onlyBefore = @($fpBefore.Ddl | Where-Object { $fpAfter.Ddl -cnotcontains $_ })
+        $onlyAfter = @($fpAfter.Ddl | Where-Object { $fpBefore.Ddl -cnotcontains $_ })
         Test-That $s5 ($onlyBefore.Count -eq 0 -and $onlyAfter.Count -eq 0) "원본 ddl_ 지문이 바뀜: 전 [$($onlyBefore -join ' / ')] 후 [$($onlyAfter -join ' / ')]"
         $s5.notes.Add("ddl_ 지문 $($fpBefore.Ddl.Count)줄 비교, 다른 줄 $($onlyBefore.Count + $onlyAfter.Count)개")
         $g = Invoke-Api -Method Get -Path '/api/sandbox' -SaveAs 's5-sandbox-after.json'
@@ -752,7 +780,7 @@ IF HASHBYTES('SHA2_256', @now) = HASHBYTES('SHA2_256', @old) THROW 50003, N'cl21
         Set-Origin $s6 $before $after
         Test-That $s6 ($s6.http -eq 404) "HTTP 기대 404, 실제 $($s6.http)$(if ($s6.status) { ", status $($s6.status)" })"
         Test-Unchanged $s6 $before $after
-        if ($after5) { Test-That $s6 ((Format-State $after) -eq (Format-State $after5)) "S5 직후 값과 다름: S5 후 [$(Format-State $after5)] 지금 [$(Format-State $after)]" }
+        if ($after5) { Test-That $s6 ((Format-State $after) -ceq (Format-State $after5)) "S5 직후 값과 다름: S5 후 [$(Format-State $after5)] 지금 [$(Format-State $after)]" }
     } catch { Add-Exception $s6 $_ }
 } catch {
     $script:SetupError = $_.Exception.Message
@@ -762,6 +790,22 @@ IF HASHBYTES('SHA2_256', @now) = HASHBYTES('SHA2_256', @old) THROW 50003, N'cl21
     try { Write-Summary } catch { Write-Warning "요약 쓰기 실패: $($_.Exception.Message)" }
 }
 
-$code = if ($script:SetupError -and $script:Scenarios.Count -eq 0) { 2 } elseif ($script:Overall -eq 'PASS') { 0 } else { 1 }
+# artifact를 받지 않고 잡 로그에서도 결과를 읽게 summary.md를 그대로 찍는다. .env의 두 비밀번호가 들어 있으면 찍지 않는다.
+try {
+    $summaryPath = Join-Path $OutAbs 'summary.md'
+    if (Test-Path -LiteralPath $summaryPath) {
+        $summaryText = [IO.File]::ReadAllText($summaryPath, $Utf8)
+        $secrets = @(@($env:MSSQL_SA_PASSWORD, $env:ORIGIN_SQL_PASSWORD) | Where-Object { $_ })
+        if (@($secrets | Where-Object { $summaryText.Contains([string]$_) }).Count -gt 0) {
+            Write-Host 'summary.md에 비밀값이 들어 있어 콘솔에 찍지 않음'
+        } else {
+            Write-Host '----- summary.md -----'
+            Write-Host $summaryText
+            Write-Host '----- summary.md 끝 -----'
+        }
+    }
+} catch { Write-Warning "summary.md 출력 실패: $($_.Exception.Message)" }
+
+$code = if ($script:SetupError -and $script:Scenarios.Count -eq 0) { 2 } elseif ($script:Overall -ceq 'PASS') { 0 } else { 1 }
 Write-Step "끝: $($script:Overall) (종료 코드 $code, 요약 $(Rel (Join-Path $OutAbs 'summary.md')))"
 exit $code
