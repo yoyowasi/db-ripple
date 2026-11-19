@@ -22,9 +22,10 @@ public sealed record PgCatalog(DbCatalog Catalog, IReadOnlyList<PgTable> Tables,
 /// <summary>pg_catalog → DbCatalog(설계 결정 7). 시스템 스키마와 감사 스키마(dbr_audit)는 뺀다.</summary>
 public static partial class PgCatalogReader
 {
+    // LIKE 이스케이프는 '!'로 쓴다. 백슬래시는 standard_conforming_strings 설정에 따라 문자열 리터럴에서 먼저 풀릴 수 있다(2026-11-19).
     const string UserSchemas = """
         n.nspname NOT IN ('pg_catalog', 'information_schema', 'dbr_audit')
-        AND n.nspname NOT LIKE 'pg\_toast%' AND n.nspname NOT LIKE 'pg\_temp%'
+        AND n.nspname NOT LIKE 'pg!_toast%' ESCAPE '!' AND n.nspname NOT LIKE 'pg!_temp%' ESCAPE '!'
         """;
 
     static readonly string TablesSql = $"""
@@ -75,7 +76,7 @@ public static partial class PgCatalogReader
         FROM pg_trigger t
         JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
         JOIN pg_proc p ON p.oid = t.tgfoid JOIN pg_language l ON l.oid = p.prolang
-        WHERE NOT t.tgisinternal AND t.tgname NOT LIKE 'zzz\_dbr\_audit\_%' AND {UserSchemas}
+        WHERE NOT t.tgisinternal AND t.tgname NOT LIKE 'zzz!_dbr!_audit!_%' ESCAPE '!' AND {UserSchemas}
         ORDER BY t.tgrelid, t.tgname
         """;
 

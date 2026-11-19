@@ -8,6 +8,7 @@ namespace DbRipple.Postgres;
 /// 허용: INSERT INTO t, UPDATE [ONLY] t, DELETE FROM [ONLY] t. 대상은 카탈로그에 있고 감사가 깔린 사용자 테이블이어야 한다.
 /// 스키마를 생략한 이름은 public에서만 찾는다(샌드박스는 원본 DB의 search_path 설정을 물려받지 않는다).
 /// 문장 안의 위험 함수(set_config·백엔드 종료·파일·dblink·SQL 문자열 실행 등)는 거부한다. 사용자 함수 안까지는 보지 않으므로 WARN_PG_MINIMAL_SCOPE를 늘 낸다.
+/// 따옴표 식별자 함수 이름도 보고, 풀지 않는 U&amp;"…" 식별자는 문장째 거부한다(2026-11-19).
 /// 예외를 던지지 않고 거부로 돌려준다(계약).
 /// </summary>
 public sealed class PgBatchAnalyzer : IBatchAnalyzer
@@ -19,22 +20,42 @@ public sealed class PgBatchAnalyzer : IBatchAnalyzer
     static readonly HashSet<string> Admin = new(StringComparer.Ordinal)
         { "VACUUM", "ANALYZE", "ANALYSE", "CHECKPOINT", "LOCK", "LISTEN", "NOTIFY", "UNLISTEN", "DISCARD", "LOAD", "REFRESH", "CLUSTER", "DEALLOCATE", "FETCH", "MOVE", "CLOSE", "DECLARE" };
 
-    // 문장 안 함수 호출 거부 목록(소문자). 미리보기 역할 전환(SET LOCAL ROLE)은 연결 사용자가 superuser면 set_config('role', …)로 되돌릴 수 있어 막는다.
+    // 문장 안 함수 호출 거부 목록(소문자, 정확한 이름). 미리보기 역할 전환(SET LOCAL ROLE)은 연결 계정과 상관없이
+    // set_config('role', 'none', …)로 되돌릴 수 있으므로 막는다(역할 경계는 이 목록에만 기댄다, 결정 3).
+    // 2026-11-19 보안 검토 보강: 문자열을 SQL로 실행하는 ts_stat·ts_rewrite·connectby(tablefunc), 복제 슬롯 삭제, 서버 로그 기록.
     static readonly HashSet<string> AdminFunctions = new(StringComparer.Ordinal)
     {
         "set_config", "pg_terminate_backend", "pg_cancel_backend", "pg_reload_conf", "pg_rotate_logfile", "pg_switch_wal",
-        "pg_create_restore_point", "pg_backup_start", "pg_backup_stop", "pg_start_backup", "pg_stop_backup", "pg_promote",
-        "pg_logical_emit_message", "pg_notify", "pg_sleep", "pg_sleep_for", "pg_sleep_until",
-        "pg_advisory_lock", "pg_advisory_xact_lock", "pg_advisory_lock_shared", "pg_advisory_xact_lock_shared",
-        "query_to_xml", "query_to_xml_and_xmlschema", "query_to_xmlschema", "cursor_to_xml", "cursor_to_xmlschema",
-        "table_to_xml", "table_to_xml_and_xmlschema", "schema_to_xml", "schema_to_xml_and_xmlschema", "database_to_xml", "database_to_xml_and_xmlschema",
+        "pg_backup_start", "pg_backup_stop", "pg_start_backup", "pg_stop_backup", "pg_promote",
+        "pg_drop_replication_slot", "pg_log_backend_memory_contexts", "pg_log_standby_snapshot",
+        "pg_notify", "pg_sleep", "pg_sleep_for", "pg_sleep_until",
+        "ts_stat", "ts_rewrite", "connectby",
         "lo_unlink", "lo_create", "lo_from_bytea", "lo_put", "txid_current", "pg_current_xact_id",
     };
+    // 접두로 묶은 거부(소문자).
+    static readonly string[] AdminPrefixes =
+    [
+        "pg_advisory", "pg_try_advisory",                                            // advisory lock 전부(잠금·해제·try·shared·xact)
+        "query_to_xml", "cursor_to_xml", "table_to_xml", "schema_to_xml", "database_to_xml", // 질의 문자열·커서·테이블을 실행하는 XML 함수(_xmlschema·_and_xmlschema 포함)
+        "crosstab",                                                                  // tablefunc: 질의 문자열 실행
+        "pg_create_", "pg_copy_", "pg_replication_slot_", "pg_replication_origin_", "pg_logical_", // 복원 지점·복제 슬롯·원점·논리 메시지(롤백되지 않음)
+        "pg_wal_replay_", "pg_stat_reset",                                           // WAL 재생 제어, 통계 초기화(롤백되지 않음)
+    ];
     static readonly HashSet<string> ExternalFunctions = new(StringComparer.Ordinal)
     {
-        "pg_read_file", "pg_read_binary_file", "pg_ls_dir", "pg_stat_file", "pg_file_write", "lo_import", "lo_export",
-        "dblink", "dblink_exec", "dblink_connect", "dblink_send_query", "dblink_open",
+        "pg_stat_file", "pg_current_logfile", "lo_import", "lo_export", "http",
     };
+    static readonly string[] ExternalPrefixes =
+    [
+        "dblink", "http_",               // 원격 연결(dblink), pgsql-http 확장(http_get·http_post·http_set_curlopt 등)
+        "pg_read_", "pg_ls_", "pg_file_", // 서버 파일 읽기·목록(pg_ls_dir·waldir·logdir·tmpdir·archive_statusdir 등)·쓰기(adminpack)
+    ];
+
+    /// <summary>거부 목록 함수의 규칙(없으면 null). 이름은 따옴표 없는 이름이면 소문자로 접은 것, 따옴표 이름이면 그대로다.</summary>
+    internal static string? DeniedFunctionRule(string name) =>
+        AdminFunctions.Contains(name) || AdminPrefixes.Any(p => name.StartsWith(p, StringComparison.Ordinal)) ? AnalysisRules.RejectAdminCommand
+        : ExternalFunctions.Contains(name) || ExternalPrefixes.Any(p => name.StartsWith(p, StringComparison.Ordinal)) ? AnalysisRules.RejectExternalRowset
+        : null;
     static readonly HashSet<string> SystemSchemas = new(StringComparer.Ordinal) { "pg_catalog", "information_schema", "pg_toast" };
 
     public AnalysisResult Analyze(string sql, BaselineContext baseline)
@@ -86,6 +107,13 @@ public sealed class PgBatchAnalyzer : IBatchAnalyzer
             var index = i + 1;
             var span = Span(sql, part.Start, part.End);
             var tokens = PgSqlLexer.Tokens(part);
+            // 문법 오류가 아니라 분석기가 풀지 않는 구문이라 REJECT_NOT_ALLOWED(이름 검사를 피하는 경로라 문장 종류보다 먼저 본다).
+            if (HasUnicodeEscapedIdentifier(part, tokens))
+            {
+                rejects.Add(Reject(index, span, AnalysisRules.RejectNotAllowed,
+                    "유니코드 이스케이프 식별자(U&\"…\")는 최소판 분석기가 풀지 않아 받지 않습니다. 일반 식별자나 따옴표 식별자로 써 주세요."));
+                continue;
+            }
             var first = tokens.Count > 0 && !tokens[0].Quoted ? tokens[0].Upper : "";
             ChangeOperation op;
             int targetAt;
@@ -130,7 +158,7 @@ public sealed class PgBatchAnalyzer : IBatchAnalyzer
                 rejects.Add(Reject(index, span, AnalysisRules.RejectTargetNotUserTable, $"{display}는 감사 수집 대상이 아닙니다({reason ?? "NOT_COVERED"}). 파티션 테이블은 최소판에서 받지 않습니다."));
                 continue;
             }
-            if (DangerousCall(part, tokens) is { } call)
+            if (DangerousCall(part, tokens, schema is null ? targetAt : targetAt + 2) is { } call)
             {
                 rejects.Add(Reject(index, span, call.Rule, $"문장 안 함수 {call.Name}()은(는) 미리보기에서 쓸 수 없습니다."));
                 continue;
@@ -176,21 +204,35 @@ public sealed class PgBatchAnalyzer : IBatchAnalyzer
         return (null, a, true);
     }
 
-    /// <summary>거부 목록 함수 호출(이름 바로 뒤 공백만 두고 여는 괄호)을 찾는다.</summary>
-    internal static (string Name, string Rule)? DangerousCall(PgStatementText st, IReadOnlyList<PgToken> tokens)
+    /// <summary>
+    /// 거부 목록 함수 호출(이름 바로 뒤 공백만 두고 여는 괄호)을 찾는다. 스키마 한정(pg_catalog.x, "pg_catalog"."x")은 마지막 이름을 본다.
+    /// 2026-11-19: 따옴표 식별자("set_config")도 본다(전에는 건너뛰어 거부 목록 전체를 피할 수 있었다).
+    /// </summary>
+    internal static (string Name, string Rule)? DangerousCall(PgStatementText st, IReadOnlyList<PgToken> tokens, int targetToken = -1)
     {
         for (var i = 0; i + 1 < tokens.Count; i++)
         {
+            // 대상 테이블 이름 뒤 괄호(INSERT INTO s.http_log (…)의 열 목록)는 함수 호출이 아니다. 대상은 카탈로그의 사용자 테이블로 이미 확인했다.
+            if (i == targetToken) continue;
             var t = tokens[i];
-            if (t.Quoted || t.Text is "." or "(" || tokens[i + 1].Text != "(") continue;
+            var open = tokens[i + 1];
+            if (open.Quoted || open.Text != "(" || (!t.Quoted && t.Text is "." or "(")) continue;
             // 이름과 괄호 사이에 공백 말고 다른 것(연산자 등)이 있으면 함수 호출이 아니다.
-            if (!string.IsNullOrWhiteSpace(st.Cleaned[(t.End - st.Start)..(tokens[i + 1].Start - st.Start)])) continue;
-            var name = t.Text.ToLowerInvariant();
-            if (AdminFunctions.Contains(name)) return (name, AnalysisRules.RejectAdminCommand);
-            if (ExternalFunctions.Contains(name) || name.StartsWith("dblink", StringComparison.Ordinal)) return (name, AnalysisRules.RejectExternalRowset);
+            if (!string.IsNullOrWhiteSpace(st.Cleaned[(t.End - st.Start)..(open.Start - st.Start)])) continue;
+            // 따옴표 이름은 PostgreSQL에서 대소문자를 구분하므로 그대로 비교한다("SET_CONFIG"는 다른 함수). 따옴표 없는 이름은 소문자로 접는다.
+            var name = t.Quoted ? t.Text : t.Text.ToLowerInvariant();
+            if (DeniedFunctionRule(name) is { } rule) return (name, rule);
         }
         return null;
     }
+
+    /// <summary>
+    /// U&amp;"…" 유니코드 이스케이프 식별자가 있는지(2026-11-19). 렉서가 이스케이프를 풀지 않으므로 U&amp;"set\005fconfig"처럼
+    /// 함수·테이블 이름 검사를 피할 수 있어 통째로 거부한다(닫힌 쪽: 긴 이름 끝의 u&amp;"…"도 거부). 문자열 U&amp;'…'은 이름이 아니라 그대로 둔다.
+    /// </summary>
+    internal static bool HasUnicodeEscapedIdentifier(PgStatementText st, IReadOnlyList<PgToken> tokens) =>
+        tokens.Any(t => t.Quoted && t.Start - st.Start >= 2
+                        && st.Cleaned[t.Start - st.Start - 1] == '&' && st.Cleaned[t.Start - st.Start - 2] is 'U' or 'u');
 
     /// <summary>
     /// 문장이 닿는 트리거(활성, 감사 제외). (테이블, 연산)에서 시작해 그 테이블 트리거, FK 연쇄 자식, 트리거 쓰기 대상(연산은 모르므로 셋 다)으로 넓힌다.

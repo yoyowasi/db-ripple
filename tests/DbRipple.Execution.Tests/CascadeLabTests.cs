@@ -114,12 +114,13 @@ public class CascadeLabTests(LabFixture lab)
         Assert.True(raw.Capture.Truncated);
         Assert.Equal(1, raw.Capture.Cap);
         Assert.Equal(ImageMode.Keys, raw.Executions[0].ModeAfter);
-        Assert.Equal(9, raw.Executions[0].ImageCountAfter); // 첫 문장 이미지 9개가 모두 수집된 뒤에 안다(D8)
+        // 2026-11-19 발동마다 상한: 첫 묶음(D 3행)부터 3 > 예산 1이라 KEYS다. 전에는 첫 문장 이미지 9개를 다 모은 뒤 다음 문장부터 바꿨다.
+        Assert.Equal(0, raw.Executions[0].ImageCountAfter);
         var second = raw.Headers.Where(h => h.CaptureSeq > raw.Executions[0].Boundary).ToList();
         Assert.NotEmpty(second);
-        Assert.All(second, h => Assert.Equal(ImageMode.Keys, h.ImageMode));
-        Assert.All(raw.Images.Where(i => second.Any(h => h.CaptureSeq == i.CaptureSeq)), i => { Assert.Null(i.RowJson); Assert.NotNull(i.KeyJson); });
-        Assert.Equal(9, raw.Capture.ImageCount);
+        Assert.All(raw.Headers, h => Assert.Equal(ImageMode.Keys, h.ImageMode));
+        Assert.All(raw.Images, i => { Assert.Null(i.RowJson); Assert.NotNull(i.KeyJson); });
+        Assert.Equal(0, raw.Capture.ImageCount);
 
         var collected = new ChangeCollector().Collect(raw, analysis, ctx);
         var keysRows = collected.RowChanges.Where(r => second.Any(h => ContractIds.Firing(h.CaptureSeq) == r.FiringId)).ToList();
@@ -127,6 +128,45 @@ public class CascadeLabTests(LabFixture lab)
         Assert.All(keysRows, r => { Assert.Null(r.Before); Assert.Null(r.After); Assert.NotEmpty(r.Key.Values); });
         Assert.All(keysRows.Where(r => r.Operation == ChangeOperation.Update), r => Assert.Equal(Pairing.ByPk, r.Pairing));
         Assert.Equal(2, keysRows.Count(r => r.Operation == ChangeOperation.Update));
+        Assert.Equal(12, collected.RowChanges.Count(r => r.Before is null && r.After is null)); // 첫 문장 9 + 둘째 문장 3, 모두 키만
+        Assert.Equal(0, await Stmts.SandboxDiffRowsAsync(b));
+    }
+
+    [SqlFact]
+    public async Task Cap_switches_to_keys_inside_one_cascade_statement()
+    {
+        // 2026-11-19 발동마다 상한(AuditControl.cap = 남은 FULL 예산). CL01 연쇄 DELETE 한 문장은 D(3) → C(3) → B(2) → A(1) 순으로 기록된다(연쇄 반대 순서, 픽스처 CL01 raw.json).
+        // 상한 6: D 3 ≤ 6(예산 3), C 3 ≤ 3(같으면 FULL, 예산 0), B 2 > 0이라 B부터 KEYS, A는 제어 모드가 이미 KEYS다. 실행 사용자 문맥이라 트리거의 제어 테이블 UPDATE도 소유권 체인으로 확인한다.
+        var (b, ctx) = lab.For(LabCase.Get("CL01"));
+        var analysis = Stmts.Sql("DELETE FROM cl01.A WHERE id = 1;");
+        Task<RawCapture> RunAsync(long? cap) => new PreviewExecutor(TestDb.ConnectionString(), Settings(), new ExceptNetDiffer())
+            .ExecuteAsync(analysis, ctx, new PreviewOptions { ImageCap = cap }, null, default);
+
+        var raw = await RunAsync(6);
+        Assert.Equal(PreviewStatus.Truncated, raw.Status);
+        Assert.True(raw.Capture.Truncated);
+        var e = Assert.Single(raw.Executions);
+        Assert.Equal((StatementStatus.Ok, ImageMode.Keys, 6L), (e.Result.Status, e.ModeAfter, e.ImageCountAfter));
+        Assert.Equal(6, raw.Capture.ImageCount);
+        Assert.Equal(["[cl01].[D]:Full", "[cl01].[C]:Full", "[cl01].[B]:Keys", "[cl01].[A]:Keys"], raw.Headers.Select(h => $"{h.TableName}:{h.ImageMode}"));
+        var fullSeqs = raw.Headers.Where(h => h.ImageMode == ImageMode.Full).Select(h => h.CaptureSeq).ToHashSet();
+        Assert.All(raw.Images, i => { Assert.NotNull(i.KeyJson); Assert.Equal(fullSeqs.Contains(i.CaptureSeq), i.RowJson is not null); });
+        Assert.False(raw.SandboxDirty);
+
+        // 발동 행 수 합이 상한과 같으면 끝까지 FULL(ok)
+        var exact = await RunAsync(9);
+        Assert.Equal((PreviewStatus.Ok, false, 9L), (exact.Status, exact.Capture.Truncated, exact.Capture.ImageCount));
+        Assert.All(exact.Headers, h => Assert.Equal(ImageMode.Full, h.ImageMode));
+
+        // 최종 차이와 행 변경 키는 기본 상한 결과와 같다(KEYS는 값만 없다)
+        var full = await RunAsync(null);
+        Assert.Equal(PreviewStatus.Ok, full.Status);
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(full.NetChanges), System.Text.Json.JsonSerializer.Serialize(raw.NetChanges));
+        Assert.NotEmpty(raw.NetChanges);
+        static string[] Keys(CollectResult r) => r.RowChanges.Select(x => $"{x.Operation}:{string.Join(",", x.Key.Values)}").Order(StringComparer.Ordinal).ToArray();
+        var collected = new ChangeCollector().Collect(raw, analysis, ctx);
+        Assert.Equal(Keys(new ChangeCollector().Collect(full, analysis, ctx)), Keys(collected));
+        Assert.Equal(3, collected.RowChanges.Count(r => r.Before is null)); // B 2 + A 1
         Assert.Equal(0, await Stmts.SandboxDiffRowsAsync(b));
     }
 

@@ -25,8 +25,13 @@ public static partial class PgTriggerAnalyzer
     [GeneratedRegex(@"\bRAISE\s+(?:EXCEPTION\b|SQLSTATE\b|'|USING\b)|\bRAISE\s*;", RegexOptions.IgnoreCase)]
     private static partial Regex Raises();
 
-    [GeneratedRegex(@"\b(dblink\w*|pg_notify|lo_import|lo_export|pg_read_file|pg_read_binary_file|pg_file_write|http_\w+)\s*\(|\bCOPY\b|\bNOTIFY\b", RegexOptions.IgnoreCase)]
+    // 2026-11-19: 따옴표 이름("pg_notify"(…), "public"."dblink_exec"(…))도 잡는다. 전에는 \b…\s*\(라 따옴표가 끼면 놓쳤다.
+    // pgsql-http는 http_get 류와 단독 http(…) 둘 다(전에는 http_\w+라 http(를 놓쳤다).
+    [GeneratedRegex(@"(?<![\w$])""?(?<f>dblink\w*|pg_notify|lo_import|lo_export|pg_read_file|pg_read_binary_file|pg_file_write|http(?:_\w+)?)""?\s*\(|\b(?<f>COPY)\b|\b(?<f>NOTIFY)\b", RegexOptions.IgnoreCase)]
     private static partial Regex External();
+
+    [GeneratedRegex(@"[Uu]&""")]
+    private static partial Regex UnicodeIdentifier();
 
     public static IReadOnlyList<TriggerStaticInfo> Analyze(PgCatalog pg)
     {
@@ -47,7 +52,9 @@ public static partial class PgTriggerAnalyzer
                     if (resolved is null) unresolved = true;
                     else targets.Add(resolved);
                 }
-            var external = External().Matches(body).Select(m => m.Value.Trim().TrimEnd('(').Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var external = External().Matches(body).Select(m => m.Groups["f"].Value).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            // U&"…" 식별자는 이름을 풀지 않으므로 외부 함수를 숨길 수 있어 외부 부작용으로 둔다(닫힌 쪽, 2026-11-19).
+            if (UnicodeIdentifier().IsMatch(body)) external.Add("U&\"…\" 식별자(해석 안 함)");
             // 신뢰하지 않는 언어(plpython3u·plperlu·pltclu 등)는 파일·네트워크에 닿을 수 있어 본문을 보지 않고 외부 부작용으로 둔다.
             if (t.Language.StartsWith("pl", StringComparison.Ordinal) && t.Language.EndsWith('u')) external.Add("untrusted language " + t.Language);
             result.Add(new TriggerStaticInfo

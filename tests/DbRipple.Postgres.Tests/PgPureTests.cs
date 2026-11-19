@@ -11,7 +11,8 @@ namespace DbRipple.Postgres.Tests;
 public class PgPureTests
 {
     // s.parent(id) ← s.child(id, parent_id ON DELETE CASCADE) ← s.grandchild(id, child_id ON DELETE CASCADE), s.note(id, parent_id ON DELETE SET NULL), public.loose(a, b: 키 없음)
-    const int Parent = 100, Child = 101, Grand = 102, Note = 103, Loose = 104;
+    // public.http_log(id, http_status: 키 없음): 거부 목록 접두(http_)와 이름이 겹치는 사용자 테이블(2026-11-19).
+    const int Parent = 100, Child = 101, Grand = 102, Note = 103, Loose = 104, HttpLog = 105;
 
     static DbCatalog Catalog() => new(
         Tables:
@@ -21,6 +22,7 @@ public class PgPureTests
             new(Grand, "s", "grandchild", TemporalType.None, false, "app"),
             new(Note, "s", "note", TemporalType.None, false, "app"),
             new(Loose, "public", "loose", TemporalType.None, false, "app"),
+            new(HttpLog, "public", "http_log", TemporalType.None, false, "app"),
         ],
         Columns:
         [
@@ -29,6 +31,7 @@ public class PgPureTests
             Col(Grand, 1, "id"), Col(Grand, 2, "child_id"),
             Col(Note, 1, "id"), Col(Note, 2, "parent_id", nullable: true),
             Col(Loose, 1, "a", nullable: true), Col(Loose, 2, "b", nullable: true),
+            Col(HttpLog, 1, "id"), Col(HttpLog, 2, "http_status", nullable: true),
         ],
         KeyIndexes:
         [
@@ -153,6 +156,9 @@ public class PgPureTests
     [InlineData("DELETE FROM parent", "REJECT_TARGET_NOT_USER_TABLE")]
     [InlineData("DELETE FROM pg_catalog.pg_class", "REJECT_TARGET_NOT_USER_TABLE")]
     [InlineData("UPDATE s.parent SET name = set_config('role', 'postgres', false)", "REJECT_ADMIN_COMMAND")]
+    // 2026-11-19: 감사 함수가 읽는 상한·모드 GUC도 같은 규칙으로 막힌다(인자와 상관없이 함수 이름으로 거부).
+    [InlineData("UPDATE s.parent SET name = set_config('dbr.image_cap', '999999999', true) WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_catalog.set_config('dbr.image_mode', 'FULL', true) WHERE id = 1", "REJECT_ADMIN_COMMAND")]
     [InlineData("UPDATE s.parent SET name = pg_catalog.pg_read_file ('/etc/passwd')", "REJECT_EXTERNAL_ROWSET")]
     [InlineData("INSERT INTO s.parent SELECT * FROM dblink('x', 'select 1') AS t(id int, name text)", "REJECT_EXTERNAL_ROWSET")]
     public void Rejects_out_of_scope_statements(string sql, string rule)
@@ -160,6 +166,105 @@ public class PgPureTests
         var r = Analyze(sql);
         Assert.False(r.IsAccepted);
         Assert.Contains(r.Rejects, d => d.RuleId == rule);
+    }
+
+    // 2026-11-19 따옴표 식별자 우회: 전에는 DangerousCall이 따옴표 토큰을 건너뛰어 아래가 모두 통과했다. 우회 경로마다 하나씩.
+    [Theory]
+    [InlineData("UPDATE s.parent SET name = \"set_config\"('role', 'postgres', false) WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = \"pg_catalog\".\"set_config\"('dbr.image_cap', '1', true) WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_catalog.\"pg_terminate_backend\"(1)::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = \"set_config\" /* c */ ('role', 'postgres', false) WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = \"query_to_xml\"('select 1', true, true, '')::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = \"pg_sleep\"(1)::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("INSERT INTO s.parent SELECT * FROM \"dblink\"('x', 'select 1') AS t(id int, name text)", "REJECT_EXTERNAL_ROWSET")]
+    [InlineData("UPDATE s.parent SET name = \"public\".\"dblink_exec\"('x', 'y') WHERE id = 1", "REJECT_EXTERNAL_ROWSET")]
+    [InlineData("UPDATE s.parent SET name = \"pg_read_file\"('/etc/passwd') WHERE id = 1", "REJECT_EXTERNAL_ROWSET")]
+    [InlineData("UPDATE s.parent SET name = \"pg_catalog\".\"lo_export\"(1, '/tmp/x')::text WHERE id = 1", "REJECT_EXTERNAL_ROWSET")]
+    // U&"…"는 렉서가 이스케이프(\005f = _)를 풀지 않으므로 이름과 상관없이 문장째 거부(REJECT_NOT_ALLOWED).
+    [InlineData("UPDATE s.parent SET name = U&\"set\\005fconfig\"('role', 'postgres', false) WHERE id = 1", "REJECT_NOT_ALLOWED")]
+    [InlineData("UPDATE s.parent SET name = u&\"pg_catalog\".x(1) WHERE id = 1", "REJECT_NOT_ALLOWED")]
+    [InlineData("DELETE FROM U&\"s\".parent WHERE id = 1", "REJECT_NOT_ALLOWED")]
+    [InlineData("UPDATE s.parent SET name = U&\"d!0061ta\" UESCAPE '!' WHERE id = 1", "REJECT_NOT_ALLOWED")]
+    public void Quoted_or_unicode_escaped_function_names_do_not_bypass_the_deny_lists(string sql, string rule)
+    {
+        var r = Analyze(sql);
+        Assert.False(r.IsAccepted, sql);
+        Assert.Equal(rule, Assert.Single(r.Rejects).RuleId);
+    }
+
+    [Theory]
+    // 따옴표 이름은 대소문자를 구분하므로 "SET_CONFIG"는 PostgreSQL에서 다른 함수다(목록의 소문자 이름과 정확히 같을 때만 거부).
+    [InlineData("UPDATE s.parent SET name = \"SET_CONFIG\"('a', 'b', true) WHERE id = 1")]
+    // 따옴표 열·테이블 이름, 함수 아닌 따옴표 이름 뒤 괄호 없음, U&'…' 문자열(이름이 아님)은 그대로 받는다.
+    [InlineData("UPDATE \"s\".\"parent\" SET \"name\" = 'set_config' WHERE \"id\" = 1")]
+    [InlineData("INSERT INTO \"s\".\"parent\" (id, name) VALUES (1, 'x')")]
+    [InlineData("UPDATE s.parent SET name = U&'d\\0061t' WHERE id = 1")]
+    public void Quoted_names_that_are_not_denied_calls_stay_accepted(string sql)
+    {
+        var r = Analyze(sql);
+        Assert.True(r.IsAccepted, string.Join(" / ", r.Rejects.Select(d => d.RuleId + " " + d.Message)));
+    }
+
+    // 2026-11-19 보안 검토 보강(F1~F5): 전부터 거부 목록에 없던 함수. 항목마다 하나 이상, 거부 1건·규칙 ID를 단언.
+    [Theory]
+    // F1 문자열을 SQL로 실행(질의 안 함수는 분석기가 못 본다)
+    [InlineData("UPDATE s.parent SET name = (SELECT count(*) FROM ts_stat('SELECT to_tsvector(name) FROM s.parent'))::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = ts_rewrite('a'::tsquery, 'SELECT ''a''::tsquery, ''b''::tsquery')::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = table_to_xmlschema('s.parent', true, true, '')::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("INSERT INTO s.parent SELECT * FROM crosstab('SELECT 1, 2, 3') AS t(id int, name text)", "REJECT_ADMIN_COMMAND")]
+    [InlineData("INSERT INTO s.parent SELECT id, 'x' FROM connectby('s.child', 'id', 'parent_id', '1', 0) AS t(id int, p int, l int)", "REJECT_ADMIN_COMMAND")]
+    // F3 pgsql-http(외부 요청): 정확히 http와 접두 http_
+    [InlineData("UPDATE s.parent SET name = (http(NULL)).content WHERE id = 1", "REJECT_EXTERNAL_ROWSET")]
+    [InlineData("UPDATE s.parent SET name = (public.http_get('http://example.invalid/')).status::text WHERE id = 1", "REJECT_EXTERNAL_ROWSET")]
+    [InlineData("UPDATE s.parent SET name = http_set_curlopt('CURLOPT_TIMEOUT', '1')::text WHERE id = 1", "REJECT_EXTERNAL_ROWSET")]
+    // F4 서버 파일 정보(pg_ls_ 접두·pg_current_logfile: 기존 pg_ls_dir와 같은 외부 행 집합), 복제 슬롯·원점·WAL·통계 초기화(관리 명령)
+    [InlineData("INSERT INTO s.parent SELECT 1, name FROM pg_ls_waldir()", "REJECT_EXTERNAL_ROWSET")]
+    [InlineData("UPDATE s.parent SET name = pg_current_logfile() WHERE id = 1", "REJECT_EXTERNAL_ROWSET")]
+    [InlineData("UPDATE s.parent SET name = pg_file_unlink('x')::text WHERE id = 1", "REJECT_EXTERNAL_ROWSET")]
+    [InlineData("UPDATE s.parent SET name = (pg_create_logical_replication_slot('s', 'pgoutput')).slot_name WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_drop_replication_slot('s')::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = (pg_copy_logical_replication_slot('a', 'b')).slot_name WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = (pg_replication_slot_advance('s', '0/0')).slot_name WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_replication_origin_create('o')::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("INSERT INTO s.parent SELECT 1, data FROM pg_logical_slot_get_changes('s', NULL, NULL)", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_wal_replay_pause()::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_stat_reset()::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_log_backend_memory_contexts(1)::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    // F5 advisory lock 전부(해제·try·shared·xact 포함)
+    [InlineData("UPDATE s.parent SET name = pg_advisory_unlock_all()::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_advisory_unlock_shared(1)::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_try_advisory_lock(1)::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("UPDATE s.parent SET name = pg_try_advisory_xact_lock_shared(1)::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    // 5. pg_notify 함수와 NOTIFY·LISTEN 문장은 전부터 거부(확인)
+    [InlineData("UPDATE s.parent SET name = pg_notify('c', 'x')::text WHERE id = 1", "REJECT_ADMIN_COMMAND")]
+    [InlineData("NOTIFY c, 'x'", "REJECT_ADMIN_COMMAND")]
+    [InlineData("LISTEN c", "REJECT_ADMIN_COMMAND")]
+    public void Functions_added_to_the_deny_lists_after_the_security_review_are_rejected(string sql, string rule)
+    {
+        var r = Analyze(sql);
+        Assert.False(r.IsAccepted, sql);
+        Assert.Equal(rule, Assert.Single(r.Rejects).RuleId);
+    }
+
+    [Theory]
+    // 이름이 비슷해도 함수 호출이 아니면 받는다: http_·pg_ls_로 시작하는 열 SET, http_로 시작하는 사용자 테이블의 INSERT 열 목록, 문자열 안 이름.
+    [InlineData("UPDATE public.http_log SET http_status = 200 WHERE id = 1")]
+    [InlineData("INSERT INTO public.http_log (id, http_status) VALUES (1, 200)")]
+    [InlineData("INSERT INTO http_log(id, http_status) VALUES (1, 200)")]
+    [InlineData("UPDATE s.parent SET name = 'http_get(x) pg_ls_dir(y) ts_stat(z)' WHERE id = 1")]
+    [InlineData("DELETE FROM public.http_log WHERE http_status IN (500, 502)")]
+    public void Look_alike_names_that_are_not_calls_stay_accepted(string sql)
+    {
+        var r = Analyze(sql);
+        Assert.True(r.IsAccepted, string.Join(" / ", r.Rejects.Select(d => d.RuleId + " " + d.Message)));
+    }
+
+    [Fact]
+    public void Preview_transaction_forces_standard_conforming_strings_before_user_statements()
+    {
+        // F2: 렉서는 일반 '…'의 백슬래시를 이스케이프로 보지 않는다. 서버도 같게(SET LOCAL과 같음) 문장 실행 전에 강제한다.
+        Assert.Contains("set_config('standard_conforming_strings', 'on', true)", PgPreviewExecutor.BeginSql);
+        Assert.Contains("set_config('dbr.image_cap', $1, true)", PgPreviewExecutor.BeginSql);
     }
 
     [Fact]
@@ -276,6 +381,118 @@ public class PgPureTests
         Assert.Equal(new[] { Note }, r.Unresolved);
     }
 
+    [Fact]
+    public void Mixed_full_and_keys_batches_of_one_table_go_to_reread_with_keys_from_both()
+    {
+        // 한 문장 안: 부모 묶음 FULL, 자식 첫 묶음 FULL, 자식 둘째 묶음 KEYS(발동 단위 상한으로 문장 중간에 바뀜, 2026-11-19).
+        var headers = new[]
+        {
+            H(1, Parent, ChangeOperation.Delete) with { DeletedCount = 1 },
+            H(2, Child, ChangeOperation.Delete) with { DeletedCount = 1 },
+            H(3, Child, ChangeOperation.Delete, mode: ImageMode.Keys) with { DeletedCount = 1 },
+        };
+        var images = new[]
+        {
+            I(1, ImageKind.Deleted, """{"id":"1"}""", """{"id":"1","name":"p1"}"""),
+            I(2, ImageKind.Deleted, """{"id":"10"}""", """{"id":"10","parent_id":"1"}"""),
+            I(3, ImageKind.Deleted, """{"id":"11"}""", null),
+        };
+        var r = ImageNetDiff.Compute(headers, images, Tables());
+        // 자식은 FULL 이미지만 더하면 id 11이 빠지므로 테이블 전체를 재조회로 넘긴다. 부모는 이미지로 계산한다.
+        Assert.Equal(new[] { Child }, r.Unresolved);
+        var parent = Assert.Single(r.Changes);
+        Assert.Equal(NetChangeKind.Deleted, parent.Change);
+        Assert.Equal(new string?[] { "1" }, parent.Key.Values);
+        // 재조회 키는 FULL 묶음의 키도 담는다.
+        Assert.Equal(new[] { """{"id":"10"}""", """{"id":"11"}""" }, PgPreviewExecutor.RereadKeys(Child, headers, images));
+    }
+
+    // ---------------- 이미지 상한(발동 단위, 2026-11-19) ----------------
+
+    static string FunctionBody(string sql, string head)
+    {
+        var start = sql.IndexOf(head, StringComparison.Ordinal);
+        Assert.True(start >= 0, head + " 없음");
+        return sql[start..sql.IndexOf("END $f$;", start, StringComparison.Ordinal)];
+    }
+
+    [Fact]
+    public void Audit_functions_decide_the_image_mode_before_writing_the_header()
+    {
+        var sql = PgCapture.StoreSql("dbr_preview");
+        Assert.True(sql.All(char.IsAscii), "감사 설치 SQL은 ASCII만(샌드박스 인코딩은 원본을 따른다)");
+        foreach (var (fn, arg) in new[] { ("capture_ins", "n"), ("capture_upd", "ni + nd"), ("capture_del", "n") })
+        {
+            var body = FunctionBody(sql, $"CREATE FUNCTION dbr_audit.{fn}()");
+            var decide = body.IndexOf($"fm := dbr_audit.full_for({arg});", StringComparison.Ordinal);
+            var header = body.IndexOf("INSERT INTO dbr_audit.header", StringComparison.Ordinal);
+            Assert.True(decide >= 0 && header > decide, $"{fn}: 판정 위치 {decide}, 헤더 INSERT 위치 {header}");
+            Assert.DoesNotContain("full_mode()", body); // 판정을 거치지 않고 모드를 바로 읽지 않는다
+        }
+
+        // 판정은 남은 FULL 예산 GUC 하나로 한다(O(1), 2026-11-19 계약 2 변경): 감사 표를 세지 않는다.
+        var check = FunctionBody(sql, "CREATE FUNCTION dbr_audit.full_for(n bigint)");
+        Assert.Contains("current_setting('dbr.image_cap', true)", check);
+        Assert.DoesNotContain("dbr_audit.header", check);
+        Assert.DoesNotContain("row_image", check);
+        Assert.Contains("IF n = 0 OR coalesce(cfg, '') = '' THEN RETURN true; END IF;", check); // 0행 발동·예산 설정 없음(옛 실행기)은 판정하지 않는다
+        Assert.Contains("IF cfg ~ '^[0-9]+$' THEN budget := cfg::numeric; END IF;", check);   // 숫자가 아니면 budget NULL → 아래에서 KEYS
+        Assert.Contains("IF budget IS NULL OR n > budget THEN", check);                        // 같으면 FULL
+        Assert.Contains("PERFORM set_config('dbr.image_mode', 'KEYS', true);", check);
+        Assert.Contains("PERFORM set_config('dbr.image_cap', (budget - n)::text, true);", check);
+        Assert.True(check.IndexOf("'KEYS'", StringComparison.Ordinal) < check.IndexOf("(budget - n)", StringComparison.Ordinal),
+            "KEYS로 닫는 분기가 예산 차감보다 앞(넘치면 예산을 줄이지 않음)");
+    }
+
+    /// <summary>
+    /// full_for의 판정을 C#으로 옮긴 모형(2026-11-19). 통합 테스트 (d)·(f) 기대값을 같은 규칙으로 다시 계산해 둔다.
+    /// 예산 방식은 앞선 헤더 합 방식(FULL 합 + n > 상한이면 KEYS)과 같은 판정을 낸다: 예산 = 상한 − 지금까지 FULL.
+    /// </summary>
+    static string Modes(long cap, params long[] firings)
+    {
+        long budget = cap, fullSoFar = 0;
+        bool keysByBudget = false, keysBySum = false;
+        var modes = "";
+        foreach (var n in firings)
+        {
+            // 예산 방식(지금): n > 남은 예산이면 KEYS로 닫고, 아니면 예산을 줄인다. 0행 발동은 그대로.
+            if (!keysByBudget && n > 0) { if (n > budget) keysByBudget = true; else budget -= n; }
+            // 헤더 합 방식(앞 커밋): 지금까지 FULL + n > 상한이면 KEYS.
+            if (!keysBySum && n > 0) { if (fullSoFar + n > cap) keysBySum = true; else fullSoFar += n; }
+            Assert.Equal(keysBySum, keysByBudget);
+            modes += keysByBudget ? "K" : "F";
+        }
+        return $"{modes} full={cap - budget}";
+    }
+
+    [Theory]
+    [InlineData(1L, "KKKKKKK full=0")]    // (d) 상한 1: 첫 발동 6 > 1
+    [InlineData(14L, "FFKKKKK full=14")]  // (d) 상한 14: 6 ≤ 14(남음 8), 8 ≤ 8(남음 0), 2 > 0
+    [InlineData(100_000L, "FFFFFFF full=25")]
+    public void Budget_rule_gives_the_integration_d_expectations(long cap, string expected)
+    {
+        Assert.Equal(expected, Modes(cap, 6, 8, 2, 2, 4, 2, 1));
+    }
+
+    [Fact]
+    public void Budget_rule_gives_the_integration_f_expectations()
+    {
+        Assert.Equal("FK full=10", Modes(100, 10, 20_000));         // (f) 상한 100: 부모 10 ≤ 100(남음 90), 자식 20,000 > 90
+        Assert.Equal("FF full=20010", Modes(100_000, 10, 20_000)); // (f) 기본 상한
+        Assert.Equal("FFK full=5", Modes(5, 5, 0, 1));              // 같으면 FULL, 0행 발동은 모드를 바꾸지 않음, 그 뒤 1 > 0
+    }
+
+    [Theory]
+    [InlineData(ImageMode.Full, 10L, 100L, 0L, false)]  // 상한 안
+    [InlineData(ImageMode.Full, 100L, 100L, 0L, false)] // 같으면 FULL
+    [InlineData(ImageMode.Full, 10L, 100L, 1L, true)]   // 감사 함수가 문장 안에서 KEYS로 바꿈
+    [InlineData(ImageMode.Full, 101L, 100L, 0L, true)]  // 옛 감사 함수(새로 고침 전): 문장 뒤 누적이 상한을 넘음
+    [InlineData(ImageMode.Keys, 101L, 100L, 3L, false)] // 이미 KEYS
+    public void Statement_switches_to_keys_on_keys_batches_or_old_style_overflow(ImageMode mode, long images, long cap, long keysBatches, bool expected)
+    {
+        Assert.Equal(expected, PgPreviewExecutor.SwitchesToKeys(mode, images, cap, keysBatches));
+    }
+
     // ---------------- 감사 묶음 귀속 ----------------
 
     [Fact]
@@ -359,6 +576,33 @@ public class PgPureTests
         Assert.DoesNotContain("DELETE FROM b", cleaned);
         Assert.DoesNotContain("UPDATE c", cleaned);
         Assert.Contains("INSERT INTO s.log", cleaned);
+    }
+
+    // 2026-11-19: 트리거 본문의 외부 부작용 검사(REJECT_TRIGGER_EXTERNAL_EFFECT 근거)도 따옴표·U& 이름으로 피하지 못한다.
+    [Theory]
+    [InlineData("BEGIN PERFORM pg_notify('c', 'x'); RETURN NULL; END", "pg_notify")]
+    [InlineData("BEGIN PERFORM \"pg_notify\"('c', 'x'); RETURN NULL; END", "pg_notify")]
+    [InlineData("BEGIN PERFORM \"public\".\"dblink_exec\"('c', 'x'); RETURN NULL; END", "dblink_exec")]
+    [InlineData("BEGIN PERFORM U&\"pg\\005fnotify\"('c', 'x'); RETURN NULL; END", "U&\"…\" 식별자(해석 안 함)")]
+    // F3: pgsql-http 단독 http(…)와 따옴표 http_post
+    [InlineData("BEGIN PERFORM http(('GET', 'http://example.invalid/', NULL, NULL, NULL)); RETURN NULL; END", "http")]
+    [InlineData("BEGIN PERFORM \"http_post\"('http://example.invalid/', 'b', 'text/plain'); RETURN NULL; END", "http_post")]
+    public void Trigger_body_external_call_is_found_even_when_quoted(string body, string expected)
+    {
+        Assert.Contains(expected, TriggerExternal(body));
+    }
+
+    [Fact]
+    public void Trigger_body_column_named_like_an_external_function_is_not_an_effect()
+    {
+        Assert.Empty(TriggerExternal("BEGIN NEW.http_status := 200; NEW.pg_notify_at := now(); RETURN NEW; END"));
+    }
+
+    static IReadOnlyList<string> TriggerExternal(string body)
+    {
+        var pg = new PgCatalog(Catalog(), [new PgTable(Parent, "s", "parent", "app", 'r', false)],
+            [new PgTrigger(900, "t_x", Parent, true, false, false, false, ["DELETE"], "", "s.f", "plpgsql", body)]);
+        return Assert.Single(PgTriggerAnalyzer.Analyze(pg)).ExternalSideEffects;
     }
 
     [Fact]

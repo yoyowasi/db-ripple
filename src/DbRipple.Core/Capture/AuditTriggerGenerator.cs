@@ -148,13 +148,17 @@ public static class AuditTriggerGenerator
           .Append("AFTER ").Append(Keyword(op)).Append('\n')
           .Append("AS\nBEGIN\n")
           .Append("    SET NOCOUNT ON;\n")
-          .Append("    DECLARE @dbr_seq bigint, @dbr_mode varchar(4);\n")
+          .Append("    DECLARE @dbr_seq bigint, @dbr_mode varchar(4), @dbr_ins bigint, @dbr_del bigint, @dbr_n bigint;\n")
           .Append("    SET @dbr_seq = NEXT VALUE FOR audit.CaptureSeq;\n")
           .Append("    SELECT @dbr_mode = mode FROM audit.AuditControl WHERE id = 1;\n")
           .Append("    SET @dbr_mode = ISNULL(@dbr_mode, 'FULL');\n")
-          .Append("    INSERT INTO audit.AuditHeader (captureSeq, tableObjectId, tableName, operation, insertedCount, deletedCount, nestLevel, tranCount, imageMode)\n")
+          .Append("    SET @dbr_ins = (SELECT COUNT_BIG(*) FROM inserted);\n")
+          .Append("    SET @dbr_del = (SELECT COUNT_BIG(*) FROM deleted);\n")
+          .Append("    SET @dbr_n = @dbr_ins + @dbr_del;\n");
+        AppendCapCheck(sb);
+        sb.Append("    INSERT INTO audit.AuditHeader (captureSeq, tableObjectId, tableName, operation, insertedCount, deletedCount, nestLevel, tranCount, imageMode)\n")
           .Append("    SELECT @dbr_seq, ").Append(t.ObjectId).Append(", ").Append(SqlText.NLiteral(t.QuotedName))
-          .Append(", '").Append(Code(op)).Append("', (SELECT COUNT_BIG(*) FROM inserted), (SELECT COUNT_BIG(*) FROM deleted), TRIGGER_NESTLEVEL(), @@TRANCOUNT, @dbr_mode;\n");
+          .Append(", '").Append(Code(op)).Append("', @dbr_ins, @dbr_del, TRIGGER_NESTLEVEL(), @@TRANCOUNT, @dbr_mode;\n");
 
         // U는 DELETED 다음 INSERTED(마지막 INSERT의 행 수 = 발동 행 수)
         if (op != DmlOperation.Insert) AppendImage(sb, t, key, "DELETED", "deleted", "d");
@@ -162,6 +166,23 @@ public static class AuditTriggerGenerator
         sb.Append("END;\n");
         return sb.ToString();
     }
+
+    /// <summary>
+    /// 발동마다 상한(D8, 2026-11-19): AuditControl.cap은 이번 미리보기에서 남은 FULL 이미지 예산이다(실행기가 시작 때 요청 상한으로 둔다).
+    /// FULL이고 이번 발동 행 수 n &gt; 0일 때 n &gt; 예산이면 이번 발동부터 KEYS로 쓰고 제어 모드를 KEYS로 바꾸며, 아니면(같음 포함) FULL로 쓰고 예산을 n만큼 줄인다.
+    /// 헤더 합을 세지 않아 발동마다 O(1)이다(루프 EXEC의 발동 수 제곱 비용 회피). 0행 발동과 이미 KEYS인 발동은 제어 행을 건드리지 않는다.
+    /// UPDATE 한 문장으로 읽기·판정·쓰기를 하고, SET 목록은 변수 → mode → cap 순이라 어느 식도 같은 문장에서 앞서 바꾼 열을 참조하지 않는다
+    /// (cap 식은 자기 자신만 참조 = 갱신 전 값). WHERE mode = 'FULL'에 걸리지 않으면(행 없음 포함) 앞서 읽은 모드를 그대로 쓴다.
+    /// 헤더보다 먼저 정해 헤더 imageMode에 실제로 쓴 모드를 남긴다. 마지막 문장은 그대로 이미지 INSERT라 문장 뒤 행 수(§6.2)는 바뀌지 않는다.
+    /// audit 쓰기는 기존 INSERT와 같은 소유권 체인(dbo 소유 트리거 → dbo 소유 audit, SP10)으로 DML 전용 사용자 문맥에서도 된다.
+    /// </summary>
+    static void AppendCapCheck(StringBuilder sb) =>
+        sb.Append("    IF @dbr_mode = 'FULL' AND @dbr_n > 0\n")
+          .Append("        UPDATE audit.AuditControl\n")
+          .Append("        SET @dbr_mode = CASE WHEN @dbr_n > cap THEN 'KEYS' ELSE 'FULL' END,\n")
+          .Append("            mode = CASE WHEN @dbr_n > cap THEN 'KEYS' ELSE 'FULL' END,\n")
+          .Append("            cap = CASE WHEN @dbr_n > cap THEN cap ELSE cap - @dbr_n END\n")
+          .Append("        WHERE id = 1 AND mode = 'FULL';\n");
 
     static void AppendImage(StringBuilder sb, TableInfo t, TableKey key, string kind, string source, string alias)
     {

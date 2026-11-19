@@ -103,6 +103,21 @@ public class ExecRunnerTests
             PreviewExecutor.ExecTranGoneMessage(StatementRunner.ProcedureTranGoneMessage + "(오류 266: m)", false, 0, false));
     }
 
+    [Theory]
+    // 새 트리거(2026-11-19): 문장 범위에 KEYS 헤더가 있으면 트리거가 문장 안에서 바꾼 것 → KEYS(truncated), 실행기는 제어 테이블을 다시 쓰지 않는다
+    [InlineData(ImageMode.Full, 6L, 6L, 2L, ImageMode.Keys, false)]
+    [InlineData(ImageMode.Full, 0L, 1L, 4L, ImageMode.Keys, false)]
+    // KEYS 헤더 없이 합이 상한 이하면 FULL 그대로(같으면 FULL)
+    [InlineData(ImageMode.Full, 9L, 9L, 0L, ImageMode.Full, false)]
+    // 옛 트리거로 설치된 샌드박스: KEYS 헤더 없이 누적 이미지가 상한을 넘으면 실행기가 다음 문장부터 KEYS로 바꾼다
+    [InlineData(ImageMode.Full, 10L, 9L, 0L, ImageMode.Keys, true)]
+    // 이미 KEYS면 그대로
+    [InlineData(ImageMode.Keys, 100L, 9L, 3L, ImageMode.Keys, false)]
+    public void Cap_after_statement_reads_keys_headers_and_keeps_old_trigger_fallback(ImageMode mode, long images, long cap, long keysHeaders, ImageMode expected, bool setKeys)
+    {
+        Assert.Equal((expected, setKeys), PreviewExecutor.CapAfterStatement(mode, images, cap, keysHeaders));
+    }
+
     [Fact]
     public void Dml_with_lost_transaction_is_still_a_tool_fault()
     {
