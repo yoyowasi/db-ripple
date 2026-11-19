@@ -1,6 +1,6 @@
 # 평가 보고서
 
-> 상태: 2026-11-12 첫 전체 실행 반영(2026-11-13: EXEC 사례 CL21~CL25와 정답 형식 v0.3을 더했고, 2026-11-15~16에 EXEC 포함 37사례 × 3회로 돌렸다, §2.1·§6.3). **CascadeLab CL01~CL20(변형 30개) M1~M4를 제품·B0·B2로 20회 반복해 쟀고(`logs/eval/eval-20261112-143835`), M5를 N = 1~10만 행으로 쟀다(`logs/eval-m5/m5-20261112-145013`, 10만 행은 `m5-20261112-145801`).** 아직 측정 전: 누적 구성 등(§6.3). SP9 브라우저 렌더는 2026-11-16에 쟀고(§6.2), 대조군 B1은 2026-11-16 로컬 3회 실행에서 쟀다(§6.1). 2026-11-17 클라우드에서 원인 귀속 수정(#16) 뒤 M5를 다시 쟀고, EXEC 포함 37사례 × 20회 평가로 M6을 쟀다(§6.1·§6.2). 수치는 CSV와 로그에서만 옮기고 손으로 만든 값은 넣지 않는다(설계 §10.6).
+> 상태: 2026-11-12 첫 전체 실행 반영(2026-11-13: EXEC 사례 CL21~CL25와 정답 형식 v0.3을 더했고, 2026-11-15~16에 EXEC 포함 37사례 × 3회로 돌렸다, §2.1·§6.3). **CascadeLab CL01~CL20(변형 30개) M1~M4를 제품·B0·B2로 20회 반복해 쟀고(`logs/eval/eval-20261112-143835`), M5를 N = 1~10만 행으로 쟀다(`logs/eval-m5/m5-20261112-145013`, 10만 행은 `m5-20261112-145801`).** 아직 측정 전: 누적 구성 등(§6.3). SP9 브라우저 렌더는 2026-11-16에 쟀고(§6.2), 대조군 B1은 2026-11-16 로컬 3회와 2026-11-19 CI 20회로 쟀다(§6.1). 2026-11-17 클라우드에서 원인 귀속 수정(#16) 뒤 M5를 다시 쟀고, EXEC 포함 37사례 × 20회 평가로 M6을 쟀다(§6.1·§6.2). 수치는 CSV와 로그에서만 옮기고 손으로 만든 값은 넣지 않는다(설계 §10.6).
 > 설계: [architecture.md](architecture.md) v1.6 §10 · 결정: [week3-plan.md](week3-plan.md) · 지표 열 정의: `eval/DbRipple.Eval/MetricsCsv.cs` 주석 · 자동 생성 보고서: `report` 명령이 실행 폴더에 쓰는 `report.md`(`eval/DbRipple.Eval/ReportBuilder.cs`)
 
 이 문서는 사람이 읽는 보고서다. 실행마다 생기는 `report.md`는 CSV 표를 그대로 옮긴 부록이고, 이 문서의 §6 결과 표는 그 `report.md`와 CSV에서 옮겨 채운다.
@@ -257,7 +257,7 @@ B2는 무엇이 바뀌었는지(M1·M2)는 제품과 같지만 왜 바뀌었는�
 
 #### 대조군 B1(2026-11-16, 로컬 3회)
 
-B1(FK 정의만 따라가는 정적 예측, §5)은 위 20회 실행 뒤에 넣어, 2026-11-16 로컬 home-test의 기본 평가(`eval-quick`, CL01~CL20 30사례 × 3회, 제품·B0·B1·B2를 함께 실행)에서 처음 쟀다. 분모는 1회분의 3배다. 출처는 `logs/home-test/local-20261116/eval/eval-quick/metrics.csv`다(로그 폴더는 저장소에 커밋하지 않는다). CI 기본 평가도 PR마다 같은 네 시스템을 3회 돌린다. 20회 정식 실행은 하지 않았다.
+B1(FK 정의만 따라가는 정적 예측, §5)은 위 20회 실행 뒤에 넣어, 2026-11-16 로컬 home-test의 기본 평가(`eval-quick`, CL01~CL20 30사례 × 3회, 제품·B0·B1·B2를 함께 실행)에서 처음 쟀다. 분모는 1회분의 3배다. 출처는 `logs/home-test/local-20261116/eval/eval-quick/metrics.csv`다(로그 폴더는 저장소에 커밋하지 않는다). CI 기본 평가도 PR마다 같은 네 시스템을 3회 돌린다. 20회 정식 실행은 2026-11-19 CI에서 했다(아래 "대조군 B1 20회").
 
 | 지표 | preview | B0(직접 대상만) | B1(FK 정적 예측) | B2(사본 + 최종 차이) |
 |---|---|---|---|---|
@@ -270,6 +270,22 @@ B1(FK 정의만 따라가는 정적 예측, §5)은 위 20회 실행 뒤에 넣�
 | M3 certain 과신 | 0/141 | 0/84 | 21/150 (0.1400) | 해당 없음(예측 없음) |
 
 B1은 FK 연쇄로 바뀐 행은 모두 찾지만, 트리거가 바꾼 행은 직접 대상 테이블의 것만 찾아 B0과 같다(6/87). certain으로 낸 간선 가운데 21/150이 틀렸다. 이 21건의 원인은 사례별로 따지지 않았다(§5 B1 행의 예상 한계 참고). 같은 실행의 제품·B0·B2 수치는 위 20회 실행의 1회분 값과 비율이 같다.
+
+#### 대조군 B1 20회(2026-11-19, CI)
+
+같은 30사례를 GitHub Actions에서 20회 반복했다. 제품·B0·B1·B2를 함께 실행했다. 실행은 CI 수동 실행(`eval_repeat=20`, run 44435519363, 커밋 bbd8105)이고, 출처는 그 실행의 `eval/eval-quick/metrics.csv`([사본](test-reports/data/2026-11-19-ci/eval20-metrics.csv))다. 기준선 `logs/eval/eval-20261112-143835`와 비교한 결과는 같음 104개, 새 항목(B1 등) 34개, 다름 0개다([비교 CSV](test-reports/data/2026-11-19-ci/eval20-vs-baseline.csv)).
+
+| 지표 | preview | B0(직접 대상만) | B1(FK 정적 예측) | B2(사본 + 최종 차이) |
+|---|---|---|---|---|
+| M1 셀 recall(total) | 3520/3520 | 1340/3520 | 2200/3520 (0.6250) | 3520/3520 |
+| M2 FK 연쇄(CASCADE·SET NULL·SET DEFAULT 합) | 860/860 | 0/860 | 860/860 | 860/860 |
+| M2 TRIGGER | 580/580 | 40/580 | 40/580 | 580/580 |
+| M2 INSTEAD_OF | 100/100 | 40/100 | 40/100 | 100/100 |
+| M2 ALL 재현율 | 2300/2300 | 840/2300 (0.3652) | 1700/2300 (0.7391) | 2300/2300 |
+| M3 all recall | 2040/2040 | 560/2040 (0.2745) | 940/2040 (0.4608) | 0/2040 |
+| M3 certain 과신 | 0/940 | 0/560 | 140/1000 (0.1400) | 해당 없음(예측 없음) |
+
+모든 값이 3회 실행의 정확히 20/3배라서 B1 예측은 반복 사이에 변하지 않았다. 제품 M4 정규 서명 안정은 30/30, 반복 오류 0/600이다.
 
 #### 중간 변경 M6(2026-11-17, CI 3회)
 
@@ -362,8 +378,8 @@ PR #19 뒤 GitHub Actions에서 같은 M5 명령을 실행했다. CL20 DELETE 10
 | SP8 AW DM1·DM2·DM3 실제 전파 | **확인함(2026-11-12)**: DM1 주문 43697, DM2 상세 52, DM3 직원 1. DM2의 SalesYTD는 회계 기간 불일치로 늘 0행 | [spikes/SP8.md](spikes/SP8.md), `spikes/logs/sp8-*.log`(AW_Origin 읽기 전용) |
 | [적용] 검증 게이트(AW DM1~DM3, DM7) | **확인함(2026-11-12, 전용 원본 사본 `dbrt_e2e_origin`)**: DM1·DM2 `committed`(원본에서 실제 반영을 독립 SQL로 확인), DM3 `precondition_failed`(미리보기 `trigger_blocked`), DM7 `drift_detected`(원본 값 커밋 안 됨). CSRF 403, 동시 요청 409 LOCKED도 확인 | `logs/e2e/host-e2e-2026-11-12.log`, `logs/e2e/sql-*.log` |
 | 누적 구성(초기화 없이 연속 실행, IDENTITY 벌어짐) | 측정 전 | 설계 §10.3 "구성". 하네스 옵션 없음(방법 미정) |
-| 대조군 B1 20회 정식 실행 | 미실행. 2026-11-19 클라우드는 SQL Server 이미지 다운로드 단계에서 중단됐다. B1 로컬 3회는 §6.1에 있다. [클라우드 검증](test-reports/2026-11-19-codex-cloud.md#b-대조군-b1-포함-평가-20회) | `cascadelab --systems preview,B0,B1,B2 --repeat 20` |
-| Split 모드(원본 서버 → 내 PC 샌드박스)의 EXEC [적용] | 미실행. 2026-11-19 클라우드에서 두 SQL Server 이미지의 파일 리디렉션 호스트가 허용 목록에 없었다. [클라우드 검증](test-reports/2026-11-19-codex-cloud.md#a-split-모드-exec-적용) | [spikes/SP17.md](spikes/SP17.md) 순서 + EXEC 미리보기·[적용] |
+| 대조군 B1 20회 정식 실행 | **실행함(2026-11-19 CI, run 44435519363)**: 30사례 × 20회, 제품·B0·B1·B2. B1 M2 ALL 1700/2300, certain 과신 140/1000. 기준선과 다름 0(§6.1 "대조군 B1 20회"). Codex 클라우드는 SQL Server 이미지 다운로드에서 막혔다([클라우드 검증](test-reports/2026-11-19-codex-cloud.md#b-대조군-b1-포함-평가-20회)) | CI 수동 실행 `gh workflow run CI --ref main -f eval_repeat=20` |
+| Split 모드(원본 서버 → 내 PC 샌드박스)의 EXEC [적용] | **확인함(2026-11-19 CI, 원본 SQL Server 2022 CU28 + 샌드박스 2025 CU10)**: 8개 시나리오 모두 기대대로였다. 권한 없음·정의 못 읽음·정의 바뀜·약한 검증 미동의는 막히고 원본은 그대로다. 동의 시 KEYSET_HASH로 `committed`이고 원본 값은 정답대로 바뀌며 DDL 지문은 그대로다. 재적용은 404다. [보고서](test-reports/2026-11-19-ci-split-b1.md) | `.github/workflows/split-exec.yml`, `scripts/split-exec-check.ps1` |
 | PostgreSQL 18 FK 연쇄 DELETE 미리보기 | **측정함(2026-11-19 클라우드, DB·API)**. 부모 1만·5만·10만 행, 크기별 5회. 부모 10만 행 API p50 26.871초, 순 삭제 50만 행. [측정 보고서](test-reports/2026-11-19-codex-cloud.md#c-postgresql-18-fk-연쇄-delete) | `bash scripts/measure-pg-cascade.sh <새 로그 디렉터리>` |
 | CL21~CL25(EXEC·거부 사례) 평가 실행 | **실행함(2026-11-15 클라우드, 2026-11-16 CI·로컬)**: 37사례 × 3회, 제품·B0·B1·B2, 상태 불일치 0, certain 과신 0/171. 사례 집합이 기준선과 달라 위 지표와 직접 비교하지 않는다 | `.\scripts\home-test.ps1 -IncludeExec`, [test-reports/2026-11-15-cloud-db-validation.md](test-reports/2026-11-15-cloud-db-validation.md), [home-test-plan.md](home-test-plan.md) 5절 |
 | 2026-11-13에 더한 기능(도달 폐포 거부, EXEC 미리보기, KEYSET_HASH, Split)의 DB 확인 | **확인함(2026-11-16)**: 실제 SQL Server 테스트 1195개(CI), [적용] DB 테스트 106개(2026-11-17 EXEC [적용] 추가 뒤 153개, PR #11 CI 실행 44000072102의 Apply DB 테스트 단계), SP11~SP21 실행 | [home-test-plan.md](home-test-plan.md), [spikes/README.md](spikes/README.md) SP11~SP21 |
