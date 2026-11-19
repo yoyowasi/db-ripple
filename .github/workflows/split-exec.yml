@@ -1,0 +1,123 @@
+name: Split EXEC 적용 확인
+
+# Split 모드(원본 sql-origin = SQL Server 2022, 샌드박스 sql = 2025 CU10)에서 저장 프로시저 호출 EXEC의 [적용]을
+# 컨테이너 두 대와 개발 모드 Host API로 끝까지 확인한다(scripts/split-exec-check.ps1, 시나리오 S0~S6, docs/spikes/SP17.md 순서).
+# ci.yml과 별개: 수동 실행과, 이 스크립트·워크플로·스크립트가 쓰는 파일·지키려는 제품 코드(EXEC [적용], Split 기준선, Host 설정)가 바뀐 PR에서만 돈다(약 2분).
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/split-exec-check.ps1
+      - .github/workflows/split-exec.yml
+      - spikes/sql/sp_container-run.ps1
+      - spikes/sql/sp17_10_create_limited_login.sql
+      - spikes/sql/sp17_20_origin_fingerprint.sql
+      - scripts/env.ps1
+      - scripts/db-up.ps1
+      - compose.yaml
+      - cascadelab/sql/**
+      - src/DbRipple.Apply/**
+      - src/DbRipple.Contracts/Apply.cs
+      - src/DbRipple.Api/DbRippleApi.cs
+      - src/DbRipple.Core/Baseline/**
+      - src/DbRipple.Preview/SandboxManager.cs
+      - src/DbRipple.Host/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: split-exec-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  split-exec:
+    name: "Split EXEC [적용] (원본 2022 + 샌드박스 2025 CU10)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config', '**/packages.lock.json', '**/Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - name: ".env 만들기 (SA·원본 로그인 비밀번호는 실행마다 무작위, 로그에서 가림, 저장소 secret 안 씀)"
+        shell: bash
+        run: |
+          set -euo pipefail
+          SA_PW="Aa1-$(openssl rand -hex 16)"
+          ORIGIN_PW="Aa1-$(openssl rand -hex 16)"
+          echo "::add-mask::$SA_PW"
+          echo "::add-mask::$ORIGIN_PW"
+          umask 077
+          {
+            printf 'MSSQL_SA_PASSWORD=%s\n' "$SA_PW"
+            printf 'ORIGIN_SQL_SERVER=127.0.0.1,14334\n'
+            printf 'ORIGIN_SQL_USER=dbr_origin_user\n'
+            printf 'ORIGIN_SQL_PASSWORD=%s\n' "$ORIGIN_PW"
+            printf 'ORIGIN_SQL_TRUST_CERT=true\n'
+          } > .env
+      - name: "setfacl 준비 (원본 백업 폴더 기본 ACL로 Host가 .bak을 읽게)"
+        shell: bash
+        run: command -v setfacl || { sudo apt-get update -q && sudo apt-get install -y -q acl; }
+      - name: "Split EXEC [적용] 확인 (S0~S6), 하나라도 기대와 다르면 실패"
+        shell: bash
+        run: |
+          # sp_container-run.ps1이 컨테이너로 복사하는 임시 SQL을 mssql 사용자가 읽게 한다
+          umask 022
+          pwsh -NoProfile -File scripts/split-exec-check.ps1 -OutDir logs/home-test/split-exec
+      - name: "진단 로그 정리 (비밀번호가 들어간 파일은 올리지 않는다)"
+        id: scrub
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          OUT=logs/home-test/split-exec
+          mkdir -p "$OUT"
+          docker compose logs --tail 200 sql > "$OUT/sql-container.log" 2>/dev/null || true
+          docker compose --profile origin logs --tail 200 sql-origin > "$OUT/sql-origin-container.log" 2>/dev/null || true
+          if [ -f .env ]; then
+            for key in MSSQL_SA_PASSWORD ORIGIN_SQL_PASSWORD; do
+              PW="$(sed -n "s/^${key}=//p" .env)"
+              if [ -n "$PW" ]; then
+                # grep은 일치가 없으면 1을 낸다. || true
+                { grep -rlF -- "$PW" "$OUT" 2>/dev/null || true; } | while read -r f; do
+                  echo "비밀번호가 포함된 파일은 올리지 않고 삭제: $f"
+                  rm -f -- "$f"
+                done
+              fi
+            done
+          fi
+      # 정리 단계가 끝까지 성공했을 때만 결과를 밖으로 낸다(실패했으면 비밀번호가 든 파일이 남았을 수 있다)
+      - name: "요약을 실행 요약에 붙이기"
+        if: always() && steps.scrub.outcome == 'success'
+        shell: bash
+        run: |
+          if [ -f logs/home-test/split-exec/summary.md ]; then
+            cat logs/home-test/split-exec/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "summary.md 없음(스크립트가 요약 전에 끝났거나, 비밀번호가 들어 있어 지웠음)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: "결과 올리기 (요약·API 응답·sqlcmd 로그·Host 로그)"
+        if: always() && steps.scrub.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: split-exec-results
+          path: logs/home-test/split-exec/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: "Host·컨테이너 정리"
+        if: always()
+        shell: bash
+        run: |
+          pkill -f 'DbRipple.Host.dll' || true
+          docker compose --profile origin down -v || true
