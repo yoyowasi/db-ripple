@@ -153,7 +153,8 @@ jobs:
         run: |
           $repeat = 0
           if (-not [int]::TryParse($env:EVAL_REPEAT, [ref]$repeat) -or $repeat -lt 1 -or $repeat -gt 50) { "eval_repeat는 1~50 정수여야 함: '$env:EVAL_REPEAT'"; exit 1 }
-          "평가 반복: $repeat회"
+          # ${} 필수: "$repeat회"는 한글까지 변수 이름($repeat회)으로 읽혀 빈칸이 된다(2026-11-19 run 44435519363 로그).
+          "평가 반복: ${repeat}회"
           ./scripts/home-test.ps1 -Date ci -EvalRepeat $repeat
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           # home-test는 WARN에도 0으로 끝난다. 기본 30사례 평가의 지표가 기준선과 달라지면 WARN이므로 여기서 막는다.
