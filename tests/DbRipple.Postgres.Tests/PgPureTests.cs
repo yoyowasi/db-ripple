@@ -57,7 +57,7 @@ public class PgPureTests
         {
             OriginDb = "shop", SandboxDb = "shop_dbr_sandbox", SnapshotDb = "shop_dbr_sandbox",
             BackupFinishedAt = DateTimeOffset.UnixEpoch,
-            Fingerprint = new Fingerprint("17.2", "PostgreSQL", 17, false, 1, 0, 0, "C"),
+            Fingerprint = PgSandboxManager.FingerprintOf("17.2", 17, "C"), // 제품과 같은 고정값(재귀 트리거 켜짐)
             FingerprintMatch = true,
             Catalog = cat,
             Triggers = triggers ?? [],
