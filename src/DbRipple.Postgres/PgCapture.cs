@@ -9,12 +9,21 @@ namespace DbRipple.Postgres;
 /// 값은 to_jsonb 뒤 ->>로 문자열(NULL은 JSON null)이라 계약 규칙(값은 모두 문자열)과 같다. key_json은 json(순서 보존)이라
 /// UPDATE의 old/new 키 문자열을 그대로 비교할 수 있다(수집기 PairUpdate).
 /// 문장 단위 트리거는 0행이어도 돈다(SP22 B·C). 중첩된 0행 문장도 사용자 문장 트리거의 쓰기 문맥이 될 수 있으므로 헤더를 남긴다.
+/// 이미지 상한은 발동마다 본다(2026-11-19, full_for): 헤더를 쓰기 전에 "이번 발동 이미지(dbr_new + dbr_old 행 수) > 남은 FULL 예산(dbr.image_cap)"이면
+/// 이 발동부터 KEYS로 쓰고 dbr.image_mode를 KEYS로 바꿔 뒤 발동도 KEYS가 된다. 아니면 예산을 줄이고 FULL. 그래서 한 문장 안에서도 상한을 지킨다.
+/// set_config(…, true)는 함수의 SET 절(search_path)과 다른 변수라 함수가 끝나도 트랜잭션 끝까지 남는다.
 /// </summary>
 public static class PgCapture
 {
     public const string ManifestVersionPrefix = "pg-";
 
-    /// <summary>감사 저장소와 공용 함수(트리거 함수는 SECURITY DEFINER: 미리보기 역할은 감사 표에 직접 쓸 수 없다).</summary>
+    /// <summary>
+    /// 감사 저장소와 공용 함수(트리거 함수는 SECURITY DEFINER: 미리보기 역할은 감사 표에 직접 쓸 수 없다).
+    /// full_for(n): 발동 단위 상한 판정(O(1), 헤더를 세지 않음). dbr.image_cap은 "남은 FULL 예산"이다: n ≤ 예산이면 예산에서 n을 빼고 FULL,
+    /// n > 예산이면 KEYS로 닫는다. 예산이 없거나 빈 값이면(옛 실행기) 판정하지 않고, 숫자가 아니면 형 변환 오류 대신 KEYS로 닫는다.
+    /// numeric으로 받아 아주 큰 값도 넘치지 않는다. 사용자 트리거의 예외 블록이 되돌린 발동은 GUC 변경도 함께 되돌려져 예산과 기록이 맞는다.
+    /// SQL 본문에는 한글 주석을 두지 않는다(샌드박스 인코딩은 원본을 따라 LATIN1 등일 수 있다).
+    /// </summary>
     public static string StoreSql(string? previewRole) => $"""
         DROP SCHEMA IF EXISTS dbr_audit CASCADE;
         CREATE SCHEMA dbr_audit;
@@ -36,21 +45,36 @@ public static class PgCapture
         CREATE FUNCTION dbr_audit.full_mode() RETURNS boolean LANGUAGE sql STABLE AS $f$
           SELECT coalesce(current_setting('dbr.image_mode', true), '') <> 'KEYS'
         $f$;
+        CREATE FUNCTION dbr_audit.full_for(n bigint) RETURNS boolean LANGUAGE plpgsql AS $f$
+        DECLARE cfg text := current_setting('dbr.image_cap', true); budget numeric;
+        BEGIN
+          IF NOT dbr_audit.full_mode() THEN RETURN false; END IF;
+          IF n = 0 OR coalesce(cfg, '') = '' THEN RETURN true; END IF;
+          IF cfg ~ '^[0-9]+$' THEN budget := cfg::numeric; END IF;
+          IF budget IS NULL OR n > budget THEN
+            PERFORM set_config('dbr.image_mode', 'KEYS', true);
+            RETURN false;
+          END IF;
+          PERFORM set_config('dbr.image_cap', (budget - n)::text, true);
+          RETURN true;
+        END $f$;
 
         CREATE FUNCTION dbr_audit.capture_ins() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $f$
-        DECLARE s bigint := nextval('dbr_audit.capture_seq'); fm boolean := dbr_audit.full_mode(); n bigint;
+        DECLARE s bigint := nextval('dbr_audit.capture_seq'); fm boolean; n bigint;
         BEGIN
           SELECT count(*) INTO n FROM dbr_new;
+          fm := dbr_audit.full_for(n);
           INSERT INTO dbr_audit.header VALUES (s, TG_RELID, TG_TABLE_SCHEMA, TG_TABLE_NAME, 'I', n, 0, pg_trigger_depth(), CASE WHEN fm THEN 'FULL' ELSE 'KEYS' END);
           INSERT INTO dbr_audit.row_image
             SELECT s, 'INSERTED', row_number() OVER (), dbr_audit.key_of(to_jsonb(x), TG_ARGV), CASE WHEN fm THEN dbr_audit.row_of(to_jsonb(x)) END FROM dbr_new x;
           RETURN NULL;
         END $f$;
         CREATE FUNCTION dbr_audit.capture_upd() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $f$
-        DECLARE s bigint := nextval('dbr_audit.capture_seq'); fm boolean := dbr_audit.full_mode(); ni bigint; nd bigint;
+        DECLARE s bigint := nextval('dbr_audit.capture_seq'); fm boolean; ni bigint; nd bigint;
         BEGIN
           SELECT count(*) INTO ni FROM dbr_new;
           SELECT count(*) INTO nd FROM dbr_old;
+          fm := dbr_audit.full_for(ni + nd);
           INSERT INTO dbr_audit.header VALUES (s, TG_RELID, TG_TABLE_SCHEMA, TG_TABLE_NAME, 'U', ni, nd, pg_trigger_depth(), CASE WHEN fm THEN 'FULL' ELSE 'KEYS' END);
           INSERT INTO dbr_audit.row_image
             SELECT s, 'DELETED', row_number() OVER (), dbr_audit.key_of(to_jsonb(x), TG_ARGV), CASE WHEN fm THEN dbr_audit.row_of(to_jsonb(x)) END FROM dbr_old x;
@@ -59,9 +83,10 @@ public static class PgCapture
           RETURN NULL;
         END $f$;
         CREATE FUNCTION dbr_audit.capture_del() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $f$
-        DECLARE s bigint := nextval('dbr_audit.capture_seq'); fm boolean := dbr_audit.full_mode(); n bigint;
+        DECLARE s bigint := nextval('dbr_audit.capture_seq'); fm boolean; n bigint;
         BEGIN
           SELECT count(*) INTO n FROM dbr_old;
+          fm := dbr_audit.full_for(n);
           INSERT INTO dbr_audit.header VALUES (s, TG_RELID, TG_TABLE_SCHEMA, TG_TABLE_NAME, 'D', 0, n, pg_trigger_depth(), CASE WHEN fm THEN 'FULL' ELSE 'KEYS' END);
           INSERT INTO dbr_audit.row_image
             SELECT s, 'DELETED', row_number() OVER (), dbr_audit.key_of(to_jsonb(x), TG_ARGV), CASE WHEN fm THEN dbr_audit.row_of(to_jsonb(x)) END FROM dbr_old x;

@@ -237,7 +237,10 @@ public sealed class PgIntegrationTests(ITestOutputHelper output)
             PgFormat.Summary(d.Result.NetSummary), "주문 트리거 사슬 netSummary");
     }
 
-    /// <summary>(d) 이미지 상한을 넘겨 KEYS로 바뀐 테이블의 재조회가 FULL 이미지 계산과 같은 최종 차이를 내는지(PK 테이블·키 없는 테이블).</summary>
+    /// <summary>
+    /// (d) 이미지 상한을 넘겨 KEYS로 바뀐 테이블의 재조회가 FULL 이미지 계산과 같은 최종 차이를 내는지(PK 테이블·키 없는 테이블).
+    /// 2026-11-19부터 상한은 발동 단위다: 상한 1(첫 발동부터 KEYS)과 상한 14(같으면 FULL, 한 테이블에 FULL·KEYS 섞임)를 함께 본다.
+    /// </summary>
     [PgFact]
     public async Task Keys_reread_after_image_cap_gives_the_same_net_diff_as_full_images()
     {
@@ -248,7 +251,8 @@ public sealed class PgIntegrationTests(ITestOutputHelper output)
             INSERT INTO s.items SELECT i, i, 'L' || i FROM generate_series(1, 10) AS i;
             INSERT INTO s.loose VALUES (1, 1), (1, 1), (1, 2), (2, 5), (3, 7);
             """;
-        // 첫 문장이 이미지 6개(UPDATE 3행 × 2)를 남겨 상한 1을 넘기므로 둘째 문장부터 KEYS다. items는 FULL·KEYS가 섞이고 loose는 모두 KEYS.
+        // 문장별 이미지(= 발동 하나의 dbr_new + dbr_old 행 수): 6(UPDATE 3행 × 2), 8(4행 × 2), 2, 2, 4, 2, 1. 합 25.
+        // 2026-11-19 발동 단위 상한: 발동마다 "이번 발동 > 남은 FULL 예산(상한 − 지금까지 FULL)"이면 그 발동부터 KEYS, 같으면 FULL하고 예산을 줄인다(PgPureTests.Modes로 같은 계산).
         const string script = """
             UPDATE s.items SET qty = qty + 100 WHERE id <= 3;
             UPDATE s.items SET qty = qty + 1, label = NULL WHERE id BETWEEN 2 AND 5;
@@ -265,12 +269,18 @@ public sealed class PgIntegrationTests(ITestOutputHelper output)
 
         var full = await env.PreviewAsync(pipeline, script);
         var keys = await env.PreviewAsync(pipeline, script, imageCap: 1);
+        var mixed = await env.PreviewAsync(pipeline, script, imageCap: 14);
 
-        // 이미지 수: 6 + 8 + 2 + 2 + 4 + 2 + 1 = 25(기본 상한), 상한 1이면 FULL로 남은 첫 문장 6개.
+        // 기본 상한: 25 ≤ 100,000이라 모두 FULL.
         PgAssert.Same("Ok truncated=False images=25 modes=s.items:Full,s.items:Full,s.items:Full,s.items:Full,s.loose:Full,s.loose:Full,s.loose:Full",
             Mode(full), "기본 상한 미리보기의 상태·이미지 모드");
-        PgAssert.Same("Truncated truncated=True images=6 modes=s.items:Full,s.items:Keys,s.items:Keys,s.items:Keys,s.loose:Keys,s.loose:Keys,s.loose:Keys",
+        // 상한 1: 첫 발동부터 6 > 예산 1이라 KEYS, 모드가 KEYS로 바뀌어 뒤 발동도 모두 KEYS. FULL 이미지 0개(옛 동작은 첫 문장 6개가 FULL).
+        PgAssert.Same("Truncated truncated=True images=0 modes=s.items:Keys,s.items:Keys,s.items:Keys,s.items:Keys,s.loose:Keys,s.loose:Keys,s.loose:Keys",
             Mode(keys), "상한 1 미리보기의 상태·이미지 모드");
+        // 상한 14: 6 ≤ 14 FULL(남음 8), 8 = 남은 8이라 FULL(남음 0), 2 > 0이라 셋째 발동부터 KEYS.
+        // items는 FULL 2개·KEYS 2개가 섞이고 loose는 모두 KEYS. FULL 이미지 14개.
+        PgAssert.Same("Truncated truncated=True images=14 modes=s.items:Full,s.items:Full,s.items:Keys,s.items:Keys,s.loose:Keys,s.loose:Keys,s.loose:Keys",
+            Mode(mixed), "상한 14 미리보기의 상태·이미지 모드");
 
         // 손으로 계산한 최종 차이(id 11은 넣고 지워 없어짐, loose의 (1,2)는 원래 1개 + 넣은 1개).
         string[] expected =
@@ -289,8 +299,10 @@ public sealed class PgIntegrationTests(ITestOutputHelper output)
             "s.loose MultisetAdded x1 key(ROW:) before- after{g=4,v=4} changed[]",
         ];
         PgAssert.SameLines(expected, PgFormat.NetLines(full.NetChanges), "FULL 이미지로 계산한 최종 차이");
-        PgAssert.SameLines(PgFormat.NetLines(full.NetChanges), PgFormat.NetLines(keys.NetChanges), "KEYS 재조회 최종 차이(기대 = FULL 이미지 계산)");
-        PgAssert.Same(PgFormat.Summary(full.Result.NetSummary), PgFormat.Summary(keys.Result.NetSummary), "KEYS 재조회 netSummary(기대 = FULL)");
+        PgAssert.SameLines(PgFormat.NetLines(full.NetChanges), PgFormat.NetLines(keys.NetChanges), "상한 1 KEYS 재조회 최종 차이(기대 = FULL 이미지 계산)");
+        PgAssert.Same(PgFormat.Summary(full.Result.NetSummary), PgFormat.Summary(keys.Result.NetSummary), "상한 1 KEYS 재조회 netSummary(기대 = FULL)");
+        PgAssert.SameLines(PgFormat.NetLines(full.NetChanges), PgFormat.NetLines(mixed.NetChanges), "상한 14 FULL·KEYS 섞인 재조회 최종 차이(기대 = FULL 이미지 계산)");
+        PgAssert.Same(PgFormat.Summary(full.Result.NetSummary), PgFormat.Summary(mixed.Result.NetSummary), "상한 14 재조회 netSummary(기대 = FULL)");
         PgAssert.Same("s.items I1 U5 D1 MR0 MA0\ns.loose I0 U0 D0 MR3 MA4", PgFormat.Summary(full.Result.NetSummary), "netSummary");
 
         static string Mode(PreviewRecord p) =>
@@ -344,7 +356,10 @@ public sealed class PgIntegrationTests(ITestOutputHelper output)
         if (ready.LastError is not null) throw PgAssert.Fail($"성공한 새로 고침 뒤 lastError 기대 null, 실제 {ready.LastError}");
     }
 
-    /// <summary>(f) 중간 규모 연쇄: 부모 10행 삭제 → 자식 2만 행 CASCADE. 정확성과 걸린 시간(출력에 기록, 단언은 120초로 넉넉히).</summary>
+    /// <summary>
+    /// (f) 중간 규모 연쇄: 부모 10행 삭제 → 자식 2만 행 CASCADE. 정확성과 걸린 시간(출력에 기록, 단언은 120초로 넉넉히).
+    /// 2026-11-19: 같은 문장을 상한 100으로 한 번 더 돌려 한 문장 안에서 부모 FULL·자식 KEYS로 갈리고 최종 차이가 같은지 본다.
+    /// </summary>
     [PgFact]
     public async Task Medium_cascade_of_20000_children_is_exact_and_timed()
     {
@@ -381,11 +396,34 @@ public sealed class PgIntegrationTests(ITestOutputHelper output)
             .Select(n => int.Parse(n.Before!["parent_id"]!, System.Globalization.CultureInfo.InvariantCulture)).ToList();
         if (deletedChildren.Count != 20000 || deletedChildren.Any(id => id is < 1 or > 10))
             throw PgAssert.Fail($"지운 자식 기대 20000행(parent_id 1..10), 실제 {deletedChildren.Count}행, 범위 밖 {deletedChildren.Count(id => id is < 1 or > 10)}행");
+        if (sw.Elapsed > TimeSpan.FromSeconds(120))
+            throw PgAssert.Fail($"2만 행 연쇄 미리보기가 120초를 넘김: {sw.ElapsedMilliseconds}ms");
+
+        // 2026-11-19 한 문장 안 상한: 상한 100이면 부모 발동(10 ≤ 100, 남음 90)은 FULL, 그 뒤 기록되는 자식 발동(20,000 > 90)은 같은 문장 안에서 KEYS.
+        // FULL 이미지는 부모 10개뿐이고, 자식은 재조회(키 2만 개)로 기본 상한과 같은 최종 차이를 내야 한다.
+        var swCap = Stopwatch.StartNew();
+        var k = await env.PreviewAsync(pipeline, "DELETE FROM s.big_parent WHERE id <= 10", imageCap: 100);
+        swCap.Stop();
+        output.WriteLine($"[측정] 상한 100(자식 KEYS 재조회) 미리보기 전체 {swCap.ElapsedMilliseconds}ms (실행 {k.Result.TimingsMs.Execute}, 감사 읽기 {k.Result.TimingsMs.ReadLog}, 최종 차이 {k.Result.TimingsMs.NetDiff}, 귀속 {k.Result.TimingsMs.Resolve})");
+        // 자식 묶음은 행 이미지가 없어 FK 값(parent_id)을 볼 수 없다. 원인 확신도는 귀속 코드 몫이라 단언하지 않고 출력에만 남긴다.
+        output.WriteLine("상한 100 묶음: " + PgFormat.Firings(k.Result.Firings).ReplaceLineEndings(" / "));
+        PgAssert.Same("Truncated truncated=True images=10 rows=10 modes=s.big_parent:Full,s.big_child:Keys",
+            $"{k.Result.Status} truncated={k.Result.Capture.Truncated} images={k.Result.Capture.ImageCount} rows={k.Result.Statements.Single().RowsAffected} "
+            + $"modes={string.Join(",", k.Result.Firings.OrderBy(f => f.CaptureSeq).Select(f => $"{f.Table}:{f.ImageMode}"))}",
+            "상한 100 미리보기의 상태·이미지 수·묶음 모드(부모 FULL, 자식 KEYS)");
+        PgAssert.Same(PgFormat.Summary(p.Result.NetSummary), PgFormat.Summary(k.Result.NetSummary), "상한 100 netSummary(기대 = 기본 상한)");
+        // 2만 줄을 통째로 메시지에 넣지 않고 다른 줄만 몇 개 보인다.
+        var fullLines = PgFormat.NetLines(p.NetChanges).ToList();
+        var capLines = PgFormat.NetLines(k.NetChanges).ToList();
+        if (!fullLines.SequenceEqual(capLines, StringComparer.Ordinal))
+            throw PgAssert.Fail($"상한 100 최종 차이(행 단위)가 기본 상한과 다름: 기본 {fullLines.Count}줄, 상한 100 {capLines.Count}줄\n"
+                                + $"기본에만: {string.Join("\n", fullLines.Except(capLines, StringComparer.Ordinal).Take(5))}\n"
+                                + $"상한 100에만: {string.Join("\n", capLines.Except(fullLines, StringComparer.Ordinal).Take(5))}");
+        if (swCap.Elapsed > TimeSpan.FromSeconds(120))
+            throw PgAssert.Fail($"상한 100 2만 행 연쇄 미리보기가 120초를 넘김: {swCap.ElapsedMilliseconds}ms");
 
         await using (var conn = await PgTestDb.OpenAsync(env.Sandbox))
             PgAssert.Same("children=40000 headers=0", $"children={await PgTestDb.CountAsync(conn, "SELECT count(*) FROM s.big_child")} headers={await PgTestDb.CountAsync(conn, "SELECT count(*) FROM dbr_audit.header")}",
                 "미리보기 뒤 샌드박스(롤백)");
-        if (sw.Elapsed > TimeSpan.FromSeconds(120))
-            throw PgAssert.Fail($"2만 행 연쇄 미리보기가 120초를 넘김: {sw.ElapsedMilliseconds}ms");
     }
 }

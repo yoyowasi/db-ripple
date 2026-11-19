@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using DbRipple.Contracts;
 using DbRipple.Core.Capture;
 using Npgsql;
@@ -8,6 +9,8 @@ namespace DbRipple.Postgres;
 /// <summary>
 /// PostgreSQL 미리보기 실행기(설계 결정 3·4). 전용 연결(풀링 끔)에서 BEGIN → 문장마다 SET LOCAL ROLE(미리보기 역할) → 실행 → RESET ROLE → 경계 읽기,
 /// 마지막에 감사 헤더·행 이미지를 읽고 최종 차이를 이미지로 계산한 뒤 ROLLBACK한다.
+/// 이미지 상한(2026-11-19): 시작 때 dbr.image_cap GUC(남은 FULL 예산)를 두면 감사 함수가 발동마다 예산을 줄이고, 모자라면 KEYS로 바꾼다(한 문장 안에서도).
+/// 실행기는 문장 뒤 그 범위에 KEYS 헤더가 있으면 truncated로 적는다(SwitchesToKeys).
 /// PostgreSQL 트리거 함수는 COMMIT할 수 없고 오류가 나면 트랜잭션 전체가 중단되므로, 실패하면 ROLLBACK만 하고 남은 변경 검사는 하지 않는다(시퀀스 값 소비는 남는다).
 /// 평가 훅(SQL Server 전용 세션)은 부르지 않는다.
 /// </summary>
@@ -34,7 +37,10 @@ public sealed class PgPreviewExecutor(PgOptions options) : IPreviewExecutor
         StatementStatus? failure = null;
         await using var tx = await conn.BeginTransactionAsync(ct);
         var sw = Stopwatch.StartNew();
-        await ExecAsync(conn, tx, "SELECT set_config('dbr.image_mode', 'FULL', true)", ct);
+        // 감사 함수가 발동마다 상한을 보도록 상한을 "남은 FULL 예산" 트랜잭션 GUC로 둔다(2026-11-19, 감사 함수가 줄여 간다).
+        await using (var init = new NpgsqlCommand("SELECT set_config('dbr.image_mode', 'FULL', true), set_config('dbr.image_cap', $1, true)", conn, tx)
+                     { Parameters = { new() { Value = cap.ToString(CultureInfo.InvariantCulture) } } })
+            await init.ExecuteNonQueryAsync(ct);
         var boundary0 = await ScalarAsync(conn, tx, "SELECT coalesce(max(capture_seq), 0) FROM dbr_audit.header", ct);
         var prev = boundary0;
 
@@ -75,11 +81,12 @@ public sealed class PgPreviewExecutor(PgOptions options) : IPreviewExecutor
                 continue;
             }
 
-            var (min, max, images) = await BoundaryAsync(conn, tx, prev, ct);
+            var (min, max, images, keysBatches) = await BoundaryAsync(conn, tx, prev, ct);
             imageCount += images;
             var boundary = max ?? prev;
-            if (mode == ImageMode.Full && imageCount > cap)
+            if (SwitchesToKeys(mode, imageCount, cap, keysBatches))
             {
+                // 새 감사 함수는 이미 KEYS로 바꿨다(해가 없음). 옛 함수는 여기서 바꿔 다음 문장부터 KEYS.
                 await ExecAsync(conn, tx, "SELECT set_config('dbr.image_mode', 'KEYS', true)", ct);
                 mode = ImageMode.Keys;
                 truncated = true;
@@ -185,18 +192,26 @@ public sealed class PgPreviewExecutor(PgOptions options) : IPreviewExecutor
         return Convert.ToInt64(await cmd.ExecuteScalarAsync(ct));
     }
 
-    /// <summary>경계 뒤 이 문장의 (최소 순번, 최대 순번, 행 JSON 있는 이미지 수).</summary>
-    static async Task<(long? Min, long? Max, long Images)> BoundaryAsync(NpgsqlConnection conn, NpgsqlTransaction tx, long prev, CancellationToken ct)
+    /// <summary>
+    /// 문장 뒤 모드 판정(순수, 2026-11-19). 그 문장 범위에 KEYS 묶음이 있으면(감사 함수가 발동 단위 상한으로 바꿈) KEYS·truncated.
+    /// 옛 감사 함수(새로 고침 전 샌드박스)는 발동 단위 판정이 없어 지금처럼 누적 FULL 이미지 수가 상한을 넘을 때 바꾼다.
+    /// </summary>
+    internal static bool SwitchesToKeys(ImageMode mode, long imageCount, long cap, long keysBatches) =>
+        mode == ImageMode.Full && (keysBatches > 0 || imageCount > cap);
+
+    /// <summary>경계 뒤 이 문장의 (최소 순번, 최대 순번, 행 JSON 있는 이미지 수, KEYS 헤더 수).</summary>
+    static async Task<(long? Min, long? Max, long Images, long KeysBatches)> BoundaryAsync(NpgsqlConnection conn, NpgsqlTransaction tx, long prev, CancellationToken ct)
     {
         const string sql = """
             SELECT (SELECT min(capture_seq) FROM dbr_audit.header WHERE capture_seq > $1),
                    (SELECT max(capture_seq) FROM dbr_audit.header WHERE capture_seq > $1),
-                   (SELECT count(*) FROM dbr_audit.row_image WHERE capture_seq > $1 AND row_json IS NOT NULL)
+                   (SELECT count(*) FROM dbr_audit.row_image WHERE capture_seq > $1 AND row_json IS NOT NULL),
+                   (SELECT count(*) FROM dbr_audit.header WHERE capture_seq > $1 AND image_mode = 'KEYS')
             """;
         await using var cmd = new NpgsqlCommand(sql, conn, tx) { Parameters = { new() { Value = prev } } };
         await using var r = await cmd.ExecuteReaderAsync(ct);
         await r.ReadAsync(ct);
-        return (r.IsDBNull(0) ? null : r.GetInt64(0), r.IsDBNull(1) ? null : r.GetInt64(1), r.GetInt64(2));
+        return (r.IsDBNull(0) ? null : r.GetInt64(0), r.IsDBNull(1) ? null : r.GetInt64(1), r.GetInt64(2), r.GetInt64(3));
     }
 
     static async Task<IReadOnlyList<AuditHeaderRow>> ReadHeadersAsync(NpgsqlConnection conn, NpgsqlTransaction tx, long boundary0, CancellationToken ct)
@@ -256,7 +271,6 @@ public sealed class PgPreviewExecutor(PgOptions options) : IPreviewExecutor
     {
         await using var before = new NpgsqlConnection(SandboxConnectionString(options, options.SandboxDb));
         await before.OpenAsync(ct);
-        var seqsByTable = headers.ToLookup(h => h.TableObjectId, h => h.CaptureSeq);
         var result = new List<NetChange>();
         foreach (var t in tables)
         {
@@ -277,8 +291,7 @@ public sealed class PgPreviewExecutor(PgOptions options) : IPreviewExecutor
                 }
                 continue;
             }
-            var seqs = seqsByTable[t.ObjectId].ToHashSet();
-            var keys = images.Where(i => seqs.Contains(i.CaptureSeq) && i.KeyJson is not null).Select(i => i.KeyJson!).Distinct(StringComparer.Ordinal).ToList();
+            var keys = RereadKeys(t.ObjectId, headers, images);
             if (keys.Count == 0) continue;
             var cols = string.Join(", ", key.Columns.Select(c => "x." + PgNames.Quote(c)));
             var rcols = string.Join(", ", key.Columns.Select(c => "r." + PgNames.Quote(c)));
@@ -309,6 +322,16 @@ public sealed class PgPreviewExecutor(PgOptions options) : IPreviewExecutor
             }
         }
         return result;
+    }
+
+    /// <summary>
+    /// 재조회할 키(순수): 그 테이블의 모든 묶음(FULL·KEYS) 이미지에 나온 키. 감사 함수는 FULL에서도 key_json을 남기므로
+    /// 한 문장 안에서 FULL·KEYS 묶음이 섞인 테이블도 빠지는 키가 없다(2026-11-19).
+    /// </summary>
+    internal static List<string> RereadKeys(int tableId, IReadOnlyList<AuditHeaderRow> headers, IReadOnlyList<AuditRowImageRow> images)
+    {
+        var seqs = headers.Where(h => h.TableObjectId == tableId).Select(h => h.CaptureSeq).ToHashSet();
+        return images.Where(i => seqs.Contains(i.CaptureSeq) && i.KeyJson is not null).Select(i => i.KeyJson!).Distinct(StringComparer.Ordinal).ToList();
     }
 
     static async Task<Dictionary<string, long>> CountsAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, string sql, CancellationToken ct)

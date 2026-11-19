@@ -9,6 +9,7 @@ namespace DbRipple.Postgres;
 /// 더하는 순서와 상관없이 "최종 − 처음"이 남는다(트리거 안 같은 행 재수정처럼 기록 순서가 실제 순서와 달라도 맞다).
 /// 값 비교는 감사 함수가 만든 문자열 그대로다(같은 row_of라 같은 값은 같은 문자열).
 /// KEYS 모드 묶음(행 JSON 없음)이 있는 테이블은 이 방법으로 셀 수 없어 Unresolved로 돌려준다(실행기가 재조회로 계산).
+/// 한 문장 안에서 FULL·KEYS 묶음이 섞인 테이블도 묶음 하나라도 KEYS면 테이블 전체를 재조회로 넘긴다(FULL 이미지만 더하면 KEYS 묶음 변경이 빠진다).
 /// </summary>
 public static class ImageNetDiff
 {
