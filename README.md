@@ -5,6 +5,7 @@
 [![CI](https://github.com/yoyowasi/db-ripple/actions/workflows/ci.yml/badge.svg)](https://github.com/yoyowasi/db-ripple/actions/workflows/ci.yml)
 ![.NET 10](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square)
 ![SQL Server 2025](https://img.shields.io/badge/SQL%20Server-2025-cc2927?style=flat-square)
+![PostgreSQL 16–18 미리보기](https://img.shields.io/badge/PostgreSQL-16--18%20preview-4169e1?style=flat-square)
 ![Vue 3](https://img.shields.io/badge/Vue-3-42b883?style=flat-square)
 
 [개요](#개요) • [기능](#기능) • [시작하기](#시작하기) • [사용법](#사용법) • [작동 방식](#작동-방식) • [문서](#문서)
@@ -38,6 +39,7 @@ db-ripple은 원본을 복제한 샌드박스 DB에서 문장(또는 저장 프�
 - **검증 후 커밋:** [적용]은 원본 스냅샷, 드리프트 검사, 재실행, 커밋 전 비교를 거친다. 하나라도 다르면 롤백한다.
 - **원격 원본(Split):** 원본 서버의 백업을 내 PC의 Docker 샌드박스로 가져와 미리 본다.
 - **실행 파일:** Node·.NET 없이 Docker Desktop만으로 쓰는 Windows 배포본을 만들 수 있다.
+- **PostgreSQL(미리보기만):** PostgreSQL 16~18에서 INSERT·UPDATE·DELETE를 같은 화면으로 미리 본다. 원인 트리·행 비교·문장별 결과는 같고, [적용]과 프로시저 호출(`CALL`)은 아직 없다.
 
 ## 시작하기
 
@@ -90,6 +92,22 @@ db-ripple은 원본을 복제한 샌드박스 DB에서 문장(또는 저장 프�
 - 브라우저를 열지 않으려면 `DbRipple.Host.exe --no-browser`로 실행하고 콘솔에 찍힌 주소를 연다.
 - 개발 모드(`dotnet run`)와 실행 파일 모드를 가르는 규칙은 [설계 문서 §3.2](docs/architecture.md)에 있다.
 
+### PostgreSQL로 쓰기
+
+샌드박스는 원본과 같은 PostgreSQL 서버에 원본 DB를 TEMPLATE으로 복제해 만든다. 연결은 환경 변수로만 정한다(설정 화면에는 저장하지 않는다). 4번처럼 API 서버를 켜기 전에 같은 창에서 설정한다.
+
+```powershell
+$env:DBRIPPLE_ENGINE = 'Postgres'
+$env:DBRIPPLE_PG_CONNECTION = 'Host=127.0.0.1;Port=5432;Username=<관리 계정>;Password=<비밀번호>;Database=postgres'
+$env:DbRipple__Pg__OriginDb = 'shop'   # 원본 DB 이름(소문자·숫자·밑줄만)
+dotnet run --project src\DbRipple.Host
+```
+
+- 관리 계정은 superuser가 아닌 CREATEDB·CREATEROLE 계정을 권장한다.
+- 도구는 미리보기용 LOGIN 역할(기본 `dbr_preview`)을 만든다. 사용자 문장은 그 역할로 로그인한 연결에서 돈다. 그래서 서버 `pg_hba.conf`가 그 역할의 비밀번호(SCRAM) 로그인을 허용해야 한다.
+- 원본 DB에 다른 연결이 열려 있으면 PostgreSQL이 복제를 거절한다(55006). 도구는 그 연결을 끊지 않고, 실패 이유를 샌드박스 상태 칩에 보인다.
+- 범위와 설계는 [PostgreSQL 최소판 설계](docs/superpowers/specs/2026-11-18-postgres-preview-minimal.md)에 있다.
+
 ## 사용법
 
 ### 화면에서
@@ -125,7 +143,7 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5080/api/previews/$($r.pre
 
 | 메서드·경로 | 하는 일 |
 |---|---|
-| `GET /api/sandbox` | 샌드박스 상태(building, ready, dirty, error), 기준 시각, 환경 지문 |
+| `GET /api/sandbox` | 샌드박스 상태(building, ready, dirty, error)와 실패 이유, 기준 시각, 환경 지문, 엔진 |
 | `POST /api/sandbox/refresh` | 기준선 다시 만들기(202) |
 | `POST /api/analyze` | SQL 분석만(거부·경고·위치) |
 | `POST /api/previews` | 미리보기 실행. 거부면 422와 `rejects[]` |
@@ -137,7 +155,7 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5080/api/previews/$($r.pre
 | `GET /api/catalog/schema` | 편집기 자동완성용 스키마 |
 | `GET`·`PUT /api/settings`, `POST /api/settings/test` | 원본·샌드박스 연결 조회·저장·시험(비밀값은 돌려주지 않는다) |
 
-오류는 ProblemDetails 형식이다(400 입력 오류, 401 실행 파일 모드 세션 불일치, 403 보안 규칙 위반, 404 없는 미리보기, 409 다른 작업 실행 중 등, 422 거부된 문장, 503 SQL Server 연결 불가). 계약 타입은 `src/DbRipple.Contracts`에 있다.
+오류는 ProblemDetails 형식이다(400 입력 오류, 401 실행 파일 모드 세션 불일치, 403 보안 규칙 위반, 404 없는 미리보기, 409 다른 작업 실행 중 등, 422 거부된 문장, 501 PostgreSQL에서 [적용], 503 DB 연결 불가). 계약 타입은 `src/DbRipple.Contracts`에 있다.
 
 API는 사용자 인증이 없는 로컬 서버다. 다른 웹사이트가 부르지 못하게 개발 모드는 전용 헤더·`Origin` 허용 목록·`Sec-Fetch-Site` 검사를, 실행 파일 모드는 일회용 실행 주소로 만든 세션 쿠키와 세션별 요청 키를 요구한다. Host 헤더는 `127.0.0.1`·`localhost`·`[::1]`만 받는다. 자세한 것은 [설계 문서 §6.4](docs/architecture.md)에 있다.
 
@@ -171,6 +189,8 @@ flowchart LR
 
 [적용]은 원본에서 스냅샷을 만들고(만들 수 없으면 사용자 동의를 받아 건수·해시 비교로 낮춘다), 미리보기 이후 원본이 바뀌었는지 확인한 뒤, 같은 SQL을 트랜잭션 안에서 다시 실행한다. 문장별 행 수, 테이블별 건수, 행 값이 미리보기와 모두 같을 때만 커밋한다. 저장 프로시저 호출이면 원본 실행 주체의 실행 권한과, 호출하는 프로시저(펼친 중첩 프로시저 포함)의 정의가 기준선과 같은지 먼저 확인하고(모듈 서명된 프로시저는 막는다), 실행 직전과 커밋 직전에 정의를 다시 확인한다. 반환 값과 결과 집합 수도 미리보기와 대조한다.
 
+PostgreSQL은 같은 흐름을 쓰되 샌드박스를 TEMPLATE으로 복제하고, 문장 단위 감사 트리거의 전이 테이블로 변경을 모으며, 최종 차이를 감사 기록으로 계산한다(기준 스냅샷 없음).
+
 설계 결정과 대안 비교는 [docs/architecture.md](docs/architecture.md)에 있다.
 
 ### 프로젝트 구성
@@ -185,6 +205,7 @@ flowchart LR
 | `src/DbRipple.Attribution` | 원인·확신도 판정, 그래프 데이터 |
 | `src/DbRipple.Preview` | 미리보기 순서 조립, 샌드박스 상태, 결과 저장 |
 | `src/DbRipple.Apply` | [적용] 검증과 커밋 |
+| `src/DbRipple.Postgres` | PostgreSQL 미리보기(샌드박스 복제, 감사, 문장 분석, 실행) |
 | `src/DbRipple.Api`, `src/DbRipple.Host` | REST API와 실행 파일(웹 서버) |
 | `src/DbRipple.Cli` | 기준선 구축·복원 명령줄 도구 |
 | `web/` | 웹 화면(Vue 3, CodeMirror 6, Vue Flow, AG Grid Community) |
@@ -199,15 +220,30 @@ flowchart LR
 dotnet test DbRipple.slnx
 ```
 
-테스트는 `dbrt_` 접두의 임시 DB를 만들고 지운다. `env.ps1`을 부르지 않으면 DB 테스트는 건너뛰고 단위 테스트만 돈다. 웹 화면은 `cd web; npm run typecheck; npm run build`로 검사한다. GitHub Actions CI는 PR과 main마다 빌드, 테스트, 웹 빌드, SQL Server 2025 컨테이너 DB 테스트, 기본 평가를 돌린다.
+테스트는 `dbrt_` 접두의 임시 DB를 만들고 지운다. `env.ps1`을 부르지 않으면 DB 테스트는 건너뛰고 단위 테스트만 돈다. PostgreSQL 통합 테스트는 `DBRIPPLE_PG_TEST_CONNECTION`(superuser가 아닌 계정, 관리용 DB `postgres`)이 있을 때만 돈다. 웹 화면은 `cd web; npm run typecheck; npm run build`로 검사한다.
 
-평가는 합성 DB [CascadeLab](cascadelab/README.md)의 손 정답과, 감사 장치 없는 사본에서 같은 SQL을 실행한 결과(오라클)로 한다. 2026-11-12 측정에서 사례 30개를 20회 반복해 셀 일치 176/176, 변경 탐지 115/115, 원인 간선 102/102였다. 직접 대상 테이블만 보는 방법은 변경 탐지 0.3652였다. 큰 DELETE(CL20)는 2026-11-18 재측정에서 1만 행 p50 1.9초, 10만 행 p50 17.8초다(GitHub Actions, CPU 4개). 지표 정의와 전체 결과는 [docs/evaluation.md](docs/evaluation.md)에 있다.
+GitHub Actions CI는 PR과 main마다 다음을 돌린다.
+- .NET 빌드·테스트, 웹 빌드, PowerShell 5.1 스크립트 회귀
+- SQL Server 2025 컨테이너 DB 테스트와 기본 평가
+- PostgreSQL 16·17·18 통합 테스트
+
+그 밖에 두 가지는 따로 돈다.
+- Split 모드의 EXEC [적용](원본 SQL Server 2022 + 샌드박스 2025): 관련 파일이 바뀐 PR과 수동 실행에서 확인한다(`split-exec.yml`).
+- 정식 20회 평가: CI 수동 실행의 `eval_repeat`로 돌린다.
+
+평가는 합성 DB [CascadeLab](cascadelab/README.md)의 손 정답과, 감사 장치 없는 사본에서 같은 SQL을 실행한 결과(오라클)로 한다.
+- 2026-11-12 측정: 사례 30개를 20회 반복해 셀 일치 176/176, 변경 탐지 115/115, 원인 간선 102/102였다.
+- 다른 방법과의 비교(변경 탐지): 직접 대상 테이블만 보는 방법은 0.3652, FK 정의만 따라가는 방법은 0.7391이었다(2026-11-19, 20회).
+- 큰 DELETE(CL20): 2026-11-18 재측정에서 1만 행 p50 1.9초, 10만 행 p50 17.8초다(GitHub Actions, CPU 4개). 이 수치는 한 문장 안에서도 이미지 상한을 지키게 바꾼 것(2026-11-19)보다 앞선 측정이다.
+
+지표 정의와 전체 결과는 [docs/evaluation.md](docs/evaluation.md)에 있다.
 
 ## 지원 범위
 
 - **문장:** INSERT·UPDATE·DELETE(여러 문장, `GO`로 나눈 배치 가능)와 저장 프로시저를 부르는 `EXEC`. SELECT, MERGE, OUTPUT 절, 변수·제어 흐름, 동적 SQL은 거부한다.
 - **[적용]:** 미리보기가 잘리지 않았을 때, 미리보기 후 30분 안에. 바뀐 행 이미지가 10만 개를 넘으면 키만 수집해 [적용]이 막힌다(UPDATE는 한 행이 이미지 2개, FK 연쇄·트리거로 바뀐 행도 센다). `EXEC`는 원본 실행 주체에 그 프로시저 실행 권한이 있고, 프로시저 정의가 기준선과 같고, 모듈 서명이 없을 때. 도구는 원본에 권한을 주지 않는다(시연 원본 `AW_Origin`은 `restore-aw-origin.ps1`이 준다).
-- **확인한 환경:** SQL Server 2025 CU10(Linux 컨테이너). Split 원본은 SQL Server 2022 컨테이너에서도 확인했다. 데이터베이스 스냅샷 기능이 필요하다.
+- **확인한 환경:** SQL Server 2025 CU10(Linux 컨테이너). Split 원본은 SQL Server 2022 컨테이너에서도 확인했다(EXEC [적용] 포함). 데이터베이스 스냅샷 기능이 필요하다.
+- **PostgreSQL:** 미리보기만 된다. INSERT·UPDATE·DELETE만 받고, 원본과 샌드박스가 같은 서버에 있어야 한다. [적용](501), `CALL`·`DO`, Split, 설정 화면 저장은 없다. PostgreSQL 16·17·18에서 확인했다(CI).
 - **미리보기:** 한 번에 하나만 돈다.
 
 ## 문서
@@ -216,7 +252,8 @@ dotnet test DbRipple.slnx
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | 설계: 결정 기록, 데이터 계약, 원인 귀속 규칙, 위험 |
 | [docs/evaluation.md](docs/evaluation.md) | 평가 보고서: 지표, 대조군, 결과, 타당성 위협 |
-| [docs/spikes/](docs/spikes/README.md) | 설계 전제를 실제 DB로 확인한 실험 기록(SP0~SP21) |
+| [docs/spikes/](docs/spikes/README.md) | 설계 전제를 실제 DB로 확인한 실험 기록(SP0~SP22) |
+| [PostgreSQL 최소판 설계](docs/superpowers/specs/2026-11-18-postgres-preview-minimal.md) | PostgreSQL 미리보기의 범위, 결정, 권한 경계 |
 | [docs/home-test-plan.md](docs/home-test-plan.md) | DB로 확인할 항목과 순서, 실행 결과표 |
 | [docs/test-reports/](docs/test-reports/) | 날짜별 검증 보고서 |
 | [docs/dev-setup.md](docs/dev-setup.md) | 개발 환경 준비 |
