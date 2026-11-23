@@ -58,15 +58,17 @@ CL21~CL25의 정답은 정답 형식 v0.3을 쓴다. 노드 `P:<스키마.프로
 
 공식 백업을 `AW_Origin`(원본 역할)에 복원해 쓴다. 정답 집합이 없어 지표 대신 시연과 스파이크에 쓴다. 대본은 설계 §10.7과 `scripts/demo/demo.http`다.
 
+2026-11-23에 새 원인 트리 화면에서 AdventureWorks 실DB로 DM1~DM3과 DM7을 확인했다. [검증 결과와 화면](test-reports/2026-11-23-adventureworks-live-ui.md)
+
 | ID | 시나리오 | 상태 |
 |---|---|---|
-| DM1 | SalesOrderHeader 1건 DELETE(FK 연쇄, 연쇄 대상 트리거 발동) | 2주차 Host HTTP로 확인(화면 확인 전). SP8 조회 준비 |
-| DM2 | SalesOrderDetail.OrderQty UPDATE(트리거 3단 사슬) | SalesYTD가 실제로 바뀌는 주문을 SP8로 고를 예정(실행 전) |
-| DM3 | HumanResources.Employee DELETE(INSTEAD OF 거부) | SP8 조회 준비, 실행 전 |
+| DM1 | SalesOrderHeader 1건 DELETE(FK 연쇄, 연쇄 대상 트리거 발동) | 화면 미리보기·적용 통과. 원본 4행 삭제 확인 |
+| DM2 | SalesOrderDetail.OrderQty UPDATE(트리거 3단 사슬) | 화면 미리보기·적용 통과. 원본 수정 3행·추가 1행 확인 |
+| DM3 | HumanResources.Employee DELETE(INSTEAD OF 거부) | 화면에서 오류 3609와 적용 비활성 확인 |
 | DM4 | CascadeLab CL10(모호한 귀속) | 실행 전 |
 | DM5 | pubs(PK 없는 테이블, ROLLBACK 트리거) | 안내만(pubs는 저장소에 넣지 않음) |
 | DM6 | CascadeLab CL20 틀 5만 행 DELETE(상한, KEYS 모드) | 실행 전 |
-| DM7 | 미리보기 뒤 원본 행을 바꾸고 [적용] → `drift_detected` | `scripts/demo/dm7-drift.sql` 준비, 실행 전 |
+| DM7 | 미리보기 뒤 원본 행을 바꾸고 [적용] → `drift_detected` | 화면에서 드리프트 감지 및 적용 차단 확인 |
 
 ### 2.3 측정 환경
 

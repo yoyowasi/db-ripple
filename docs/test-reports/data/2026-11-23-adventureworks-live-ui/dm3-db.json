@@ -1,0 +1,7 @@
+{
+  "before": 1,
+  "afterBlocked": 1,
+  "sandbox": 1,
+  "applyRequests": 0,
+  "cancelHttp": 204
+}
