@@ -15,6 +15,7 @@ import ProblemBanner from '../components/ProblemBanner.vue'
 import PropagationGraph from '../components/PropagationGraph.vue'
 import SandboxBar from '../components/SandboxBar.vue'
 import SqlEditor from '../components/SqlEditor.vue'
+import FlowSteps from '../components/compare/FlowSteps.vue'
 import TableTree from '../components/compare/TableTree.vue'
 import PreviewInfo from '../components/compare/PreviewInfo.vue'
 import RowCompare from '../components/compare/RowCompare.vue'
@@ -217,7 +218,7 @@ const emptyState = computed(() => {
   const st = sandbox.status?.state
   if (st === 'building') return { title: '샌드박스 기준선을 만드는 중', body: '다 만들면 미리보기를 실행할 수 있습니다.' }
   if (st === 'dirty' || st === 'error')
-    return { title: '샌드박스를 새로 고쳐야 합니다', body: '위 띠의 샌드박스 상태를 눌러 [샌드박스 새로 고침]으로 기준선을 다시 만든 뒤 실행하세요.' }
+    return { title: '샌드박스를 새로 고쳐야 합니다', body: '위 메뉴 줄의 [샌드박스 새로 고침]으로 기준선을 다시 만든 뒤 실행하세요.' }
   return { title: '미리보기 결과 없음', body: 'SQL을 쓰고 [미리보기 실행](Ctrl+Enter)을 누르면 바뀌는 테이블과 행이 여기에 나옵니다.' }
 })
 </script>
@@ -237,8 +238,7 @@ const emptyState = computed(() => {
             </button>
             <button
               type="button"
-              class="btn btn-sm"
-              :class="{ 'btn-primary': !store.preview && !store.running }"
+              class="btn btn-sm btn-ink"
               :aria-disabled="runDisabled"
               :aria-describedby="runBlockedReason ? 'run-why' : undefined"
               aria-keyshortcuts="Control+Enter"
@@ -360,6 +360,7 @@ const emptyState = computed(() => {
 
         <!-- 2) 미리보기: 테이블 단위 원인 트리(D안, 2026-11-18 확정) + 아래 창. 원인 경로는 트리가 보이므로 아래 창은 행만 -->
         <template v-else-if="store.preview">
+          <div class="flowbar"><FlowSteps :key="store.preview.previewId" :preview="store.preview" /></div>
           <TableTree
             class="ctable"
             :class="{ short: store.resultTab !== 'compare' }"
@@ -486,7 +487,7 @@ const emptyState = computed(() => {
 .box {
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--r-lg);
   background: var(--panel);
 }
 
@@ -519,8 +520,8 @@ const emptyState = computed(() => {
   border: 1px solid transparent;
   border-radius: var(--r);
   background: none;
-  color: var(--muted);
-  font: 600 12px var(--ui);
+  color: var(--fg);
+  font: 600 13px var(--mono);
   cursor: pointer;
 }
 .tgl:hover {
@@ -615,7 +616,7 @@ const emptyState = computed(() => {
   margin: 6px 10px;
 }
 .applybox {
-  border-top: 3px solid var(--accent);
+  overflow: hidden;
 }
 
 /* 알림 */
@@ -636,6 +637,11 @@ const emptyState = computed(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+.flowbar {
+  flex: none;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
 }
 .ctable {
   flex: 0 1 auto;

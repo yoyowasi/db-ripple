@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// 샌드박스 상태(시안 3-compare 상단 띠): 메뉴 줄 안에 "원본 → 샌드박스"와 상태 칩 하나. 정상이면 조용하게, 문제가 있으면 칩이 옆에 붙는다.
-// 칩을 누르면 모드 · 원본 · 기준 시각 · 환경 지문(차단·경고) · 인스턴스 경고 · 원본 연결 · 잠금 · [샌드박스 새로 고침]이 열린다.
+// 샌드박스 상태(리디자인 시안 2026-11-23 상단바): 왼쪽 "원본 → 샌드박스" · 기준 시각, 오른쪽 초록 점 + 한 줄 글씨(배경 상자 없음) · [샌드박스 새로 고침] · [테마].
+// 정상이면 조용하게, 문제가 있으면 짧은 표시가 옆에 붙는다. 상태 글씨를 누르면 모드 · 원본 · 기준 시각 · 환경 지문(차단·경고) · 인스턴스 경고 · 원본 연결 · 잠금이 열린다.
 // App.vue 메뉴 줄의 #menu-slot 으로 Teleport 한다(홈 화면에서만 보인다).
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { SandboxState } from '../api/types'
@@ -31,6 +31,8 @@ function shortTime(iso: string): string {
 }
 const busy = computed(() => sandbox.refreshing || st.value?.state === 'building')
 const refreshBlocked = computed(() => busy.value || !!st.value?.locked)
+/** 새로 고침이 필요한 상태면 단추를 주 단추로 */
+const refreshUrgent = computed(() => st.value?.baselineStale === true || st.value?.state === 'dirty' || st.value?.state === 'error')
 
 /** 버전 문자열은 미리보기 결과의 baseline.fingerprint 에만 있다(GET /sandbox 에는 일치 여부만). */
 const fingerprintText = computed(() => {
@@ -99,10 +101,13 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDoc))
       <span v-if="originText" class="dbpair mono" :title="modeLabel ? modeTitle : undefined">
         {{ originText }}<template v-if="sandboxDb"> → {{ sandboxDb }}</template>
       </span>
+      <span v-if="st?.baselineAt" class="base">기준 <time :datetime="st.baselineAt">{{ shortTime(st.baselineAt) }}</time></span>
+      <span class="sp"></span>
       <details v-if="st" ref="det" class="st" @keydown="onEsc">
         <summary :aria-label="`${STATE_LABEL[st.state]}${flags.length ? `, ${flags.map((f) => f.text).join(', ')}` : ''}. 자세히 보기`">
           <span class="dot" :class="DOT[st.state]" aria-hidden="true"></span>
           <span role="status">{{ STATE_LABEL[st.state] }}</span>
+          <small v-if="st.state === 'ready' && !flags.length" class="calm">· 잠금 없음</small>
           <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
         </summary>
         <div class="pop">
@@ -156,20 +161,28 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDoc))
             <h3>샌드박스 인스턴스 경고(막지는 않습니다)</h3>
             <ul><li v-for="w in instanceWarnings" :key="w">{{ w }}</li></ul>
           </template>
-          <button type="button" class="btn btn-sm" :class="{ 'btn-primary': stale }" :aria-disabled="refreshBlocked" @click="refresh">
-            {{ sandbox.refreshing ? '새로 고치는 중…' : '샌드박스 새로 고침' }}
-          </button>
         </div>
       </details>
       <b v-else-if="sandbox.statusError" class="err" role="alert">{{ sandbox.statusError }}</b>
       <span v-else class="muted" role="status">샌드박스 상태 확인 중…</span>
       <span v-for="f in flags" :key="f.text" class="flag" :class="f.tone">{{ f.text }}</span>
-      <button type="button" class="thm" :aria-pressed="theme === 'dark'" title="어두운 테마" @click="toggle">
+      <button
+        v-if="st"
+        type="button"
+        class="btn btn-sm"
+        :class="{ 'btn-primary': refreshUrgent }"
+        :aria-disabled="refreshBlocked"
+        :title="st.locked ? '다른 미리보기·적용이 끝나면 켜집니다' : undefined"
+        @click="refresh"
+      >
+        {{ sandbox.refreshing ? '새로 고치는 중…' : '샌드박스 새로 고침' }}
+      </button>
+      <button type="button" class="btn btn-sm thm" :aria-pressed="theme === 'dark'" title="어두운 테마" @click="toggle">
         <svg class="ic" viewBox="0 0 16 16" aria-hidden="true">
           <circle cx="8" cy="8" r="5.8" />
           <path d="M8 2.2a5.8 5.8 0 0 1 0 11.6z" fill="currentColor" />
         </svg>
-        <span class="sr-only">어두운 테마</span>
+        테마<span class="sr-only">: 어두운 테마</span>
       </button>
     </div>
   </Teleport>
@@ -182,10 +195,33 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDoc))
   gap: 10px;
   min-width: 0;
 }
+/* 메뉴 줄이 좁으면 왼쪽 정보(DB 이름·기준 시각)부터 말줄임으로 줄인다. 상태와 단추는 줄이지 않는다. */
+.sbar > * {
+  flex: none;
+}
+.sbar > .dbpair,
+.sbar > .base {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .dbpair {
   color: var(--menu-fg);
   font-size: 12px;
   white-space: nowrap;
+}
+.base {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.sbar > .sp {
+  flex: 1;
+}
+.calm {
+  color: var(--muted);
+  font-size: 13px;
 }
 .st {
   position: relative;
@@ -196,8 +232,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDoc))
   gap: 6px;
   padding: 3px 6px;
   border-radius: var(--r);
-  color: var(--menu-fg);
-  font-size: 12px;
+  color: var(--menu-fg-strong);
+  font-size: 13px;
   list-style: none;
   cursor: pointer;
   white-space: nowrap;
@@ -300,8 +336,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDoc))
   font-size: 12px;
 }
 .flag {
-  padding: 1px 7px;
-  border-radius: 3px;
+  padding: 1px 8px;
+  border-radius: 99px;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -314,20 +350,10 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDoc))
   background: var(--err-bg);
   color: var(--err);
 }
-.thm {
-  display: inline-grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--r);
-  background: none;
-  color: var(--menu-fg);
-  cursor: pointer;
+.sbar .btn {
+  font-size: 13px;
 }
-.thm:hover {
-  border-color: var(--line);
-  color: var(--menu-fg-strong);
+.thm {
+  gap: 6px;
 }
 </style>

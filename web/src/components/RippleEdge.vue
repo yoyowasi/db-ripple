@@ -153,7 +153,11 @@ const labelStyle = computed(() => ({
   .drawing .rpath {
     stroke-dasharray: 1;
     stroke-dashoffset: 1;
-    animation: rg-edraw 0.28s var(--ease) var(--dl) forwards;
+    animation: rg-edraw 0.4s var(--ease) var(--dl) forwards;
+  }
+  /* 추론 간선은 점선이 흐른다(확실한 실선과 구분) */
+  .flow-wrap:not(.drawing) .rpath.c-inferred {
+    animation: rg-flow 1.1s linear infinite;
   }
   .drawing .rlabel {
     opacity: 0;
@@ -163,6 +167,11 @@ const labelStyle = computed(() => ({
 @keyframes rg-edraw {
   to {
     stroke-dashoffset: 0;
+  }
+}
+@keyframes rg-flow {
+  to {
+    stroke-dashoffset: -13;
   }
 }
 @keyframes rg-efade {

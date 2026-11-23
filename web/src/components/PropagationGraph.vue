@@ -3,7 +3,7 @@
 // 노드를 누르거나 Enter → select-firing 이벤트(선택·서랍은 부모가 정한다: 전역 스토어를 쓰지 않아 /sp9에서도 안전). 마우스·포커스·hoveredTable → 문장부터 그 노드까지 경로 강조.
 import { VueFlow, useVueFlow } from '@vue-flow/core'
 import type { NodeMouseEvent } from '@vue-flow/core'
-import { computed, markRaw, nextTick, onBeforeUnmount, provide, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, provide, shallowRef, useTemplateRef, watch } from 'vue'
 import type { Firing, GraphDto } from '../api/types'
 import { ancestorsOf, buildFlow, legendOf, summaryLine } from '../lib/graphModel'
 import type { FlowModel, RippleNodeData } from '../lib/graphModel'
@@ -135,7 +135,7 @@ watch(
     if (!old || old[0] !== graph) {
       window.clearTimeout(drawTimer)
       drawing.value = !reducedMotion()
-      if (drawing.value) drawTimer = window.setTimeout(() => (drawing.value = false), 900)
+      if (drawing.value) drawTimer = window.setTimeout(() => (drawing.value = false), 1600)
     }
     await nextTick()
     await twoFrames()
@@ -185,7 +185,7 @@ const summary = computed(() => (props.graph ? summaryLine(props.graph, props.fir
 const zeroTotal = computed(() => model.value?.collapsibleZeroRows ?? 0)
 
 const zoomPct = computed(() => Math.round(viewport.value.zoom * 100))
-const drawStep = computed(() => Math.min(0.14, 0.5 / Math.max(1, model.value?.maxRank ?? 1)))
+const drawStep = computed(() => Math.min(0.22, 0.9 / Math.max(1, model.value?.maxRank ?? 1)))
 
 // 경로 강조: 마우스 > 포커스 > 레일·탐색기 hover(hoveredTable)
 const active = computed(() => {
@@ -276,34 +276,44 @@ function pickMember(firingId: string): void {
 }
 
 const summaryId = computed(() => `${props.flowId}-sum`)
+
+// "읽는 법 ?" 팝오버: 바깥을 누르거나 Esc면 닫는다.
+const lgd = useTemplateRef<HTMLDetailsElement>('lgd')
+function onDocDown(e: MouseEvent): void {
+  if (lgd.value?.open && !lgd.value.contains(e.target as Node)) lgd.value.open = false
+}
+function onLgdKey(e: KeyboardEvent): void {
+  if (e.key !== 'Escape' || !lgd.value?.open) return
+  lgd.value.open = false
+  lgd.value.querySelector('summary')?.focus()
+}
+onMounted(() => document.addEventListener('mousedown', onDocDown))
+onBeforeUnmount(() => document.removeEventListener('mousedown', onDocDown))
 </script>
 
 <template>
   <section class="pg" :class="{ fixed: height !== undefined }" aria-label="전파 그래프">
+    <!-- 리디자인 시안의 한 줄 도구 막대: 줌은 한 묶음 컨트롤, 범례는 "읽는 법 ?" 팝오버로 접어 둔다 -->
     <div class="gtool">
-      <a class="lnk" href="#res-panel-rows" :aria-describedby="summaryId" @click.prevent="emit('show-rows')">표로 보기</a>
-      <div class="grp" role="group" aria-label="그래프 보기 도구">
-        <button type="button" class="btn btn-sm" :disabled="!nodeCount" @click="void refit()">
-          <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" /></svg>맞춤
-        </button>
-        <button type="button" class="btn btn-sm" aria-label="확대" :disabled="!nodeCount" @click="zoomBy(1)">
-          <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>확대
-        </button>
-        <button type="button" class="btn btn-sm" aria-label="축소" :disabled="!nodeCount" @click="zoomBy(-1)">
-          <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10" /></svg>축소
-        </button>
+      <div class="zoom" role="group" aria-label="그래프 배율">
+        <button type="button" :disabled="!nodeCount" @click="void refit()">맞춤</button>
+        <button type="button" aria-label="축소" :disabled="!nodeCount" @click="zoomBy(-1)">−</button>
         <span class="zoomv" aria-live="polite" aria-label="현재 배율">{{ zoomPct }}%</span>
+        <button type="button" aria-label="확대" :disabled="!nodeCount" @click="zoomBy(1)">＋</button>
       </div>
       <label v-if="zeroTotal > 0" class="opt">
         <input type="checkbox" :checked="showZeroRows" @change="emit('update:showZeroRows', ($event.target as HTMLInputElement).checked)" />
         0행 묶음 보기<span v-if="!showZeroRows">({{ zeroTotal }}개 숨김)</span>
       </label>
+      <a class="btn btn-sm lnk" href="#res-panel-rows" :aria-describedby="summaryId" @click.prevent="emit('show-rows')">표로 보기</a>
+      <details v-if="legend && nodeCount > 0" ref="lgd" class="lgpop" @keydown="onLgdKey">
+        <summary class="btn btn-sm">읽는 법 ?</summary>
+        <div class="pop" role="note"><GraphLegend :present="legend" expanded /></div>
+      </details>
     </div>
 
-    <template v-if="graph && nodeCount > 0">
-      <p :id="summaryId" class="gline"><b>한 줄 요약</b> {{ summary }}</p>
-      <GraphLegend v-if="legend" class="lgd-wrap" :present="legend" />
-    </template>
+    <!-- 한 줄 요약은 결과 맨 위 단계 칩이 보여 주므로 여기서는 그래프 설명(aria-describedby)으로만 둔다 -->
+    <p v-if="graph && nodeCount > 0" :id="summaryId" class="sr-only">한 줄 요약 {{ summary }}</p>
 
     <div v-if="!graph" class="empty">미리보기를 실행하면 전파 그래프가 여기에 나옵니다.</div>
     <div v-else-if="nodeCount === 0" class="empty">그릴 노드가 없습니다.</div>
@@ -389,19 +399,70 @@ const summaryId = computed(() => `${props.flowId}-sum`)
   padding: 6px var(--gx);
   border-bottom: 1px solid var(--line);
 }
-.grp {
+.zoom {
   display: flex;
-  gap: 4px;
-  align-items: center;
+  align-items: stretch;
+  border: 1px solid var(--ctl);
+  border-radius: var(--r);
+  overflow: hidden;
 }
-.btn .ic {
-  margin-right: -2px;
+.zoom button {
+  min-width: 30px;
+  padding: 3px 10px;
+  border: 0;
+  background: var(--panel);
+  color: var(--fg);
+  font: 500 13px var(--ui);
+  cursor: pointer;
+}
+.zoom button:not(:disabled):hover {
+  background: var(--sunk);
+}
+.zoom button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+.zoom button:focus-visible {
+  outline-offset: -2px;
 }
 .zoomv {
-  min-width: 3.2em;
-  text-align: right;
-  font: 600 12px var(--mono);
-  color: var(--fg);
+  align-self: center;
+  min-width: 46px;
+  text-align: center;
+  font: 12px var(--mono);
+  color: var(--muted);
+}
+.lnk {
+  text-decoration: none;
+}
+.lgpop {
+  position: relative;
+  margin-left: auto;
+}
+.lgpop > summary {
+  list-style: none;
+}
+.lgpop > summary::-webkit-details-marker {
+  display: none;
+}
+.lgpop .pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: min(380px, calc(100vw - 32px));
+  max-height: 60vh;
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.12);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lgpop[open] .pop {
+    animation: dr-pop 0.2s var(--ease);
+  }
 }
 .opt {
   display: inline-flex;
@@ -409,27 +470,12 @@ const summaryId = computed(() => `${props.flowId}-sum`)
   align-items: center;
   white-space: nowrap;
 }
-.gline {
-  flex: none;
-  padding: 8px var(--gx);
-  border-bottom: 1px solid var(--line);
-  font-size: 13px;
-  color: var(--fg);
-}
-.gline b {
-  font-weight: 600;
-  margin-right: 4px;
-}
-.lgd-wrap {
-  flex: none;
-  padding: 6px var(--gx);
-  border-bottom: 1px solid var(--line);
-}
 .flow-wrap {
   position: relative;
   flex: 1;
   min-height: 240px;
-  background: var(--panel);
+  background: var(--dots), var(--panel);
+  border-radius: 0 0 var(--r) var(--r);
 }
 .pg.fixed .flow-wrap {
   flex: none;

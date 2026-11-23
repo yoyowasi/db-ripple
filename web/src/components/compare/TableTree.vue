@@ -66,6 +66,13 @@ function onKey(e: KeyboardEvent, t: string): void {
   emit('select', nt)
   void nextTick(() => body.value?.querySelector<HTMLElement>(`tr[data-t="${CSS.escape(nt)}"]`)?.focus())
 }
+/** 행 수 막대(리디자인 시안의 테이블별 막대): 가장 큰 테이블 = 100%. 색은 첫 원인(직접 빨강 · FK 파랑 · 트리거 황색) */
+const maxTotal = computed(() => Math.max(1, ...tables.value.map((x) => x.row.total)))
+function bar(it: TItem): { w: string; tone: string } {
+  const b = it.row.basis.split(' · ')[0] ?? ''
+  const tone = b.startsWith('FK') ? 'f' : b.includes('트리거') ? 't' : b === '설명 안 됨' ? 'x' : 'd'
+  return { w: `${Math.max(4, (it.row.total / maxTotal.value) * 100)}%`, tone }
+}
 const split = (t: string) => {
   const i = t.lastIndexOf('.')
   return i < 0 ? { schema: '', name: t } : { schema: t.slice(0, i), name: t.slice(i + 1) }
@@ -77,6 +84,7 @@ const split = (t: string) => {
     <table class="grid" aria-label="테이블 단위 원인 트리. 위아래 화살표로 옮기고 Enter로 고르며, 오른쪽 화살표로 경로를 펼칩니다">
       <colgroup>
         <col />
+        <col class="c-bar" />
         <col class="c-n" />
         <col class="c-n" />
         <col class="c-n" />
@@ -85,6 +93,7 @@ const split = (t: string) => {
       <thead>
         <tr>
           <th scope="col">원인과 테이블</th>
+          <th scope="col"><span class="sr-only">행 수 막대</span></th>
           <th scope="col" class="n"><span aria-hidden="true">− </span>삭제</th>
           <th scope="col" class="n"><span aria-hidden="true">≠ </span>수정</th>
           <th scope="col" class="n"><span aria-hidden="true">+ </span>추가</th>
@@ -94,27 +103,28 @@ const split = (t: string) => {
       <tbody ref="body">
         <tr class="total">
           <th scope="row">합계 · 순변경 <span class="tcount">{{ n(totals.tables) }}개 테이블</span></th>
+          <td aria-hidden="true"></td>
           <td class="n" :class="totals.deleted ? 'v-del' : 'zero'">{{ totals.deleted ? n(totals.deleted) : '·' }}</td>
           <td class="n" :class="totals.updated ? 'v-chg' : 'zero'">{{ totals.updated ? n(totals.updated) : '·' }}</td>
           <td class="n" :class="totals.inserted ? 'v-add' : 'zero'">{{ totals.inserted ? n(totals.inserted) : '·' }}</td>
           <td class="tmeta">발동 {{ n(preview.firings.length) }} · 행 변경 {{ n(changed) }}</td>
         </tr>
         <tr class="legend">
-          <td colspan="5">
+          <td colspan="6">
             들여쓰기 = 원인 · <span class="lg">──</span> 확실 <span class="lg inf">┄┄</span> 추론(적용 전에 아래 창에서 값 확인) · 위아래 순서는 실행 순서가 아님
           </td>
         </tr>
 
         <template v-for="it in tree.items" :key="it.key">
           <tr v-if="it.kind === 'stmt'" class="stmt">
-            <td colspan="5">
+            <td colspan="6">
               <span class="chip">{{ it.title }}</span>
               <span class="mono">{{ it.text }}</span>
             </td>
           </tr>
 
           <tr v-else-if="it.kind === 'trigger'" class="trg" :class="{ noobs: it.observed === false }">
-            <td colspan="5">
+            <td colspan="6">
               <span class="ind" :style="{ width: `${it.level * 22}px` }" aria-hidden="true"></span>
               <span class="cn inf" aria-hidden="true">└┄</span>
               <svg class="bolt" viewBox="0 0 12 14" aria-hidden="true"><path d="M7 1L2 8h3.5L4.5 13 10 6H6.5z" /></svg>
@@ -156,6 +166,9 @@ const split = (t: string) => {
                 </button>
                 <span v-if="it.row.keysOnly" class="tag">키만</span>
               </th>
+              <td class="barc" aria-hidden="true">
+                <span v-if="it.row.total" class="trk"><i :class="bar(it).tone" :style="{ width: bar(it).w }"></i></span>
+              </td>
               <td class="n" :class="it.row.deleted ? 'v-del' : 'zero'">{{ it.row.deleted ? `−${n(it.row.deleted)}` : '·' }}</td>
               <td class="n" :class="it.row.updated ? 'v-chg' : 'zero'">{{ it.row.updated ? `≠${n(it.row.updated)}` : '·' }}</td>
               <td class="n" :class="it.row.inserted ? 'v-add' : 'zero'">{{ it.row.inserted ? `+${n(it.row.inserted)}` : '·' }}</td>
@@ -165,7 +178,7 @@ const split = (t: string) => {
               </td>
             </tr>
             <tr v-if="it.others && open.has(it.key)" class="paths">
-              <td colspan="5">
+              <td colspan="6">
                 <div class="pwrap" :style="{ paddingLeft: `${it.level * 22 + 32}px` }">
                   <PathLine :preview="preview" :table="it.key" />
                 </div>
@@ -175,7 +188,7 @@ const split = (t: string) => {
         </template>
 
         <tr v-if="tree.zeroElsewhere || tree.triggersElsewhere.length" class="foot">
-          <td colspan="5">
+          <td colspan="6">
             그 밖에
             <template v-if="tree.zeroElsewhere">0행 쓰기 {{ n(tree.zeroElsewhere) }}건</template>
             <template v-if="tree.zeroElsewhere && tree.triggersElsewhere.length"> · </template>
@@ -205,6 +218,40 @@ const split = (t: string) => {
 }
 .c-conf {
   width: 120px;
+}
+.c-bar {
+  width: 96px;
+}
+.barc .trk {
+  display: block;
+  border-radius: 9px;
+  background: var(--line);
+}
+.barc i {
+  display: block;
+  height: 6px;
+  border-radius: 9px;
+  background: var(--del-mk);
+  transform-origin: left;
+}
+.barc i.f {
+  background: var(--k-fk);
+}
+.barc i.t {
+  background: var(--k-fires);
+}
+.barc i.x {
+  background: repeating-linear-gradient(90deg, var(--err) 0 4px, transparent 4px 7px);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .barc i {
+    animation: tt-grow 0.7s 0.2s var(--ease) both;
+  }
+}
+@keyframes tt-grow {
+  from {
+    transform: scaleX(0);
+  }
 }
 .grid th,
 .grid td {
@@ -281,8 +328,8 @@ const split = (t: string) => {
 .chip {
   display: inline-block;
   margin-right: 8px;
-  padding: 0 7px;
-  border-radius: var(--r);
+  padding: 0 9px;
+  border-radius: 99px;
   background: var(--fg);
   color: var(--panel);
   font: 600 12px / 1.6 var(--ui);
@@ -317,7 +364,7 @@ const split = (t: string) => {
   margin-left: 8px;
   padding: 0 6px;
   border: 1px solid var(--ctl);
-  border-radius: 3px;
+  border-radius: 99px;
   background: none;
   color: var(--muted);
   font: 500 11px / 1.6 var(--ui);

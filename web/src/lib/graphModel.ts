@@ -43,6 +43,8 @@ export interface RippleNodeData {
   boxHeight: number
   /** 이 노드가 쓴 0행 묶음 수(0이면 칩 없음) */
   zeroChip: number
+  /** 첫 그리기 순서(문장 = 0, 간선 단 수) */
+  rank: number
 }
 
 export interface RippleEdgeData {
@@ -383,7 +385,7 @@ export function buildFlow(
       id: n.id,
       type: 'ripple',
       position: layout.positions.get(n.id) ?? { x: 0, y: 0 },
-      data: { node: n, firing, flags, view, order: ord, sentence: s, width: w, boxHeight: h, zeroChip },
+      data: { node: n, firing, flags, view, order: ord, sentence: s, width: w, boxHeight: h, zeroChip, rank: rank.get(n.id) ?? 0 },
       ariaLabel: ord !== null ? `${s} (표시 순번 ${ord})` : view.kind === 'procedureCall' ? procedureAria(s, view) : s,
       draggable: false,
       connectable: false,
