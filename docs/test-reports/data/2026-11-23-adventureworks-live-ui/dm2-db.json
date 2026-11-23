@@ -1,0 +1,15 @@
+{
+  "before": [
+    "1|419.4589|10|CBC20AE89D54994405D7F8A24E1C274157043F544C7AEEFA01B37D7A169D663B|0"
+  ],
+  "afterCommit": [
+    "2|838.9178|11|F48C585080D863E2B35BF00A342B18C6EE8606B4074738B8C7D7A3A7E396B20E|1"
+  ],
+  "columns": [
+    "OrderQty",
+    "SubTotal",
+    "RevisionNumber",
+    "Demographics SHA256",
+    "matching TransactionHistory rows"
+  ]
+}
