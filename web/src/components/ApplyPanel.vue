@@ -1,8 +1,8 @@
 <script setup lang="ts">
-// 오른쪽 위 고정 적용 상자(시안 3-compare): [원본에 적용](주, 바뀌는 건수를 함께) · 적용 조건 n/n · 남은 시간 · [미리보기 취소](글자 단추).
-// 꺼져 있으면 disabled 대신 aria-disabled 로 두고 이유 목록을 aria-describedby 로 잇는다. 누르면 화면 가운데 확인 대화상자(테이블별 건수 · 원본 DB 이름 입력).
+// 오른쪽 위 고정 적용 상자(리디자인 시안 2026-11-23): 큰 합계 숫자("이 쿼리를 적용하면 4행 삭제") → 접이식 적용 조건 n/n · 남은 시간 → [원본에 적용] [미리보기 취소].
+// 꺼져 있으면 disabled 대신 aria-disabled 로 두고 이유 목록을 aria-describedby 로 잇는다. 누르면 화면 가운데 확인 대화상자(테이블별 건수 · 원본 DB 이름 입력)가 2단계 확인을 맡는다.
 // 적용을 시도한 뒤에는 결과 한 줄과 다음 행동([새 미리보기]·[샌드박스 새로 고침])만 둔다. 자세한 대조는 본문의 ApplyResultView.
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useNow } from '../composables/useNow'
 import { evaluateApplyGate } from '../lib/applyGate'
 import { formatCount, formatTime } from '../lib/format'
@@ -163,16 +163,61 @@ function refresh(): void {
 const remain = computed(() => applyStatusLine(gate.value).remain)
 const okCount = computed(() => items.value.filter((i) => i.ok).length)
 
-/** 단추 아래 작은 글자: "수정 3 · 추가 1 · 4행 변경" */
-const countsLine = computed(() => {
+/** 큰 숫자 옆 글자: 한 종류면 "행 삭제", 섞이면 "행 변경" + 아래 줄에 종류별 건수 */
+const single = computed(() => {
   const t = totals.value
-  if (!store.preview || t.total === 0) return null
+  if (t.total === 0) return null
+  if (t.deleted === t.total) return { verb: '삭제', impact: '삭제됩니다' }
+  if (t.inserted === t.total) return { verb: '추가', impact: '추가됩니다' }
+  if (t.updated === t.total) return { verb: '수정', impact: '수정됩니다' }
+  return null
+})
+const sumText = computed(() =>
+  totals.value.total === 0 ? '행 변경' : `행 ${single.value?.verb ?? '변경'} · ${formatCount(totals.value.tables)}개 테이블`,
+)
+const bigTone = computed(() => (totals.value.total === 0 ? 'zero' : totals.value.deleted === totals.value.total ? 'del' : 'chg'))
+/** 섞였을 때만: "수정 3 · 추가 1" */
+const mixLine = computed(() => {
+  const t = totals.value
+  if (t.total === 0 || single.value) return null
   const parts: string[] = []
   if (t.updated) parts.push(`수정 ${formatCount(t.updated)}`)
   if (t.inserted) parts.push(`추가 ${formatCount(t.inserted)}`)
   if (t.deleted) parts.push(`삭제 ${formatCount(t.deleted)}`)
-  return `${parts.join(' · ')} · ${formatCount(t.total)}행 변경`
+  return parts.join(' · ')
 })
+/** 확인 상자 첫 줄(굵은 빨강): "원본에서 4행이 삭제됩니다." */
+const impactLine = computed(() => {
+  const t = totals.value
+  if (t.total === 0) return null
+  return `원본에서 ${formatCount(t.total)}행이 ${single.value?.impact ?? '바뀝니다'}.`
+})
+const warnCount = computed(() => store.preview?.warnings.length ?? 0)
+
+// 합계 숫자 카운트업: 새 미리보기가 올 때만(같은 미리보기의 재계산·움직임 줄이기 설정이면 바로 값).
+const shown = ref(0)
+let raf = 0
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+watch(
+  () => [store.preview?.previewId, totals.value.total] as const,
+  ([id, end], old) => {
+    cancelAnimationFrame(raf)
+    if (!id || reducedMotion() || (old && old[0] === id)) {
+      shown.value = end
+      return
+    }
+    const t0 = performance.now()
+    const step = (t: number) => {
+      const p = Math.min(1, (t - t0) / 700)
+      shown.value = Math.round(end * (1 - (1 - p) ** 3))
+      if (p < 1) raf = requestAnimationFrame(step)
+    }
+    shown.value = 0
+    raf = requestAnimationFrame(step)
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => cancelAnimationFrame(raf))
 
 /** 확인 대화상자의 테이블별 건수 */
 const confirmRows = computed(() =>
@@ -233,7 +278,7 @@ function newPreview(): void {
     <template v-if="attempted">
       <div class="res" :class="resultTone" role="status">
         <b>
-          <svg v-if="resultTone === 'ok'" class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 4.8" /></svg>
+          <svg v-if="resultTone === 'ok'" class="ic done" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 4.8" /></svg>
           <svg v-else class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.2L14.2 13H1.8z" /><path d="M8 6.6v3M8 11.4v.1" /></svg>
           {{ RESULT_TITLE[status ?? ''] }}
         </b>
@@ -276,28 +321,25 @@ function newPreview(): void {
     </template>
 
     <template v-else>
+      <div v-if="store.preview" class="sum">
+        <div class="lbl">이 쿼리를 적용하면<span v-if="remain" class="remain">{{ remain }}</span></div>
+        <div class="big" :class="bigTone">
+          <span aria-hidden="true">{{ formatCount(shown) }}</span><span class="sr-only">{{ formatCount(totals.total) }}</span><small>{{ sumText }}</small>
+        </div>
+        <div v-if="mixLine" class="mix">{{ mixLine }}</div>
+      </div>
       <p v-if="emptyNote" class="hint">{{ emptyNote }}</p>
-
-      <button
-        ref="applyBtn"
-        type="button"
-        class="go"
-        :aria-disabled="!gate.enabled"
-        :aria-describedby="gate.enabled ? undefined : 'apply-reasons'"
-        :aria-expanded="gate.enabled ? confirming : undefined"
-        :aria-controls="gate.enabled ? 'apply-confirm' : undefined"
-        @click="ask"
-      >
-        <span>{{ store.applying ? '적용 중…' : '원본에 적용' }}</span>
-        <small v-if="countsLine">{{ countsLine }}</small>
-      </button>
 
       <!-- 적용 조건: 모두 충족이면 한 줄로 접는다. 미충족이 있으면 펼쳐 이유를 모두 보인다. -->
       <div class="condrow">
         <details v-if="allOk" class="gdet">
           <summary>
             <span class="ck" aria-hidden="true">✓</span>
-            조건 {{ okCount }}/{{ items.length }} 충족
+            <span>
+              <span :class="{ wn: warnCount }">{{ warnCount ? `경고 ${formatCount(warnCount)}건` : '경고 없음' }}</span>
+              · 적용 조건 {{ okCount }}/{{ items.length }} 충족
+            </span>
+            <svg class="ic chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" /></svg>
           </summary>
           <ul id="apply-reasons" class="gate">
             <li v-for="it in items" :key="it.label" class="ok">
@@ -307,7 +349,6 @@ function newPreview(): void {
           </ul>
         </details>
         <span v-else-if="store.preview" class="cnt bad">조건 {{ okCount }}/{{ items.length }} 충족</span>
-        <span v-if="remain" class="remain">{{ remain }}</span>
       </div>
       <div v-if="!allOk && store.preview" class="gdet bad">
         <ul id="apply-reasons" class="gate">
@@ -325,9 +366,21 @@ function newPreview(): void {
         <li v-for="it in items.filter((x) => !x.ok)" :key="it.label">{{ it.label }}</li>
       </ul>
 
-      <!-- 누른 뒤에도 사라지지 않게 늘 두고 aria-disabled로 끈다(초점이 body로 떨어지지 않게) -->
-      <div class="cancelrow">
-        <button type="button" class="linkbtn" :aria-disabled="!canCancel" @click="onCancel">{{ cancelLabel }}</button>
+      <!-- 두 단추 모두 누른 뒤에도 사라지지 않게 늘 두고 aria-disabled로 끈다(초점이 body로 떨어지지 않게) -->
+      <div class="actrow">
+        <button
+          ref="applyBtn"
+          type="button"
+          class="go"
+          :aria-disabled="!gate.enabled"
+          :aria-describedby="gate.enabled ? undefined : 'apply-reasons'"
+          :aria-expanded="gate.enabled ? confirming : undefined"
+          :aria-controls="gate.enabled ? 'apply-confirm' : undefined"
+          @click="ask"
+        >
+          {{ store.applying ? '적용 중…' : '원본에 적용' }}
+        </button>
+        <button type="button" class="btn" :aria-disabled="!canCancel" @click="onCancel">{{ cancelLabel }}</button>
       </div>
 
       <p v-if="store.applying" class="lock" role="status">
@@ -349,7 +402,10 @@ function newPreview(): void {
       >
       <div class="cfin">
         <h4 id="cf-h">원본 DB 변경 확인</h4>
-        <p id="cf-d">원본 {{ originDb }}에서 같은 SQL을 다시 실행하고 결과가 같을 때만 커밋합니다. 되돌릴 수 없습니다.</p>
+        <p id="cf-d">
+          <b v-if="impactLine" class="impact">{{ impactLine }}</b>
+          원본 {{ originDb }}에서 같은 SQL을 다시 실행하고 결과가 같을 때만 커밋합니다. 되돌릴 수 없습니다.
+        </p>
         <table v-if="confirmRows.length" class="cfrows">
           <caption class="sr-only">바뀌는 테이블과 건수</caption>
           <tbody>
@@ -386,8 +442,8 @@ function newPreview(): void {
           <input id="cf-db" v-model="typedDb" type="text" class="field" spellcheck="false" autocomplete="off" @keydown.enter.prevent="doApply" />
         </div>
         <div class="row">
-          <button type="button" class="btn btn-primary" :aria-disabled="!canConfirm" @click="doApply">{{ confirmLabel }}</button>
           <button type="button" class="btn" @click="back">돌아가기</button>
+          <button type="button" class="btn btn-danger cfgo" :aria-disabled="!canConfirm" @click="doApply">{{ confirmLabel }}</button>
         </div>
       </div>
       </dialog>
@@ -401,33 +457,70 @@ function newPreview(): void {
 <style scoped>
 .apply {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
-  padding: 12px;
+  padding: 16px;
+}
+/* 큰 합계: 이 상자에서 가장 먼저 읽히는 값 */
+.sum .lbl {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.big {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.big small {
+  margin-left: 6px;
+  color: var(--fg);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.big.del {
+  color: var(--err);
+}
+.big.zero {
+  color: var(--muted);
+}
+.mix {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.actrow {
+  display: flex;
+  gap: 8px;
+}
+.actrow .btn {
+  flex: none;
 }
 .go {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 54px;
+  flex: 1;
+  min-width: 0;
+  min-height: 38px;
   padding: 6px 10px;
   border: 1px solid var(--accent);
-  border-radius: 5px;
+  border-radius: var(--r);
   background: var(--accent);
   color: var(--accent-fg);
-  font: 700 16px / 1.25 var(--ui);
+  font: 600 14px / 1.25 var(--ui);
   cursor: pointer;
-  transition: filter var(--m-out) var(--ease);
-}
-.go small {
-  font-size: 12px;
-  font-weight: 500;
-  opacity: 0.92;
+  transition:
+    filter var(--m-out) var(--ease),
+    transform var(--m-press) var(--ease);
 }
 .go:not([aria-disabled='true']):hover {
-  filter: brightness(1.15);
+  filter: brightness(1.1);
+}
+.go:not([aria-disabled='true']):active {
+  transform: scale(0.98);
 }
 .go[aria-disabled='true'] {
   border-color: var(--ctl);
@@ -465,27 +558,6 @@ function newPreview(): void {
 .remain {
   flex: none;
   font-variant-numeric: tabular-nums;
-}
-.cancelrow {
-  text-align: right;
-}
-.linkbtn {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font: 13px var(--ui);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-.linkbtn:not([aria-disabled='true']):hover {
-  color: var(--fg);
-}
-.linkbtn[aria-disabled='true'] {
-  color: var(--ctl);
-  text-decoration: none;
-  cursor: default;
 }
 .res {
   display: grid;
@@ -582,12 +654,28 @@ function newPreview(): void {
   display: flex;
   gap: 6px;
   align-items: center;
+  list-style: none;
   cursor: pointer;
   font-weight: 600;
   color: var(--ok);
 }
-.gdet > summary .ic {
-  color: var(--ok);
+.gdet > summary::-webkit-details-marker {
+  display: none;
+}
+.gdet > summary .wn {
+  color: var(--warn);
+}
+.gdet > summary .chev {
+  margin-left: auto;
+  color: var(--muted);
+}
+.gdet[open] > summary .chev {
+  transform: rotate(90deg);
+}
+.condrow .gdet:has(summary) {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
 }
 .lock {
   font-size: 12px;
@@ -603,7 +691,7 @@ function newPreview(): void {
   color: var(--fg);
   border: 1px solid var(--ctl);
   border-top: 4px solid var(--err);
-  border-radius: 6px;
+  border-radius: var(--r-lg);
   background: var(--panel);
   box-shadow: 0 12px 32px rgb(0 0 0 / 0.25);
 }
@@ -690,5 +778,31 @@ function newPreview(): void {
 }
 .confirm p {
   margin: 0 0 8px;
+}
+.impact {
+  display: block;
+  color: var(--err);
+  font-size: 14px;
+}
+.cfgo {
+  flex: 1;
+  justify-content: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .gdet > summary .chev {
+    transition: transform 0.2s var(--ease);
+  }
+  .confirm[open] {
+    animation: dr-pop 0.25s var(--ease);
+  }
+  .confirm[open]::backdrop {
+    animation: dr-fade 0.2s linear;
+  }
+  /* 적용 완료 체크를 그린다 */
+  .done path {
+    stroke-dasharray: 16;
+    stroke-dashoffset: 16;
+    animation: dr-draw 0.45s 0.15s var(--ease) forwards;
+  }
 }
 </style>

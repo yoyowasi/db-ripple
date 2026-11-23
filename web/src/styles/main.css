@@ -23,74 +23,80 @@
   --ui: 'Pretendard Variable', Pretendard, 'Malgun Gothic', 'Segoe UI', sans-serif;
   --mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, 'D2Coding', monospace;
   --fs: 13px;
-  --r: 4px;
+  --r: 8px;
+  --r-lg: 12px;
   --gx: 14px;
-  --menu-h: 40px;
+  --menu-h: 48px;
   --m-in: 150ms;
   --m-out: 120ms;
   --m-press: 90ms;
-  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
-  /* 바탕·글자·강조는 docs/mockups/r2/3-compare.html(2026-11-18 확정 시안). 연산 색(삭제·수정·추가)은 그래프와 맞추려고 그대로 둔다. */
-  --bg: #eceef2;
+  /*
+   * 색은 리디자인 시안(db-ripple-redesign.html, 2026-11-23). 빨강 = 삭제·파괴적 동작, 파랑 = FK 연쇄, 황색 = 트리거·추론, 초록 = 정상·통과.
+   * 작은 글자에 쓰는 --muted·--warn은 시안 값보다 조금 진하게 잡아 대비 4.5:1을 지킨다(바탕 --sunk 위에서도).
+   */
+  --bg: #f5f6f4;
   --panel: #fff;
-  --sunk: #f5f6f8;
-  --fg: #141a24;
-  --muted: #556074;
-  --line: #d3d8e0;
-  --ctl: #838c9e;
-  --accent: #12345a;
+  --sunk: #eef1ee;
+  --fg: #17211e;
+  --muted: #5f6d69;
+  --line: #e1e6e2;
+  --ctl: #84918c;
+  --accent: #0e6b5b;
   --accent-fg: #fff;
-  --ok: #0f6e3a;
-  --ok-bg: #dff3e7;
-  --warn: #85500a;
-  --warn-bg: #fff1cf;
-  --err: #b3261e;
-  --err-bg: #fde8e6;
-  --del-bg: #fbdbd8;
-  --del-fg: #8c1b14;
-  --add-bg: #d6f0de;
-  --add-fg: #12603a;
-  --chg-bg: #ffe8a0;
+  --ok: #1d7a4c;
+  --ok-bg: #e3f3ea;
+  --warn: #946010;
+  --warn-bg: #fbf1dc;
+  --err: #c4402e;
+  --err-bg: #fbeae6;
+  --del-bg: #f9dcd6;
+  --del-fg: #9c2c1d;
+  --add-bg: #d9f0e2;
+  --add-fg: #17643e;
+  --chg-bg: #fbe9b8;
   /* 연산 표시 칩(흰 글자) · 없는 쪽 빗금 */
-  --del-mk: #c2301f;
-  --add-mk: #1d7a47;
-  --chg-mk: #85500a;
-  --hatch: #dfe3ea;
-  --bg-fk: #dde8fb;
-  --bg-trg: #fde9cc;
+  --del-mk: #c4402e;
+  --add-mk: #1d7a4c;
+  --chg-mk: #946010;
+  --hatch: #e3e8e4;
+  --bg-fk: #e3ebfb;
+  --bg-trg: #fbf1dc;
   --nd: #fff;
-  --nd-s: #6f828e;
-  --nd-stmt: #e5edfb;
-  --nd-stmt-s: #12345a;
-  --nd-trig: #fff2d8;
-  --nd-proc: #dff3e7;
-  --nd-proc-s: #0f6e3a;
-  --nd-t: #14212a;
-  --nd-t2: #4f5f6b;
+  --nd-s: #7d8a85;
+  --nd-stmt: #e1f1ed;
+  --nd-stmt-s: #0e6b5b;
+  --nd-trig: #fbf1dc;
+  --nd-proc: #e3f3ea;
+  --nd-proc-s: #1d7a4c;
+  --nd-t: #17211e;
+  --nd-t2: #4f5d58;
   --halo: #fff;
-  --st-bg: #141a24;
-  --st-s: #141a24;
-  --st-fg: #f2f4f8;
-  --st-fg2: #c3cad6;
-  --st-verb: #a9c6ff;
-  --k-fk: #1456c8;
-  --k-fires: #a15000;
-  --k-direct: #445560;
-  --k-call: #0f6e3a;
-  --k-blocked: #b3261e;
-  --tick: #9aa3b2;
-  --code-kw: #1b4fa8;
-  --code-num: #9a4a00;
-  --code-cm: #6a7386;
-  --sel: rgba(26, 107, 224, 0.18);
+  --st-bg: #17211e;
+  --st-s: #17211e;
+  --st-fg: #f2f5f3;
+  --st-fg2: #c3ccc8;
+  --st-verb: #8fdcc9;
+  --k-fk: #2d62d6;
+  --k-fires: #a86d12;
+  --k-direct: #4f5d58;
+  --k-call: #1d7a4c;
+  --k-blocked: #c4402e;
+  --tick: #9aa6a1;
+  --code-kw: #0e6b5b;
+  --code-num: #946010;
+  --code-cm: #6b7773;
+  --sel: rgba(14, 107, 91, 0.18);
+  /* 점 격자(그래프 바탕) */
+  --dots: radial-gradient(circle, var(--line) 1px, transparent 1.2px) 0 0 / 22px 22px;
 
-  /* 메뉴 줄: 시안처럼 밝은 띠(테마를 따른다) */
+  /* 메뉴 줄: 밝은 띠(테마를 따른다) */
   --menu-bg: #fff;
-  --menu-fg: #434d60;
-  --menu-fg-strong: #141a24;
-  --menu-ctl: #838c9e;
-  --menu-focus: #1a6be0;
+  --menu-fg: #3f4a46;
+  --menu-fg-strong: #17211e;
+  --menu-ctl: #84918c;
+  --menu-focus: #0e6b5b;
 
   /* 옛 이름(별칭) */
   --bg-elev: var(--panel);
@@ -116,63 +122,63 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #0f1218;
-  --panel: #181c25;
-  --sunk: #1e2330;
-  --fg: #e8ebf1;
-  --muted: #9aa3b5;
-  --line: #2d3444;
-  --ctl: #6b758a;
-  --accent: #a9c6ff;
-  --accent-fg: #0a1426;
-  --ok: #5fd391;
-  --ok-bg: #123626;
-  --warn: #f2b95a;
-  --warn-bg: #3a2d10;
-  --err: #ff8b90;
-  --err-bg: #431a1f;
-  --del-bg: #4a1d24;
-  --del-fg: #ff9fa4;
-  --add-bg: #12402b;
-  --add-fg: #86e6ad;
-  --chg-bg: #4b4010;
-  --del-mk: #ff7b6b;
-  --add-mk: #5fcf8c;
-  --chg-mk: #f2b95a;
-  --hatch: #232a38;
-  --bg-fk: #18305a;
-  --bg-trg: #3b2b10;
-  --nd: #1e2330;
-  --nd-s: #6b758a;
-  --nd-stmt: #1f2b45;
-  --nd-stmt-s: #a9c6ff;
-  --nd-trig: #3a2c12;
-  --nd-proc: #0f3a2b;
-  --nd-proc-s: #5fd391;
-  --nd-t: #e8f1f5;
-  --nd-t2: #9bb0bc;
-  --halo: #181c25;
-  --st-bg: #1f2b45;
-  --st-s: #7fb0ff;
-  --st-fg: #f2f4f8;
-  --st-fg2: #c3cad6;
-  --st-verb: #a9c6ff;
-  --k-fk: #7fb0ff;
-  --k-fires: #ffb454;
-  --k-direct: #9aa3b5;
-  --k-call: #5fd391;
-  --k-blocked: #ff8b90;
-  --tick: #4a5366;
-  --code-kw: #8fb6ff;
-  --code-num: #f0b36a;
-  --code-cm: #8b94a6;
-  --sel: rgba(127, 176, 255, 0.25);
+  --bg: #111715;
+  --panel: #18201d;
+  --sunk: #202a26;
+  --fg: #e7eeeb;
+  --muted: #8a9893;
+  --line: #2a3430;
+  --ctl: #5f6d68;
+  --accent: #4fc3ab;
+  --accent-fg: #0b1a16;
+  --ok: #58c88c;
+  --ok-bg: #13301f;
+  --warn: #e8b254;
+  --warn-bg: #332a14;
+  --err: #ef7b69;
+  --err-bg: #33201c;
+  --del-bg: #45211b;
+  --del-fg: #ffa596;
+  --add-bg: #143823;
+  --add-fg: #86e0ad;
+  --chg-bg: #463a12;
+  --del-mk: #ef7b69;
+  --add-mk: #58c88c;
+  --chg-mk: #e8b254;
+  --hatch: #222c28;
+  --bg-fk: #1a2a4a;
+  --bg-trg: #332a14;
+  --nd: #202a26;
+  --nd-s: #5f6d68;
+  --nd-stmt: #163129;
+  --nd-stmt-s: #4fc3ab;
+  --nd-trig: #332a14;
+  --nd-proc: #13301f;
+  --nd-proc-s: #58c88c;
+  --nd-t: #e7eeeb;
+  --nd-t2: #9fb0aa;
+  --halo: #18201d;
+  --st-bg: #163129;
+  --st-s: #4fc3ab;
+  --st-fg: #eef5f2;
+  --st-fg2: #c0ccc7;
+  --st-verb: #8fdcc9;
+  --k-fk: #7ba2ff;
+  --k-fires: #e8b254;
+  --k-direct: #8a9893;
+  --k-call: #58c88c;
+  --k-blocked: #ef7b69;
+  --tick: #46524d;
+  --code-kw: #6fd6bf;
+  --code-num: #e8b254;
+  --code-cm: #84918c;
+  --sel: rgba(79, 195, 171, 0.25);
 
-  --menu-bg: #181c25;
-  --menu-fg: #b3bccb;
-  --menu-fg-strong: #e8ebf1;
-  --menu-ctl: #6b758a;
-  --menu-focus: #7fb0ff;
+  --menu-bg: #18201d;
+  --menu-fg: #b5c2bd;
+  --menu-fg-strong: #e7eeeb;
+  --menu-ctl: #5f6d68;
+  --menu-focus: #4fc3ab;
 }
 
 *,
@@ -349,30 +355,41 @@ a {
 .btn-sm {
   padding: 2px 8px;
 }
+/* 주(.btn-primary) = 원본 적용 같은 결정(브랜드 초록) · 실행(.btn-ink) = 진한 잉크 · 파괴 확정(.btn-danger) = 빨강 */
 .btn-primary,
-.btn-danger {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-fg);
+.btn-danger,
+.btn-ink {
+  --b: var(--accent);
+  --bf: var(--accent-fg);
+  background: var(--b);
+  border-color: var(--b);
+  color: var(--bf);
   font-weight: 600;
+}
+.btn-danger {
+  --b: var(--err);
+  --bf: #fff;
+}
+.btn-ink {
+  --b: var(--fg);
+  --bf: var(--panel);
 }
 .btn:not(:disabled, [aria-disabled='true']):hover,
 .btn:not(:disabled, [aria-disabled='true']):focus-visible {
-  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
-  border-color: var(--accent);
+  background: var(--sunk);
+  border-color: var(--muted);
 }
 .btn-primary:not(:disabled, [aria-disabled='true']):hover,
 .btn-primary:not(:disabled, [aria-disabled='true']):focus-visible,
 .btn-danger:not(:disabled, [aria-disabled='true']):hover,
-.btn-danger:not(:disabled, [aria-disabled='true']):focus-visible {
-  background: color-mix(in srgb, var(--accent) 84%, var(--fg));
+.btn-danger:not(:disabled, [aria-disabled='true']):focus-visible,
+.btn-ink:not(:disabled, [aria-disabled='true']):hover,
+.btn-ink:not(:disabled, [aria-disabled='true']):focus-visible {
+  background: color-mix(in srgb, var(--b) 86%, var(--panel));
+  border-color: var(--b);
 }
 .btn:not(:disabled, [aria-disabled='true']):active {
-  background: color-mix(in srgb, var(--accent) 20%, var(--panel));
-}
-.btn-primary:not(:disabled, [aria-disabled='true']):active,
-.btn-danger:not(:disabled, [aria-disabled='true']):active {
-  background: color-mix(in srgb, var(--accent) 70%, var(--fg));
+  transform: scale(0.97);
 }
 .btn:disabled,
 .btn[aria-disabled='true'] {
@@ -407,7 +424,7 @@ select:hover {
   font-size: 12px;
   line-height: 1.6;
   font-weight: 600;
-  border-radius: var(--r);
+  border-radius: 99px;
   border: 1px solid var(--line);
   background: var(--sunk);
   color: var(--muted);
@@ -488,30 +505,30 @@ select:hover {
   color: var(--ok);
 }
 
-/* 탭: 탭 목록(role=tablist)에는 탭 단추만 둔다. 도구는 형제 .tool */
+/* 탭: 탭 목록(role=tablist)에는 탭 단추만 둔다. 도구는 형제 .tool. 고른 탭은 밑줄(브랜드 색) 하나로만 말한다. */
 .tabrow {
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
   flex: none;
-  min-height: 34px;
-  background: var(--sunk);
+  min-height: 38px;
+  background: var(--panel);
   border-bottom: 1px solid var(--line);
 }
 .tablist {
   display: flex;
   align-items: stretch;
   flex-wrap: wrap;
+  gap: 2px;
 }
 .tablist [role='tab'] {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 34px;
-  padding: 0 var(--gx);
+  min-height: 36px;
+  padding: 0 12px;
   border: 0;
-  border-right: 1px solid var(--line);
   background: transparent;
   color: var(--muted);
   font: 500 13px var(--ui);
@@ -523,26 +540,24 @@ select:hover {
 .tablist [role='tab']::after {
   content: '';
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 6px;
+  right: 6px;
   bottom: -1px;
   height: 2px;
-  background: color-mix(in srgb, var(--accent) 50%, transparent);
+  border-radius: 2px;
+  background: var(--line);
   transform: scaleX(0);
-  transform-origin: right;
+  transform-origin: center;
 }
 .tablist [role='tab']:hover {
   color: var(--fg);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 .tablist [role='tab']:hover::after {
   transform: scaleX(1);
-  transform-origin: left;
 }
 .tablist [role='tab'][aria-selected='true'] {
   color: var(--fg);
   font-weight: 600;
-  background: var(--panel);
 }
 .tablist [role='tab'][aria-selected='true']::after {
   transform: scaleX(1);
@@ -660,7 +675,8 @@ dl.kv dd {
     transition:
       background-color var(--m-out) var(--ease),
       border-color var(--m-out) var(--ease),
-      color var(--m-out) var(--ease);
+      color var(--m-out) var(--ease),
+      transform var(--m-press) var(--ease);
   }
   .btn:hover,
   .tablist [role='tab']:hover {
@@ -673,6 +689,24 @@ dl.kv dd {
     transition: transform var(--m-in) var(--ease);
   }
 }
+/* 공용 등장 움직임(움직임 줄이기 설정이면 아래 규칙이 모두 끈다) */
+@keyframes dr-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes dr-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+@keyframes dr-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -3,7 +3,8 @@
 import type { LegendPresence } from '../lib/graphModel'
 import { CONFIDENCE_LINE, TONE_LEGEND } from '../lib/graphStyle'
 
-defineProps<{ present: LegendPresence }>()
+/** expanded: 팝오버 안에서 쓴다("읽는 법"을 접지 않고 다 보인다) */
+defineProps<{ present: LegendPresence; expanded?: boolean }>()
 
 const DASH: Record<string, string | undefined> = { certain: undefined, inferred: '8 5', ambiguous: '2 5', unexplained: '2 5' }
 const OP_TEXT = {
@@ -29,8 +30,8 @@ const OP_TEXT = {
       </span>
       <span v-if="present.hasOrder" class="item ord">번호 = 화면 표시 순번(실행 순서 아님 · 관측 순서, 보장 안 됨)</span>
     </div>
-    <details class="howto">
-      <summary>읽는 법</summary>
+    <component :is="expanded ? 'div' : 'details'" class="howto">
+      <summary v-if="!expanded">읽는 법</summary>
       <ul>
         <li v-if="present.statement"><i class="sw sw-st" />진한 알약 = 출발점(문장)</li>
         <li v-if="present.procedure"><i class="sw sw-proc" />초록 알약 = 출발점(EXEC 프로시저 호출). 반환 값·결과 집합 수와, 안쪽에서 펼친 프로시저를 작은 줄로 보입니다</li>
@@ -47,7 +48,7 @@ const OP_TEXT = {
           <span><b :class="`tone-${t}`">{{ TONE_LEGEND[t][0] }}</b> 간선 = {{ TONE_LEGEND[t][1] }}</span>
         </li>
       </ul>
-    </details>
+    </component>
   </div>
 </template>
 

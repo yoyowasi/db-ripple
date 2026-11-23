@@ -105,19 +105,25 @@ dotnet run --project src\DbRipple.Host
 
 - 관리 계정은 superuser가 아닌 CREATEDB·CREATEROLE 계정을 권장한다.
 - 도구는 미리보기용 LOGIN 역할(기본 `dbr_preview`)을 만든다. 사용자 문장은 그 역할로 로그인한 연결에서 돈다. 그래서 서버 `pg_hba.conf`가 그 역할의 비밀번호(SCRAM) 로그인을 허용해야 한다.
-- 원본 DB에 다른 연결이 열려 있으면 PostgreSQL이 복제를 거절한다(55006). 도구는 그 연결을 끊지 않고, 실패 이유를 샌드박스 상태 칩에 보인다.
+- 원본 DB에 다른 연결이 열려 있으면 PostgreSQL이 복제를 거절한다(55006). 도구는 그 연결을 끊지 않고, 메뉴 줄의 샌드박스 상태를 펼치면 실패 이유를 보인다.
 - 범위와 설계는 [PostgreSQL 최소판 설계](docs/superpowers/specs/2026-11-18-postgres-preview-minimal.md)에 있다.
 
 ## 사용법
 
 ### 화면에서
 
-1. 처음 한 번은 위쪽 메뉴 줄의 샌드박스 상태를 눌러 **[샌드박스 새로 고침]** 으로 기준선을 만든다.
+1. 처음 한 번은 위쪽 메뉴 줄의 **[샌드박스 새로 고침]** 으로 기준선을 만든다.
 2. 편집기에 SQL을 쓰고 **Ctrl+Enter** 를 누른다.
 3. 가운데 **원인 트리**에서 무엇이 왜 바뀌는지 보고, 줄을 골라 아래 창에서 그 테이블의 행을 비교한다. 묶음 단위로 보려면 아래 창의 **[발동 묶음]**·**[전파 그래프]** 탭을 쓴다.
 4. 오른쪽 위 **[원본에 적용]** 또는 **[미리보기 취소]** 를 누른다. [원본에 적용]은 확인 상자에서 원본 DB 이름을 입력해야 확정되고, 확정 단추의 문구는 결과에 따라 "원본에서 N행 삭제"처럼 바뀐다. 이 문서에서 [적용]·[취소]라고 부르는 것이 이 두 단추다.
 
-화면 구성은 [web/README.md](web/README.md)에 있다. 화면 설계 목업은 [docs/mockups/r2/](docs/mockups/r2/index.html)에 있다(지금 화면의 바탕인 `3-compare.html`과 다른 시안 3종, 옛 화면 검토). 그 전 라운드 시안은 [docs/mockups/](docs/mockups/index.html)에 남아 있다.
+화면 구성은 [web/README.md](web/README.md)에 있다.
+
+지금 화면의 색·상태 표시·움직임은 2026-11-23 리디자인 시안 [docs/mockups/r3/db-ripple-redesign.html](docs/mockups/r3/db-ripple-redesign.html)([개선안 설명](docs/mockups/r3/db-ripple-redesign.md))에서 왔다. 시안은 옛 3분할 화면(탐색기 · 전파 그래프 · 요약)을 바탕으로 그려졌고, 실제 화면은 원인 트리 구조를 그대로 두고 색, 초록 점 상태 한 줄, 전파 단계 칩, 큰 합계 숫자, 행 수 막대, 그래프 순차 등장, "읽는 법 ?" 팝오버를 옮겼다. 원본 적용 확인은 시안의 인라인 2단계 대신 원본 DB 이름을 입력하는 확인 상자를 그대로 쓴다.
+
+![리디자인 시안: 상단 초록 점 상태 한 줄, DELETE → 직접 → FK 연쇄 → 트리거 단계 칩, 전파 그래프, 오른쪽 큰 합계 4행 삭제와 테이블별 막대](docs/mockups/r3/png/redesign.jpg)
+
+화면 구조(원인 트리)의 바탕인 목업은 [docs/mockups/r2/](docs/mockups/r2/index.html)에 있다(`3-compare.html`과 다른 시안 3종, 옛 화면 검토). 그 전 라운드 시안은 [docs/mockups/](docs/mockups/index.html)에 남아 있다.
 
 ### HTTP로
 

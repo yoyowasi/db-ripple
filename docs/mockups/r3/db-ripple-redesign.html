@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>db-ripple · 리디자인</title>
+<style>
+:root{
+  --bg:#f5f6f4;--surface:#fff;--ink:#17211e;--muted:#667470;--line:#e1e6e2;--soft:#eef1ee;
+  --brand:#0e6b5b;--brand-soft:#e1f1ed;--danger:#c4402e;--danger-soft:#fbeae6;
+  --fk:#2d62d6;--trig:#a86d12;--trig-soft:#fbf1dc;--ok:#1d7a4c;
+  --mono:"JetBrains Mono","D2Coding",ui-monospace,Menlo,monospace;
+  --sans:"Pretendard","Noto Sans KR","Apple SD Gothic Neo",system-ui,sans-serif;
+  --ease:cubic-bezier(.2,.7,.2,1);--bh:104px;
+}
+:root[data-theme=dark]{
+  --bg:#111715;--surface:#18201d;--ink:#e7eeeb;--muted:#8a9893;--line:#2a3430;--soft:#202a26;
+  --brand:#4fc3ab;--brand-soft:#163129;--danger:#ef7b69;--danger-soft:#33201c;
+  --fk:#7ba2ff;--trig:#e8b254;--trig-soft:#332a14;--ok:#58c88c;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{font:14px/1.5 var(--sans);color:var(--ink);background:var(--bg);display:grid;grid-template-rows:48px 1fr;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:1px solid var(--line);border-radius:8px;padding:5px 11px;cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
+button:hover{background:var(--soft)}button:active{transform:scale(.97)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.mono{font-family:var(--mono)}
+
+/* 상단바 */
+header{display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.logo{font:700 15px var(--mono);letter-spacing:-.02em}
+.sp{flex:1}
+.status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink)}
+.status i{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.status small{color:var(--muted)}
+.chip{color:var(--muted);font-size:13px}
+
+/* 레이아웃 */
+main{display:grid;grid-template-columns:240px 1fr 330px;min-height:0;transition:grid-template-columns .3s var(--ease)}
+main.no-side{grid-template-columns:0 1fr 330px}
+aside,section{min-height:0;overflow:auto}
+.side{background:var(--surface);border-right:1px solid var(--line);padding:14px 10px;overflow:hidden}
+.db{display:flex;align-items:center;gap:8px;padding:0 8px 12px;font-weight:600;white-space:nowrap}
+.db span{color:var(--muted);font-weight:400;font-size:12px}
+.tree summary{list-style:none;cursor:pointer;padding:5px 8px;border-radius:7px;color:var(--muted);white-space:nowrap}
+.tree summary::before{content:"›";display:inline-block;width:14px;transition:transform .2s}
+.tree details[open]>summary::before{transform:rotate(90deg)}
+.tree summary:hover{background:var(--soft)}
+.tbl{display:flex;align-items:center;gap:6px;padding:5px 8px 5px 26px;border-radius:7px;font:12.5px var(--mono);cursor:pointer;white-space:nowrap;transition:background .15s}
+.tbl:hover{background:var(--soft)}
+.tbl.hit{background:var(--danger-soft)}
+.tbl b{margin-left:auto;font:600 11px var(--sans);color:var(--danger);background:var(--danger-soft);border-radius:99px;padding:0 7px}
+.tbl.hit b{background:var(--surface)}
+
+/* 중앙 */
+.center{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.editor{background:var(--surface);border-bottom:1px solid var(--line);padding:12px 18px;transition:max-height .3s var(--ease);overflow:hidden}
+.editor.closed .code{display:none}
+.bar{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bar h2{font:600 13px var(--mono)}
+.code{font:13px/1.6 var(--mono);padding:10px 14px;background:var(--soft);border-radius:10px}
+.k{color:var(--brand);font-weight:600}.n{color:var(--trig)}
+.res{display:flex;align-items:center;gap:8px;margin-top:8px;color:var(--ok);font-size:13px}
+.res span{color:var(--muted)}
+.btn-run{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn-run:hover{background:var(--ink);opacity:.85}
+.btn-run kbd{font:11px var(--mono);opacity:.6;margin-left:6px}
+
+.flow{display:flex;align-items:center;gap:6px;padding:12px 18px;flex-wrap:wrap}
+.step{display:flex;align-items:center;gap:6px;padding:4px 11px;border-radius:99px;background:var(--surface);border:1px solid var(--line);font-size:13px}
+.step b{font-weight:600}
+.step.d b{color:var(--danger)}.step.f b{color:var(--fk)}.step.t b{color:var(--trig)}
+.arrow{color:var(--muted)}
+
+.tabs{display:flex;align-items:center;gap:2px;padding:0 18px;border-bottom:1px solid var(--line)}
+.tab{border:0;border-radius:0;padding:9px 12px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab[aria-selected=true]{color:var(--ink);border-color:var(--brand);font-weight:600}
+.tabs .meta{margin-left:auto;font-size:12px;color:var(--muted)}
+
+.tools{display:flex;align-items:center;gap:8px;padding:10px 18px;flex-wrap:wrap}
+.tools input[type=search]{font:inherit;padding:5px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:170px;transition:width .25s var(--ease),border-color .15s}
+.tools input[type=search]:focus{width:230px;border-color:var(--brand);outline:0}
+.zoom{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.zoom button{border:0;border-radius:0;padding:5px 10px}
+.zoom output{align-self:center;min-width:44px;text-align:center;font:12px var(--mono);color:var(--muted)}
+label.sw{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;cursor:pointer}
+.legend-wrap{position:relative;margin-left:auto}
+.legend{position:absolute;right:0;top:36px;z-index:5;width:260px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.12);font-size:12.5px;display:grid;gap:7px;opacity:0;transform:translateY(-6px);pointer-events:none;transition:.2s var(--ease)}
+.legend.on{opacity:1;transform:none;pointer-events:auto}
+.legend p{display:flex;align-items:center;gap:8px}
+.legend svg{flex:none}
+
+.stage{flex:1;min-height:0;position:relative;overflow:auto;background:
+  radial-gradient(circle,var(--line) 1px,transparent 1.2px) 0 0/22px 22px}
+.canvas{width:900px;height:290px;margin:auto;position:absolute;inset:0;transform-origin:center;transform:scale(var(--z,.8));transition:transform .25s var(--ease)}
+.stage svg{width:900px;height:290px;overflow:visible}
+.node rect{fill:var(--surface);stroke-width:1.4;transition:opacity .2s}
+.node.del rect{stroke:var(--danger);fill:var(--danger-soft)}
+.node.trg rect{stroke:var(--trig);fill:var(--trig-soft)}
+.node.q rect{fill:var(--ink);stroke:var(--ink)}
+.node text{fill:var(--ink);font-family:var(--sans)}
+.node .t1{font-size:13px;font-weight:600}
+.node .t2{font-size:11px;font-family:var(--mono)}
+.node.q text{fill:var(--bg)}
+.node{cursor:pointer;transition:opacity .2s}
+.node.dim{opacity:.18}
+.edge{fill:none;stroke-width:1.8}
+.edge.fk{stroke:var(--fk)}
+.edge.tr{stroke:var(--trig);stroke-dasharray:5 5}
+.edge.dir{stroke:var(--muted)}
+.pill rect{fill:var(--surface);stroke:var(--fk);stroke-width:1}
+.pill text{font:600 10px var(--sans);fill:var(--fk);text-anchor:middle}
+.pill.tr rect{stroke:var(--trig)}.pill.tr text{fill:var(--trig)}
+
+/* 실행 시 순차 등장 — 이 화면의 핵심 모션 */
+.run .node{animation:pop .45s var(--ease) both;animation-delay:var(--d)}
+.run .edge:not(.tr){stroke-dasharray:1;stroke-dashoffset:1;animation:draw .5s ease forwards;animation-delay:var(--d)}
+.run .edge.tr{animation:fade .4s both,flow 1s linear infinite;animation-delay:var(--d),0s}
+.run .pill{animation:fade .3s both;animation-delay:var(--d)}
+.flow-on .edge.tr{animation:flow 1s linear infinite}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.96)}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes fade{from{opacity:0}}
+@keyframes flow{to{stroke-dashoffset:-20}}
+
+.rows{padding:18px;overflow:auto;display:none}
+.rows.on{display:block}
+table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:10px;overflow:hidden;font-size:13px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:500;background:var(--soft)}
+td.mono{font-size:12px}
+
+.bottom{height:36px;transition:height .3s var(--ease);flex:none;border-top:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;justify-content:center;gap:6px;padding:0 18px;overflow:auto}
+.bottom.open{height:var(--bh)}
+.foot{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted)}
+.foot button{border:0;padding:2px 6px;color:var(--brand)}
+.evidence{display:none;font-size:12px;line-height:1.5;color:var(--muted)}
+.evidence.on{display:block;animation:fade .3s both}
+
+/* 오른쪽 요약 */
+.panel{background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column}
+.sum{padding:20px 20px 14px}
+.sum .lbl{color:var(--muted);font-size:13px}
+.big{font-size:44px;font-weight:700;letter-spacing:-.03em;line-height:1.1;color:var(--danger);font-variant-numeric:tabular-nums}
+.big small{font-size:16px;font-weight:500;color:var(--ink);margin-left:6px;letter-spacing:0}
+.list{padding:0 20px;display:grid;gap:14px;flex:1;align-content:start;overflow:auto}
+.li .top{display:flex;justify-content:space-between;align-items:baseline}
+.li .nm{font:12.5px var(--mono)}
+.li .cnt{font-weight:600}
+.li .sub{font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
+.li .bar2{height:5px;border-radius:9px;background:var(--soft);margin:5px 0 3px;overflow:hidden}
+.li .bar2 i{display:block;height:100%;width:0;border-radius:9px;background:var(--danger);transition:width .8s var(--ease)}
+.li.f .bar2 i{background:var(--fk)}
+.note{padding:12px 20px;font-size:12.5px;color:var(--muted)}
+details.chk{margin:0 20px 10px;border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+details.chk summary{cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--ok);font-weight:600;list-style:none}
+details.chk summary::after{content:"›";margin-left:auto;color:var(--muted);transition:transform .2s}
+details.chk[open] summary::after{transform:rotate(90deg)}
+details.chk ul{list-style:none;padding:8px 0 2px;display:grid;gap:4px;font-size:12.5px;color:var(--muted)}
+details.chk li::before{content:"✓";color:var(--ok);margin-right:8px}
+.act{height:var(--bh);flex:none;padding:0 20px;display:flex;align-items:center;border-top:1px solid var(--line);position:relative;overflow:hidden}
+.act .row{display:flex;gap:8px;width:100%;transition:transform .35s var(--ease),opacity .25s}
+.act .row .primary{flex:1;background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600;padding:9px}
+.act .row .primary:hover{filter:brightness(1.1)}
+.act .warn{position:absolute;inset:0 20px;display:grid;gap:8px;align-content:center;transform:translateY(120%);opacity:0;transition:transform .35s var(--ease),opacity .25s}
+.act.confirm .row{transform:translateY(-120%);opacity:0}
+.act.confirm .warn{transform:none;opacity:1}
+.warn p{font-size:13px}.warn p b{color:var(--danger)}
+.warn .two{display:flex;gap:8px}
+.warn .danger{flex:1;background:var(--danger);border-color:var(--danger);color:#fff;font-weight:600}
+.done{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--surface);color:var(--ok);font-weight:600;opacity:0;pointer-events:none;transition:opacity .3s}
+.act.applied .done{opacity:1;pointer-events:auto}
+.done svg{stroke-dasharray:30;stroke-dashoffset:30}
+.act.applied .done svg{animation:draw2 .5s .15s forwards}
+@keyframes draw2{to{stroke-dashoffset:0}}
+
+@media (max-width:1000px){main,main.no-side{grid-template-columns:1fr}.side,.panel{display:none}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <button id="toggleSide" title="탐색기 접기/펴기" aria-label="탐색기 접기/펴기">☰</button>
+  <span class="logo">db-ripple</span>
+  <span class="chip">기준 2026-11-12 14:27</span>
+  <span class="sp"></span>
+  <div class="status" title="환경 지문 일치 · 잠금 없음 · DM1 정상 · 삭제 1건">
+    <i></i>샌드박스 준비됨 <small>· 잠금 없음</small>
+  </div>
+  <button id="refresh">샌드박스 새로 고침</button>
+  <button id="theme" aria-label="테마 전환">◐ 테마</button>
+</header>
+
+<main id="main">
+  <aside class="side">
+    <div class="db">▤ AdventureWorks <span>복제본</span></div>
+    <div class="tree">
+      <details open><summary>Sales</summary>
+        <div class="tbl hit" data-t="SalesOrderHeader">SalesOrderHeader<b>삭제 1</b></div>
+        <div class="tbl hit" data-t="SalesOrderDetail">SalesOrderDetail<b>삭제 1</b></div>
+        <div class="tbl hit" data-t="SalesOrderHeaderSalesReason">SalesOrderHeaderSa…<b>삭제 2</b></div>
+        <div class="tbl">SalesPerson</div><div class="tbl">SalesTerritory</div><div class="tbl">Customer</div>
+      </details>
+      <details><summary>HumanResources</summary></details>
+      <details><summary>Person</summary></details>
+      <details><summary>Production</summary></details>
+    </div>
+  </aside>
+
+  <section class="center">
+    <div class="editor" id="editor">
+      <div class="bar">
+        <h2>쿼리 1.sql</h2><span class="sp"></span>
+        <button id="toggleEd">편집기 접기</button>
+        <button class="btn-run" id="run">다시 실행<kbd>Ctrl+Enter</kbd></button>
+      </div>
+      <div class="code"><span class="k">DELETE FROM</span> Sales.SalesOrderHeader <span class="k">WHERE</span> SalesOrderID = <span class="n">43697</span>;</div>
+      <div class="res">✓ 통과 <span>문장 1 · 경고 0건 · 1.6초</span></div>
+    </div>
+
+    <div class="flow" aria-label="전파 요약">
+      <span class="step"><span class="mono">DELETE</span></span><span class="arrow">→</span>
+      <span class="step d">직접 <b>1행</b> · 1개 테이블</span><span class="arrow">→</span>
+      <span class="step f">FK 연쇄 <b>3행</b> · 2개 테이블</span><span class="arrow">→</span>
+      <span class="step t">트리거 쓰기 <b>0행 변경</b> · 2건</span>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-tab="graph">전파 그래프</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="rows">행 변경</button>
+      <span class="meta">실행 14:27 · 미리보기 정상</span>
+    </div>
+
+    <div class="tools" id="tools">
+      <div class="zoom">
+        <button id="fit" title="맞춤">맞춤</button><button id="zout" aria-label="축소">−</button>
+        <output id="zv">80%</output><button id="zin" aria-label="확대">＋</button>
+      </div>
+      <input type="search" id="q" placeholder="테이블 검색  예: Sales" aria-label="테이블 검색">
+      <label class="sw"><input type="checkbox" id="hide0"> 0행 숨기기 (2개)</label>
+      <button id="tableView">표로 보기</button>
+      <div class="legend-wrap">
+        <button id="help">읽는 법 ?</button>
+        <div class="legend" id="legend" role="note">
+          <p><svg width="30" height="8"><line x1="0" y1="4" x2="30" y2="4" stroke="var(--fk)" stroke-width="2"/></svg>실선 = 확실한 영향</p>
+          <p><svg width="30" height="8"><line x1="0" y1="4" x2="30" y2="4" stroke="var(--trig)" stroke-width="2" stroke-dasharray="5 4"/></svg>점선 = 파서 추론</p>
+          <p style="color:var(--muted)">번호는 화면 표시 순번이며 실행 순서가 아닙니다.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="canvas" id="canvas">
+      <svg id="svg" viewBox="0 0 900 290" class="run" role="img" aria-label="DELETE가 SalesOrderHeader에서 하위 테이블로 전파되는 그래프">
+        <path class="edge dir" pathLength="1" style="--d:.1s" d="M150 135 H210"/>
+        <path class="edge fk" pathLength="1" style="--d:.5s" d="M380 120 C430 120 420 58 470 58"/>
+        <path class="edge fk" pathLength="1" style="--d:.6s" d="M380 150 C430 150 420 198 470 198"/>
+        <path class="edge tr" style="--d:1.2s,0s" d="M660 58 H720"/>
+        <g class="pill" style="--d:.9s"><rect x="410" y="79" width="26" height="18" rx="9"/><text x="423" y="92">FK</text></g>
+        <g class="pill" style="--d:.9s"><rect x="410" y="160" width="26" height="18" rx="9"/><text x="423" y="173">FK</text></g>
+        <g class="pill tr" style="--d:1.4s"><rect x="672" y="49" width="38" height="18" rx="9"/><text x="691" y="62">트리거</text></g>
+
+        <g class="node q" style="--d:0s"><rect x="10" y="112" width="140" height="46" rx="12"/><text class="t2" x="26" y="130">DELETE</text><text class="t1" x="26" y="148">SalesOrderHeader</text></g>
+        <g class="node del" data-t="SalesOrderHeader" style="--d:.3s"><rect x="210" y="105" width="170" height="60" rx="12"/><text class="t1" x="226" y="130">1행 삭제</text><text class="t2" x="226" y="150">SalesOrderHeader</text></g>
+        <g class="node del" data-t="SalesOrderDetail" style="--d:.8s"><rect x="470" y="30" width="190" height="56" rx="12"/><text class="t1" x="486" y="55">1행 삭제</text><text class="t2" x="486" y="73">SalesOrderDetail</text></g>
+        <g class="node del" data-t="SalesOrderHeaderSalesReason" style="--d:.9s"><rect x="470" y="170" width="190" height="56" rx="12"/><text class="t1" x="486" y="195">2행 삭제</text><text class="t2" x="486" y="213">…HeaderSalesReason</text></g>
+        <g class="node trg" data-t="iduSalesOrderDetail" data-zero="1" style="--d:1.3s"><rect x="720" y="30" width="170" height="56" rx="12"/><text class="t1" x="736" y="55">⚡ iduSalesOrderDetail</text><text class="t2" x="736" y="73">0행 쓰기 2건 · 보기</text></g>
+      </svg>
+      </div>
+    </div>
+
+    <div class="rows" id="rowsView">
+      <table>
+        <tr><th>테이블</th><th>PK</th><th>사유</th></tr>
+        <tr><td class="mono">Sales.SalesOrderHeader</td><td class="mono">43697</td><td>직접 삭제</td></tr>
+        <tr><td class="mono">Sales.SalesOrderDetail</td><td class="mono">43697 · 353</td><td>FK 연쇄</td></tr>
+        <tr><td class="mono">Sales.SalesOrderHeaderSalesReason</td><td class="mono">43697 · 5</td><td>FK 연쇄</td></tr>
+        <tr><td class="mono">Sales.SalesOrderHeaderSalesReason</td><td class="mono">43697 · 9</td><td>FK 연쇄</td></tr>
+      </table>
+    </div>
+
+    <div class="bottom" id="bottom">
+    <div class="evidence" id="evidence">e2e 로그 6줄(DM1 firings 5 · netSummary 경고 0) · 47줄(트리거 3개 관여) · 키 43697 · 353 · 사유 5/9와 CustomerID 21768 · Status 5는 demo.http · SP8 로그 · 남은 24분 · 표시 순번은 예시값</div>
+    <div class="foot">
+      <span>미리보기에 걸린 테이블 위주로 보여 줍니다 (전체 71개 중 일부)</span><span class="sp"></span>
+      <button id="ev">목업 근거 보기</button>
+    </div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="sum">
+      <div class="lbl">이 쿼리를 적용하면</div>
+      <div class="big"><span id="total">0</span><small>행 삭제 · 3개 테이블</small></div>
+    </div>
+
+    <div class="list">
+      <div class="li"><div class="top"><span class="nm">SalesOrderHeader</span><span class="cnt">1</span></div><div class="bar2"><i data-w="25"></i></div><div class="sub"><span>Sales · 삭제</span><span>직접</span></div></div>
+      <div class="li f"><div class="top"><span class="nm">SalesOrderDetail</span><span class="cnt">1</span></div><div class="bar2"><i data-w="25"></i></div><div class="sub"><span>Sales · 삭제</span><span>FK 연쇄</span></div></div>
+      <div class="li f"><div class="top"><span class="nm">SalesOrderHeaderSalesReason</span><span class="cnt">2</span></div><div class="bar2"><i data-w="50"></i></div><div class="sub"><span>Sales · 삭제</span><span>FK 연쇄</span></div></div>
+      <p class="note">합계는 순변경 기준입니다. 트리거 쓰기 2건은 변경이 없어 제외했고, 롤백 후 남은 변경은 없습니다. 트리거로 인한 귀속은 추론입니다.</p>
+    </div>
+
+    <details class="chk">
+      <summary>경고 없음 · 적용 조건 7/7 충족</summary>
+      <ul><li>문법 검사 통과</li><li>환경 지문 일치</li><li>잠금 없음</li><li>FK 연쇄 확인</li><li>트리거 영향 확인</li><li>롤백 검증 통과</li><li>샌드박스 유효 (24분)</li></ul>
+    </details>
+
+    <div class="act" id="act">
+      <div class="row"><button class="primary" id="apply">원본에 적용</button><button id="cancel">미리보기 취소</button></div>
+      <div class="warn"><p><b>원본 DB에서 4행이 삭제됩니다.</b> 되돌릴 수 없습니다.</p>
+        <div class="two"><button id="back">돌아가기</button><button class="danger" id="confirm">삭제 확정</button></div></div>
+      <div class="done"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M4 12l5 5L20 6"/></svg>원본에 적용했습니다</div>
+    </div>
+  </aside>
+</main>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+let z=.8;
+const setZ=v=>{z=Math.min(1.4,Math.max(.4,v));$('#canvas').style.setProperty('--z',z);$('#zv').textContent=Math.round(z*100)+'%'};
+const fitZ=()=>{const w=$('#stage').clientWidth;setZ(Math.min(1,(w-40)/900))};
+$('#zin').onclick=()=>setZ(z+.1);$('#zout').onclick=()=>setZ(z-.1);$('#fit').onclick=fitZ;
+
+// 숫자 카운트업 + 막대 채우기
+function countUp(){
+  const t=$('#total'),end=4,s=performance.now();
+  (function f(n){const p=Math.min(1,(n-s)/700);t.textContent=Math.round(end*(1-Math.pow(1-p,3)));p<1&&requestAnimationFrame(f)})(s);
+  $$('.bar2 i').forEach((b,i)=>{b.style.width='0';setTimeout(()=>b.style.width=b.dataset.w+'%',300+i*150)});
+}
+function run(){
+  const s=$('#svg');s.classList.remove('run');void s.getBoundingClientRect();s.classList.add('run');countUp();
+}
+$('#run').onclick=run;
+$('#refresh').onclick=run;
+document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='Enter')run()});
+
+// 탭
+$$('.tab').forEach(t=>t.onclick=()=>{
+  $$('.tab').forEach(x=>x.setAttribute('aria-selected',x===t));
+  const g=t.dataset.tab==='graph';
+  $('#stage').style.display=g?'':'none';$('#tools').style.display=g?'':'none';
+  $('#rowsView').classList.toggle('on',!g);
+});
+$('#tableView').onclick=()=>$$('.tab')[1].click();
+
+// 검색 / 0행 숨기기 / 트리 연동
+function filter(){
+  const q=$('#q').value.trim().toLowerCase(),h=$('#hide0').checked;
+  $$('.node[data-t]').forEach(n=>{
+    const miss=q&&!n.dataset.t.toLowerCase().includes(q);
+    n.classList.toggle('dim',!!miss);
+    n.style.display=(h&&n.dataset.zero)?'none':'';
+  });
+  $$('.edge.tr,.pill.tr').forEach(e=>e.style.display=h?'none':'');
+}
+$('#q').oninput=filter;$('#hide0').onchange=filter;
+$$('.tbl[data-t]').forEach(r=>r.onclick=()=>{$('#q').value=r.dataset.t;filter()});
+
+// 기타 토글
+$('#help').onclick=e=>{e.stopPropagation();$('#legend').classList.toggle('on')};
+document.addEventListener('click',()=>$('#legend').classList.remove('on'));
+$('#ev').onclick=e=>{const o=$('#bottom').classList.toggle('open');$('#evidence').classList.toggle('on',o);e.target.textContent=o?'근거 접기':'목업 근거 보기'};
+$('#toggleSide').onclick=()=>$('#main').classList.toggle('no-side');
+$('#toggleEd').onclick=e=>{const ed=$('#editor').classList.toggle('closed');e.target.textContent=ed?'편집기 펴기':'편집기 접기'};
+$('#theme').onclick=()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'':'dark'};
+
+// 적용: 2단계 확인 (파괴적 작업)
+$('#apply').onclick=()=>$('#act').classList.add('confirm');
+$('#back').onclick=()=>$('#act').classList.remove('confirm');
+$('#confirm').onclick=()=>$('#act').classList.add('applied');
+$('#cancel').onclick=()=>{$('#act').classList.remove('confirm','applied')};
+
+fitZ();countUp();
+addEventListener('resize',fitZ);
+</script>
+</body>
+</html>

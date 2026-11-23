@@ -33,11 +33,17 @@ const cls = computed(() => {
   ]
 })
 
+/** 첫 그리기: 들어오는 간선이 그려진 뒤 노드가 떠오른다(문장은 바로) */
+const popDelay = computed(() => {
+  const r = props.data.rank
+  return { '--dl': `${(r > 0 ? (r - 1) * ctx.drawStep.value + 0.22 : 0).toFixed(2)}s` }
+})
+
 const chipText = computed(() => `0행 쓰기 ${props.data.zeroChip}건 · ${ctx.showZeroRows.value ? '접기' : '보기'}`)
 </script>
 
 <template>
-  <div class="rn" :class="cls" :title="data.sentence">
+  <div class="rn" :class="cls" :style="popDelay" :title="data.sentence">
     <div class="box" :style="{ width: `${data.width}px`, height: `${data.boxHeight}px` }">
       <Handle type="target" :position="Position.Left" :connectable="false" :style="handleStyle" />
 
@@ -442,6 +448,12 @@ const chipText = computed(() => `0행 쓰기 ${props.data.zeroChip}건 · ${ctx.
 </style>
 
 <style>
+/* 첫 그리기(리디자인 시안의 순차 등장): 문장 → 직접 → FK → 트리거 순으로 노드가 떠오른다. .drawing은 PropagationGraph가 붙인다. */
+@media (prefers-reduced-motion: no-preference) {
+  .drawing .rn {
+    animation: dr-pop 0.4s var(--ease) var(--dl) both;
+  }
+}
 /* 배율 80% 미만: 부가 줄·순번·문장 둘째 줄을 숨기고 결과 글자를 키운다(.lo는 PropagationGraph가 붙인다). 이름은 폭 어림이 깨지지 않게 그대로 둔다. */
 .lo .rn .xtra,
 .lo .rn .sch,

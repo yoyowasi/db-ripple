@@ -75,11 +75,11 @@ onBeforeUnmount(() => sandbox.stop())
   background: var(--menu-bg);
   border-bottom: 1px solid var(--line);
   color: var(--menu-fg);
-  font-size: 12px;
+  font-size: 13px;
 }
 .menu-slot {
+  flex: 1;
   min-width: 0;
-  margin-right: auto;
 }
 .menu :focus-visible {
   outline-color: var(--menu-focus);
@@ -103,10 +103,14 @@ onBeforeUnmount(() => sandbox.stop())
   gap: 7px;
   margin-right: 4px;
   color: var(--menu-fg-strong);
-  font: 700 14px var(--ui);
-  letter-spacing: -0.01em;
+  font: 700 15px var(--mono);
+  letter-spacing: -0.02em;
+}
+.menu .logo:hover {
+  text-decoration: none;
 }
 .menu .logo svg {
+  color: var(--accent);
   width: 20px;
   height: 20px;
   fill: none;
