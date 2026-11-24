@@ -208,7 +208,8 @@ watch(
     }
     const t0 = performance.now()
     const step = (t: number) => {
-      const p = Math.min(1, (t - t0) / 700)
+      // 첫 프레임의 시각(t)은 t0보다 이를 수 있다. 0 아래를 막지 않으면 -0이나 큰 합계의 음수가 한 프레임 보인다.
+      const p = Math.min(1, Math.max(0, (t - t0) / 700))
       shown.value = Math.round(end * (1 - (1 - p) ** 3))
       if (p < 1) raf = requestAnimationFrame(step)
     }
