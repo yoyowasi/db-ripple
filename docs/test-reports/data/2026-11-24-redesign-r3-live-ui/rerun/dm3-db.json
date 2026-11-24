@@ -1,0 +1,18 @@
+{
+  "before": {
+    "AW_Origin": {
+      "Employee": 1
+    },
+    "AW_Sandbox": {
+      "Employee": 1
+    }
+  },
+  "afterBlocked": {
+    "AW_Origin": {
+      "Employee": 1
+    },
+    "AW_Sandbox": {
+      "Employee": 1
+    }
+  }
+}

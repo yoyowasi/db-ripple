@@ -52,3 +52,13 @@
 
 - 로컬 `npm run build`와 .NET Release Host 게시가 성공했다. 기본 .NET 테스트(`dotnet test DbRipple.slnx --no-build --no-restore -m:2`)는 1,460건 중 1,387건 통과, 실패 0건, DB 연결이 필요한 73건 건너뜀이다.
 - `aba4409`의 GitHub Actions CI는 .NET, 웹 빌드, PowerShell 5.1, SQL Server, PostgreSQL 16·17·18까지 7개 잡이 모두 성공했다. [해당 커밋 CI](https://github.com/yoyowasi/db-ripple/actions/runs/45137177765)
+
+## 재검증
+
+같은 날 15:58 KST에 새 SQL Server 2025 CU10 인스턴스에서 같은 공식 백업을 복원하고 첫 기준선을 생성했다. `aba4409`의 웹을 다시 빌드해 Release Host 실행 파일 모드와 Chromium으로 실행했다. 기준선은 지문 일치와 71개 수집 테이블을 반환했다. DM7의 첫 자동 확인에서는 새로 고침 직전에 받은 상태를 읽었다. 기준 시각이 바뀐 뒤 조회하도록 대기를 조정해 DM7을 다시 실행했다.
+
+- **시나리오 4개 통과.** DM1은 3개 테이블에서 삭제 4행, DM2는 수정 3행·추가 1행이었다. DM3은 `trigger_blocked`·3609·순변경 0행과 직원 유지, DM7은 `drift_detected`와 `ProductID=680`·`ListPrice`를 재확인했다. 상단에서 기준선을 갱신한 뒤 양쪽의 가격은 `1431.50`이었다. [DM1 DB](data/2026-11-24-redesign-r3-live-ui/rerun/dm1-db.json) · [DM2 DB](data/2026-11-24-redesign-r3-live-ui/rerun/dm2-db.json) · [DM3 DB](data/2026-11-24-redesign-r3-live-ui/rerun/dm3-db.json) · [DM7 DB](data/2026-11-24-redesign-r3-live-ui/rerun/dm7-db.json)
+- **A~H 6개 통과, 2개 실패(A·E).** 일반 실행의 상단 잠금 표시는 미리보기 중 네 시나리오 모두에서 보이지 않았다. 적용 중 DM1·DM2에서 보였다. 별도 SQL 트랜잭션으로 잠금을 유지한 보조 실행에서는 화면의 잠금 문구, 새로 고침의 비활성화와 제목, 잠금 해제 뒤 활성화를 다시 확인했다. 리디자인 전 같은 보조 미리보기는 API에서 잠금이 약 768ms 관측됐고 상단 표시가 나오지 않았다. [미리보기 잠금](data/2026-11-24-redesign-r3-live-ui/rerun/a-locked-preview.png) · [적용 잠금](data/2026-11-24-redesign-r3-live-ui/rerun/a-locked-apply.png)
+- **색상·카운트업 결함 재현.** 복수 원인 막대의 빨강, 두 테마에서 ‘설명 안 됨’ 줄무늬의 빨강, DM1·DM2·DM3의 화면 숫자 `-0`을 재확인했다. 100%·4% 너비와 최종 합계 및 동작 줄이기는 다시 통과했다. [첫 원인 색](data/2026-11-24-redesign-r3-live-ui/rerun/e-first-cause.png) · [밝은 색 비교](data/2026-11-24-redesign-r3-live-ui/rerun/e-bar-colors-light.png) · [어두운 색 비교](data/2026-11-24-redesign-r3-live-ui/rerun/e-bar-colors-dark.png) · [관측 프레임](data/2026-11-24-redesign-r3-live-ui/rerun/c-countup-observed-frame.png) · [DM1 밝게](data/2026-11-24-redesign-r3-live-ui/rerun/dm1-light.png) · [DM1 어둡게](data/2026-11-24-redesign-r3-live-ui/rerun/dm1-dark.png) · [DM2 밝게](data/2026-11-24-redesign-r3-live-ui/rerun/dm2-light.png) · [DM2 어둡게](data/2026-11-24-redesign-r3-live-ui/rerun/dm2-dark.png)
+- **오류 및 미확인.** 최초 분석 409 1회와 대응하는 Chromium 리소스 메시지를 제외하고 콘솔 오류·페이지 예외·CSP 위반·예상 밖 HTTP 오류는 0건이었다. 첫 기준선이 준비된 뒤에도 남는 분석 오류는 리디자인 전 빌드에서 다시 재현했다. 실제 복원본 시나리오에서 `UNEXPLAINED` 응답이 없어서 해당 막대의 API 연동은 미확인이다. [리디자인 전 캡처](data/2026-11-24-redesign-r3-live-ui/rerun/pre-r3-stale-analysis.png) · [API·브라우저 관측값](data/2026-11-24-redesign-r3-live-ui/rerun/api-ui.json)
+- **자동 테스트.** 로컬 웹 빌드와 Release Host 게시 성공. .NET 기본 테스트 1,387건 통과, 실패 0건, DB 연결 변수가 필요한 73건 건너뜀.
