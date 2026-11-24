@@ -1,0 +1,52 @@
+{
+  "before": {
+    "AW_Origin": {
+      "ProductID": 680,
+      "ListPrice": 1431.5
+    },
+    "AW_Sandbox": {
+      "ProductID": 680,
+      "ListPrice": 1431.5
+    }
+  },
+  "afterExternalEdit": {
+    "AW_Origin": {
+      "ProductID": 680,
+      "ListPrice": 1431.51
+    },
+    "AW_Sandbox": {
+      "ProductID": 680,
+      "ListPrice": 1431.5
+    }
+  },
+  "afterBlockedApply": {
+    "AW_Origin": {
+      "ProductID": 680,
+      "ListPrice": 1431.51
+    },
+    "AW_Sandbox": {
+      "ProductID": 680,
+      "ListPrice": 1431.5
+    }
+  },
+  "afterRevert": {
+    "AW_Origin": {
+      "ProductID": 680,
+      "ListPrice": 1431.5
+    },
+    "AW_Sandbox": {
+      "ProductID": 680,
+      "ListPrice": 1431.5
+    }
+  },
+  "afterTopBarRefresh": {
+    "AW_Origin": {
+      "ProductID": 680,
+      "ListPrice": 1431.5
+    },
+    "AW_Sandbox": {
+      "ProductID": 680,
+      "ListPrice": 1431.5
+    }
+  }
+}
