@@ -1,6 +1,6 @@
 // 미리보기 작업 흐름: SQL 편집 → 분석 → 미리보기 → 적용·취소.
 import { defineStore } from 'pinia'
-import { computed, ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import {
   ApiError,
   CLIENT_ERROR_STATUS,
@@ -134,6 +134,23 @@ export const usePreviewStore = defineStore('preview', () => {
       if (mine === analyzeSeq) analyzing.value = false
     }
   }
+
+  // 기준선이 새로 생기거나 바뀌면 지금 SQL을 다시 분석한다. 분석은 기준선 카탈로그로 판정하므로, 그대로 두면
+  // 첫 기준선 전에 받은 409(기준선 없음) 같은 옛 결과가 SQL을 고칠 때까지 남는다.
+  // 첫 상태 읽기(undefined → 값)는 분석이 실패해 있을 때만 다시 한다(정상 분석을 한 번 더 부르지 않게).
+  const sandbox = useSandboxStore()
+  watch(
+    () => {
+      const s = sandbox.status
+      if (!s) return undefined
+      return s.state === 'building' ? null : (s.baselineAt ?? null)
+    },
+    (now, before) => {
+      if (!now || now === before) return
+      if (before === undefined && !analyzeError.value) return
+      if (sql.value.trim()) scheduleAnalyze(0)
+    },
+  )
 
   // ---- 미리보기(C10) ----
 

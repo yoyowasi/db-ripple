@@ -66,11 +66,12 @@ function onKey(e: KeyboardEvent, t: string): void {
   emit('select', nt)
   void nextTick(() => body.value?.querySelector<HTMLElement>(`tr[data-t="${CSS.escape(nt)}"]`)?.focus())
 }
-/** 행 수 막대(리디자인 시안의 테이블별 막대): 가장 큰 테이블 = 100%. 색은 첫 원인(직접 빨강 · FK 파랑 · 트리거 황색) */
+/** 행 수 막대(리디자인 시안의 테이블별 막대): 가장 큰 테이블 = 100%. 색은 첫 원인(직접 빨강 · FK 파랑 · 트리거 황색 · 설명 안 됨 빨강 빗금).
+ *  원인 글자에는 "설명 안 됨 2건"처럼 건수가 붙을 수 있어 앞부분으로 가른다. */
 const maxTotal = computed(() => Math.max(1, ...tables.value.map((x) => x.row.total)))
 function bar(it: TItem): { w: string; tone: string } {
   const b = it.row.basis.split(' · ')[0] ?? ''
-  const tone = b.startsWith('FK') ? 'f' : b.includes('트리거') ? 't' : b === '설명 안 됨' ? 'x' : 'd'
+  const tone = b.startsWith('FK') ? 'f' : b.includes('트리거') ? 't' : b.startsWith('설명 안 됨') ? 'x' : 'd'
   return { w: `${Math.max(4, (it.row.total / maxTotal.value) * 100)}%`, tone }
 }
 const split = (t: string) => {

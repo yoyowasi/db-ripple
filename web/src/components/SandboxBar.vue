@@ -30,7 +30,12 @@ function shortTime(iso: string): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 const busy = computed(() => sandbox.refreshing || st.value?.state === 'building')
-const refreshBlocked = computed(() => busy.value || !!st.value?.locked)
+/** 이 창이 실행 중인 미리보기·적용. 서버 잠금은 15초마다만 읽어 몇 초짜리 내 잠금을 놓치므로 화면이 아는 사실로 막는다. */
+const ownWork = computed(() => (preview.running ? '미리보기 실행 중' : preview.applying ? '적용 중' : null))
+const refreshBlocked = computed(() => busy.value || !!st.value?.locked || !!ownWork.value)
+const refreshTitle = computed(() =>
+  ownWork.value ? '실행 중인 미리보기·적용이 끝나면 켜집니다' : st.value?.locked ? '다른 미리보기·적용이 끝나면 켜집니다' : undefined,
+)
 /** 새로 고침이 필요한 상태면 단추를 주 단추로 */
 const refreshUrgent = computed(() => st.value?.baselineStale === true || st.value?.state === 'dirty' || st.value?.state === 'error')
 
@@ -71,7 +76,8 @@ const flags = computed(() => {
   if (!s.fingerprintMatch || mismatches.value.length) out.push({ text: '환경 지문 불일치', tone: 'err' })
   if (stale.value) out.push({ text: '기준선 오래됨', tone: 'warn' })
   if (unreachable.value) out.push({ text: '원본 연결 안 됨', tone: 'warn' })
-  if (s.locked) out.push({ text: '잠금: 다른 작업 진행 중', tone: 'warn' })
+  // 내 작업 중에 읽힌 잠금은 내 것이다("다른 작업"이 아니다).
+  if (s.locked && !ownWork.value) out.push({ text: '잠금: 다른 작업 진행 중', tone: 'warn' })
   if (instanceWarnings.value.length) out.push({ text: `인스턴스 경고 ${instanceWarnings.value.length}`, tone: 'warn' })
   return out
 })
@@ -104,10 +110,11 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDoc))
       <span v-if="st?.baselineAt" class="base">기준 <time :datetime="st.baselineAt">{{ shortTime(st.baselineAt) }}</time></span>
       <span class="sp"></span>
       <details v-if="st" ref="det" class="st" @keydown="onEsc">
-        <summary :aria-label="`${STATE_LABEL[st.state]}${flags.length ? `, ${flags.map((f) => f.text).join(', ')}` : ''}. 자세히 보기`">
+        <summary :aria-label="`${STATE_LABEL[st.state]}${ownWork ? `, ${ownWork}` : ''}${flags.length ? `, ${flags.map((f) => f.text).join(', ')}` : ''}. 자세히 보기`">
           <span class="dot" :class="DOT[st.state]" aria-hidden="true"></span>
           <span role="status">{{ STATE_LABEL[st.state] }}</span>
-          <small v-if="st.state === 'ready' && !flags.length" class="calm">· 잠금 없음</small>
+          <small v-if="st.state === 'ready' && ownWork" class="calm">· {{ ownWork }}</small>
+          <small v-else-if="st.state === 'ready' && !flags.length" class="calm">· 잠금 없음</small>
           <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
         </summary>
         <div class="pop">
@@ -147,7 +154,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDoc))
             <dt>원본 연결</dt>
             <dd :class="{ bad: unreachable }">{{ unreachable ? '연결 안 됨 · 지문 비교 보류' : '연결됨' }}</dd>
             <dt>잠금</dt>
-            <dd>{{ st.locked ? '다른 미리보기·적용 진행 중' : '없음' }}</dd>
+            <dd>{{ ownWork ? `이 창의 ${ownWork}` : st.locked ? '다른 미리보기·적용 진행 중' : '없음' }}</dd>
           </dl>
           <template v-if="mismatches.length">
             <h3>차단(미리보기·적용이 막힙니다)</h3>
@@ -172,7 +179,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDoc))
         class="btn btn-sm"
         :class="{ 'btn-primary': refreshUrgent }"
         :aria-disabled="refreshBlocked"
-        :title="st.locked ? '다른 미리보기·적용이 끝나면 켜집니다' : undefined"
+        :title="refreshTitle"
         @click="refresh"
       >
         {{ sandbox.refreshing ? '새로 고치는 중…' : '샌드박스 새로 고침' }}
