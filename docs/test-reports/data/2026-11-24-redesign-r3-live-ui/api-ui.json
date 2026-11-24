@@ -1,0 +1,1829 @@
+{
+  "commit": "aba440976d7347dd8e8e8cfccbe29edb8a88952f",
+  "sandbox": {
+    "status": {
+      "state": "ready",
+      "mode": "single_server",
+      "baselineAt": "2026-11-24T13:34:14.5164488+09:00",
+      "fingerprintMatch": true,
+      "locked": false,
+      "manifest": {
+        "coveredTables": 71,
+        "excludedTables": 0,
+        "auditNotLast": 0
+      }
+    },
+    "readyUi": {
+      "fields": [
+        "연결",
+        "한 서버 · 원본과 샌드박스가 한 서버에 있습니다.",
+        "원본",
+        "AW_Origin",
+        "기준 시각",
+        "2026-11-24 13:34",
+        "환경 지문",
+        "원본과 일치",
+        "수집 범위",
+        "테이블 71개 · 제외 0개",
+        "원본 연결",
+        "연결됨",
+        "잠금",
+        "없음"
+      ],
+      "text": "샌드박스 준비됨 · 잠금 없음",
+      "dot": {
+        "cls": "dot ok",
+        "color": "rgb(29, 122, 76)"
+      },
+      "disabled": "false",
+      "title": null
+    },
+    "fingerprint": {
+      "productVersion": "17.0.5035.5",
+      "edition": "Enterprise Developer Edition (64-bit)",
+      "compatibilityLevel": 170,
+      "isRecursiveTriggersOn": false,
+      "nestedTriggers": 1,
+      "disallowResultsFromTriggers": 0,
+      "sessionOptions": 5432,
+      "collation": "SQL_Latin1_General_CP1_CI_AS",
+      "serverCollation": "SQL_Latin1_General_CP1_CI_AS",
+      "hostPlatform": "Linux",
+      "majorVersion": 17,
+      "language": "us_english",
+      "dateFormat": "mdy",
+      "dateFirst": 7,
+      "hasUserClrAssemblies": false
+    }
+  },
+  "firstAnalyze": {
+    "http": 409,
+    "reason": "NO_BASELINE"
+  },
+  "scenarios": {
+    "dm1": {
+      "previewHttp": 200,
+      "previewStatus": "ok",
+      "statements": [
+        {
+          "kind": "DELETE",
+          "status": "ok",
+          "target": "Sales.SalesOrderHeader",
+          "rowsAffected": 1,
+          "error": null
+        }
+      ],
+      "netSummary": [
+        {
+          "table": "Sales.SalesOrderDetail",
+          "inserted": 0,
+          "updated": 0,
+          "deleted": 1,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "Sales.SalesOrderHeader",
+          "inserted": 0,
+          "updated": 0,
+          "deleted": 1,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "Sales.SalesOrderHeaderSalesReason",
+          "inserted": 0,
+          "updated": 0,
+          "deleted": 2,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        }
+      ],
+      "firings": [
+        {
+          "id": "f-13",
+          "table": "Sales.SalesOrderHeaderSalesReason",
+          "depth": 1,
+          "cause": "FK_CASCADE",
+          "triggerCandidates": [],
+          "rowCount": 2
+        },
+        {
+          "id": "f-14",
+          "table": "Sales.SalesOrderHeader",
+          "depth": 2,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.iduSalesOrderDetail"
+          ],
+          "rowCount": 0
+        },
+        {
+          "id": "f-15",
+          "table": "Person.Person",
+          "depth": 2,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.iduSalesOrderDetail"
+          ],
+          "rowCount": 0
+        },
+        {
+          "id": "f-16",
+          "table": "Sales.SalesOrderDetail",
+          "depth": 1,
+          "cause": "FK_CASCADE",
+          "triggerCandidates": [],
+          "rowCount": 1
+        },
+        {
+          "id": "f-17",
+          "table": "Sales.SalesOrderHeader",
+          "depth": 1,
+          "cause": "DIRECT",
+          "triggerCandidates": [],
+          "rowCount": 1
+        }
+      ],
+      "previewLock": {
+        "lockedSamples": 90,
+        "uiLocked": false,
+        "samples": 92,
+        "lockedObservedMs": 2818
+      },
+      "large": {
+        "value": 4,
+        "description": "행 삭제 · 3개 테이블",
+        "mix": null,
+        "motion": false,
+        "frames": [
+          "0",
+          "-0",
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      },
+      "flow": [
+        "DELETE",
+        "직접 1행 · 1개 테이블",
+        "FK 연쇄 3행 · 2개 테이블",
+        "트리거 쓰기 0행 변경 · 2건"
+      ],
+      "bars": [
+        {
+          "table": "Sales.SalesOrderHeader",
+          "width": "50%",
+          "actualWidthPct": 50,
+          "cls": "d",
+          "color": "rgb(196, 64, 46)",
+          "pattern": "none"
+        },
+        {
+          "table": "Sales.SalesOrderDetail",
+          "width": "50%",
+          "actualWidthPct": 50,
+          "cls": "f",
+          "color": "rgb(45, 98, 214)",
+          "pattern": "none"
+        },
+        {
+          "table": "Sales.SalesOrderHeaderSalesReason",
+          "width": "100%",
+          "actualWidthPct": 100,
+          "cls": "f",
+          "color": "rgb(45, 98, 214)",
+          "pattern": "none"
+        }
+      ],
+      "graph": {
+        "initial": {
+          "drawing": true,
+          "nodes": [
+            {
+              "id": "st-1",
+              "delay": "0s",
+              "opacity": 0
+            },
+            {
+              "id": "f-17",
+              "delay": "0.22s",
+              "opacity": 0
+            },
+            {
+              "id": "f-13",
+              "delay": "0.44s",
+              "opacity": 0
+            },
+            {
+              "id": "f-16",
+              "delay": "0.44s",
+              "opacity": 0
+            },
+            {
+              "id": "t-3",
+              "delay": "0.66s",
+              "opacity": 0
+            }
+          ]
+        },
+        "fitted": {
+          "compact": false,
+          "nodes": [
+            {
+              "id": "st-1",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-17",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-13",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-16",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-3",
+              "opacity": 1,
+              "inFrame": true
+            }
+          ]
+        },
+        "zoom0": 100,
+        "zoomIn": 120,
+        "wide": {
+          "compact": false,
+          "nodes": [
+            {
+              "id": "st-1",
+              "opacity": 1,
+              "inFrame": false
+            },
+            {
+              "id": "f-17",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-13",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-16",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-3",
+              "opacity": 1,
+              "inFrame": false
+            }
+          ],
+          "zoom": 120
+        },
+        "compact": {
+          "compact": true,
+          "nodes": [
+            {
+              "id": "st-1",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-17",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-13",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-16",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-3",
+              "opacity": 1,
+              "inFrame": true
+            }
+          ],
+          "zoom": 69
+        },
+        "afterFit": {
+          "compact": false,
+          "nodes": [
+            {
+              "id": "st-1",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-17",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-13",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-16",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-3",
+              "opacity": 1,
+              "inFrame": true
+            }
+          ],
+          "zoom": 100
+        },
+        "opened": true,
+        "closedEsc": true,
+        "closedOutside": true,
+        "beforeZeros": 5,
+        "expandedZeros": {
+          "compact": true,
+          "nodes": [
+            {
+              "id": "st-1",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-17",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-13",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-16",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-14",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-15",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-3",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-1",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-2",
+              "opacity": 1,
+              "inFrame": true
+            }
+          ]
+        },
+        "graphApiNodes": [
+          {
+            "id": "st-1",
+            "type": "statement"
+          },
+          {
+            "id": "f-13",
+            "type": "firing"
+          },
+          {
+            "id": "f-16",
+            "type": "firing"
+          },
+          {
+            "id": "t-3",
+            "type": "trigger"
+          },
+          {
+            "id": "f-17",
+            "type": "firing"
+          },
+          {
+            "id": "f-14",
+            "type": "firing"
+          },
+          {
+            "id": "t-1",
+            "type": "trigger"
+          },
+          {
+            "id": "f-15",
+            "type": "firing"
+          },
+          {
+            "id": "t-2",
+            "type": "trigger"
+          }
+        ]
+      },
+      "confirm": {
+        "impact": "원본에서 4행이 삭제됩니다.",
+        "label": "원본에서 4행 삭제",
+        "states": {
+          "empty": "true",
+          "wrong": "true",
+          "wrongRequestCount": 0,
+          "lowercase": "false",
+          "exact": "false"
+        },
+        "rows": [
+          "Sales.SalesOrderDetail 삭제 1",
+          "Sales.SalesOrderHeader 삭제 1",
+          "Sales.SalesOrderHeaderSalesReason 삭제 2"
+        ]
+      },
+      "apply": {
+        "http": 200,
+        "status": "committed",
+        "mode": "SNAPSHOT_NETDIFF",
+        "netSummaryMatch": true,
+        "actualNetSummary": [
+          {
+            "table": "Sales.SalesOrderDetail",
+            "inserted": 0,
+            "updated": 0,
+            "deleted": 1,
+            "multisetRemoved": 0,
+            "multisetAdded": 0
+          },
+          {
+            "table": "Sales.SalesOrderHeader",
+            "inserted": 0,
+            "updated": 0,
+            "deleted": 1,
+            "multisetRemoved": 0,
+            "multisetAdded": 0
+          },
+          {
+            "table": "Sales.SalesOrderHeaderSalesReason",
+            "inserted": 0,
+            "updated": 0,
+            "deleted": 2,
+            "multisetRemoved": 0,
+            "multisetAdded": 0
+          }
+        ],
+        "mismatches": [],
+        "driftRows": [],
+        "sandboxRefreshStarted": true
+      },
+      "applyLock": {
+        "lockedSamples": 196,
+        "uiLocked": true,
+        "samples": 200,
+        "lockedObservedMs": 5926
+      },
+      "applyHeading": "원본에 적용됨 committed"
+    },
+    "dm2": {
+      "previewHttp": 200,
+      "previewStatus": "ok",
+      "statements": [
+        {
+          "kind": "UPDATE",
+          "status": "ok",
+          "target": "Sales.SalesOrderDetail",
+          "rowsAffected": 1,
+          "error": null
+        }
+      ],
+      "netSummary": [
+        {
+          "table": "Person.Person",
+          "inserted": 0,
+          "updated": 1,
+          "deleted": 0,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "Production.TransactionHistory",
+          "inserted": 1,
+          "updated": 0,
+          "deleted": 0,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "Sales.SalesOrderDetail",
+          "inserted": 0,
+          "updated": 1,
+          "deleted": 0,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "Sales.SalesOrderHeader",
+          "inserted": 0,
+          "updated": 1,
+          "deleted": 0,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        }
+      ],
+      "firings": [
+        {
+          "id": "f-25",
+          "table": "Production.TransactionHistory",
+          "depth": 2,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.iduSalesOrderDetail"
+          ],
+          "rowCount": 1
+        },
+        {
+          "id": "f-26",
+          "table": "Person.Person",
+          "depth": 3,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Person.iuPerson"
+          ],
+          "rowCount": 0
+        },
+        {
+          "id": "f-27",
+          "table": "Person.Person",
+          "depth": 3,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Person.iuPerson"
+          ],
+          "rowCount": 0
+        },
+        {
+          "id": "f-28",
+          "table": "Person.Person",
+          "depth": 2,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.iduSalesOrderDetail"
+          ],
+          "rowCount": 1
+        },
+        {
+          "id": "f-29",
+          "table": "Sales.SalesOrderHeader",
+          "depth": 3,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.uSalesOrderHeader"
+          ],
+          "rowCount": 1
+        },
+        {
+          "id": "f-30",
+          "table": "Sales.SalesPerson",
+          "depth": 3,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.uSalesOrderHeader"
+          ],
+          "rowCount": 0
+        },
+        {
+          "id": "f-31",
+          "table": "Sales.SalesTerritory",
+          "depth": 3,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.uSalesOrderHeader"
+          ],
+          "rowCount": 0
+        },
+        {
+          "id": "f-32",
+          "table": "Sales.SalesOrderHeader",
+          "depth": 2,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.iduSalesOrderDetail"
+          ],
+          "rowCount": 1
+        },
+        {
+          "id": "f-33",
+          "table": "Person.Person",
+          "depth": 3,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Person.iuPerson"
+          ],
+          "rowCount": 0
+        },
+        {
+          "id": "f-34",
+          "table": "Person.Person",
+          "depth": 3,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Person.iuPerson"
+          ],
+          "rowCount": 0
+        },
+        {
+          "id": "f-35",
+          "table": "Person.Person",
+          "depth": 2,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.iduSalesOrderDetail"
+          ],
+          "rowCount": 1
+        },
+        {
+          "id": "f-36",
+          "table": "Sales.SalesOrderDetail",
+          "depth": 1,
+          "cause": "DIRECT",
+          "triggerCandidates": [],
+          "rowCount": 1
+        }
+      ],
+      "previewLock": {
+        "lockedSamples": 47,
+        "uiLocked": false,
+        "samples": 48,
+        "lockedObservedMs": 1486
+      },
+      "large": {
+        "value": 4,
+        "description": "행 변경 · 4개 테이블",
+        "mix": "수정 3 · 추가 1",
+        "motion": false,
+        "frames": [
+          "0",
+          "-0",
+          "0",
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      },
+      "flow": [
+        "UPDATE",
+        "직접 1행 · 1개 테이블",
+        "트리거 5행 · 3개 테이블 · 0행 쓰기 6건"
+      ],
+      "bars": [
+        {
+          "table": "Sales.SalesOrderDetail",
+          "width": "100%",
+          "actualWidthPct": 100,
+          "cls": "d",
+          "color": "rgb(196, 64, 46)",
+          "pattern": "none"
+        },
+        {
+          "table": "Person.Person",
+          "width": "100%",
+          "actualWidthPct": 100,
+          "cls": "t",
+          "color": "rgb(168, 109, 18)",
+          "pattern": "none"
+        },
+        {
+          "table": "Production.TransactionHistory",
+          "width": "100%",
+          "actualWidthPct": 100,
+          "cls": "t",
+          "color": "rgb(168, 109, 18)",
+          "pattern": "none"
+        },
+        {
+          "table": "Sales.SalesOrderHeader",
+          "width": "100%",
+          "actualWidthPct": 100,
+          "cls": "t",
+          "color": "rgb(168, 109, 18)",
+          "pattern": "none"
+        }
+      ],
+      "graph": {
+        "initial": {
+          "drawing": true,
+          "nodes": [
+            {
+              "id": "st-1",
+              "delay": "0s",
+              "opacity": 0.826665
+            },
+            {
+              "id": "f-36",
+              "delay": "0.22s",
+              "opacity": 0
+            },
+            {
+              "id": "f-25",
+              "delay": "0.58s",
+              "opacity": 0
+            },
+            {
+              "id": "f-28",
+              "delay": "0.58s",
+              "opacity": 0
+            },
+            {
+              "id": "f-32",
+              "delay": "0.58s",
+              "opacity": 0
+            },
+            {
+              "id": "f-29",
+              "delay": "0.94s",
+              "opacity": 0
+            },
+            {
+              "id": "f-35",
+              "delay": "0.58s",
+              "opacity": 0
+            },
+            {
+              "id": "t-4",
+              "delay": "0.4s",
+              "opacity": 0
+            },
+            {
+              "id": "t-1",
+              "delay": "0.76s",
+              "opacity": 0
+            },
+            {
+              "id": "t-2",
+              "delay": "0.76s",
+              "opacity": 0
+            },
+            {
+              "id": "t-3",
+              "delay": "0.76s",
+              "opacity": 0
+            }
+          ]
+        },
+        "fitted": {
+          "compact": true,
+          "nodes": [
+            {
+              "id": "st-1",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-36",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-25",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-28",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-32",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-29",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-35",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-4",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-1",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-2",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-3",
+              "opacity": 1,
+              "inFrame": true
+            }
+          ]
+        },
+        "zoom0": 100,
+        "zoomIn": 120,
+        "wide": {
+          "compact": false,
+          "nodes": [
+            {
+              "id": "st-1",
+              "opacity": 1,
+              "inFrame": false
+            },
+            {
+              "id": "f-36",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-25",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-28",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-32",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-29",
+              "opacity": 1,
+              "inFrame": false
+            },
+            {
+              "id": "f-35",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-4",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-1",
+              "opacity": 1,
+              "inFrame": false
+            },
+            {
+              "id": "t-2",
+              "opacity": 1,
+              "inFrame": false
+            },
+            {
+              "id": "t-3",
+              "opacity": 1,
+              "inFrame": false
+            }
+          ],
+          "zoom": 120
+        },
+        "compact": {
+          "compact": true,
+          "nodes": [
+            {
+              "id": "st-1",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-36",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-25",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-28",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-32",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-29",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-35",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-4",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-1",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-2",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-3",
+              "opacity": 1,
+              "inFrame": true
+            }
+          ],
+          "zoom": 69
+        },
+        "afterFit": {
+          "compact": true,
+          "nodes": [
+            {
+              "id": "st-1",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-36",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-25",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-28",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-32",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-29",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-35",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-4",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-1",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-2",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-3",
+              "opacity": 1,
+              "inFrame": true
+            }
+          ],
+          "zoom": 100
+        },
+        "opened": true,
+        "closedEsc": true,
+        "closedOutside": true,
+        "beforeZeros": 11,
+        "expandedZeros": {
+          "compact": true,
+          "nodes": [
+            {
+              "id": "st-1",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-36",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-25",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-28",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-32",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-29",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-35",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-26",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-27",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-30",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-31",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-33",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "f-34",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-4",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-1",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-2",
+              "opacity": 1,
+              "inFrame": true
+            },
+            {
+              "id": "t-3",
+              "opacity": 1,
+              "inFrame": true
+            }
+          ]
+        },
+        "graphApiNodes": [
+          {
+            "id": "st-1",
+            "type": "statement"
+          },
+          {
+            "id": "f-36",
+            "type": "firing"
+          },
+          {
+            "id": "t-4",
+            "type": "trigger"
+          },
+          {
+            "id": "f-25",
+            "type": "firing"
+          },
+          {
+            "id": "f-28",
+            "type": "firing"
+          },
+          {
+            "id": "t-1",
+            "type": "trigger"
+          },
+          {
+            "id": "f-32",
+            "type": "firing"
+          },
+          {
+            "id": "t-2",
+            "type": "trigger"
+          },
+          {
+            "id": "f-35",
+            "type": "firing"
+          },
+          {
+            "id": "t-3",
+            "type": "trigger"
+          },
+          {
+            "id": "f-26",
+            "type": "firing"
+          },
+          {
+            "id": "f-27",
+            "type": "firing"
+          },
+          {
+            "id": "f-29",
+            "type": "firing"
+          },
+          {
+            "id": "f-30",
+            "type": "firing"
+          },
+          {
+            "id": "f-31",
+            "type": "firing"
+          },
+          {
+            "id": "f-33",
+            "type": "firing"
+          },
+          {
+            "id": "f-34",
+            "type": "firing"
+          }
+        ]
+      },
+      "confirm": {
+        "impact": "원본에서 4행이 바뀝니다.",
+        "label": "원본에 4행 변경 적용",
+        "states": {
+          "empty": "true",
+          "wrong": "true",
+          "wrongRequestCount": 0,
+          "lowercase": "false",
+          "exact": "false"
+        },
+        "rows": [
+          "Person.Person 수정 1",
+          "Production.TransactionHistory 추가 1",
+          "Sales.SalesOrderDetail 수정 1",
+          "Sales.SalesOrderHeader 수정 1"
+        ]
+      },
+      "apply": {
+        "http": 200,
+        "status": "committed",
+        "mode": "SNAPSHOT_NETDIFF",
+        "netSummaryMatch": true,
+        "actualNetSummary": [
+          {
+            "table": "Person.Person",
+            "inserted": 0,
+            "updated": 1,
+            "deleted": 0,
+            "multisetRemoved": 0,
+            "multisetAdded": 0
+          },
+          {
+            "table": "Production.TransactionHistory",
+            "inserted": 1,
+            "updated": 0,
+            "deleted": 0,
+            "multisetRemoved": 0,
+            "multisetAdded": 0
+          },
+          {
+            "table": "Sales.SalesOrderDetail",
+            "inserted": 0,
+            "updated": 1,
+            "deleted": 0,
+            "multisetRemoved": 0,
+            "multisetAdded": 0
+          },
+          {
+            "table": "Sales.SalesOrderHeader",
+            "inserted": 0,
+            "updated": 1,
+            "deleted": 0,
+            "multisetRemoved": 0,
+            "multisetAdded": 0
+          }
+        ],
+        "mismatches": [],
+        "driftRows": [],
+        "sandboxRefreshStarted": true
+      },
+      "applyLock": {
+        "lockedSamples": 169,
+        "uiLocked": true,
+        "samples": 170,
+        "lockedObservedMs": 5132
+      },
+      "applyHeading": "원본에 적용됨 committed"
+    },
+    "dm3": {
+      "previewHttp": 200,
+      "previewStatus": "trigger_blocked",
+      "statements": [
+        {
+          "kind": "DELETE",
+          "status": "trigger_blocked",
+          "target": "HumanResources.Employee",
+          "rowsAffected": null,
+          "error": {
+            "number": 3609,
+            "message": "The transaction ended in the trigger. The batch has been aborted."
+          }
+        }
+      ],
+      "netSummary": [],
+      "firings": [],
+      "previewLock": {
+        "lockedSamples": 119,
+        "uiLocked": false,
+        "samples": 121,
+        "lockedObservedMs": 3658
+      },
+      "large": {
+        "value": 0,
+        "description": "행 변경",
+        "mix": null,
+        "motion": false,
+        "frames": [
+          "0",
+          "-0",
+          "0"
+        ]
+      },
+      "flow": [
+        "DELETE",
+        "관측된 변경 없음"
+      ],
+      "cancelHttp": 204
+    },
+    "dm7": {
+      "previewHttp": 200,
+      "previewStatus": "ok",
+      "statements": [
+        {
+          "kind": "UPDATE",
+          "status": "ok",
+          "target": "Production.Product",
+          "rowsAffected": 1,
+          "error": null
+        }
+      ],
+      "netSummary": [
+        {
+          "table": "Production.Product",
+          "inserted": 0,
+          "updated": 1,
+          "deleted": 0,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        }
+      ],
+      "firings": [
+        {
+          "id": "f-13",
+          "table": "Production.Product",
+          "depth": 1,
+          "cause": "DIRECT",
+          "triggerCandidates": [],
+          "rowCount": 1
+        }
+      ],
+      "previewLock": {
+        "lockedSamples": 10,
+        "uiLocked": false,
+        "samples": 12,
+        "lockedObservedMs": 267
+      },
+      "large": {
+        "value": 1,
+        "description": "행 수정 · 1개 테이블",
+        "mix": null,
+        "motion": false,
+        "frames": [
+          "0",
+          "1"
+        ]
+      },
+      "flow": [
+        "UPDATE",
+        "직접 1행 · 1개 테이블"
+      ],
+      "confirm": {
+        "impact": "원본에서 1행이 수정됩니다.",
+        "label": "원본에서 1행 수정",
+        "states": {
+          "empty": "true",
+          "wrong": "true",
+          "wrongRequestCount": 0,
+          "lowercase": "false",
+          "exact": "false"
+        },
+        "rows": [
+          "Production.Product 수정 1"
+        ]
+      },
+      "apply": {
+        "http": 200,
+        "status": "drift_detected",
+        "mode": "SNAPSHOT_NETDIFF",
+        "netSummaryMatch": null,
+        "actualNetSummary": [],
+        "mismatches": [],
+        "driftRows": [
+          {
+            "table": "Production.Product",
+            "key": {
+              "kind": "PK",
+              "columns": [
+                "ProductID"
+              ],
+              "values": [
+                "680"
+              ]
+            },
+            "kind": "CHANGED",
+            "columns": [
+              "ListPrice"
+            ],
+            "expected": {
+              "ListPrice": "1431.5000"
+            },
+            "actual": {
+              "ListPrice": "1431.5100"
+            },
+            "expectedMultiplicity": null,
+            "actualMultiplicity": null
+          }
+        ],
+        "sandboxRefreshStarted": false
+      },
+      "applyLock": {
+        "lockedSamples": 34,
+        "uiLocked": false,
+        "samples": 41,
+        "lockedObservedMs": 971
+      },
+      "applyHeading": "드리프트 감지 drift_detected"
+    },
+    "dm2-reduced": {
+      "previewHttp": 200,
+      "previewStatus": "ok",
+      "statements": [
+        {
+          "kind": "UPDATE",
+          "status": "ok",
+          "target": "Sales.SalesOrderDetail",
+          "rowsAffected": 1,
+          "error": null
+        }
+      ],
+      "netSummary": [
+        {
+          "table": "Person.Person",
+          "inserted": 0,
+          "updated": 1,
+          "deleted": 0,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "Production.TransactionHistory",
+          "inserted": 1,
+          "updated": 0,
+          "deleted": 0,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "Sales.SalesOrderDetail",
+          "inserted": 0,
+          "updated": 1,
+          "deleted": 0,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "Sales.SalesOrderHeader",
+          "inserted": 0,
+          "updated": 1,
+          "deleted": 0,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        }
+      ],
+      "firings": [
+        {
+          "id": "f-13",
+          "table": "Production.TransactionHistory",
+          "depth": 2,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.iduSalesOrderDetail"
+          ],
+          "rowCount": 1
+        },
+        {
+          "id": "f-14",
+          "table": "Person.Person",
+          "depth": 3,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Person.iuPerson"
+          ],
+          "rowCount": 0
+        },
+        {
+          "id": "f-15",
+          "table": "Person.Person",
+          "depth": 3,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Person.iuPerson"
+          ],
+          "rowCount": 0
+        },
+        {
+          "id": "f-16",
+          "table": "Person.Person",
+          "depth": 2,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.iduSalesOrderDetail"
+          ],
+          "rowCount": 1
+        },
+        {
+          "id": "f-17",
+          "table": "Sales.SalesOrderHeader",
+          "depth": 3,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.uSalesOrderHeader"
+          ],
+          "rowCount": 1
+        },
+        {
+          "id": "f-18",
+          "table": "Sales.SalesPerson",
+          "depth": 3,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.uSalesOrderHeader"
+          ],
+          "rowCount": 0
+        },
+        {
+          "id": "f-19",
+          "table": "Sales.SalesTerritory",
+          "depth": 3,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.uSalesOrderHeader"
+          ],
+          "rowCount": 0
+        },
+        {
+          "id": "f-20",
+          "table": "Sales.SalesOrderHeader",
+          "depth": 2,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.iduSalesOrderDetail"
+          ],
+          "rowCount": 1
+        },
+        {
+          "id": "f-21",
+          "table": "Person.Person",
+          "depth": 3,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Person.iuPerson"
+          ],
+          "rowCount": 0
+        },
+        {
+          "id": "f-22",
+          "table": "Person.Person",
+          "depth": 3,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Person.iuPerson"
+          ],
+          "rowCount": 0
+        },
+        {
+          "id": "f-23",
+          "table": "Person.Person",
+          "depth": 2,
+          "cause": "TRIGGER",
+          "triggerCandidates": [
+            "Sales.iduSalesOrderDetail"
+          ],
+          "rowCount": 1
+        },
+        {
+          "id": "f-24",
+          "table": "Sales.SalesOrderDetail",
+          "depth": 1,
+          "cause": "DIRECT",
+          "triggerCandidates": [],
+          "rowCount": 1
+        }
+      ],
+      "previewLock": {
+        "lockedSamples": 69,
+        "uiLocked": false,
+        "samples": 70,
+        "lockedObservedMs": 2243
+      },
+      "large": {
+        "value": 4,
+        "description": "행 변경 · 4개 테이블",
+        "mix": "수정 3 · 추가 1",
+        "motion": true,
+        "frames": [
+          "4"
+        ]
+      },
+      "flow": [
+        "UPDATE",
+        "직접 1행 · 1개 테이블",
+        "트리거 5행 · 3개 테이블 · 0행 쓰기 6건"
+      ]
+    }
+  },
+  "dm3ApplyGate": {
+    "disabled": "true",
+    "applyRequests": 0,
+    "errorText": "트리거가 문장을 거부했습니다(오류 3609) 원본에서도 같은 결과가 납니다. 변경된 행은 없습니다.",
+    "cancelHttp": 204
+  },
+  "dm7AfterRefresh": {
+    "state": "ready",
+    "mode": "single_server",
+    "baselineAt": "2026-11-24T13:36:59.9582041+09:00",
+    "fingerprintMatch": true,
+    "locked": false,
+    "manifest": {
+      "coveredTables": 71,
+      "excludedTables": 0,
+      "auditNotLast": 0
+    }
+  },
+  "browserErrors": {
+    "expected409": 1,
+    "unexpected": [],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "csp": [],
+    "failedRequests": []
+  },
+  "supplementalLocks": {
+    "results": {
+      "preview": {
+        "during": {
+          "flag": "잠금: 다른 작업 진행 중",
+          "title": "다른 미리보기·적용이 끝나면 켜집니다",
+          "disabled": "true",
+          "seenAfterMs": 11993
+        },
+        "after": {
+          "flag": null,
+          "title": null,
+          "disabled": "false"
+        },
+        "status": "ok"
+      },
+      "apply": {
+        "during": {
+          "flag": "잠금: 다른 작업 진행 중",
+          "title": "다른 미리보기·적용이 끝나면 켜집니다",
+          "disabled": "true",
+          "seenAfterMs": 13179
+        },
+        "after": {
+          "flag": null,
+          "title": null,
+          "disabled": "false"
+        },
+        "status": "drift_detected"
+      },
+      "refreshHttp": 202,
+      "restored": {
+        "AW_Origin": "1431.5000",
+        "AW_Sandbox": "1431.5000"
+      }
+    },
+    "native": [
+      {
+        "phase": "preview",
+        "locked": false,
+        "state": "ready"
+      },
+      {
+        "phase": "preview",
+        "locked": true,
+        "state": "ready"
+      },
+      {
+        "phase": "preview",
+        "locked": false,
+        "state": "ready"
+      },
+      {
+        "phase": "apply",
+        "locked": false,
+        "state": "ready"
+      },
+      {
+        "phase": "apply",
+        "locked": false,
+        "state": "ready"
+      },
+      {
+        "phase": "apply",
+        "locked": true,
+        "state": "ready"
+      },
+      {
+        "phase": "apply",
+        "locked": false,
+        "state": "ready"
+      }
+    ],
+    "errors": []
+  },
+  "supplementalBars": {
+    "previewStatus": "ok",
+    "found": [
+      {
+        "id": "f-17",
+        "statementIndex": 1,
+        "depth": 3,
+        "kind": "TRIGGER",
+        "rowCount": 1
+      },
+      {
+        "id": "f-20",
+        "statementIndex": 1,
+        "depth": 2,
+        "kind": "TRIGGER",
+        "rowCount": 1
+      },
+      {
+        "id": "f-25",
+        "statementIndex": 2,
+        "depth": 2,
+        "kind": "TRIGGER",
+        "rowCount": 1
+      },
+      {
+        "id": "f-26",
+        "statementIndex": 2,
+        "depth": 1,
+        "kind": "DIRECT",
+        "rowCount": 1
+      }
+    ],
+    "actual": {
+      "color": "rgb(196, 64, 46)",
+      "cls": "d"
+    },
+    "details": "문장 1 직접 (확실) SalesOrderDetail 트리거 iduSalesOrderDetail (추론) 이 테이블 문장 1 직접 (확실) SalesOrderDetail 트리거 iduSalesOrderDetail (추론) SalesOrderHeader 트리거 uSalesOrderHeader (추론) 이 테이블 문장 2 직접 (확실) 이 테이블 문장 2 직접 (확실) SalesOrderHeader 트리거 uSalesOrderHeader (추론) 이 테이블",
+    "colorCases": {
+      "light": {
+        "theme": "light",
+        "direct": "rgb(196, 64, 46)",
+        "unexplained": "repeating-linear-gradient(90deg, rgb(196, 64, 46) 0px, rgb(196, 64, 46) 4px, rgba(0, 0, 0, 0) 4px, rgba(0, 0, 0, 0) 7px)",
+        "expectedTrigger": "#a86d12"
+      },
+      "dark": {
+        "theme": "dark",
+        "direct": "rgb(239, 123, 105)",
+        "unexplained": "repeating-linear-gradient(90deg, rgb(239, 123, 105) 0px, rgb(239, 123, 105) 4px, rgba(0, 0, 0, 0) 4px, rgba(0, 0, 0, 0) 7px)",
+        "expectedTrigger": "#e8b254"
+      }
+    },
+    "cancelHttp": 204,
+    "floorNet": [
+      {
+        "table": "Production.Location",
+        "inserted": 0,
+        "updated": 1,
+        "deleted": 0,
+        "multisetRemoved": 0,
+        "multisetAdded": 0
+      },
+      {
+        "table": "Production.Product",
+        "inserted": 0,
+        "updated": 44,
+        "deleted": 0,
+        "multisetRemoved": 0,
+        "multisetAdded": 0
+      }
+    ],
+    "floorBars": [
+      {
+        "table": "Production.Product",
+        "style": "100%",
+        "width": 72,
+        "track": 72
+      },
+      {
+        "table": "Production.Location",
+        "style": "4%",
+        "width": 2.875,
+        "track": 72
+      }
+    ]
+  },
+  "supplementalCountUp": {
+    "frames": [
+      {
+        "text": "-0",
+        "element": "<span data-v-31e43282=\"\" aria-hidden=\"true\">-0</span>",
+        "color": "rgb(23, 33, 30)"
+      }
+    ],
+    "final": "1",
+    "netSummary": [
+      {
+        "table": "Production.Product",
+        "inserted": 0,
+        "updated": 1,
+        "deleted": 0,
+        "multisetRemoved": 0,
+        "multisetAdded": 0
+      }
+    ]
+  },
+  "preRedesignFirstBaseline": {
+    "commit": "1aa86a2",
+    "analyzeHttp": 409,
+    "refreshHttp": 202,
+    "ready": "샌드박스 준비됨",
+    "remaining": "분석하지 못했습니다. 기준선이 없습니다. 샌드박스를 새로 고쳐 기준선을 만드세요. (지금 처리할 수 없는 상태입니다) 샌드박스 새로 고침",
+    "errors": [
+      {
+        "path": "/api/analyze",
+        "status": 409
+      }
+    ]
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "before": {
+    "AW_Origin": {
+      "SalesOrderHeader": 1,
+      "SalesOrderDetail": 1,
+      "SalesOrderHeaderSalesReason": 2
+    },
+    "AW_Sandbox": {
+      "SalesOrderHeader": 1,
+      "SalesOrderDetail": 1,
+      "SalesOrderHeaderSalesReason": 2
+    }
+  },
+  "afterPreview": {
+    "AW_Origin": {
+      "SalesOrderHeader": 1,
+      "SalesOrderDetail": 1,
+      "SalesOrderHeaderSalesReason": 2
+    },
+    "AW_Sandbox": {
+      "SalesOrderHeader": 1,
+      "SalesOrderDetail": 1,
+      "SalesOrderHeaderSalesReason": 2
+    }
+  },
+  "afterCommit": {
+    "AW_Origin": {
+      "SalesOrderHeader": 0,
+      "SalesOrderDetail": 0,
+      "SalesOrderHeaderSalesReason": 0
+    }
+  },
+  "afterAutoRefresh": {
+    "AW_Origin": {
+      "SalesOrderHeader": 0,
+      "SalesOrderDetail": 0,
+      "SalesOrderHeaderSalesReason": 0
+    },
+    "AW_Sandbox": {
+      "SalesOrderHeader": 0,
+      "SalesOrderDetail": 0,
+      "SalesOrderHeaderSalesReason": 0
+    }
+  }
+}
