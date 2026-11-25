@@ -108,7 +108,26 @@ public class MetricsTests
         var b = new MetricsCalculator().M1(truth, bad, vol);
         Assert.Equal(1, b.VolatilePresentFormatOk);
         Assert.Equal(0, b.RowsExact);
-        Assert.Equal("x-x-xTx:x:x.x", MetricsCalculator.FormatShape("2026-11-10T10:00:00.123"));
+        Assert.Equal("x-x-xTx:x:x", MetricsCalculator.FormatShape("2026-11-10T10:00:00.123"));
+    }
+
+    [Fact]
+    public void Volatile_time_with_omitted_zero_fraction_has_the_same_shape()
+    {
+        // FOR JSON은 0밀리초면 소수 초를 생략한다(SP6 7번). 정답 쪽만 0밀리초여도 형식은 같다(2026-11-25 CI CL16 r2).
+        Assert.Equal(MetricsCalculator.FormatShape("2026-11-25T07:49:21"), MetricsCalculator.FormatShape("2026-11-25T07:49:21.697"));
+        Assert.Equal(MetricsCalculator.FormatShape("07:49:21"), MetricsCalculator.FormatShape("07:49:21.1234567"));
+        Assert.Equal(MetricsCalculator.FormatShape("2026-11-25T07:49:21+09:00"), MetricsCalculator.FormatShape("2026-11-25T07:49:21.5+09:00"));
+        // 소수 초만 무시한다. 날짜·GUID처럼 모양이 다른 값은 그대로 다르다.
+        Assert.NotEqual(MetricsCalculator.FormatShape("2026-11-25"), MetricsCalculator.FormatShape("2026-11-25T07:49:21"));
+        Assert.NotEqual(MetricsCalculator.FormatShape("6F9619FF-8B86-D011-B42D-00C04FC964FF"), MetricsCalculator.FormatShape("2026-11-25T07:49:21"));
+
+        var vol = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase) { ["cl16.OrdLine"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "added_at" } };
+        IReadOnlyList<OracleRowChange> truth = [Ins("cl16.OrdLine", 5, ("added_at", "2026-11-25T07:49:21"), ("memo", "c2"))];
+        var predicted = PredictedChange.FromRecord(Record([Net("cl16.OrdLine", 5, NetChangeKind.Inserted, V(("added_at", "2026-11-25T07:49:21.697"), ("memo", "c2")))]));
+        var c = new MetricsCalculator().M1(truth, predicted, vol);
+        Assert.Equal((1L, 1L), (c.VolatileCells, c.VolatilePresentFormatOk));
+        Assert.Equal(1, c.RowsExact);
     }
 
     [Fact]
