@@ -232,12 +232,15 @@ public sealed class MetricsCalculator
     }
 
     /// <summary>
-    /// 비결정 셀의 형식 모양: NULL은 "NULL", 아니면 16진 문자·숫자의 연속을 "x" 하나로 줄인 문자열.
-    /// 예: "2026-11-06T10:15:30.117" → "x-x-xTx:x:x.x", "213443" → "x", GUID → "x-x-x-x-x". 값이 아니라 형식만 맞는지 본다(E1).
+    /// 비결정 셀의 형식 모양: NULL은 "NULL", 아니면 시각 뒤 소수 초를 떼고 16진 문자·숫자의 연속을 "x" 하나로 줄인 문자열.
+    /// 예: "2026-11-06T10:15:30.117" → "x-x-xTx:x:x", "213443" → "x", GUID → "x-x-x-x-x". 값이 아니라 형식만 맞는지 본다(E1).
+    /// 소수 초를 떼는 이유: FOR JSON은 끝자리 0 소수 초를 생략해(SP6 7번) 밀리초가 정확히 0인 실행만 "…:30"으로 나온다.
+    /// 그대로 두면 정답·예측 중 한쪽만 0밀리초일 때 같은 형식인데도 모양이 달라진다(2026-11-25 CI CL16 added_at).
     /// </summary>
-    public static string FormatShape(string? value) => value is null ? "NULL" : HexRun.Replace(value, "x");
+    public static string FormatShape(string? value) => value is null ? "NULL" : HexRun.Replace(FractionalSeconds.Replace(value, ""), "x");
 
     static readonly Regex HexRun = new("[0-9A-Fa-f]+", RegexOptions.CultureInvariant);
+    static readonly Regex FractionalSeconds = new(@"(?<=\d{2}:\d{2}:\d{2})\.\d+", RegexOptions.CultureInvariant);
 
     // "열@srid"·"열@type" 생성 속성은 원래 열의 비결정 여부를 따른다.
     static string BaseColumn(string c) => c.IndexOf('@') is var i and > 0 ? c[..i] : c;
