@@ -1,0 +1,4858 @@
+{
+  "startupRedirect": {
+    "path": "/settings",
+    "heading": "연결 모드",
+    "returnPath": "/"
+  },
+  "cases": {
+    "a": {
+      "http": 200,
+      "status": "ok",
+      "net": [
+        {
+          "table": "s.child",
+          "inserted": 0,
+          "updated": 0,
+          "deleted": 2,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "s.grandchild",
+          "inserted": 0,
+          "updated": 0,
+          "deleted": 3,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "s.note",
+          "inserted": 0,
+          "updated": 2,
+          "deleted": 0,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "s.parent",
+          "inserted": 0,
+          "updated": 0,
+          "deleted": 1,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        }
+      ],
+      "causes": [
+        {
+          "table": "s.parent",
+          "rows": 1,
+          "kind": "DIRECT",
+          "confidence": "certain",
+          "parent": null
+        },
+        {
+          "table": "s.child",
+          "rows": 2,
+          "kind": "FK_CASCADE",
+          "confidence": "certain",
+          "parent": "f-1"
+        },
+        {
+          "table": "s.note",
+          "rows": 2,
+          "kind": "FK_SET_NULL",
+          "confidence": "certain",
+          "parent": "f-1"
+        },
+        {
+          "table": "s.grandchild",
+          "rows": 3,
+          "kind": "FK_CASCADE",
+          "confidence": "certain",
+          "parent": "f-2"
+        }
+      ],
+      "statements": [
+        {
+          "status": "ok",
+          "rowsAffected": 1,
+          "error": null
+        }
+      ],
+      "fingerprint": {
+        "productVersion": "18.7 (Debian 18.7-1.pgdg13+5)",
+        "edition": "PostgreSQL",
+        "compatibilityLevel": 18,
+        "isRecursiveTriggersOn": true,
+        "nestedTriggers": 1,
+        "disallowResultsFromTriggers": 0,
+        "sessionOptions": 0,
+        "collation": "en_US.utf8",
+        "serverCollation": null,
+        "hostPlatform": null,
+        "majorVersion": 18,
+        "language": null,
+        "dateFormat": null,
+        "dateFirst": null,
+        "hasUserClrAssemblies": null
+      },
+      "big": {
+        "samples": 136,
+        "uniqueFrameTimes": 70,
+        "negatives": 0,
+        "values": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "frames": [
+          {
+            "kind": "frame",
+            "t": 16971.8,
+            "at": 1795592312239,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 16971.8,
+            "at": 1795592312239,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 16971.8,
+            "at": 1795592312239,
+            "value": "0"
+          },
+          {
+            "kind": "frame",
+            "t": 17005.1,
+            "at": 1795592312244,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 17005.1,
+            "at": 1795592312248,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 17005.1,
+            "at": 1795592312248,
+            "value": "1"
+          },
+          {
+            "kind": "frame",
+            "t": 17038.4,
+            "at": 1795592312271,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 17038.4,
+            "at": 1795592312271,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 17038.4,
+            "at": 1795592312271,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 17071.8,
+            "at": 1795592312293,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 17071.8,
+            "at": 1795592312293,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 17071.8,
+            "at": 1795592312293,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 17088.4,
+            "at": 1795592312309,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 17088.4,
+            "at": 1795592312309,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 17088.4,
+            "at": 1795592312309,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 17105.2,
+            "at": 1795592312325,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 17105.2,
+            "at": 1795592312325,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 17105.2,
+            "at": 1795592312325,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 17121.8,
+            "at": 1795592312342,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 17121.8,
+            "at": 1795592312342,
+            "value": "4"
+          },
+          {
+            "kind": "callback",
+            "t": 17121.8,
+            "at": 1795592312342,
+            "value": "4"
+          },
+          {
+            "kind": "frame",
+            "t": 17138.5,
+            "at": 1795592312359,
+            "value": "4"
+          },
+          {
+            "kind": "callback",
+            "t": 17138.5,
+            "at": 1795592312359,
+            "value": "4"
+          },
+          {
+            "kind": "callback",
+            "t": 17138.5,
+            "at": 1795592312359,
+            "value": "4"
+          },
+          {
+            "kind": "frame",
+            "t": 17155.1,
+            "at": 1795592312375,
+            "value": "4"
+          },
+          {
+            "kind": "callback",
+            "t": 17155.1,
+            "at": 1795592312375,
+            "value": "4"
+          },
+          {
+            "kind": "callback",
+            "t": 17155.1,
+            "at": 1795592312376,
+            "value": "4"
+          },
+          {
+            "kind": "frame",
+            "t": 17171.8,
+            "at": 1795592312392,
+            "value": "4"
+          },
+          {
+            "kind": "callback",
+            "t": 17171.8,
+            "at": 1795592312392,
+            "value": "5"
+          },
+          {
+            "kind": "callback",
+            "t": 17171.8,
+            "at": 1795592312393,
+            "value": "5"
+          },
+          {
+            "kind": "frame",
+            "t": 17188.4,
+            "at": 1795592312409,
+            "value": "5"
+          },
+          {
+            "kind": "callback",
+            "t": 17188.4,
+            "at": 1795592312409,
+            "value": "5"
+          },
+          {
+            "kind": "callback",
+            "t": 17188.4,
+            "at": 1795592312409,
+            "value": "5"
+          },
+          {
+            "kind": "frame",
+            "t": 17205.2,
+            "at": 1795592312427,
+            "value": "5"
+          },
+          {
+            "kind": "callback",
+            "t": 17205.2,
+            "at": 1795592312427,
+            "value": "5"
+          },
+          {
+            "kind": "callback",
+            "t": 17205.2,
+            "at": 1795592312427,
+            "value": "5"
+          },
+          {
+            "kind": "frame",
+            "t": 17221.8,
+            "at": 1795592312442,
+            "value": "5"
+          },
+          {
+            "kind": "callback",
+            "t": 17221.8,
+            "at": 1795592312442,
+            "value": "6"
+          },
+          {
+            "kind": "callback",
+            "t": 17221.8,
+            "at": 1795592312442,
+            "value": "6"
+          },
+          {
+            "kind": "frame",
+            "t": 17238.4,
+            "at": 1795592312459,
+            "value": "6"
+          },
+          {
+            "kind": "callback",
+            "t": 17238.4,
+            "at": 1795592312459,
+            "value": "6"
+          },
+          {
+            "kind": "callback",
+            "t": 17238.4,
+            "at": 1795592312459,
+            "value": "6"
+          },
+          {
+            "kind": "frame",
+            "t": 17255.1,
+            "at": 1795592312475,
+            "value": "6"
+          },
+          {
+            "kind": "callback",
+            "t": 17255.1,
+            "at": 1795592312475,
+            "value": "6"
+          },
+          {
+            "kind": "callback",
+            "t": 17255.1,
+            "at": 1795592312476,
+            "value": "6"
+          },
+          {
+            "kind": "frame",
+            "t": 17271.8,
+            "at": 1795592312492,
+            "value": "6"
+          },
+          {
+            "kind": "callback",
+            "t": 17271.8,
+            "at": 1795592312492,
+            "value": "6"
+          },
+          {
+            "kind": "callback",
+            "t": 17271.8,
+            "at": 1795592312492,
+            "value": "6"
+          },
+          {
+            "kind": "frame",
+            "t": 17288.4,
+            "at": 1795592312509,
+            "value": "6"
+          },
+          {
+            "kind": "callback",
+            "t": 17288.4,
+            "at": 1795592312509,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17288.4,
+            "at": 1795592312509,
+            "value": "7"
+          },
+          {
+            "kind": "frame",
+            "t": 17305.2,
+            "at": 1795592312526,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17305.2,
+            "at": 1795592312526,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17305.2,
+            "at": 1795592312526,
+            "value": "7"
+          },
+          {
+            "kind": "frame",
+            "t": 17321.8,
+            "at": 1795592312542,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17321.8,
+            "at": 1795592312542,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17321.8,
+            "at": 1795592312542,
+            "value": "7"
+          },
+          {
+            "kind": "frame",
+            "t": 17338.5,
+            "at": 1795592312559,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17338.5,
+            "at": 1795592312559,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17338.5,
+            "at": 1795592312559,
+            "value": "7"
+          },
+          {
+            "kind": "frame",
+            "t": 17355.1,
+            "at": 1795592312575,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17355.1,
+            "at": 1795592312575,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17355.1,
+            "at": 1795592312575,
+            "value": "7"
+          },
+          {
+            "kind": "frame",
+            "t": 17371.7,
+            "at": 1795592312592,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17371.7,
+            "at": 1795592312592,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17371.7,
+            "at": 1795592312592,
+            "value": "7"
+          },
+          {
+            "kind": "frame",
+            "t": 17388.4,
+            "at": 1795592312609,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17388.4,
+            "at": 1795592312609,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17388.4,
+            "at": 1795592312609,
+            "value": "7"
+          },
+          {
+            "kind": "frame",
+            "t": 17405.1,
+            "at": 1795592312625,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17405.1,
+            "at": 1795592312625,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17405.1,
+            "at": 1795592312626,
+            "value": "7"
+          },
+          {
+            "kind": "frame",
+            "t": 17421.8,
+            "at": 1795592312642,
+            "value": "7"
+          },
+          {
+            "kind": "callback",
+            "t": 17421.8,
+            "at": 1795592312643,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17421.8,
+            "at": 1795592312643,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17438.4,
+            "at": 1795592312659,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17438.4,
+            "at": 1795592312659,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17455.1,
+            "at": 1795592312677,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17455.1,
+            "at": 1795592312677,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17471.8,
+            "at": 1795592312692,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17471.8,
+            "at": 1795592312692,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17488.4,
+            "at": 1795592312709,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17488.4,
+            "at": 1795592312709,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17505.1,
+            "at": 1795592312725,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17505.1,
+            "at": 1795592312725,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17521.8,
+            "at": 1795592312742,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17521.8,
+            "at": 1795592312742,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17538.4,
+            "at": 1795592312759,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17538.4,
+            "at": 1795592312759,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17555.1,
+            "at": 1795592312775,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17555.1,
+            "at": 1795592312775,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17571.8,
+            "at": 1795592312792,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17571.8,
+            "at": 1795592312792,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17588.5,
+            "at": 1795592312809,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17588.5,
+            "at": 1795592312809,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17605.1,
+            "at": 1795592312825,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17605.1,
+            "at": 1795592312825,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17621.8,
+            "at": 1795592312842,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17621.8,
+            "at": 1795592312842,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17638.4,
+            "at": 1795592312859,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17638.4,
+            "at": 1795592312859,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17655.1,
+            "at": 1795592312875,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17655.1,
+            "at": 1795592312875,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17671.7,
+            "at": 1795592312892,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17671.7,
+            "at": 1795592312892,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17688.4,
+            "at": 1795592312909,
+            "value": "8"
+          },
+          {
+            "kind": "callback",
+            "t": 17688.4,
+            "at": 1795592312909,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17705.1,
+            "at": 1795592312925,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17721.7,
+            "at": 1795592312942,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17738.5,
+            "at": 1795592312959,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17755.1,
+            "at": 1795592312975,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17771.8,
+            "at": 1795592312992,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17788.4,
+            "at": 1795592313009,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17805.1,
+            "at": 1795592313025,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17821.8,
+            "at": 1795592313042,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17838.4,
+            "at": 1795592313059,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17855.1,
+            "at": 1795592313075,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17871.8,
+            "at": 1795592313092,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17888.5,
+            "at": 1795592313109,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17905,
+            "at": 1795592313125,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17921.8,
+            "at": 1795592313142,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17938.4,
+            "at": 1795592313159,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17955.1,
+            "at": 1795592313175,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17971.7,
+            "at": 1795592313192,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 17988.4,
+            "at": 1795592313209,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 18005.1,
+            "at": 1795592313225,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 18021.7,
+            "at": 1795592313242,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 18038.4,
+            "at": 1795592313259,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 18055.1,
+            "at": 1795592313275,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 18071.8,
+            "at": 1795592313292,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 18088.4,
+            "at": 1795592313308,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 18105.1,
+            "at": 1795592313325,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 18121.7,
+            "at": 1795592313342,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 18138.4,
+            "at": 1795592313359,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 18155.1,
+            "at": 1795592313375,
+            "value": "8"
+          },
+          {
+            "kind": "frame",
+            "t": 18171.7,
+            "at": 1795592313392,
+            "value": "8"
+          }
+        ]
+      },
+      "busy": {
+        "at": 1795592311921,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 미리보기 실행 중",
+        "flag": null,
+        "allFlags": [],
+        "lock": "이 창의 미리보기 실행 중",
+        "refreshDisabled": "true",
+        "refreshTitle": "실행 중인 미리보기·적용이 끝나면 켜집니다",
+        "analyzeError": null
+      },
+      "idle": {
+        "at": 1795592313431,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 잠금 없음",
+        "flag": null,
+        "allFlags": [],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": null,
+        "big": "8"
+      },
+      "tableRows": {
+        "s.parent": {
+          "text": "└─직접s.parent −1 · · 확실"
+        },
+        "s.child": {
+          "text": "└─FK 연쇄s.child −2 · · 확실"
+        },
+        "s.grandchild": {
+          "text": "└─FK 연쇄s.grandchild −3 · · 확실"
+        },
+        "s.note": {
+          "text": "└─FK SET NULLs.note · ≠2 · 확실"
+        }
+      },
+      "expectedCauses": {
+        "s.parent": {
+          "kind": "DIRECT",
+          "confidence": "certain",
+          "rows": 1
+        },
+        "s.child": {
+          "kind": "FK_CASCADE",
+          "confidence": "certain",
+          "rows": 2
+        },
+        "s.grandchild": {
+          "kind": "FK_CASCADE",
+          "confidence": "certain",
+          "rows": 3
+        },
+        "s.note": {
+          "kind": "FK_SET_NULL",
+          "confidence": "certain",
+          "rows": 2
+        }
+      },
+      "firingParents": {
+        "s.parent": null,
+        "s.child": "s.parent",
+        "s.grandchild": "s.child",
+        "s.note": "s.parent"
+      },
+      "applyDisabled": "true",
+      "applyReasons": [
+        "미충족: PostgreSQL 최소판은 [적용]을 지원하지 않습니다. 미리보기만 됩니다."
+      ],
+      "fingerprintDisplay": "원본과 일치 PostgreSQL 18.7 (Debian 18.7-1.pgdg13+5) · en_US.utf8",
+      "cancelHttp": 204
+    },
+    "b": {
+      "http": 200,
+      "status": "ok",
+      "net": [
+        {
+          "table": "s.child",
+          "inserted": 0,
+          "updated": 0,
+          "deleted": 1,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "s.note",
+          "inserted": 0,
+          "updated": 1,
+          "deleted": 0,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "s.parent",
+          "inserted": 0,
+          "updated": 0,
+          "deleted": 1,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        }
+      ],
+      "causes": [
+        {
+          "table": "s.parent",
+          "rows": 1,
+          "kind": "DIRECT",
+          "confidence": "certain",
+          "parent": null
+        },
+        {
+          "table": "s.child",
+          "rows": 1,
+          "kind": "FK_CASCADE",
+          "confidence": "certain",
+          "parent": "f-5"
+        },
+        {
+          "table": "s.note",
+          "rows": 1,
+          "kind": "FK_SET_NULL",
+          "confidence": "certain",
+          "parent": "f-5"
+        },
+        {
+          "table": "s.grandchild",
+          "rows": 0,
+          "kind": "UNEXPLAINED",
+          "confidence": "unexplained",
+          "parent": null
+        }
+      ],
+      "statements": [
+        {
+          "status": "ok",
+          "rowsAffected": 1,
+          "error": null
+        }
+      ],
+      "fingerprint": {
+        "productVersion": "18.7 (Debian 18.7-1.pgdg13+5)",
+        "edition": "PostgreSQL",
+        "compatibilityLevel": 18,
+        "isRecursiveTriggersOn": true,
+        "nestedTriggers": 1,
+        "disallowResultsFromTriggers": 0,
+        "sessionOptions": 0,
+        "collation": "en_US.utf8",
+        "serverCollation": null,
+        "hostPlatform": null,
+        "majorVersion": 18,
+        "language": null,
+        "dateFormat": null,
+        "dateFirst": null,
+        "hasUserClrAssemblies": null
+      },
+      "big": {
+        "samples": 130,
+        "uniqueFrameTimes": 65,
+        "negatives": 0,
+        "values": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "frames": [
+          {
+            "kind": "frame",
+            "t": 18855,
+            "at": 1795592314082,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 18855,
+            "at": 1795592314082,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 18855,
+            "at": 1795592314082,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 18855,
+            "at": 1795592314082,
+            "value": "0"
+          },
+          {
+            "kind": "frame",
+            "t": 18871.8,
+            "at": 1795592314092,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 18871.8,
+            "at": 1795592314092,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 18871.8,
+            "at": 1795592314092,
+            "value": "0"
+          },
+          {
+            "kind": "frame",
+            "t": 18888.4,
+            "at": 1795592314108,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 18888.4,
+            "at": 1795592314109,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 18888.4,
+            "at": 1795592314109,
+            "value": "1"
+          },
+          {
+            "kind": "frame",
+            "t": 18905.1,
+            "at": 1795592314125,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 18905.1,
+            "at": 1795592314125,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 18905.1,
+            "at": 1795592314125,
+            "value": "1"
+          },
+          {
+            "kind": "frame",
+            "t": 18921.7,
+            "at": 1795592314142,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 18921.7,
+            "at": 1795592314142,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 18921.7,
+            "at": 1795592314142,
+            "value": "1"
+          },
+          {
+            "kind": "frame",
+            "t": 18938.4,
+            "at": 1795592314159,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 18938.4,
+            "at": 1795592314159,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 18938.4,
+            "at": 1795592314159,
+            "value": "1"
+          },
+          {
+            "kind": "frame",
+            "t": 18955,
+            "at": 1795592314175,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 18955,
+            "at": 1795592314175,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 18955,
+            "at": 1795592314175,
+            "value": "1"
+          },
+          {
+            "kind": "frame",
+            "t": 18971.7,
+            "at": 1795592314192,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 18971.7,
+            "at": 1795592314192,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 18971.7,
+            "at": 1795592314192,
+            "value": "1"
+          },
+          {
+            "kind": "frame",
+            "t": 18988.3,
+            "at": 1795592314209,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 18988.3,
+            "at": 1795592314209,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 18988.3,
+            "at": 1795592314209,
+            "value": "1"
+          },
+          {
+            "kind": "frame",
+            "t": 19005,
+            "at": 1795592314225,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 19005,
+            "at": 1795592314226,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19005,
+            "at": 1795592314226,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 19021.7,
+            "at": 1795592314242,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19021.7,
+            "at": 1795592314242,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19021.7,
+            "at": 1795592314242,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 19038.4,
+            "at": 1795592314259,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19038.4,
+            "at": 1795592314259,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19038.4,
+            "at": 1795592314259,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 19055.1,
+            "at": 1795592314275,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19055.1,
+            "at": 1795592314275,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19055.1,
+            "at": 1795592314275,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 19071.7,
+            "at": 1795592314292,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19071.7,
+            "at": 1795592314292,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19071.7,
+            "at": 1795592314292,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 19088.4,
+            "at": 1795592314308,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19088.4,
+            "at": 1795592314309,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19088.4,
+            "at": 1795592314309,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 19105,
+            "at": 1795592314325,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19105,
+            "at": 1795592314325,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19105,
+            "at": 1795592314325,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 19121.7,
+            "at": 1795592314342,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19121.7,
+            "at": 1795592314342,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19121.7,
+            "at": 1795592314342,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 19138.4,
+            "at": 1795592314359,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19138.4,
+            "at": 1795592314359,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19138.4,
+            "at": 1795592314359,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 19155,
+            "at": 1795592314375,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19155,
+            "at": 1795592314375,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19155,
+            "at": 1795592314375,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 19171.7,
+            "at": 1795592314392,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 19171.7,
+            "at": 1795592314392,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19171.7,
+            "at": 1795592314392,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19188.4,
+            "at": 1795592314409,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19188.4,
+            "at": 1795592314409,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19205,
+            "at": 1795592314425,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19205,
+            "at": 1795592314425,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19221.7,
+            "at": 1795592314442,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19221.7,
+            "at": 1795592314442,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19238.4,
+            "at": 1795592314459,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19238.4,
+            "at": 1795592314459,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19255,
+            "at": 1795592314475,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19255,
+            "at": 1795592314475,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19271.7,
+            "at": 1795592314492,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19271.7,
+            "at": 1795592314492,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19288.4,
+            "at": 1795592314509,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19288.4,
+            "at": 1795592314509,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19305.1,
+            "at": 1795592314525,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19305.1,
+            "at": 1795592314525,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19321.7,
+            "at": 1795592314542,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19321.7,
+            "at": 1795592314542,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19338.4,
+            "at": 1795592314559,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19338.4,
+            "at": 1795592314559,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19355,
+            "at": 1795592314575,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19355,
+            "at": 1795592314575,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19371.7,
+            "at": 1795592314592,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19371.7,
+            "at": 1795592314592,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19388.4,
+            "at": 1795592314609,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19388.4,
+            "at": 1795592314609,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19405,
+            "at": 1795592314625,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19405,
+            "at": 1795592314625,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19421.7,
+            "at": 1795592314642,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19421.7,
+            "at": 1795592314642,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19438.4,
+            "at": 1795592314659,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19438.4,
+            "at": 1795592314659,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19455,
+            "at": 1795592314678,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19455,
+            "at": 1795592314678,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19455,
+            "at": 1795592314678,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19471.7,
+            "at": 1795592314692,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19471.7,
+            "at": 1795592314692,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19488.4,
+            "at": 1795592314709,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19488.4,
+            "at": 1795592314709,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19505,
+            "at": 1795592314725,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19505,
+            "at": 1795592314725,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19521.7,
+            "at": 1795592314742,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19521.7,
+            "at": 1795592314742,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19538.3,
+            "at": 1795592314759,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19538.3,
+            "at": 1795592314759,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19555,
+            "at": 1795592314775,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 19555,
+            "at": 1795592314775,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19571.7,
+            "at": 1795592314792,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19588.4,
+            "at": 1795592314809,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19605,
+            "at": 1795592314825,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19621.7,
+            "at": 1795592314842,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19638.4,
+            "at": 1795592314859,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19655,
+            "at": 1795592314875,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19671.7,
+            "at": 1795592314892,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19688.3,
+            "at": 1795592314908,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19705,
+            "at": 1795592314925,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19721.7,
+            "at": 1795592314942,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19738.3,
+            "at": 1795592314958,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19755,
+            "at": 1795592314975,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19771.7,
+            "at": 1795592314992,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19788.4,
+            "at": 1795592315008,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19805,
+            "at": 1795592315025,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19821.7,
+            "at": 1795592315042,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19838.3,
+            "at": 1795592315058,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19855,
+            "at": 1795592315075,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19871.6,
+            "at": 1795592315092,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19888.4,
+            "at": 1795592315108,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19905,
+            "at": 1795592315125,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 19921.6,
+            "at": 1795592315142,
+            "value": "3"
+          }
+        ]
+      },
+      "busy": {
+        "at": 1795592314016,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 미리보기 실행 중",
+        "flag": null,
+        "allFlags": [],
+        "lock": "이 창의 미리보기 실행 중",
+        "refreshDisabled": "true",
+        "refreshTitle": "실행 중인 미리보기·적용이 끝나면 켜집니다",
+        "analyzeError": null
+      },
+      "idle": {
+        "at": 1795592315166,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 잠금 없음",
+        "flag": null,
+        "allFlags": [],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": null,
+        "big": "3"
+      },
+      "tableRows": {
+        "s.parent": {
+          "text": "└─직접s.parent −1 · · 확실"
+        },
+        "s.child": {
+          "text": "└─FK 연쇄s.child −1 · · 확실"
+        },
+        "s.note": {
+          "text": "└─FK SET NULLs.note · ≠1 · 확실"
+        }
+      },
+      "expectedCauses": {
+        "s.parent": {
+          "kind": "DIRECT",
+          "confidence": "certain",
+          "rows": 1
+        },
+        "s.child": {
+          "kind": "FK_CASCADE",
+          "confidence": "certain",
+          "rows": 1
+        },
+        "s.note": {
+          "kind": "FK_SET_NULL",
+          "confidence": "certain",
+          "rows": 1
+        }
+      },
+      "firingParents": {
+        "s.parent": null,
+        "s.child": "s.parent",
+        "s.note": "s.parent"
+      },
+      "applyDisabled": "true",
+      "applyReasons": [
+        "미충족: PostgreSQL 최소판은 [적용]을 지원하지 않습니다. 미리보기만 됩니다."
+      ],
+      "fingerprintDisplay": "원본과 일치 PostgreSQL 18.7 (Debian 18.7-1.pgdg13+5) · en_US.utf8",
+      "compare": {
+        "parentId": [
+          "2",
+          "NULL"
+        ]
+      },
+      "cancelHttp": 204
+    },
+    "c": {
+      "http": 200,
+      "status": "ok",
+      "net": [
+        {
+          "table": "s.history",
+          "inserted": 1,
+          "updated": 0,
+          "deleted": 0,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "s.order_lines",
+          "inserted": 0,
+          "updated": 1,
+          "deleted": 0,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        },
+        {
+          "table": "s.orders",
+          "inserted": 0,
+          "updated": 1,
+          "deleted": 0,
+          "multisetRemoved": 0,
+          "multisetAdded": 0
+        }
+      ],
+      "causes": [
+        {
+          "table": "s.history",
+          "rows": 1,
+          "kind": "TRIGGER",
+          "confidence": "inferred",
+          "parent": "f-11"
+        },
+        {
+          "table": "s.orders",
+          "rows": 1,
+          "kind": "TRIGGER",
+          "confidence": "inferred",
+          "parent": "f-11"
+        },
+        {
+          "table": "s.orders",
+          "rows": 1,
+          "kind": "TRIGGER",
+          "confidence": "inferred",
+          "parent": "f-12"
+        },
+        {
+          "table": "s.order_lines",
+          "rows": 1,
+          "kind": "DIRECT",
+          "confidence": "certain",
+          "parent": null
+        }
+      ],
+      "statements": [
+        {
+          "status": "ok",
+          "rowsAffected": 1,
+          "error": null
+        }
+      ],
+      "fingerprint": {
+        "productVersion": "18.7 (Debian 18.7-1.pgdg13+5)",
+        "edition": "PostgreSQL",
+        "compatibilityLevel": 18,
+        "isRecursiveTriggersOn": true,
+        "nestedTriggers": 1,
+        "disallowResultsFromTriggers": 0,
+        "sessionOptions": 0,
+        "collation": "en_US.utf8",
+        "serverCollation": null,
+        "hostPlatform": null,
+        "majorVersion": 18,
+        "language": null,
+        "dateFormat": null,
+        "dateFirst": null,
+        "hasUserClrAssemblies": null
+      },
+      "big": {
+        "samples": 129,
+        "uniqueFrameTimes": 65,
+        "negatives": 0,
+        "values": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "frames": [
+          {
+            "kind": "frame",
+            "t": 20455,
+            "at": 1795592315688,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 20455,
+            "at": 1795592315688,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 20455,
+            "at": 1795592315688,
+            "value": "0"
+          },
+          {
+            "kind": "frame",
+            "t": 20471.6,
+            "at": 1795592315696,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 20471.6,
+            "at": 1795592315696,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 20471.6,
+            "at": 1795592315696,
+            "value": "0"
+          },
+          {
+            "kind": "frame",
+            "t": 20488.3,
+            "at": 1795592315709,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 20488.3,
+            "at": 1795592315709,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 20488.3,
+            "at": 1795592315709,
+            "value": "0"
+          },
+          {
+            "kind": "frame",
+            "t": 20505,
+            "at": 1795592315725,
+            "value": "0"
+          },
+          {
+            "kind": "callback",
+            "t": 20505,
+            "at": 1795592315726,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 20505,
+            "at": 1795592315726,
+            "value": "1"
+          },
+          {
+            "kind": "frame",
+            "t": 20521.7,
+            "at": 1795592315742,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 20521.7,
+            "at": 1795592315742,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 20521.7,
+            "at": 1795592315742,
+            "value": "1"
+          },
+          {
+            "kind": "frame",
+            "t": 20538.3,
+            "at": 1795592315758,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 20538.3,
+            "at": 1795592315758,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 20538.3,
+            "at": 1795592315759,
+            "value": "1"
+          },
+          {
+            "kind": "frame",
+            "t": 20555,
+            "at": 1795592315775,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 20555,
+            "at": 1795592315775,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 20555,
+            "at": 1795592315775,
+            "value": "1"
+          },
+          {
+            "kind": "frame",
+            "t": 20571.6,
+            "at": 1795592315792,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 20571.6,
+            "at": 1795592315792,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 20571.6,
+            "at": 1795592315792,
+            "value": "1"
+          },
+          {
+            "kind": "frame",
+            "t": 20588.3,
+            "at": 1795592315809,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 20588.3,
+            "at": 1795592315809,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 20588.3,
+            "at": 1795592315809,
+            "value": "1"
+          },
+          {
+            "kind": "frame",
+            "t": 20604.9,
+            "at": 1795592315825,
+            "value": "1"
+          },
+          {
+            "kind": "callback",
+            "t": 20604.9,
+            "at": 1795592315826,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20604.9,
+            "at": 1795592315826,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 20621.6,
+            "at": 1795592315842,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20621.6,
+            "at": 1795592315842,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20621.6,
+            "at": 1795592315842,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 20638.3,
+            "at": 1795592315859,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20638.3,
+            "at": 1795592315859,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20638.3,
+            "at": 1795592315859,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 20654.9,
+            "at": 1795592315875,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20654.9,
+            "at": 1795592315875,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20654.9,
+            "at": 1795592315875,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 20671.7,
+            "at": 1795592315892,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20671.7,
+            "at": 1795592315892,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20671.7,
+            "at": 1795592315892,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 20688.4,
+            "at": 1795592315908,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20688.4,
+            "at": 1795592315908,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20688.4,
+            "at": 1795592315908,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 20705,
+            "at": 1795592315925,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20705,
+            "at": 1795592315925,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20705,
+            "at": 1795592315925,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 20721.6,
+            "at": 1795592315942,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20721.6,
+            "at": 1795592315942,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20721.6,
+            "at": 1795592315942,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 20738.3,
+            "at": 1795592315958,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20738.3,
+            "at": 1795592315958,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20738.3,
+            "at": 1795592315958,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 20755,
+            "at": 1795592315975,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20755,
+            "at": 1795592315975,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20755,
+            "at": 1795592315975,
+            "value": "2"
+          },
+          {
+            "kind": "frame",
+            "t": 20771.6,
+            "at": 1795592315992,
+            "value": "2"
+          },
+          {
+            "kind": "callback",
+            "t": 20771.6,
+            "at": 1795592315992,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 20771.6,
+            "at": 1795592315992,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 20788.3,
+            "at": 1795592316009,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 20788.3,
+            "at": 1795592316009,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 20805,
+            "at": 1795592316025,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 20805,
+            "at": 1795592316025,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 20821.6,
+            "at": 1795592316042,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 20821.6,
+            "at": 1795592316042,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 20838.3,
+            "at": 1795592316058,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 20838.3,
+            "at": 1795592316058,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 20855,
+            "at": 1795592316075,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 20855,
+            "at": 1795592316075,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 20871.6,
+            "at": 1795592316092,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 20871.6,
+            "at": 1795592316092,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 20888.3,
+            "at": 1795592316108,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 20888.3,
+            "at": 1795592316108,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 20905,
+            "at": 1795592316125,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 20905,
+            "at": 1795592316125,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 20921.7,
+            "at": 1795592316142,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 20921.7,
+            "at": 1795592316142,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 20938.3,
+            "at": 1795592316158,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 20938.3,
+            "at": 1795592316158,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 20954.9,
+            "at": 1795592316175,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 20954.9,
+            "at": 1795592316175,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 20971.7,
+            "at": 1795592316192,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 20971.7,
+            "at": 1795592316192,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 20988.3,
+            "at": 1795592316208,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 20988.3,
+            "at": 1795592316208,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21005,
+            "at": 1795592316225,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 21005,
+            "at": 1795592316225,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21021.6,
+            "at": 1795592316242,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 21021.6,
+            "at": 1795592316242,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21038.3,
+            "at": 1795592316258,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 21038.3,
+            "at": 1795592316258,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21055,
+            "at": 1795592316275,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 21055,
+            "at": 1795592316275,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21071.6,
+            "at": 1795592316293,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 21071.6,
+            "at": 1795592316293,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 21071.6,
+            "at": 1795592316293,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21088.3,
+            "at": 1795592316308,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 21088.3,
+            "at": 1795592316308,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21104.9,
+            "at": 1795592316325,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 21104.9,
+            "at": 1795592316325,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21121.6,
+            "at": 1795592316342,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 21121.6,
+            "at": 1795592316342,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21138.3,
+            "at": 1795592316358,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 21138.3,
+            "at": 1795592316358,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21154.9,
+            "at": 1795592316375,
+            "value": "3"
+          },
+          {
+            "kind": "callback",
+            "t": 21154.9,
+            "at": 1795592316375,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21171.6,
+            "at": 1795592316392,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21188.3,
+            "at": 1795592316408,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21205,
+            "at": 1795592316425,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21221.6,
+            "at": 1795592316442,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21238.3,
+            "at": 1795592316458,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21255,
+            "at": 1795592316475,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21271.6,
+            "at": 1795592316492,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21288.3,
+            "at": 1795592316508,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21305,
+            "at": 1795592316525,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21321.6,
+            "at": 1795592316542,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21338.3,
+            "at": 1795592316558,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21354.9,
+            "at": 1795592316575,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21371.6,
+            "at": 1795592316592,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21388.3,
+            "at": 1795592316609,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21404.9,
+            "at": 1795592316625,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21421.6,
+            "at": 1795592316642,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21438.3,
+            "at": 1795592316658,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21455,
+            "at": 1795592316675,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21471.6,
+            "at": 1795592316692,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21488.3,
+            "at": 1795592316708,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21504.9,
+            "at": 1795592316725,
+            "value": "3"
+          },
+          {
+            "kind": "frame",
+            "t": 21521.6,
+            "at": 1795592316742,
+            "value": "3"
+          }
+        ]
+      },
+      "busy": {
+        "at": 1795592315615,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 미리보기 실행 중",
+        "flag": null,
+        "allFlags": [],
+        "lock": "이 창의 미리보기 실행 중",
+        "refreshDisabled": "true",
+        "refreshTitle": "실행 중인 미리보기·적용이 끝나면 켜집니다",
+        "analyzeError": null
+      },
+      "idle": {
+        "at": 1795592316762,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 잠금 없음",
+        "flag": null,
+        "allFlags": [],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": null,
+        "big": "3"
+      },
+      "tableRows": {
+        "s.order_lines": {
+          "text": "└─직접s.order_lines · ≠1 · 확실"
+        },
+        "s.orders": {
+          "text": "└┄s.orders같은 행 2번 ▸ · ≠1 · 추론"
+        },
+        "s.history": {
+          "text": "└┄s.history · · +1 추론"
+        }
+      },
+      "expectedCauses": {
+        "s.order_lines": {
+          "kind": "DIRECT",
+          "confidence": "certain",
+          "rows": 1
+        },
+        "s.orders": {
+          "kind": "TRIGGER",
+          "confidence": "inferred",
+          "rows": 1
+        },
+        "s.history": {
+          "kind": "TRIGGER",
+          "confidence": "inferred",
+          "rows": 1
+        }
+      },
+      "firingParents": {
+        "s.order_lines": null,
+        "s.orders": "s.orders",
+        "s.history": "s.orders"
+      },
+      "triggerLinks": [
+        {
+          "id": "f-9",
+          "table": "s.history",
+          "parent": "s.orders",
+          "parentId": "f-11"
+        },
+        {
+          "id": "f-10",
+          "table": "s.orders",
+          "parent": "s.orders",
+          "parentId": "f-11"
+        },
+        {
+          "id": "f-11",
+          "table": "s.orders",
+          "parent": "s.order_lines",
+          "parentId": "f-12"
+        }
+      ],
+      "applyDisabled": "true",
+      "applyReasons": [
+        "미충족: PostgreSQL 최소판은 [적용]을 지원하지 않습니다. 미리보기만 됩니다."
+      ],
+      "fingerprintDisplay": "원본과 일치 PostgreSQL 18.7 (Debian 18.7-1.pgdg13+5) · en_US.utf8",
+      "compare": {
+        "total": [
+          "20.00",
+          "30.00"
+        ],
+        "rev": [
+          "0",
+          "1"
+        ]
+      },
+      "applyApi": {
+        "status": 501,
+        "body": {
+          "type": "https://tools.ietf.org/html/rfc9110#section-15.6.2",
+          "title": "아직 구현되지 않았습니다",
+          "status": 501,
+          "instance": "/api/previews/pv_20261125_65733ec8/apply",
+          "traceId": "00-a6f4bf5068e54b28be96be82c461c60d-a6f558f1294b8467-00"
+        }
+      },
+      "cancelHttp": 204
+    }
+  },
+  "rejections": {
+    "truncate": {
+      "http": 422,
+      "rejects": [
+        {
+          "statementIndex": 1,
+          "ruleId": "REJECT_TRUNCATE",
+          "span": {
+            "startLine": 1,
+            "startColumn": 1,
+            "endLine": 1,
+            "endColumn": 18
+          }
+        }
+      ],
+      "reason": "REJECT_TRUNCATE TRUNCATE 문장은 받지 않습니다. INSERT INTO·UPDATE·DELETE FROM만 미리보기합니다.",
+      "disabled": "true"
+    },
+    "admin": {
+      "http": 422,
+      "rejects": [
+        {
+          "statementIndex": 1,
+          "ruleId": "REJECT_ADMIN_COMMAND",
+          "span": {
+            "startLine": 1,
+            "startColumn": 1,
+            "endLine": 1,
+            "endColumn": 82
+          }
+        }
+      ],
+      "reason": "REJECT_ADMIN_COMMAND 문장 안 함수 set_config()은(는) 미리보기에서 쓸 수 없습니다.",
+      "disabled": "true"
+    }
+  },
+  "refreshFailure": {
+    "openConnections": 1,
+    "refreshHttp": 202,
+    "text": "InvalidOperationException: 원본 DB 'shop'에 다른 연결이 있어 복제하지 못했습니다. TEMPLATE 복제는 원본에 연결이 없어야 합니다. 원본 연결을 닫고 새로 고침하세요(도구는 원본 세션을 끊지 않습니다).",
+    "openConnectionsAfterClose": 0,
+    "recoverHttp": 202,
+    "recovered": {
+      "at": 1795592344711,
+      "state": "샌드박스 준비됨",
+      "baseline": "2026-11-25T07:38:50.0263706+00:00",
+      "own": "· 잠금 없음",
+      "flag": null,
+      "allFlags": [],
+      "lock": "없음",
+      "refreshDisabled": "false",
+      "refreshTitle": null,
+      "analyzeError": null,
+      "big": null
+    }
+  },
+  "checks": {
+    "B0 management account": true,
+    "B2 fingerprint before preview": true,
+    "B0 seeded baseline": true,
+    "B1 a net": true,
+    "B1 a s.parent cause": true,
+    "B1 a s.child cause": true,
+    "B1 a s.grandchild cause": true,
+    "B1 a s.note cause": true,
+    "B1 a parent links": true,
+    "B2 a own state and return": true,
+    "B2 a frames": true,
+    "B2 a apply gate": true,
+    "B2 a fingerprint": true,
+    "B1 a cancel": true,
+    "B1 a DB unchanged": true,
+    "B1 b net": true,
+    "B1 b s.parent cause": true,
+    "B1 b s.child cause": true,
+    "B1 b s.note cause": true,
+    "B1 b parent link": true,
+    "B2 b own state and return": true,
+    "B2 b frames": true,
+    "B2 b apply gate": true,
+    "B2 b fingerprint": true,
+    "B1 b NULL compare": true,
+    "B1 b cancel": true,
+    "B1 b DB unchanged": true,
+    "B1 c net": true,
+    "B1 c s.order_lines cause": true,
+    "B1 c s.orders cause": true,
+    "B1 c s.history cause": true,
+    "B1 c trigger links": true,
+    "B2 c own state and return": true,
+    "B2 c frames": true,
+    "B2 c apply gate": true,
+    "B2 c fingerprint": true,
+    "B1 c orders compare": true,
+    "B2 apply endpoint": true,
+    "B1 c cancel": true,
+    "B1 c DB unchanged": true,
+    "B1 rejected truncate": true,
+    "B1 rejected admin": true,
+    "B1 rejects DB unchanged": true,
+    "B1 audit empty": true,
+    "B3 connected error": true,
+    "B3 recovered": true
+  },
+  "env": {
+    "version": "PostgreSQL 18.7 (Debian 18.7-1.pgdg13+5) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+    "role": "dbr_ui_manager",
+    "superuser": false,
+    "createDb": true,
+    "createRole": true,
+    "canLogin": true,
+    "owner": "dbr_ui_manager",
+    "openOriginConnections": 0
+  },
+  "baselineRefresh": 202,
+  "beforeFirstPreviewFingerprint": "원본과 일치",
+  "browser": {
+    "events": [
+      {
+        "at": 1795592295336,
+        "state": null,
+        "baseline": null,
+        "own": null,
+        "flag": null,
+        "allFlags": [],
+        "lock": null,
+        "refreshDisabled": null,
+        "refreshTitle": null,
+        "analyzeError": null
+      },
+      {
+        "at": 1795592296115,
+        "state": "샌드박스 오류",
+        "baseline": null,
+        "own": null,
+        "flag": "환경 지문 불일치",
+        "allFlags": [
+          "환경 지문 불일치"
+        ],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": "분석하지 못했습니다.기준선이 없습니다. 샌드박스를 새로 고쳐 기준선을 만드세요. (지금 처리할 수 없는 상태입니다) 샌드박스 새로 고침"
+      },
+      {
+        "at": 1795592296331,
+        "state": "샌드박스 오류",
+        "baseline": null,
+        "own": null,
+        "flag": "환경 지문 불일치",
+        "allFlags": [
+          "환경 지문 불일치"
+        ],
+        "lock": "없음",
+        "refreshDisabled": "true",
+        "refreshTitle": null,
+        "analyzeError": "분석하지 못했습니다.기준선이 없습니다. 샌드박스를 새로 고쳐 기준선을 만드세요. (지금 처리할 수 없는 상태입니다) 샌드박스 새로 고침"
+      },
+      {
+        "at": 1795592296349,
+        "state": "샌드박스 오류",
+        "baseline": null,
+        "own": null,
+        "flag": "환경 지문 불일치",
+        "allFlags": [
+          "환경 지문 불일치"
+        ],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": "분석하지 못했습니다.기준선이 없습니다. 샌드박스를 새로 고쳐 기준선을 만드세요. (지금 처리할 수 없는 상태입니다) 샌드박스 새로 고침"
+      },
+      {
+        "at": 1795592296353,
+        "state": "샌드박스 기준선을 만드는 중",
+        "baseline": null,
+        "own": null,
+        "flag": "환경 지문 불일치",
+        "allFlags": [
+          "환경 지문 불일치"
+        ],
+        "lock": "없음",
+        "refreshDisabled": "true",
+        "refreshTitle": null,
+        "analyzeError": "분석하지 못했습니다.기준선이 없습니다. 샌드박스를 새로 고쳐 기준선을 만드세요. (지금 처리할 수 없는 상태입니다) 샌드박스 새로 고침"
+      },
+      {
+        "at": 1795592310655,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 잠금 없음",
+        "flag": null,
+        "allFlags": [],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": "분석하지 못했습니다.기준선이 없습니다. 샌드박스를 새로 고쳐 기준선을 만드세요. (지금 처리할 수 없는 상태입니다) 샌드박스 새로 고침"
+      },
+      {
+        "at": 1795592310716,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 잠금 없음",
+        "flag": null,
+        "allFlags": [],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": null
+      },
+      {
+        "at": 1795592311921,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 미리보기 실행 중",
+        "flag": null,
+        "allFlags": [],
+        "lock": "이 창의 미리보기 실행 중",
+        "refreshDisabled": "true",
+        "refreshTitle": "실행 중인 미리보기·적용이 끝나면 켜집니다",
+        "analyzeError": null
+      },
+      {
+        "at": 1795592312209,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 잠금 없음",
+        "flag": null,
+        "allFlags": [],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": null
+      },
+      {
+        "at": 1795592314016,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 미리보기 실행 중",
+        "flag": null,
+        "allFlags": [],
+        "lock": "이 창의 미리보기 실행 중",
+        "refreshDisabled": "true",
+        "refreshTitle": "실행 중인 미리보기·적용이 끝나면 켜집니다",
+        "analyzeError": null
+      },
+      {
+        "at": 1795592314065,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 잠금 없음",
+        "flag": null,
+        "allFlags": [],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": null
+      },
+      {
+        "at": 1795592315615,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 미리보기 실행 중",
+        "flag": null,
+        "allFlags": [],
+        "lock": "이 창의 미리보기 실행 중",
+        "refreshDisabled": "true",
+        "refreshTitle": "실행 중인 미리보기·적용이 끝나면 켜집니다",
+        "analyzeError": null
+      },
+      {
+        "at": 1795592315671,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 잠금 없음",
+        "flag": null,
+        "allFlags": [],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": null
+      },
+      {
+        "at": 1795592317449,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 미리보기 실행 중",
+        "flag": null,
+        "allFlags": [],
+        "lock": "이 창의 미리보기 실행 중",
+        "refreshDisabled": "true",
+        "refreshTitle": "실행 중인 미리보기·적용이 끝나면 켜집니다",
+        "analyzeError": null
+      },
+      {
+        "at": 1795592317464,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 잠금 없음",
+        "flag": null,
+        "allFlags": [],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": null
+      },
+      {
+        "at": 1795592320048,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 미리보기 실행 중",
+        "flag": null,
+        "allFlags": [],
+        "lock": "이 창의 미리보기 실행 중",
+        "refreshDisabled": "true",
+        "refreshTitle": "실행 중인 미리보기·적용이 끝나면 켜집니다",
+        "analyzeError": null
+      },
+      {
+        "at": 1795592320065,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 잠금 없음",
+        "flag": null,
+        "allFlags": [],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": null
+      },
+      {
+        "at": 1795592322515,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 잠금 없음",
+        "flag": null,
+        "allFlags": [],
+        "lock": "없음",
+        "refreshDisabled": "true",
+        "refreshTitle": null,
+        "analyzeError": null
+      },
+      {
+        "at": 1795592322527,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": "· 잠금 없음",
+        "flag": null,
+        "allFlags": [],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": null
+      },
+      {
+        "at": 1795592322532,
+        "state": "샌드박스 기준선을 만드는 중",
+        "baseline": "2026-11-25T07:38:16.4065846+00:00",
+        "own": null,
+        "flag": null,
+        "allFlags": [],
+        "lock": "없음",
+        "refreshDisabled": "true",
+        "refreshTitle": null,
+        "analyzeError": null
+      },
+      {
+        "at": 1795592329683,
+        "state": "샌드박스 오류",
+        "baseline": null,
+        "own": null,
+        "flag": "환경 지문 불일치",
+        "allFlags": [
+          "환경 지문 불일치"
+        ],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": null
+      },
+      {
+        "at": 1795592329948,
+        "state": "샌드박스 오류",
+        "baseline": null,
+        "own": null,
+        "flag": "환경 지문 불일치",
+        "allFlags": [
+          "환경 지문 불일치"
+        ],
+        "lock": "없음",
+        "refreshDisabled": "true",
+        "refreshTitle": null,
+        "analyzeError": null
+      },
+      {
+        "at": 1795592329964,
+        "state": "샌드박스 오류",
+        "baseline": null,
+        "own": null,
+        "flag": "환경 지문 불일치",
+        "allFlags": [
+          "환경 지문 불일치"
+        ],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": null
+      },
+      {
+        "at": 1795592329969,
+        "state": "샌드박스 기준선을 만드는 중",
+        "baseline": null,
+        "own": null,
+        "flag": "환경 지문 불일치",
+        "allFlags": [
+          "환경 지문 불일치"
+        ],
+        "lock": "없음",
+        "refreshDisabled": "true",
+        "refreshTitle": null,
+        "analyzeError": null
+      },
+      {
+        "at": 1795592344693,
+        "state": "샌드박스 준비됨",
+        "baseline": "2026-11-25T07:38:50.0263706+00:00",
+        "own": "· 잠금 없음",
+        "flag": null,
+        "allFlags": [],
+        "lock": "없음",
+        "refreshDisabled": "false",
+        "refreshTitle": null,
+        "analyzeError": null
+      }
+    ],
+    "color": "light",
+    "reducedMotion": false
+  },
+  "network": {
+    "primary": {
+      "network": [
+        {
+          "method": "GET",
+          "path": "/api/sandbox",
+          "phase": "startup",
+          "requestAt": 1795592295651,
+          "status": 200,
+          "responseAt": 1795592295940,
+          "body": {
+            "state": "error",
+            "baselineAt": null,
+            "engine": "postgres",
+            "locked": false,
+            "fingerprintMatch": false,
+            "manifest": null,
+            "lastError": "InvalidOperationException: 샌드박스 DB 'shop_dbr_sandbox'가 없습니다. 새로 고침으로 구축하세요."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/analyze",
+          "phase": "startup",
+          "requestAt": 1795592295805,
+          "sql": "UPDATE Sales.SalesOrderDetail\nSET OrderQty = OrderQty + 1\nWHERE SalesOrderID = 43659 AND SalesOrderDetailID = 1;\n",
+          "status": 409,
+          "responseAt": 1795592295995,
+          "body": {
+            "reason": "NO_BASELINE"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/settings",
+          "phase": "startup",
+          "requestAt": 1795592295805,
+          "status": 200,
+          "responseAt": 1795592295840,
+          "body": {
+            "configured": false,
+            "source": "none"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/settings",
+          "phase": "startup",
+          "requestAt": 1795592295889,
+          "status": 200,
+          "responseAt": 1795592295901,
+          "body": {
+            "configured": false,
+            "source": "none"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/analyze",
+          "phase": "startup",
+          "requestAt": 1795592296119,
+          "sql": "UPDATE Sales.SalesOrderDetail\nSET OrderQty = OrderQty + 1\nWHERE SalesOrderID = 43659 AND SalesOrderDetailID = 1;\n",
+          "status": 409,
+          "responseAt": 1795592296120,
+          "body": {
+            "reason": "NO_BASELINE"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/sandbox/refresh",
+          "phase": "first-baseline",
+          "requestAt": 1795592296339,
+          "status": 202,
+          "responseAt": 1795592296352
+        },
+        {
+          "method": "GET",
+          "path": "/api/sandbox",
+          "phase": "first-baseline",
+          "requestAt": 1795592296353,
+          "status": 200,
+          "responseAt": 1795592296355,
+          "body": {
+            "state": "building",
+            "baselineAt": null,
+            "engine": "postgres",
+            "locked": false,
+            "fingerprintMatch": false,
+            "manifest": null
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sandbox",
+          "phase": "first-baseline",
+          "requestAt": 1795592310646,
+          "status": 200,
+          "responseAt": 1795592310653,
+          "body": {
+            "state": "ready",
+            "baselineAt": "2026-11-25T07:38:16.4065846+00:00",
+            "engine": "postgres",
+            "locked": false,
+            "fingerprintMatch": true,
+            "manifest": {
+              "coveredTables": 7,
+              "excludedTables": 0,
+              "auditNotLast": 0
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/catalog/schema",
+          "phase": "first-baseline",
+          "requestAt": 1795592310656,
+          "status": 200,
+          "responseAt": 1795592310690
+        },
+        {
+          "method": "POST",
+          "path": "/api/analyze",
+          "phase": "first-baseline",
+          "requestAt": 1795592310658,
+          "sql": "UPDATE Sales.SalesOrderDetail\nSET OrderQty = OrderQty + 1\nWHERE SalesOrderID = 43659 AND SalesOrderDetailID = 1;\n",
+          "status": 200,
+          "responseAt": 1795592310933,
+          "body": {
+            "diagnostics": [
+              {
+                "statementIndex": 1,
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 3,
+                  "endColumn": 54
+                },
+                "severity": "error",
+                "ruleId": "REJECT_TARGET_NOT_USER_TABLE",
+                "message": "sales.salesorderdetail는 사용자 테이블이 아닙니다(뷰·외부 테이블·시스템 테이블은 받지 않습니다).",
+                "docRef": null
+              },
+              {
+                "statementIndex": null,
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                },
+                "severity": "warning",
+                "ruleId": "WARN_PG_MINIMAL_SCOPE",
+                "message": "PostgreSQL 최소판입니다: 미리보기만 되고 [적용]은 없습니다. 문장 안 사용자 함수와 트리거 본문은 이름 수준으로만 검사합니다.",
+                "docRef": null
+              }
+            ],
+            "statements": []
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/analyze",
+          "phase": "pg-a",
+          "requestAt": 1795592311695,
+          "sql": "DELETE FROM s.parent WHERE id = 1",
+          "status": 200,
+          "responseAt": 1795592311714,
+          "body": {
+            "diagnostics": [
+              {
+                "statementIndex": null,
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                },
+                "severity": "warning",
+                "ruleId": "WARN_PG_MINIMAL_SCOPE",
+                "message": "PostgreSQL 최소판입니다: 미리보기만 되고 [적용]은 없습니다. 문장 안 사용자 함수와 트리거 본문은 이름 수준으로만 검사합니다.",
+                "docRef": null
+              }
+            ],
+            "statements": [
+              {
+                "kind": "DELETE",
+                "target": "s.parent"
+              }
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/previews",
+          "phase": "pg-a",
+          "requestAt": 1795592311929,
+          "sql": "DELETE FROM s.parent WHERE id = 1",
+          "status": 200,
+          "responseAt": 1795592312183,
+          "body": {
+            "status": "ok",
+            "baseline": {
+              "productVersion": "18.7 (Debian 18.7-1.pgdg13+5)",
+              "edition": "PostgreSQL",
+              "compatibilityLevel": 18,
+              "isRecursiveTriggersOn": true,
+              "nestedTriggers": 1,
+              "disallowResultsFromTriggers": 0,
+              "sessionOptions": 0,
+              "collation": "en_US.utf8",
+              "serverCollation": null,
+              "hostPlatform": null,
+              "majorVersion": 18,
+              "language": null,
+              "dateFormat": null,
+              "dateFirst": null,
+              "hasUserClrAssemblies": null
+            },
+            "netSummary": [
+              {
+                "table": "s.child",
+                "inserted": 0,
+                "updated": 0,
+                "deleted": 2,
+                "multisetRemoved": 0,
+                "multisetAdded": 0
+              },
+              {
+                "table": "s.grandchild",
+                "inserted": 0,
+                "updated": 0,
+                "deleted": 3,
+                "multisetRemoved": 0,
+                "multisetAdded": 0
+              },
+              {
+                "table": "s.note",
+                "inserted": 0,
+                "updated": 2,
+                "deleted": 0,
+                "multisetRemoved": 0,
+                "multisetAdded": 0
+              },
+              {
+                "table": "s.parent",
+                "inserted": 0,
+                "updated": 0,
+                "deleted": 1,
+                "multisetRemoved": 0,
+                "multisetAdded": 0
+              }
+            ],
+            "statements": [
+              {
+                "index": 1,
+                "batch": 1,
+                "position": 1,
+                "kind": "DELETE",
+                "target": "s.parent",
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 34
+                },
+                "status": "ok",
+                "rowsAffected": 1,
+                "returnValue": null,
+                "resultSetCount": null,
+                "captureSeqRange": [
+                  1,
+                  4
+                ],
+                "error": null
+              }
+            ],
+            "firings": [
+              {
+                "id": "f-1",
+                "table": "s.parent",
+                "operation": "DELETE",
+                "rowCount": 1,
+                "cause": {
+                  "kind": "DIRECT",
+                  "confidence": "certain",
+                  "parentFiringId": null,
+                  "foreignKey": null,
+                  "triggerCandidates": [],
+                  "evidence": [
+                    "depth"
+                  ]
+                },
+                "imageMode": "FULL"
+              },
+              {
+                "id": "f-2",
+                "table": "s.child",
+                "operation": "DELETE",
+                "rowCount": 2,
+                "cause": {
+                  "kind": "FK_CASCADE",
+                  "confidence": "certain",
+                  "parentFiringId": "f-1",
+                  "foreignKey": {
+                    "name": "child_parent_id_fkey",
+                    "parent": "s.parent",
+                    "child": "s.child",
+                    "action": "CASCADE",
+                    "event": "DELETE",
+                    "matchedRows": 2,
+                    "unmatchedRows": 0
+                  },
+                  "triggerCandidates": [],
+                  "evidence": [
+                    "fkKeyMatch",
+                    "depth"
+                  ]
+                },
+                "imageMode": "FULL"
+              },
+              {
+                "id": "f-3",
+                "table": "s.note",
+                "operation": "UPDATE",
+                "rowCount": 2,
+                "cause": {
+                  "kind": "FK_SET_NULL",
+                  "confidence": "certain",
+                  "parentFiringId": "f-1",
+                  "foreignKey": {
+                    "name": "note_parent_id_fkey",
+                    "parent": "s.parent",
+                    "child": "s.note",
+                    "action": "SET_NULL",
+                    "event": "DELETE",
+                    "matchedRows": 2,
+                    "unmatchedRows": 0
+                  },
+                  "triggerCandidates": [],
+                  "evidence": [
+                    "fkKeyMatch",
+                    "depth"
+                  ]
+                },
+                "imageMode": "FULL"
+              },
+              {
+                "id": "f-4",
+                "table": "s.grandchild",
+                "operation": "DELETE",
+                "rowCount": 3,
+                "cause": {
+                  "kind": "FK_CASCADE",
+                  "confidence": "certain",
+                  "parentFiringId": "f-2",
+                  "foreignKey": {
+                    "name": "grandchild_child_id_fkey",
+                    "parent": "s.child",
+                    "child": "s.grandchild",
+                    "action": "CASCADE",
+                    "event": "DELETE",
+                    "matchedRows": 3,
+                    "unmatchedRows": 0
+                  },
+                  "triggerCandidates": [],
+                  "evidence": [
+                    "fkKeyMatch",
+                    "depth"
+                  ]
+                },
+                "imageMode": "FULL"
+              }
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sandbox",
+          "phase": "pg-a",
+          "requestAt": 1795592312211,
+          "status": 200,
+          "responseAt": 1795592312246,
+          "body": {
+            "state": "ready",
+            "baselineAt": "2026-11-25T07:38:16.4065846+00:00",
+            "engine": "postgres",
+            "locked": false,
+            "fingerprintMatch": true,
+            "manifest": {
+              "coveredTables": 7,
+              "excludedTables": 0,
+              "auditNotLast": 0
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/previews/{id}/rows",
+          "phase": "pg-a",
+          "requestAt": 1795592312211,
+          "table": "s.parent",
+          "status": 200,
+          "responseAt": 1795592312249,
+          "body": {
+            "total": 1,
+            "rows": [
+              {
+                "table": "s.parent",
+                "key": {
+                  "kind": "PK",
+                  "columns": [
+                    "id"
+                  ],
+                  "values": [
+                    "1"
+                  ]
+                },
+                "change": "DELETED",
+                "multiplicity": 1,
+                "before": {
+                  "id": "1",
+                  "name": "p1"
+                },
+                "after": null,
+                "changedColumns": [],
+                "explainedBy": {
+                  "firingIds": [
+                    "f-1"
+                  ],
+                  "residualId": null
+                }
+              }
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/previews/{id}/cancel",
+          "phase": "pg-a",
+          "requestAt": 1795592313756,
+          "status": 204,
+          "responseAt": 1795592313761
+        },
+        {
+          "method": "POST",
+          "path": "/api/previews",
+          "phase": "pg-b",
+          "requestAt": 1795592314019,
+          "sql": "DELETE FROM s.parent WHERE id = 2",
+          "status": 200,
+          "responseAt": 1795592314059,
+          "body": {
+            "status": "ok",
+            "baseline": {
+              "productVersion": "18.7 (Debian 18.7-1.pgdg13+5)",
+              "edition": "PostgreSQL",
+              "compatibilityLevel": 18,
+              "isRecursiveTriggersOn": true,
+              "nestedTriggers": 1,
+              "disallowResultsFromTriggers": 0,
+              "sessionOptions": 0,
+              "collation": "en_US.utf8",
+              "serverCollation": null,
+              "hostPlatform": null,
+              "majorVersion": 18,
+              "language": null,
+              "dateFormat": null,
+              "dateFirst": null,
+              "hasUserClrAssemblies": null
+            },
+            "netSummary": [
+              {
+                "table": "s.child",
+                "inserted": 0,
+                "updated": 0,
+                "deleted": 1,
+                "multisetRemoved": 0,
+                "multisetAdded": 0
+              },
+              {
+                "table": "s.note",
+                "inserted": 0,
+                "updated": 1,
+                "deleted": 0,
+                "multisetRemoved": 0,
+                "multisetAdded": 0
+              },
+              {
+                "table": "s.parent",
+                "inserted": 0,
+                "updated": 0,
+                "deleted": 1,
+                "multisetRemoved": 0,
+                "multisetAdded": 0
+              }
+            ],
+            "statements": [
+              {
+                "index": 1,
+                "batch": 1,
+                "position": 1,
+                "kind": "DELETE",
+                "target": "s.parent",
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 34
+                },
+                "status": "ok",
+                "rowsAffected": 1,
+                "returnValue": null,
+                "resultSetCount": null,
+                "captureSeqRange": [
+                  5,
+                  8
+                ],
+                "error": null
+              }
+            ],
+            "firings": [
+              {
+                "id": "f-5",
+                "table": "s.parent",
+                "operation": "DELETE",
+                "rowCount": 1,
+                "cause": {
+                  "kind": "DIRECT",
+                  "confidence": "certain",
+                  "parentFiringId": null,
+                  "foreignKey": null,
+                  "triggerCandidates": [],
+                  "evidence": [
+                    "depth"
+                  ]
+                },
+                "imageMode": "FULL"
+              },
+              {
+                "id": "f-6",
+                "table": "s.child",
+                "operation": "DELETE",
+                "rowCount": 1,
+                "cause": {
+                  "kind": "FK_CASCADE",
+                  "confidence": "certain",
+                  "parentFiringId": "f-5",
+                  "foreignKey": {
+                    "name": "child_parent_id_fkey",
+                    "parent": "s.parent",
+                    "child": "s.child",
+                    "action": "CASCADE",
+                    "event": "DELETE",
+                    "matchedRows": 1,
+                    "unmatchedRows": 0
+                  },
+                  "triggerCandidates": [],
+                  "evidence": [
+                    "fkKeyMatch",
+                    "depth"
+                  ]
+                },
+                "imageMode": "FULL"
+              },
+              {
+                "id": "f-7",
+                "table": "s.note",
+                "operation": "UPDATE",
+                "rowCount": 1,
+                "cause": {
+                  "kind": "FK_SET_NULL",
+                  "confidence": "certain",
+                  "parentFiringId": "f-5",
+                  "foreignKey": {
+                    "name": "note_parent_id_fkey",
+                    "parent": "s.parent",
+                    "child": "s.note",
+                    "action": "SET_NULL",
+                    "event": "DELETE",
+                    "matchedRows": 1,
+                    "unmatchedRows": 0
+                  },
+                  "triggerCandidates": [],
+                  "evidence": [
+                    "fkKeyMatch",
+                    "depth"
+                  ]
+                },
+                "imageMode": "FULL"
+              },
+              {
+                "id": "f-8",
+                "table": "s.grandchild",
+                "operation": "DELETE",
+                "rowCount": 0,
+                "cause": {
+                  "kind": "UNEXPLAINED",
+                  "confidence": "unexplained",
+                  "parentFiringId": null,
+                  "foreignKey": null,
+                  "triggerCandidates": [],
+                  "evidence": [
+                    "depth"
+                  ]
+                },
+                "imageMode": "FULL"
+              }
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sandbox",
+          "phase": "pg-b",
+          "requestAt": 1795592314066,
+          "status": 200,
+          "responseAt": 1795592314069,
+          "body": {
+            "state": "ready",
+            "baselineAt": "2026-11-25T07:38:16.4065846+00:00",
+            "engine": "postgres",
+            "locked": false,
+            "fingerprintMatch": true,
+            "manifest": {
+              "coveredTables": 7,
+              "excludedTables": 0,
+              "auditNotLast": 0
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/previews/{id}/rows",
+          "phase": "pg-b",
+          "requestAt": 1795592314066,
+          "table": "s.parent",
+          "status": 200,
+          "responseAt": 1795592314070,
+          "body": {
+            "total": 1,
+            "rows": [
+              {
+                "table": "s.parent",
+                "key": {
+                  "kind": "PK",
+                  "columns": [
+                    "id"
+                  ],
+                  "values": [
+                    "2"
+                  ]
+                },
+                "change": "DELETED",
+                "multiplicity": 1,
+                "before": {
+                  "id": "2",
+                  "name": "p2"
+                },
+                "after": null,
+                "changedColumns": [],
+                "explainedBy": {
+                  "firingIds": [
+                    "f-5"
+                  ],
+                  "residualId": null
+                }
+              }
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/analyze",
+          "phase": "pg-b",
+          "requestAt": 1795592314673,
+          "sql": "DELETE FROM s.parent WHERE id = 2",
+          "status": 200,
+          "responseAt": 1795592314675,
+          "body": {
+            "diagnostics": [
+              {
+                "statementIndex": null,
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                },
+                "severity": "warning",
+                "ruleId": "WARN_PG_MINIMAL_SCOPE",
+                "message": "PostgreSQL 최소판입니다: 미리보기만 되고 [적용]은 없습니다. 문장 안 사용자 함수와 트리거 본문은 이름 수준으로만 검사합니다.",
+                "docRef": null
+              }
+            ],
+            "statements": [
+              {
+                "kind": "DELETE",
+                "target": "s.parent"
+              }
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/previews/{id}/rows",
+          "phase": "pg-b",
+          "requestAt": 1795592315251,
+          "table": "s.note",
+          "status": 200,
+          "responseAt": 1795592315260,
+          "body": {
+            "total": 1,
+            "rows": [
+              {
+                "table": "s.note",
+                "key": {
+                  "kind": "PK",
+                  "columns": [
+                    "id"
+                  ],
+                  "values": [
+                    "1002"
+                  ]
+                },
+                "change": "UPDATED",
+                "multiplicity": 1,
+                "before": {
+                  "id": "1002",
+                  "parent_id": "2"
+                },
+                "after": {
+                  "id": "1002",
+                  "parent_id": null
+                },
+                "changedColumns": [
+                  "parent_id"
+                ],
+                "explainedBy": {
+                  "firingIds": [
+                    "f-7"
+                  ],
+                  "residualId": null
+                }
+              }
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/previews/{id}/cancel",
+          "phase": "pg-b",
+          "requestAt": 1795592315367,
+          "status": 204,
+          "responseAt": 1795592315378
+        },
+        {
+          "method": "POST",
+          "path": "/api/previews",
+          "phase": "pg-c",
+          "requestAt": 1795592315619,
+          "sql": "UPDATE s.order_lines SET qty = qty + 1 WHERE id = 70",
+          "status": 200,
+          "responseAt": 1795592315665,
+          "body": {
+            "status": "ok",
+            "baseline": {
+              "productVersion": "18.7 (Debian 18.7-1.pgdg13+5)",
+              "edition": "PostgreSQL",
+              "compatibilityLevel": 18,
+              "isRecursiveTriggersOn": true,
+              "nestedTriggers": 1,
+              "disallowResultsFromTriggers": 0,
+              "sessionOptions": 0,
+              "collation": "en_US.utf8",
+              "serverCollation": null,
+              "hostPlatform": null,
+              "majorVersion": 18,
+              "language": null,
+              "dateFormat": null,
+              "dateFirst": null,
+              "hasUserClrAssemblies": null
+            },
+            "netSummary": [
+              {
+                "table": "s.history",
+                "inserted": 1,
+                "updated": 0,
+                "deleted": 0,
+                "multisetRemoved": 0,
+                "multisetAdded": 0
+              },
+              {
+                "table": "s.order_lines",
+                "inserted": 0,
+                "updated": 1,
+                "deleted": 0,
+                "multisetRemoved": 0,
+                "multisetAdded": 0
+              },
+              {
+                "table": "s.orders",
+                "inserted": 0,
+                "updated": 1,
+                "deleted": 0,
+                "multisetRemoved": 0,
+                "multisetAdded": 0
+              }
+            ],
+            "statements": [
+              {
+                "index": 1,
+                "batch": 1,
+                "position": 1,
+                "kind": "UPDATE",
+                "target": "s.order_lines",
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 53
+                },
+                "status": "ok",
+                "rowsAffected": 1,
+                "returnValue": null,
+                "resultSetCount": null,
+                "captureSeqRange": [
+                  9,
+                  12
+                ],
+                "error": null
+              }
+            ],
+            "firings": [
+              {
+                "id": "f-9",
+                "table": "s.history",
+                "operation": "INSERT",
+                "rowCount": 1,
+                "cause": {
+                  "kind": "TRIGGER",
+                  "confidence": "inferred",
+                  "parentFiringId": "f-11",
+                  "foreignKey": null,
+                  "triggerCandidates": [
+                    "s.t_orders_hist"
+                  ],
+                  "evidence": [
+                    "depth",
+                    "postorderBracket",
+                    "staticWriteSet"
+                  ]
+                },
+                "imageMode": "FULL"
+              },
+              {
+                "id": "f-10",
+                "table": "s.orders",
+                "operation": "UPDATE",
+                "rowCount": 1,
+                "cause": {
+                  "kind": "TRIGGER",
+                  "confidence": "inferred",
+                  "parentFiringId": "f-11",
+                  "foreignKey": null,
+                  "triggerCandidates": [
+                    "s.t_orders_hist"
+                  ],
+                  "evidence": [
+                    "depth",
+                    "postorderBracket",
+                    "staticWriteSet"
+                  ]
+                },
+                "imageMode": "FULL"
+              },
+              {
+                "id": "f-11",
+                "table": "s.orders",
+                "operation": "UPDATE",
+                "rowCount": 1,
+                "cause": {
+                  "kind": "TRIGGER",
+                  "confidence": "inferred",
+                  "parentFiringId": "f-12",
+                  "foreignKey": null,
+                  "triggerCandidates": [
+                    "s.t_lines_recalc"
+                  ],
+                  "evidence": [
+                    "depth",
+                    "postorderBracket",
+                    "staticWriteSet"
+                  ]
+                },
+                "imageMode": "FULL"
+              },
+              {
+                "id": "f-12",
+                "table": "s.order_lines",
+                "operation": "UPDATE",
+                "rowCount": 1,
+                "cause": {
+                  "kind": "DIRECT",
+                  "confidence": "certain",
+                  "parentFiringId": null,
+                  "foreignKey": null,
+                  "triggerCandidates": [],
+                  "evidence": [
+                    "depth"
+                  ]
+                },
+                "imageMode": "FULL"
+              }
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sandbox",
+          "phase": "pg-c",
+          "requestAt": 1795592315672,
+          "status": 200,
+          "responseAt": 1795592315677,
+          "body": {
+            "state": "ready",
+            "baselineAt": "2026-11-25T07:38:16.4065846+00:00",
+            "engine": "postgres",
+            "locked": false,
+            "fingerprintMatch": true,
+            "manifest": {
+              "coveredTables": 7,
+              "excludedTables": 0,
+              "auditNotLast": 0
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/previews/{id}/rows",
+          "phase": "pg-c",
+          "requestAt": 1795592315673,
+          "table": "s.order_lines",
+          "status": 200,
+          "responseAt": 1795592315677,
+          "body": {
+            "total": 1,
+            "rows": [
+              {
+                "table": "s.order_lines",
+                "key": {
+                  "kind": "PK",
+                  "columns": [
+                    "id"
+                  ],
+                  "values": [
+                    "70"
+                  ]
+                },
+                "change": "UPDATED",
+                "multiplicity": 1,
+                "before": {
+                  "id": "70",
+                  "qty": "1",
+                  "price": "10.00",
+                  "order_id": "7"
+                },
+                "after": {
+                  "id": "70",
+                  "qty": "2",
+                  "price": "10.00",
+                  "order_id": "7"
+                },
+                "changedColumns": [
+                  "qty"
+                ],
+                "explainedBy": {
+                  "firingIds": [
+                    "f-12"
+                  ],
+                  "residualId": null
+                }
+              }
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/analyze",
+          "phase": "pg-c",
+          "requestAt": 1795592316287,
+          "sql": "UPDATE s.order_lines SET qty = qty + 1 WHERE id = 70",
+          "status": 200,
+          "responseAt": 1795592316290,
+          "body": {
+            "diagnostics": [
+              {
+                "statementIndex": null,
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                },
+                "severity": "warning",
+                "ruleId": "WARN_PG_MINIMAL_SCOPE",
+                "message": "PostgreSQL 최소판입니다: 미리보기만 되고 [적용]은 없습니다. 문장 안 사용자 함수와 트리거 본문은 이름 수준으로만 검사합니다.",
+                "docRef": null
+              }
+            ],
+            "statements": [
+              {
+                "kind": "UPDATE",
+                "target": "s.order_lines"
+              }
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/previews/{id}/rows",
+          "phase": "pg-c",
+          "requestAt": 1795592316853,
+          "table": "s.orders",
+          "status": 200,
+          "responseAt": 1795592316864,
+          "body": {
+            "total": 1,
+            "rows": [
+              {
+                "table": "s.orders",
+                "key": {
+                  "kind": "PK",
+                  "columns": [
+                    "id"
+                  ],
+                  "values": [
+                    "7"
+                  ]
+                },
+                "change": "UPDATED",
+                "multiplicity": 1,
+                "before": {
+                  "id": "7",
+                  "rev": "0",
+                  "total": "20.00"
+                },
+                "after": {
+                  "id": "7",
+                  "rev": "1",
+                  "total": "30.00"
+                },
+                "changedColumns": [
+                  "total",
+                  "rev"
+                ],
+                "explainedBy": {
+                  "firingIds": [
+                    "f-10",
+                    "f-11"
+                  ],
+                  "residualId": null
+                }
+              }
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/previews/{id}/apply",
+          "phase": "pg-apply-unsupported",
+          "requestAt": 1795592317127,
+          "status": 501,
+          "responseAt": 1795592317138,
+          "body": {
+            "status": 501
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/previews/{id}/cancel",
+          "phase": "pg-apply-unsupported",
+          "requestAt": 1795592317185,
+          "status": 204,
+          "responseAt": 1795592317195
+        },
+        {
+          "method": "POST",
+          "path": "/api/previews",
+          "phase": "pg-reject-truncate",
+          "requestAt": 1795592317453,
+          "sql": "TRUNCATE s.parent",
+          "status": 422,
+          "responseAt": 1795592317461,
+          "body": {
+            "status": 422,
+            "rejects": [
+              {
+                "statementIndex": 1,
+                "ruleId": "REJECT_TRUNCATE",
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 18
+                }
+              }
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sandbox",
+          "phase": "pg-reject-truncate",
+          "requestAt": 1795592317466,
+          "status": 200,
+          "responseAt": 1795592317470,
+          "body": {
+            "state": "ready",
+            "baselineAt": "2026-11-25T07:38:16.4065846+00:00",
+            "engine": "postgres",
+            "locked": false,
+            "fingerprintMatch": true,
+            "manifest": {
+              "coveredTables": 7,
+              "excludedTables": 0,
+              "auditNotLast": 0
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/analyze",
+          "phase": "pg-reject-truncate",
+          "requestAt": 1795592318107,
+          "sql": "TRUNCATE s.parent",
+          "status": 200,
+          "responseAt": 1795592318109,
+          "body": {
+            "diagnostics": [
+              {
+                "statementIndex": 1,
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 18
+                },
+                "severity": "error",
+                "ruleId": "REJECT_TRUNCATE",
+                "message": "TRUNCATE 문장은 받지 않습니다. INSERT INTO·UPDATE·DELETE FROM만 미리보기합니다.",
+                "docRef": null
+              },
+              {
+                "statementIndex": null,
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                },
+                "severity": "warning",
+                "ruleId": "WARN_PG_MINIMAL_SCOPE",
+                "message": "PostgreSQL 최소판입니다: 미리보기만 되고 [적용]은 없습니다. 문장 안 사용자 함수와 트리거 본문은 이름 수준으로만 검사합니다.",
+                "docRef": null
+              }
+            ],
+            "statements": []
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/analyze",
+          "phase": "pg-reject-admin",
+          "requestAt": 1795592319973,
+          "sql": "UPDATE s.order_lines SET qty = qty + 1 WHERE id = 70",
+          "status": 200,
+          "responseAt": 1795592319975,
+          "body": {
+            "diagnostics": [
+              {
+                "statementIndex": null,
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                },
+                "severity": "warning",
+                "ruleId": "WARN_PG_MINIMAL_SCOPE",
+                "message": "PostgreSQL 최소판입니다: 미리보기만 되고 [적용]은 없습니다. 문장 안 사용자 함수와 트리거 본문은 이름 수준으로만 검사합니다.",
+                "docRef": null
+              }
+            ],
+            "statements": [
+              {
+                "kind": "UPDATE",
+                "target": "s.order_lines"
+              }
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/previews",
+          "phase": "pg-reject-admin",
+          "requestAt": 1795592320051,
+          "sql": "UPDATE s.parent SET name = set_config('application_name', 'x', true) WHERE id = 1",
+          "status": 422,
+          "responseAt": 1795592320060,
+          "body": {
+            "status": 422,
+            "rejects": [
+              {
+                "statementIndex": 1,
+                "ruleId": "REJECT_ADMIN_COMMAND",
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 82
+                }
+              }
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sandbox",
+          "phase": "pg-reject-admin",
+          "requestAt": 1795592320066,
+          "status": 200,
+          "responseAt": 1795592320067,
+          "body": {
+            "state": "ready",
+            "baselineAt": "2026-11-25T07:38:16.4065846+00:00",
+            "engine": "postgres",
+            "locked": false,
+            "fingerprintMatch": true,
+            "manifest": {
+              "coveredTables": 7,
+              "excludedTables": 0,
+              "auditNotLast": 0
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/analyze",
+          "phase": "pg-reject-admin",
+          "requestAt": 1795592320723,
+          "sql": "UPDATE s.parent SET name = set_config('application_name', 'x', true) WHERE id = 1",
+          "status": 200,
+          "responseAt": 1795592320724,
+          "body": {
+            "diagnostics": [
+              {
+                "statementIndex": 1,
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 82
+                },
+                "severity": "error",
+                "ruleId": "REJECT_ADMIN_COMMAND",
+                "message": "문장 안 함수 set_config()은(는) 미리보기에서 쓸 수 없습니다.",
+                "docRef": null
+              },
+              {
+                "statementIndex": null,
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                },
+                "severity": "warning",
+                "ruleId": "WARN_PG_MINIMAL_SCOPE",
+                "message": "PostgreSQL 최소판입니다: 미리보기만 되고 [적용]은 없습니다. 문장 안 사용자 함수와 트리거 본문은 이름 수준으로만 검사합니다.",
+                "docRef": null
+              }
+            ],
+            "statements": []
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/sandbox/refresh",
+          "phase": "pg-refresh-origin-open",
+          "requestAt": 1795592322519,
+          "status": 202,
+          "responseAt": 1795592322528
+        },
+        {
+          "method": "GET",
+          "path": "/api/sandbox",
+          "phase": "pg-refresh-origin-open",
+          "requestAt": 1795592322529,
+          "status": 200,
+          "responseAt": 1795592322530,
+          "body": {
+            "state": "building",
+            "baselineAt": "2026-11-25T07:38:16.4065846+00:00",
+            "engine": "postgres",
+            "locked": false,
+            "fingerprintMatch": true,
+            "manifest": {
+              "coveredTables": 7,
+              "excludedTables": 0,
+              "auditNotLast": 0
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sandbox",
+          "phase": "pg-refresh-origin-open",
+          "requestAt": 1795592325657,
+          "status": 200,
+          "responseAt": 1795592325661,
+          "body": {
+            "state": "building",
+            "baselineAt": "2026-11-25T07:38:16.4065846+00:00",
+            "engine": "postgres",
+            "locked": false,
+            "fingerprintMatch": true,
+            "manifest": {
+              "coveredTables": 7,
+              "excludedTables": 0,
+              "auditNotLast": 0
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sandbox",
+          "phase": "pg-refresh-origin-open",
+          "requestAt": 1795592327664,
+          "status": 200,
+          "responseAt": 1795592327668,
+          "body": {
+            "state": "building",
+            "baselineAt": "2026-11-25T07:38:16.4065846+00:00",
+            "engine": "postgres",
+            "locked": false,
+            "fingerprintMatch": true,
+            "manifest": {
+              "coveredTables": 7,
+              "excludedTables": 0,
+              "auditNotLast": 0
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sandbox",
+          "phase": "pg-refresh-origin-open",
+          "requestAt": 1795592329677,
+          "status": 200,
+          "responseAt": 1795592329681,
+          "body": {
+            "state": "error",
+            "baselineAt": null,
+            "engine": "postgres",
+            "locked": false,
+            "fingerprintMatch": false,
+            "manifest": null,
+            "lastError": "InvalidOperationException: 원본 DB 'shop'에 다른 연결이 있어 복제하지 못했습니다. TEMPLATE 복제는 원본에 연결이 없어야 합니다. 원본 연결을 닫고 새로 고침하세요(도구는 원본 세션을 끊지 않습니다)."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/sandbox/refresh",
+          "phase": "pg-refresh-recover",
+          "requestAt": 1795592329950,
+          "status": 202,
+          "responseAt": 1795592329960
+        },
+        {
+          "method": "GET",
+          "path": "/api/sandbox",
+          "phase": "pg-refresh-recover",
+          "requestAt": 1795592329965,
+          "status": 200,
+          "responseAt": 1795592329969,
+          "body": {
+            "state": "building",
+            "baselineAt": null,
+            "engine": "postgres",
+            "locked": false,
+            "fingerprintMatch": false,
+            "manifest": null
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sandbox",
+          "phase": "pg-refresh-recover",
+          "requestAt": 1795592344688,
+          "status": 200,
+          "responseAt": 1795592344693,
+          "body": {
+            "state": "ready",
+            "baselineAt": "2026-11-25T07:38:50.0263706+00:00",
+            "engine": "postgres",
+            "locked": false,
+            "fingerprintMatch": true,
+            "manifest": {
+              "coveredTables": 7,
+              "excludedTables": 0,
+              "auditNotLast": 0
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/catalog/schema",
+          "phase": "pg-refresh-recover",
+          "requestAt": 1795592344695,
+          "status": 200,
+          "responseAt": 1795592344701
+        },
+        {
+          "method": "POST",
+          "path": "/api/analyze",
+          "phase": "pg-refresh-recover",
+          "requestAt": 1795592344695,
+          "sql": "UPDATE s.parent SET name = set_config('application_name', 'x', true) WHERE id = 1",
+          "status": 200,
+          "responseAt": 1795592344698,
+          "body": {
+            "diagnostics": [
+              {
+                "statementIndex": 1,
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 82
+                },
+                "severity": "error",
+                "ruleId": "REJECT_ADMIN_COMMAND",
+                "message": "문장 안 함수 set_config()은(는) 미리보기에서 쓸 수 없습니다.",
+                "docRef": null
+              },
+              {
+                "statementIndex": null,
+                "span": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                },
+                "severity": "warning",
+                "ruleId": "WARN_PG_MINIMAL_SCOPE",
+                "message": "PostgreSQL 최소판입니다: 미리보기만 되고 [적용]은 없습니다. 문장 안 사용자 함수와 트리거 본문은 이름 수준으로만 검사합니다.",
+                "docRef": null
+              }
+            ],
+            "statements": []
+          }
+        }
+      ],
+      "consoleErrors": [
+        {
+          "phase": "startup",
+          "text": "Failed to load resource: the server responded with a status of 409 (Conflict)"
+        },
+        {
+          "phase": "startup",
+          "text": "Failed to load resource: the server responded with a status of 409 (Conflict)"
+        },
+        {
+          "phase": "pg-apply-unsupported",
+          "text": "Failed to load resource: the server responded with a status of 501 (Not Implemented)"
+        },
+        {
+          "phase": "pg-reject-truncate",
+          "text": "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)"
+        },
+        {
+          "phase": "pg-reject-admin",
+          "text": "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)"
+        }
+      ],
+      "pageErrors": [],
+      "requestFailures": []
+    }
+  }
+}

@@ -1,0 +1,158 @@
+{
+  "dm1": {
+    "before": {
+      "AW_Origin": {
+        "Header": 1,
+        "Detail": 1,
+        "Reason": 2
+      },
+      "AW_Sandbox": {
+        "Header": 1,
+        "Detail": 1,
+        "Reason": 2
+      }
+    },
+    "afterPreview": {
+      "AW_Origin": {
+        "Header": 1,
+        "Detail": 1,
+        "Reason": 2
+      },
+      "AW_Sandbox": {
+        "Header": 1,
+        "Detail": 1,
+        "Reason": 2
+      }
+    },
+    "afterRefresh": {
+      "AW_Origin": {
+        "Header": 0,
+        "Detail": 0,
+        "Reason": 0
+      },
+      "AW_Sandbox": {
+        "Header": 0,
+        "Detail": 0,
+        "Reason": 0
+      }
+    }
+  },
+  "dm2": {
+    "before": {
+      "AW_Origin": {
+        "OrderQty": 1,
+        "SubTotal": 419.4589,
+        "RevisionNumber": 10,
+        "DemographicsSha256": "CBC20AE89D54994405D7F8A24E1C274157043F544C7AEEFA01B37D7A169D663B",
+        "TransactionHistory": 0
+      },
+      "AW_Sandbox": {
+        "OrderQty": 1,
+        "SubTotal": 419.4589,
+        "RevisionNumber": 10,
+        "DemographicsSha256": "CBC20AE89D54994405D7F8A24E1C274157043F544C7AEEFA01B37D7A169D663B",
+        "TransactionHistory": 0
+      }
+    },
+    "afterPreview": {
+      "AW_Origin": {
+        "OrderQty": 1,
+        "SubTotal": 419.4589,
+        "RevisionNumber": 10,
+        "DemographicsSha256": "CBC20AE89D54994405D7F8A24E1C274157043F544C7AEEFA01B37D7A169D663B",
+        "TransactionHistory": 0
+      },
+      "AW_Sandbox": {
+        "OrderQty": 1,
+        "SubTotal": 419.4589,
+        "RevisionNumber": 10,
+        "DemographicsSha256": "CBC20AE89D54994405D7F8A24E1C274157043F544C7AEEFA01B37D7A169D663B",
+        "TransactionHistory": 0
+      }
+    },
+    "afterRefresh": {
+      "AW_Origin": {
+        "OrderQty": 2,
+        "SubTotal": 838.9178,
+        "RevisionNumber": 11,
+        "DemographicsSha256": "F48C585080D863E2B35BF00A342B18C6EE8606B4074738B8C7D7A3A7E396B20E",
+        "TransactionHistory": 1
+      },
+      "AW_Sandbox": {
+        "OrderQty": 2,
+        "SubTotal": 838.9178,
+        "RevisionNumber": 11,
+        "DemographicsSha256": "F48C585080D863E2B35BF00A342B18C6EE8606B4074738B8C7D7A3A7E396B20E",
+        "TransactionHistory": 1
+      }
+    }
+  },
+  "dm3": {
+    "before": {
+      "AW_Origin": {
+        "Employees": 1
+      },
+      "AW_Sandbox": {
+        "Employees": 1
+      }
+    },
+    "afterPreview": {
+      "AW_Origin": {
+        "Employees": 1
+      },
+      "AW_Sandbox": {
+        "Employees": 1
+      }
+    },
+    "afterCancel": {
+      "AW_Origin": {
+        "Employees": 1
+      },
+      "AW_Sandbox": {
+        "Employees": 1
+      }
+    }
+  },
+  "dm7": {
+    "before": {
+      "AW_Origin": {
+        "ListPrice": 1431.5
+      },
+      "AW_Sandbox": {
+        "ListPrice": 1431.5
+      }
+    },
+    "afterPreview": {
+      "AW_Origin": {
+        "ListPrice": 1431.5
+      },
+      "AW_Sandbox": {
+        "ListPrice": 1431.5
+      }
+    },
+    "drifted": {
+      "AW_Origin": {
+        "ListPrice": 1431.51
+      },
+      "AW_Sandbox": {
+        "ListPrice": 1431.5
+      }
+    },
+    "afterApply": {
+      "AW_Origin": {
+        "ListPrice": 1431.51
+      },
+      "AW_Sandbox": {
+        "ListPrice": 1431.5
+      }
+    },
+    "restored": {
+      "AW_Origin": {
+        "ListPrice": 1431.5
+      },
+      "AW_Sandbox": {
+        "ListPrice": 1431.5
+      }
+    }
+  }
+}
