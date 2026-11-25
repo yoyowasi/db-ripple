@@ -13,10 +13,13 @@ const route = useRoute()
 const router = useRouter()
 
 // 첫 실행(설정 없음)이면 홈에서 설정 화면으로 안내한다. 설정 API가 없는 옛 서버·읽기 실패는 조용히 넘어간다.
+// 설정 화면은 SQL Server 연결만 다룬다. PostgreSQL은 환경 변수로만 구성해 설정이 늘 비어 있으므로 안내하지 않는다
+// (거기서 SQL Server를 저장하면 엔진이 SQL Server로 바뀐다).
 async function guideFirstRun(): Promise<void> {
   try {
     await router.isReady()
-    const s = await getSettings()
+    const [s] = await Promise.all([getSettings(), sandbox.poll()])
+    if (sandbox.status?.engine === 'postgres') return
     if (!s.configured && router.currentRoute.value.name === 'home') await router.replace({ name: 'settings', query: route.query })
   } catch {
     /* 설정 화면은 [설정]에서 직접 연다 */
