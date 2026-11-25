@@ -1284,6 +1284,8 @@ export const FIXTURES: Record<FixtureId, Fixture> = {
   }),
   pgerror: variant('pgerror', 'PostgreSQL 새로 고침 실패 · 원본에 다른 연결(55006) · 실패 이유 표시', {
     autoRun: false,
+    // PostgreSQL은 환경 변수로만 구성해 SQL Server 설정은 늘 비어 있다(실서버와 같게). 첫 실행 안내가 설정 화면으로 보내지 않아야 한다.
+    settings: SETTINGS_NONE,
     sandbox: {
       state: 'error',
       baselineAt: null,

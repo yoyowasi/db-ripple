@@ -15,7 +15,7 @@ export const useSandboxStore = defineStore('sandbox', () => {
 
   const schemaCache = new Map<string, CatalogSchema>()
   let timer: number | undefined
-  let polling = false
+  let inflight: Promise<void> | null = null
   let schemaLoading = false
 
   const tableIndex = computed(() => {
@@ -50,9 +50,15 @@ export const useSandboxStore = defineStore('sandbox', () => {
     }
   }
 
-  async function poll(): Promise<void> {
-    if (polling) return
-    polling = true
+  /** 읽는 중이면 그 읽기를 기다린다(첫 실행 안내가 첫 상태를 보고 판단할 수 있게). */
+  function poll(): Promise<void> {
+    inflight ??= readStatus().finally(() => {
+      inflight = null
+    })
+    return inflight
+  }
+
+  async function readStatus(): Promise<void> {
     try {
       const s = await getSandbox()
       status.value = s
@@ -64,8 +70,6 @@ export const useSandboxStore = defineStore('sandbox', () => {
     } catch (e) {
       statusError.value = e instanceof ApiError ? describeApiError(e) : String(e)
       noSession.value = e instanceof ApiError && e.isNoSession ? e : null
-    } finally {
-      polling = false
     }
   }
 
