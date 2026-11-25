@@ -321,7 +321,7 @@ M6(§4)을 처음 잰 값이다. 출처는 PR #14의 CI 실행 44021793087(커�
 
 단위 ms, p50·p95는 워밍업을 뺀 5회의 선형 보간 백분위수다(5회라 p95는 4·5번째 값 사이).
 
-> 2026-11-19: 이 절의 M5 수치(아래 재측정 포함)는 모두 이미지 상한을 발동마다 지키도록 고치기 전 측정이다. 그때는 문장이 끝난 뒤에만 상한을 봐서, 한 문장인 CL20·CL20b 5만·10만 행은 `truncated`여도 행 이미지를 모두 FULL로 모았다(표의 행 이미지 25만·50만 등). 고친 뒤에는 FULL 이미지가 상한(10만) 이하라 execute·reread·resolve 값이 달라질 수 있다(설계 §5.2 5).
+> 2026-11-25 재측정은 이미지 상한을 감사 트리거 발동마다 적용한 PR #31 뒤의 값이다. 11-12·11-17·11-18 수치는 #31 전 측정이다. 당시에는 문장 끝에서 상한을 확인해 CL20·CL20b 5만·10만 행이 `truncated`여도 모든 행 이미지를 FULL로 모았다. 11-25에는 FULL 이미지가 기본 상한 10만 개 이하였다. [설계 §5.2](architecture.md#52-미리보기)
 
 | 사례 | 연산 | N | 상태 | 행 이미지 | 순 변경 | total p50 | total p95 | execute p50 | reread p50 | resolve p50 | 오라클 execute p50 | 오버헤드(execute ÷ 오라클) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -374,6 +374,17 @@ PR #16(FK 판정의 부모 × 자식 이중 반복 제거) 뒤 Codex 클라우�
 
 PR #19 뒤 GitHub Actions에서 같은 M5 명령을 실행했다. CL20 DELETE 10만 행에서 재조회 p50은 이전 클라우드 실행의 47.784초에서 1.461초, 전체 p50은 65.510초에서 17.784초였다. 픽스처의 CL20은 부모 2행에서 재조회 키가 10개에서 4개로 줄었고, `collect.json`은 변경 전후 일치했다. [실행 환경과 크기별 비교](test-reports/2026-11-18-cloud-reread-validation.md)
 
+#### 이미지 상한 발동마다 적용 뒤 재측정(2026-11-25)
+
+GitHub Actions에서 `main`의 `8828012`를 대상으로 CL20·CL20b 각 6개 크기를 쟀다. 워밍업을 뺀 60개 표본이 모두 유효했고 `differences.txt`는 0바이트였다. 아래는 11-18 → 11-25 total p50이며 단위는 ms다. [측정 보고서와 단계별 비교](test-reports/2026-11-25-m5-after-image-cap.md)
+
+| 사례 | 1만 행 | 5만 행 | 10만 행 |
+|---|---:|---:|---:|
+| CL20 DELETE | 1,858 → 2,564 | 8,564 → 10,614 | 17,784 → 16,609 |
+| CL20b UPDATE | 804 → 1,068 | 4,008 → 3,843 | 7,827 → 7,388 |
+
+5만·10만 행은 모두 `truncated`였다. FULL 이미지 최댓값은 CL20이 100,000·0개, CL20b가 50,000·100,000개였다. 순 변경 건수는 11-18과 일치했다. [집계 CSV](test-reports/data/2026-11-25-m5-after-image-cap/m5.csv)
+
 ### 6.3 측정 전·이후 확인한 항목
 
 | 항목 | 상태 | 명령(저장소 루트, `eval/DbRipple.Eval.Cli/Program.cs` 옵션) |
@@ -384,7 +395,7 @@ PR #19 뒤 GitHub Actions에서 같은 M5 명령을 실행했다. CL20 DELETE 10
 | 누적 구성(초기화 없이 연속 실행, IDENTITY 벌어짐) | 측정 전 | 설계 §10.3 "구성". 하네스 옵션 없음(방법 미정) |
 | 대조군 B1 20회 정식 실행 | **실행함(2026-11-19 CI, run 44435519363)**: 30사례 × 20회, 제품·B0·B1·B2. B1 M2 ALL 1700/2300, certain 과신 140/1000. 기준선과 다름 0(§6.1 "대조군 B1 20회"). Codex 클라우드는 SQL Server 이미지 다운로드에서 막혔다([클라우드 검증](test-reports/2026-11-19-codex-cloud.md#b-대조군-b1-포함-평가-20회)) | CI 수동 실행 `gh workflow run CI --ref main -f eval_repeat=20` |
 | Split 모드(원본 서버 → 내 PC 샌드박스)의 EXEC [적용] | **확인함(2026-11-19 CI, 원본 SQL Server 2022 CU28 + 샌드박스 2025 CU10)**: 8개 시나리오 모두 기대대로였다. 권한 없음·정의 못 읽음·정의 바뀜·약한 검증 미동의는 막히고 원본은 그대로다. 동의 시 KEYSET_HASH로 `committed`이고 원본 값은 정답대로 바뀌며 DDL 지문은 그대로다. 재적용은 404다. [보고서](test-reports/2026-11-19-ci-split-b1.md) | `.github/workflows/split-exec.yml`, `scripts/split-exec-check.ps1` |
-| PostgreSQL 18 FK 연쇄 DELETE 미리보기 | **측정함(2026-11-19 클라우드, DB·API)**. 부모 1만·5만·10만 행, 크기별 5회. 부모 10만 행 API p50 26.871초, 순 삭제 50만 행. [측정 보고서](test-reports/2026-11-19-codex-cloud.md#c-postgresql-18-fk-연쇄-delete) | `bash scripts/measure-pg-cascade.sh <새 로그 디렉터리>` |
+| PostgreSQL 18 FK 연쇄 DELETE 미리보기 | **재측정함(2026-11-25 GitHub Actions, DB·API)**. 부모 1만·5만·10만 행, 크기별 5회. API p50 1.305·8.145·16.651초. 10만 부모 행에서 순 삭제 50만 행과 FULL 이미지 10만 개를 확인했다. 5만·10만 부모 행의 자식·손자 FK 링크는 일치했고 신뢰도는 `inferred`였다. [측정 보고서](test-reports/2026-11-25-m5-after-image-cap.md#postgresql-18-fk-연쇄-delete) | `bash scripts/measure-pg-cascade.sh <새 로그 디렉터리>` |
 | CL21~CL25(EXEC·거부 사례) 평가 실행 | **실행함(2026-11-15 클라우드, 2026-11-16 CI·로컬)**: 37사례 × 3회, 제품·B0·B1·B2, 상태 불일치 0, certain 과신 0/171. 사례 집합이 기준선과 달라 위 지표와 직접 비교하지 않는다 | `.\scripts\home-test.ps1 -IncludeExec`, [test-reports/2026-11-15-cloud-db-validation.md](test-reports/2026-11-15-cloud-db-validation.md), [home-test-plan.md](home-test-plan.md) 5절 |
 | 2026-11-13에 더한 기능(도달 폐포 거부, EXEC 미리보기, KEYSET_HASH, Split)의 DB 확인 | **확인함(2026-11-16)**: 실제 SQL Server 테스트 1195개(CI), [적용] DB 테스트 106개(2026-11-17 EXEC [적용] 추가 뒤 153개, PR #11 CI 실행 44000072102의 Apply DB 테스트 단계), SP11~SP21 실행 | [home-test-plan.md](home-test-plan.md), [spikes/README.md](spikes/README.md) SP11~SP21 |
 

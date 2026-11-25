@@ -1,0 +1,4 @@
+parent_rows,samples,status,image_count,firings,http_p50_ms,http_p95_ms,analyze_p50_ms,execute_p50_ms,readLog_p50_ms,reread_p50_ms,netDiff_p50_ms,resolve_p50_ms,serialize_p50_ms,host_total_p50_ms
+10000,5,ok,50000,3,1305.359,1878.778,0,573,31,0,139,387,95,1173
+50000,5,truncated,50000,3,8145.070,8226.890,0,2057,160,0,3211,1753,426,7605
+100000,5,truncated,100000,3,16650.617,17081.113,0,4159,359,0,6788,3484,809,15710
