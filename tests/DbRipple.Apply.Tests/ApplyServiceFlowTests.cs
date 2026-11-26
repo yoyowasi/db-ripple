@@ -237,6 +237,7 @@ public sealed class ApplyServiceFlowTests
         Assert.NotNull(result);
         Assert.Equal(ApplyStatus.Committed, result.Status);
         Assert.Equal(VerificationMode.SnapshotNetdiff, result.Verification.Mode);
+        Assert.Contains(ApplyService.SnapshotNetdiffLimitation, result.Verification.Limitations);
         Assert.True(result.Verification.NetSummaryMatch);
         Assert.True(result.SandboxRefreshStarted);
         Assert.Equal(
@@ -1086,6 +1087,7 @@ public sealed class ApplyServiceFlowTests
             log.Where(e => e is "drift" or "targets" or "count" or "run 1" or "keyset" or "commit"));
         Assert.Equal(["dbo.T"], rig.Origin.Connection.SeenPreviewTables!);             // 미리보기 테이블은 해시하지 않는다
         Assert.All(KeysetVerifier.Limitations, l => Assert.Contains(l, result.Verification.Limitations));
+        Assert.DoesNotContain(ApplyService.SnapshotNetdiffLimitation, result.Verification.Limitations); // 스냅샷을 만들지 않았다
         Assert.Contains(result.Verification.Limitations, l => l.Contains("dbo.Other.doc(xml)", StringComparison.Ordinal));
     }
 
