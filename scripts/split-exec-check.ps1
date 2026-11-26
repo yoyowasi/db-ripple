@@ -1,7 +1,8 @@
 #Requires -Version 7.0
 <#
 용도: Split 모드(원본 = compose sql-origin, SQL Server 2022 / 샌드박스 = sql, SQL Server 2025 CU10)에서 저장 프로시저 호출 EXEC의
-      [원본에 적용]을 컨테이너 두 대와 개발 모드 Host API로 끝까지 돌려 시나리오 S0~S6의 기대값을 단언한다.
+      [원본에 적용]을 컨테이너 두 대와 개발 모드 Host API로 끝까지 돌려 시나리오 S0~S7의 기대값을 단언한다.
+      S0~S6은 제한 로그인(KEYSET_HASH), S7은 같은 로그인을 sysadmin에 넣은 경우(SNAPSHOT_NETDIFF)다.
       순서는 docs/spikes/SP17.md(Split 끝까지)를 EXEC에 맞춘 것이다. CI는 .github/workflows/split-exec.yml.
       입력 EXEC: EXEC cl21.usp_Outer @id = 1, @delta = 5;  (cascadelab/sql/cl21.sql, cascadelab/cases/CL21-proc-no-branch.json)
       정상 결과: cl21.Parent id 1 qty 10→15, cl21.Touch parent_id 1 touched 0→1, cl21.Log에 'outer' 1행, cl21.Spare 그대로, 반환 값 0.
@@ -11,6 +12,8 @@
       src/DbRipple.Apply/ApplySteps.cs OriginProcedures.Judge: 정의를 못 읽으면(권한 없음·VIEW DEFINITION 없음) 또는 다르면 PROC_DEFINITION_CHANGED,
         최상위 EXECUTE가 없으면 PROC_EXECUTE_PERMISSION_MISSING(둘 다 해당하면 둘 다).
       ApplyService.ApplyAsync: 이미 커밋한 미리보기 id는 null → API 404(src/DbRipple.Api/DbRippleApi.cs). precondition_failed는 미리보기를 소비하지 않는다.
+      src/DbRipple.Apply/ApplySteps.cs 검증 모드 결정 SQL: CREATE ANY DATABASE(또는 master CREATE DATABASE)와 원본 DB CONTROL이 있으면 스냅샷 가능
+        → SNAPSHOT_NETDIFF(동의 불필요). sysadmin이면 둘 다 있다. Split 스냅샷은 원본 서버에 만들고 적용 뒤 지운다(ApplyService.cs 원본 스냅샷).
 실행: 저장소 루트, PowerShell 7(Linux 러너 기준, Windows PowerShell 5.1은 지원하지 않음).
       .env에 MSSQL_SA_PASSWORD, ORIGIN_SQL_SERVER=127.0.0.1,14334, ORIGIN_SQL_USER=dbr_origin_user, ORIGIN_SQL_PASSWORD, ORIGIN_SQL_TRUST_CERT=true($ 금지).
       pwsh -NoProfile -File scripts/split-exec-check.ps1 [-OutDir logs/home-test/split-exec] [-Port 5080] [-SkipBuild] [-SkipContainerStart] [-BaselineTimeoutSec 600]
@@ -343,6 +346,23 @@ function Invoke-Refresh([string]$Tag) {
     }
 }
 
+# 샌드박스가 기준선을 만들거나 잠겨 있지 않을 때까지 기다린다(적용 뒤 자동 새로 고침이 도는 중에 Host를 멈추지 않게)
+function Wait-SandboxIdle([string]$Tag) {
+    $deadline = (Get-Date).AddSeconds($BaselineTimeoutSec)
+    $last = $null
+    while ((Get-Date) -lt $deadline) {
+        $g = Invoke-Api -Method Get -Path '/api/sandbox'
+        if ($g.Code -eq 200 -and $null -ne $g.Json) {
+            $last = $g.Json
+            $null = Write-Text "$Tag.json" $g.Content
+            if ($last.state -cne 'building' -and -not $last.locked) { return $last }
+        }
+        if ($script:HostProc.HasExited) { break }
+        Start-Sleep -Seconds 3
+    }
+    $last
+}
+
 # ---------- 요약 ----------
 
 # 이름을 Md로 하면 별칭 md(mkdir)가 먼저 불린다(별칭이 함수보다 우선)
@@ -523,6 +543,14 @@ REVOKE VIEW DEFINITION ON SCHEMA::cl21 FROM dbr_origin_user;
 '@
     $r = Invoke-ContainerSql -File $resetSql -Database CascadeLab -LogName 'setup-reset-perms.log'
     if ($r.Code -ne 0) { throw 'cl21 권한 회수 실패(setup-reset-perms.log)' }
+    # S7이 중간에 끊겨 sysadmin이 남았어도 S0~S6이 제한 로그인에서 시작하게 회수한다(구성원이 아니면 아무 일도 안 함)
+    $resetSysadmin = Write-Text 'q-reset-sysadmin.sql' @'
+SET NOCOUNT ON;
+IF IS_SRVROLEMEMBER(N'sysadmin', N'dbr_origin_user') = 1 ALTER SERVER ROLE sysadmin DROP MEMBER [dbr_origin_user];
+SELECT CONCAT('VAL|sysadmin|', IS_SRVROLEMEMBER(N'sysadmin', N'dbr_origin_user')) AS line;
+'@
+    $r = Invoke-ContainerSql -File $resetSysadmin -LogName 'setup-reset-sysadmin.log'
+    if ($r.Code -ne 0 -or (Get-Val $r.Lines 'sysadmin') -cne '0') { throw "dbr_origin_user의 sysadmin 회수 실패(setup-reset-sysadmin.log, 값 $(Get-Val $r.Lines 'sysadmin'))" }
 
     $script:StateSqlPath = Write-Text 'q-origin-state.sql' @'
 SET NOCOUNT ON;
@@ -782,6 +810,99 @@ IF HASHBYTES('SHA2_256', @now) = HASHBYTES('SHA2_256', @old) THROW 50003, N'cl21
         Test-Unchanged $s6 $before $after
         if ($after5) { Test-That $s6 ((Format-State $after) -ceq (Format-State $after5)) "S5 직후 값과 다름: S5 후 [$(Format-State $after5)] 지금 [$(Format-State $after)]" }
     } catch { Add-Exception $s6 $_ }
+
+    # ---------- S7 원본 로그인이 sysadmin(SNAPSHOT_NETDIFF) ----------
+    # 2026-11-19 보고서(docs/test-reports/2026-11-19-ci-split-b1.md) "확인하지 않은 것" 첫째. 같은 dbr_origin_user를 sysadmin에 넣으면
+    # CREATE DATABASE와 원본 DB CONTROL이 생겨 검증 모드가 SNAPSHOT_NETDIFF가 되므로 동의 없이 커밋돼야 한다.
+    # 서버 역할은 로그인할 때 보안 토큰에 들어가므로 Host를 다시 띄워 연결 풀을 새로 만든다. S5 커밋으로 원본이 바뀌어 기준선도 다시 만든다.
+    $s7 = New-Scenario 'S7' '원본 로그인 sysadmin, 동의 없음' 'S6 뒤 샌드박스가 쉬면 Host 정지 → sa: ALTER SERVER ROLE sysadmin ADD MEMBER dbr_origin_user → Host 다시 시작 → 기준선 새로 고침 → 원본 지문(전) → 새 미리보기 → [적용] {sqlHash} → 원본 지문(후)' 'HTTP 200, committed, SNAPSHOT_NETDIFF, mismatches [], 반환 값 0, 원본 Parent 1 +5·Touch 1 +1·Log outer 1행 추가·나머지 그대로, ddl_ 지문 전후 같음, 적용 뒤 원본에 CascadeLab 스냅샷 없음, 끝나면 sysadmin 회수'
+    $sysadminAdded = $false
+    try {
+        Write-Step 'S7'
+        $idle = Wait-SandboxIdle 's7-sandbox-idle'
+        $s7.notes.Add("Host 정지 전 /api/sandbox: state $(if ($idle) { $idle.state } else { '(읽지 못함)' }), locked $(if ($idle) { $idle.locked } else { '-' })")
+        Stop-DbRippleHost
+        $grant = Write-Text 'q-s7-grant-sysadmin.sql' @'
+SET NOCOUNT ON;
+ALTER SERVER ROLE sysadmin ADD MEMBER [dbr_origin_user];
+SELECT CONCAT('VAL|sysadmin|', IS_SRVROLEMEMBER(N'sysadmin', N'dbr_origin_user')) AS line;
+'@
+        $r = Invoke-ContainerSql -File $grant -LogName 's7-grant-sysadmin.log'
+        $s7.evidence.Add('s7-grant-sysadmin.log')
+        if ($r.Code -ne 0) { throw 'sysadmin 부여 실패(s7-grant-sysadmin.log)' }
+        $sysadminAdded = $true
+        Test-That $s7 ((Get-Val $r.Lines 'sysadmin') -ceq '1') "준비 조건 다름: IS_SRVROLEMEMBER(sysadmin, dbr_origin_user) = $(Get-Val $r.Lines 'sysadmin')"
+        Write-Step 'S7 Host 다시 시작'
+        # 끈 Host의 연결이 TIME_WAIT로 포트를 잠깐 잡을 수 있다(Linux 기본 60초). 풀릴 때까지 기다린다.
+        $portDeadline = (Get-Date).AddSeconds(90)
+        while ($true) {
+            $l = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $Port)
+            try { $l.Start(); $l.Stop(); break } catch { if ((Get-Date) -gt $portDeadline) { throw "포트 $Port 이(가) 90초 동안 풀리지 않음" } }
+            Start-Sleep -Seconds 3
+        }
+        Start-DbRippleHost
+        $rb = Invoke-Refresh 'baseline-s7'
+        $s7.evidence.Add($rb.File)
+        $s7.notes.Add("기준선 새로 고침: HTTP $($rb.Post), state $($rb.State), $($rb.Seconds)초")
+        if (-not $rb.Ok) { throw "S7 기준선 새로 고침 실패: state $($rb.State), lastError $($rb.LastError)" }
+        $apiLogin = if ($rb.Status.origin) { [string]$rb.Status.origin.login } else { '' }
+        Test-That $s7 ($apiLogin -ceq 'dbr_origin_user') "Host 원본 로그인 기대 dbr_origin_user, 실제 '$apiLogin'"
+        $fp7Before = Read-Fingerprint 's7-fingerprint-before'
+        $s7.evidence.Add($fp7Before.Log)
+        $before = Read-OriginState 's7-origin-before'
+        $p7 = New-Preview $s7 's7'
+        if ($p7) {
+            $r = Invoke-Apply $s7 $p7 $false 's7'
+            $after = Read-OriginState 's7-origin-after'
+            Set-Origin $s7 $before $after
+            Test-That $s7 ($s7.http -eq 200) "HTTP 기대 200, 실제 $($s7.http)"
+            Test-That $s7 ($s7.status -ceq 'committed') "status 기대 committed, 실제 $($s7.status)"
+            Test-That $s7 ($s7.verificationMode -ceq 'SNAPSHOT_NETDIFF') "verification.mode 기대 SNAPSHOT_NETDIFF, 실제 $($s7.verificationMode)"
+            Test-That $s7 (@($s7.mismatches).Count -eq 0) "mismatches 기대 [], 실제 $($s7.mismatches -join '; ')"
+            Test-That $s7 (@($s7.preconditionFailures).Count -eq 0) "preconditionFailures 기대 [], 실제 $($s7.preconditionFailures -join ',')"
+            $stmt = if ($r.Json) { @($r.Json.statements)[0] } else { $null }
+            Test-That $s7 ($null -ne $stmt -and $null -ne $stmt.returnValue -and [int]$stmt.returnValue -eq 0) "반환 값 기대 0, 실제 $(if ($stmt) { $stmt.returnValue } else { '(문장 없음)' })"
+            if ($r.Json) {
+                $v = $r.Json.verification
+                $s7.notes.Add("statementRowCounts: $((@($v.statementRowCounts) | Where-Object { $_ } | ForEach-Object { "#$($_.index) preview=$($_.preview) actual=$($_.actual)" }) -join '; ')")
+                $s7.notes.Add("tableCounts: $((@($v.tableCounts) | Where-Object { $_ } | ForEach-Object { "$($_.table) $($_.before)->$($_.after)(기대 $($_.expectedDelta))" }) -join '; ')")
+                $s7.notes.Add("limitations $(@($v.limitations).Count)건(s7-apply.json), sandboxRefreshStarted $($r.Json.sandboxRefreshStarted)")
+            }
+            # 앞선 시나리오 결과와 상관없이 직전 값에서 한 번 더 실행한 만큼만 바뀌었는지 본다
+            Test-That $s7 ($before.Ok -and $after.Ok) '원본 값을 sa로 읽지 못함'
+            if ($before.Ok -and $after.Ok) {
+                $expParent = [ordered]@{}; foreach ($k in $before.Parent.Keys) { $expParent[$k] = $(if ($k -ceq '1') { [string]([int]$before.Parent[$k] + 5) } else { $before.Parent[$k] }) }
+                $expTouch = [ordered]@{}; foreach ($k in $before.Touch.Keys) { $expTouch[$k] = $(if ($k -ceq '1') { [string]([int]$before.Touch[$k] + 1) } else { $before.Touch[$k] }) }
+                Test-That $s7 ((Format-Map $after.Parent) -ceq (Format-Map $expParent)) "Parent 기대 $(Format-Map $expParent), 실제 $(Format-Map $after.Parent)"
+                Test-That $s7 ((Format-Map $after.Touch) -ceq (Format-Map $expTouch)) "Touch 기대 $(Format-Map $expTouch), 실제 $(Format-Map $after.Touch)"
+                $newLog = @($after.LogRows | Where-Object { $before.LogRows -cnotcontains $_ })
+                Test-That $s7 ($after.LogRows.Count -eq $before.LogRows.Count + 1 -and $newLog.Count -eq 1 -and $newLog[0] -clike '*:outer') "Log 기대 'outer' 1행 추가, 전 $($before.LogRows -join ',') 후 $($after.LogRows -join ',')"
+                Test-That $s7 ((Format-Map $after.Spare) -ceq (Format-Map $before.Spare)) "Spare 기대 그대로 $(Format-Map $before.Spare), 실제 $(Format-Map $after.Spare)"
+            }
+        }
+        $fp7After = Read-Fingerprint 's7-fingerprint-after'
+        $s7.evidence.Add($fp7After.Log)
+        Test-That $s7 ($fp7Before.Ok -and $fp7After.Ok -and $fp7Before.Ddl.Count -gt 0) "원본 지문을 읽지 못함(전 $($fp7Before.Ddl.Count)줄, 후 $($fp7After.Ddl.Count)줄)"
+        $onlyBefore = @($fp7Before.Ddl | Where-Object { $fp7After.Ddl -cnotcontains $_ })
+        $onlyAfter = @($fp7After.Ddl | Where-Object { $fp7Before.Ddl -cnotcontains $_ })
+        Test-That $s7 ($onlyBefore.Count -eq 0 -and $onlyAfter.Count -eq 0) "원본 ddl_ 지문이 바뀜: 전 [$($onlyBefore -join ' / ')] 후 [$($onlyAfter -join ' / ')]"
+        # Split 원본 스냅샷은 원본 서버에 만들고 적용이 끝나면 지운다. 남아 있으면 원본 서버에 쓰레기 DB가 쌓인다.
+        $snapSql = Write-Text 'q-s7-snapshots.sql' @'
+SET NOCOUNT ON;
+SELECT CONCAT('VAL|snapshots|', COUNT(*)) AS line FROM sys.databases WHERE source_database_id = DB_ID(N'CascadeLab');
+'@
+        $sn = Invoke-ContainerSql -File $snapSql -LogName 's7-snapshots-after.log'
+        $s7.evidence.Add('s7-snapshots-after.log')
+        Test-That $s7 ($sn.Code -eq 0 -and (Get-Val $sn.Lines 'snapshots') -ceq '0') "적용 뒤 원본에 CascadeLab 스냅샷이 남음(또는 못 읽음): $(Get-Val $sn.Lines 'snapshots')"
+    } catch { Add-Exception $s7 $_ }
+    finally {
+        if ($sysadminAdded) {
+            $rv = Invoke-ContainerSql -File $resetSysadmin -LogName 's7-revoke-sysadmin.log'
+            $s7.evidence.Add('s7-revoke-sysadmin.log')
+            if ($rv.Code -ne 0 -or (Get-Val $rv.Lines 'sysadmin') -cne '0') { $s7.failures.Add("끝난 뒤 sysadmin 회수 실패(s7-revoke-sysadmin.log)") }
+            else { $s7.notes.Add('끝난 뒤 dbr_origin_user sysadmin 회수') }
+        }
+    }
 } catch {
     $script:SetupError = $_.Exception.Message
     Write-Step "준비 단계 또는 예기치 않은 오류: $($script:SetupError)"
