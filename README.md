@@ -227,7 +227,7 @@ dotnet test DbRipple.slnx
 dotnet test tests\DbRipple.Apply.Tests -p:ApplyIntegration=true
 ```
 
-테스트는 `dbrt_` 접두의 임시 DB를 만들고 지운다. `env.ps1`을 부르지 않으면 DB 테스트는 건너뛰고 단위 테스트만 돈다. [적용]의 DB 테스트(`ApplySqlTests`)는 `-p:ApplyIntegration=true`를 줄 때만 컴파일되므로 둘째 줄로 따로 돌린다. PostgreSQL 통합 테스트는 `DBRIPPLE_PG_TEST_CONNECTION`(superuser가 아닌 계정, 관리용 DB `postgres`)이 있을 때만 돈다. 웹 화면은 `cd web; npm run typecheck; npm run build`로 검사한다.
+테스트는 `dbrt_` 접두의 임시 DB를 만들고 지운다. `env.ps1`을 부르지 않으면 DB 테스트는 건너뛰고 단위 테스트만 돈다. [적용]의 DB 테스트(`ApplySqlTests`)는 `-p:ApplyIntegration=true`를 줄 때만 컴파일되므로 둘째 줄로 따로 돌린다. PostgreSQL 통합 테스트는 `DBRIPPLE_PG_TEST_CONNECTION`(superuser가 아닌 계정, 관리용 DB `postgres`)이 있을 때만 돈다. 웹 화면은 `cd web; npm run build`로 검사한다(타입 검사 `vue-tsc --noEmit`을 먼저 돈다).
 
 GitHub Actions CI는 PR과 main마다 다음을 돌린다.
 - .NET 빌드·테스트, 웹 빌드, PowerShell 5.1 스크립트 회귀
@@ -242,10 +242,10 @@ GitHub Actions CI는 PR과 main마다 다음을 돌린다.
 - 정식 20회 평가: CI 수동 실행의 `eval_repeat`로 돌린다.
 
 평가는 합성 DB [CascadeLab](cascadelab/README.md)의 손 정답과, 감사 장치 없는 사본에서 같은 SQL을 실행한 결과(오라클)로 한다.
-- 2026-11-12 측정: 사례 30개를 20회 반복해 셀 일치 176/176, 변경 탐지 115/115, 원인 간선 102/102였다.
+- 2026-11-12 측정: 사례 30개를 20회 반복해 셀 일치 176/176, 변경 탐지 115/115, 원인 간선 재현율 102/102였다(1회분, 20회 모두 같음). 원인 간선 정밀도는 0.9358이다.
 - 다른 방법과의 비교(변경 탐지): 직접 대상 테이블만 보는 방법은 0.3652, FK 정의만 따라가는 방법은 0.7391이었다(2026-11-19, 20회).
 - 사본에서 실행하고 최종 차이만 보는 방법도 변경 탐지는 1.0000으로 제품과 같다. 다만 왜 바뀌었는지(원인 간선 재현율)는 0이다. 제품이 더하는 것은 원인 귀속이다.
-- 큰 DELETE(CL20)는 2026-11-25 재측정에서 1만·5만·10만 행의 total p50이 각각 2.6·10.6·16.6초였다(GitHub Actions, vCPU 4개).
+- 큰 DELETE(CL20)는 2026-11-25 재측정에서 부모 1만·5만·10만 행의 total p50이 각각 2.6·10.6·16.6초였다(GitHub Actions, vCPU 4개). 연쇄 삭제와 트리거까지 바뀌는 행은 그 5배다. 5만·10만은 이미지 상한을 넘어 키만 수집되므로 [적용]할 수 없다.
 
 지표 정의와 전체 결과는 [docs/evaluation.md](docs/evaluation.md)에 있다.
 
@@ -264,7 +264,7 @@ GitHub Actions CI는 PR과 main마다 다음을 돌린다.
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | 설계: 결정 기록, 데이터 계약, 원인 귀속 규칙, 위험 |
 | [docs/evaluation.md](docs/evaluation.md) | 평가 보고서: 지표, 대조군, 결과, 타당성 위협 |
-| [docs/spikes/](docs/spikes/README.md) | 설계 전제를 실제 DB로 확인한 실험 기록(SP0~SP22) |
+| [docs/spikes/](docs/spikes/README.md) | 설계 전제를 실제 DB로 확인한 실험 기록(SP0~SP22, SP15는 기록 없음) |
 | [PostgreSQL 최소판 설계](docs/superpowers/specs/2026-11-18-postgres-preview-minimal.md) | PostgreSQL 미리보기의 범위, 결정, 권한 경계 |
 | [docs/home-test-plan.md](docs/home-test-plan.md) | DB로 확인할 항목과 순서, 실행 결과표 |
 | [docs/test-reports/](docs/test-reports/) | 날짜별 검증 보고서 |
