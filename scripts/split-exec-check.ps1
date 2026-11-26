@@ -18,13 +18,16 @@
         PROC_SIGNED_NOT_SUPPORTED로 막는다(정의가 같고 권한이 있어도). 미리보기는 막지 않는다(docs/architecture.md EXEC [적용] 서명 항목).
 실행: 저장소 루트, PowerShell 7(Linux 러너 기준, Windows PowerShell 5.1은 지원하지 않음).
       .env에 MSSQL_SA_PASSWORD, ORIGIN_SQL_SERVER=127.0.0.1,14334, ORIGIN_SQL_USER=dbr_origin_user, ORIGIN_SQL_PASSWORD, ORIGIN_SQL_TRUST_CERT=true($ 금지).
-      pwsh -NoProfile -File scripts/split-exec-check.ps1 [-OutDir logs/home-test/split-exec] [-Port 5080] [-SkipBuild] [-SkipContainerStart] [-BaselineTimeoutSec 600]
+      pwsh -NoProfile -File scripts/split-exec-check.ps1 [-OutDir logs/home-test/split-exec] [-Port 5080] [-SkipBuild] [-SkipContainerStart] [-BaselineTimeoutSec 600] [-LockParents 3,100000,1000000] [-LockRepeat 3]
 매개변수:
   -OutDir             결과 폴더(저장소 루트 기준). summary.md·summary.json, API 응답 JSON, sqlcmd 로그, Host 로그. 비밀번호는 쓰지 않는다.
   -Port               Host 포트(127.0.0.1). 개발 모드는 포트가 쓰이면 다른 포트로 바꾸지 않으므로 시작 전에 비어 있는지 본다.
   -SkipBuild          dotnet build src/DbRipple.Host(Debug, --dev에 필요)를 건너뛴다.
   -SkipContainerStart 컨테이너 기동(scripts/db-up.ps1, sql-origin)을 건너뛴다(이미 healthy일 때).
   -BaselineTimeoutSec 기준선 구축(POST /api/sandbox/refresh) 대기 상한(초).
+  -LockParents        선택 측정 L(원본 크기별 [적용] 잠금 시간). cl20.usp_Generate 부모 행 수를 쉼표로(1~1000000). 비우면 측정하지 않는다.
+                      S0~S8 뒤에 원본을 그 크기로 만들고 KEYSET_HASH(제한 로그인, 동의) → SNAPSHOT_NETDIFF(sysadmin, 동의 없음) 순으로 잰다.
+  -LockRepeat         측정 L에서 크기·검증 방식마다 반복 횟수(1~10, 기본 3). 결과는 lock.csv와 summary.md 표(중앙값).
 종료 코드: 0 모두 기대와 같음, 1 하나 이상 다르거나 실행 못 함, 2 준비 단계 실패(시나리오 미실행).
 주의: 원본 컨테이너의 CascadeLab을 지우고 다시 만든다(00-create-databases.sql). 원본 모사 컨테이너에서만 쓴다. 컨테이너는 끄지 않는다(CI 워크플로가 정리).
       ORIGIN_SQL_SERVER가 127.0.0.1·localhost + 원본 포트(ORIGIN_HOST_PORT, 기본 14334)가 아니거나, 기준선 뒤 /api/sandbox의 origin.server가
@@ -37,7 +40,10 @@ param(
     [ValidateRange(1024, 65535)][int]$Port = 5080,
     [switch]$SkipBuild,
     [switch]$SkipContainerStart,
-    [ValidateRange(30, 3600)][int]$BaselineTimeoutSec = 600
+    [ValidateRange(30, 3600)][int]$BaselineTimeoutSec = 600,
+    # pwsh -File은 인자를 문자열로 넘기므로 쉼표 목록을 문자열로 받아 아래에서 나눈다
+    [string]$LockParents = '',
+    [ValidateRange(1, 10)][int]$LockRepeat = 3
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'   # Invoke-WebRequest 진행 표시가 CI 로그를 채우지 않게
@@ -67,6 +73,17 @@ $script:BaselineInfo = $null
 $script:Envi = [ordered]@{}
 $script:HostProc = $null
 $script:Overall = 'FAIL'
+$script:LockRows = [System.Collections.Generic.List[object]]::new()
+
+# 측정 L 입력은 무거운 준비(빌드·컨테이너) 전에 검사한다
+$LockSizes = [System.Collections.Generic.List[int]]::new()
+if (-not [string]::IsNullOrWhiteSpace($LockParents)) {
+    foreach ($tok in $LockParents.Split(',', [StringSplitOptions]::RemoveEmptyEntries -bor [StringSplitOptions]::TrimEntries)) {
+        $n = 0
+        if (-not [int]::TryParse($tok, [ref]$n) -or $n -lt 1 -or $n -gt 1000000) { throw "-LockParents는 1~1000000 정수를 쉼표로 적어야 함: '$tok'" }
+        $LockSizes.Add($n)
+    }
+}
 
 # ---------- 공통 도우미 ----------
 
@@ -365,6 +382,23 @@ function Wait-SandboxIdle([string]$Tag) {
     $last
 }
 
+# 끈 Host의 연결이 TIME_WAIT로 포트를 잠깐 잡을 수 있다(Linux 기본 60초). 다시 띄우기 전에 풀릴 때까지 기다린다.
+function Wait-PortFree {
+    $deadline = (Get-Date).AddSeconds(90)
+    while ($true) {
+        $l = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $Port)
+        try { $l.Start(); $l.Stop(); return } catch { if ((Get-Date) -gt $deadline) { throw "포트 $Port 이(가) 90초 동안 풀리지 않음" } }
+        Start-Sleep -Seconds 3
+    }
+}
+
+function Get-Median([double[]]$Values) {
+    if ($null -eq $Values -or $Values.Count -eq 0) { return $null }
+    $s = @($Values | Sort-Object)
+    $m = [int][Math]::Floor($s.Count / 2)
+    if ($s.Count % 2 -eq 1) { $s[$m] } else { ($s[$m - 1] + $s[$m]) / 2 }
+}
+
 # ---------- 요약 ----------
 
 # 이름을 Md로 하면 별칭 md(mkdir)가 먼저 불린다(별칭이 함수보다 우선)
@@ -382,8 +416,13 @@ function Write-Summary {
         environment = $script:Envi
         baseline = $script:BaselineInfo
         scenarios = @($script:Scenarios)
+        lock = @($script:LockRows)
     }
     $null = Write-Text 'summary.json' ($doc | ConvertTo-Json -Depth 8)
+    if ($script:LockRows.Count -gt 0) {
+        $csv = @($script:LockRows | ForEach-Object { [pscustomobject]$_ } | ConvertTo-Csv -NoTypeInformation)
+        $null = Write-Text 'lock.csv' (($csv -join "`n") + "`n")
+    }
 
     $md = [System.Collections.Generic.List[string]]::new()
     $md.Add('# Split 모드 EXEC [적용] 자동 확인')
@@ -426,6 +465,24 @@ function Write-Summary {
     } else {
         $md.Add('시나리오를 실행하지 못했다.')
     }
+    if ($script:LockRows.Count -gt 0) {
+        $md.Add('')
+        $md.Add('## 원본 크기별 [적용] 잠금 시간(측정 L)')
+        $md.Add('')
+        $md.Add('잠금 = timingsMs의 drift + execute + netDiff + commit(BEGIN TRAN부터 COMMIT까지). snapshot은 BEGIN TRAN 전. 값은 반복 회차의 중앙값(ms), 잠금 최대는 회차 중 가장 큰 값. 회차별 값은 lock.csv.')
+        $md.Add('')
+        $md.Add('| 검증 방식 | cl20 부모 | 사용자 테이블 행 | 데이터 MB | 회차 | 잠금 p50 | 잠금 최대 | drift p50 | execute p50 | netDiff p50 | commit p50 | snapshot p50 | [적용] HTTP p50 |')
+        $md.Add('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|')
+        $groups = $script:LockRows | Group-Object -Property { "$($_.mode)|$($_.parents)" }
+        foreach ($g in $groups) {
+            $rs = @($g.Group)
+            $f = $rs[0]
+            $med = { param([string]$k) Get-Median @($rs | ForEach-Object { $_[$k] }) }
+            $cells = @($f.mode, $f.parents, $f.userRows, $f.dataMb, $rs.Count, (& $med 'lockMs'), (@($rs | ForEach-Object { $_.lockMs }) | Measure-Object -Maximum).Maximum,
+                (& $med 'driftMs'), (& $med 'executeMs'), (& $med 'netDiffMs'), (& $med 'commitMs'), (& $med 'snapshotMs'), (& $med 'applyHttpMs'))
+            $md.Add('| ' + (($cells | ForEach-Object { Format-Cell ([string]$_) }) -join ' | ') + ' |')
+        }
+    }
     if ($failed.Count -gt 0) {
         $md.Add('')
         $md.Add('## 기대와 다른 점')
@@ -440,7 +497,7 @@ function Write-Summary {
     $md.Add('')
     $md.Add('## 증거 파일(결과 폴더 기준)')
     foreach ($s in $script:Scenarios) { $md.Add("- $($s.id): $(($s.evidence | Select-Object -Unique) -join ', ')") }
-    $md.Add('- 공통: progress.log, host.out.log, host.err.log, setup-*.log, baseline-*.json, folders-after-baseline.log, summary.json')
+    $md.Add('- 공통: progress.log, host.out.log, host.err.log, setup-*.log, baseline-*.json, folders-after-baseline.log, summary.json' + $(if ($script:LockRows.Count -gt 0) { ', lock.csv' } else { '' }))
     [IO.File]::WriteAllLines((Join-Path $OutAbs 'summary.md'), [string[]]$md, $Utf8)
 }
 
@@ -957,6 +1014,99 @@ SELECT CONCAT('VAL|signed|', OBJECT_SCHEMA_NAME(c.major_id), '.', OBJECT_NAME(c.
                 Test-Unchanged $s8 $before $after
             }
         } catch { Add-Exception $s8 $_ }
+    }
+
+    # ---------- L 원본 크기별 [적용] 잠금 시간(선택: -LockParents) ----------
+    # 2026-11-19 보고서 "확인하지 않은 것" 셋째. 두 검증 방식 모두 [적용] 트랜잭션 안에서 원본 전체를 읽는다
+    # (SNAPSHOT_NETDIFF는 전체 사용자 테이블을 스냅샷과 비교, KEYSET_HASH는 미리보기 밖 테이블을 실행 전후로 COUNT_BIG·CHECKSUM_AGG, architecture.md §5.3).
+    # 그래서 cl21 1행을 바꾸는 같은 EXEC라도 원본이 크면 잠금이 길어질 수 있다. cl20.usp_Generate로 원본에 큰 테이블을 만들어 잰다.
+    # 잠금 시간 = timingsMs.drift + execute + netDiff + commit(BEGIN TRAN 뒤 칸이 끊김 없이 이어진다, ApplyService.cs ExecuteAsync).
+    # snapshot은 BEGIN TRAN 전이라 따로 적는다. [적용]마다 원본이 바뀌어 기준선이 오래되므로 매회 새로 만든다(그 시간은 잠금에 들지 않는다).
+    if ($LockSizes.Count -gt 0) {
+        Write-Step "L: 원본 크기별 [적용] 잠금 시간(cl20 부모 $($LockSizes -join ',') × $LockRepeat회, KEYSET_HASH 뒤 SNAPSHOT_NETDIFF)"
+        $lockSysadmin = $false
+        try {
+            # S8b가 남긴 서명을 떼야 [적용]이 PROC_SIGNED_NOT_SUPPORTED로 막히지 않는다
+            $unsign = Write-Text 'q-l-unsign.sql' @'
+SET NOCOUNT ON;
+IF EXISTS (SELECT 1 FROM sys.crypt_properties WHERE class = 1 AND major_id = OBJECT_ID(N'cl21.usp_Inner'))
+    DROP SIGNATURE FROM OBJECT::cl21.usp_Inner BY CERTIFICATE split_s8_cert;
+IF EXISTS (SELECT 1 FROM sys.crypt_properties WHERE class = 1 AND major_id = OBJECT_ID(N'cl21.usp_Outer'))
+    DROP SIGNATURE FROM OBJECT::cl21.usp_Outer BY CERTIFICATE split_s8_cert;
+SELECT CONCAT('VAL|signed|', COUNT(*)) AS line FROM sys.crypt_properties WHERE class = 1;
+'@
+            $r = Invoke-ContainerSql -File $unsign -Database CascadeLab -LogName 'l-unsign.log'
+            if ($r.Code -ne 0 -or (Get-Val $r.Lines 'signed') -cne '0') { throw 'S8 서명 떼기 실패(l-unsign.log)' }
+            foreach ($mode in @('KEYSET_HASH', 'SNAPSHOT_NETDIFF')) {
+                $short = $mode.Split('_')[0]
+                if ($mode -ceq 'SNAPSHOT_NETDIFF') {
+                    # S7과 같다: 서버 역할은 로그인 때 토큰에 들어가므로 Host를 다시 띄운다
+                    $null = Wait-SandboxIdle 'l-sandbox-idle'
+                    Stop-DbRippleHost
+                    $grantL = Write-Text 'q-l-grant-sysadmin.sql' @'
+SET NOCOUNT ON;
+ALTER SERVER ROLE sysadmin ADD MEMBER [dbr_origin_user];
+SELECT CONCAT('VAL|sysadmin|', IS_SRVROLEMEMBER(N'sysadmin', N'dbr_origin_user')) AS line;
+'@
+                    $g = Invoke-ContainerSql -File $grantL -LogName 'l-grant-sysadmin.log'
+                    if ($g.Code -ne 0 -or (Get-Val $g.Lines 'sysadmin') -cne '1') { throw 'sysadmin 부여 실패(l-grant-sysadmin.log)' }
+                    $lockSysadmin = $true
+                    Wait-PortFree
+                    Start-DbRippleHost
+                }
+                foreach ($n in $LockSizes) {
+                    $tag = "l-$($short.ToLowerInvariant())-$n"
+                    $consent = $mode -ceq 'KEYSET_HASH'
+                    $sc = New-Scenario "L-$short-$n" "잠금 시간: $mode, cl20 부모 $n" "sa: EXEC cl20.usp_Generate @parents = $n → (기준선 새로 고침 → 새 미리보기 → [적용] $(if ($consent) { '{allowKeysetVerification:true}' } else { '{동의 없음}' })) × $LockRepeat" "매회 HTTP 200, committed, verification.mode $mode"
+                    try {
+                        Write-Step "L $mode 부모 $n"
+                        $gen = Write-Text "q-$tag-generate.sql" @"
+SET NOCOUNT ON;
+EXEC cl20.usp_Generate @parents = $n;
+SELECT CONCAT('VAL|rows|', SUM(p.rows)) AS line FROM sys.partitions AS p INNER JOIN sys.tables AS t ON t.object_id = p.object_id WHERE p.index_id IN (0, 1) AND t.is_ms_shipped = 0;
+SELECT CONCAT('VAL|mb|', CAST(SUM(CAST(FILEPROPERTY(name, 'SpaceUsed') AS bigint)) * 8 / 1024.0 AS decimal(12, 1))) AS line FROM sys.database_files WHERE type = 0;
+"@
+                        $r = Invoke-ContainerSql -File $gen -Database CascadeLab -LogName "$tag-generate.log"
+                        $sc.evidence.Add("$tag-generate.log")
+                        if ($r.Code -ne 0) { throw "cl20.usp_Generate 실패($tag-generate.log)" }
+                        $rows = Get-Val $r.Lines 'rows'
+                        $mb = Get-Val $r.Lines 'mb'
+                        $sc.notes.Add("원본 CascadeLab 사용자 테이블 $rows 행, 데이터 파일 사용 $mb MB")
+                        for ($i = 1; $i -le $LockRepeat; $i++) {
+                            $rb = Invoke-Refresh "$tag-r$i"
+                            if (-not $rb.Ok) { throw "기준선 새로 고침 실패(r$i): state $($rb.State), lastError $($rb.LastError)" }
+                            $p = New-Preview $sc "$tag-r$i"
+                            if (-not $p) { continue }
+                            $res = Invoke-Apply $sc $p $consent "$tag-r$i"
+                            Test-That $sc ($sc.http -eq 200 -and $sc.status -ceq 'committed') "r${i}: 기대 HTTP 200 committed, 실제 HTTP $($sc.http) status $($sc.status) $($sc.message)"
+                            Test-That $sc ($sc.verificationMode -ceq $mode) "r${i}: verification.mode 기대 $mode, 실제 $($sc.verificationMode)"
+                            $t = if ($res.Json) { $res.Json.timingsMs } else { $null }
+                            if ($null -eq $t) { $sc.failures.Add("r${i}: 응답에 timingsMs 없음"); continue }
+                            $script:LockRows.Add([ordered]@{
+                                mode = $mode; parents = $n; userRows = $rows; dataMb = $mb; rep = $i; status = [string]$sc.status
+                                snapshotMs = [long]$t.snapshot; driftMs = [long]$t.drift; executeMs = [long]$t.execute; netDiffMs = [long]$t.netDiff; commitMs = [long]$t.commit
+                                lockMs = [long]$t.drift + [long]$t.execute + [long]$t.netDiff + [long]$t.commit; applyHttpMs = [long]$res.Ms
+                            })
+                        }
+                        $mine = @($script:LockRows | Where-Object { $_.mode -ceq $mode -and $_.parents -eq $n })
+                        if ($mine.Count -gt 0) {
+                            $sc.notes.Add("잠금 p50 $(Get-Median @($mine | ForEach-Object { $_.lockMs }))ms(회차별 $(($mine | ForEach-Object { $_.lockMs }) -join '/')), drift p50 $(Get-Median @($mine | ForEach-Object { $_.driftMs })), netDiff p50 $(Get-Median @($mine | ForEach-Object { $_.netDiffMs })), snapshot p50 $(Get-Median @($mine | ForEach-Object { $_.snapshotMs }))ms")
+                        }
+                    } catch { Add-Exception $sc $_ }
+                }
+            }
+        } catch {
+            $lf = New-Scenario 'L' '잠금 시간 측정 준비' '서명 떼기·sysadmin 부여·Host 다시 시작' '준비 성공'
+            Add-Exception $lf $_
+        } finally {
+            if ($lockSysadmin) {
+                $rv = Invoke-ContainerSql -File $resetSysadmin -LogName 'l-revoke-sysadmin.log'
+                if ($rv.Code -ne 0 -or (Get-Val $rv.Lines 'sysadmin') -cne '0') {
+                    $lf = New-Scenario 'L-revoke' '측정 뒤 sysadmin 회수' 'sa: ALTER SERVER ROLE sysadmin DROP MEMBER' '회수 성공'
+                    $lf.failures.Add('측정 뒤 sysadmin 회수 실패(l-revoke-sysadmin.log)')
+                }
+            }
+        }
     }
 } catch {
     $script:SetupError = $_.Exception.Message
