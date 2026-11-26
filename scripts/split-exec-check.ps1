@@ -1,8 +1,8 @@
 #Requires -Version 7.0
 <#
 용도: Split 모드(원본 = compose sql-origin, SQL Server 2022 / 샌드박스 = sql, SQL Server 2025 CU10)에서 저장 프로시저 호출 EXEC의
-      [원본에 적용]을 컨테이너 두 대와 개발 모드 Host API로 끝까지 돌려 시나리오 S0~S7의 기대값을 단언한다.
-      S0~S6은 제한 로그인(KEYSET_HASH), S7은 같은 로그인을 sysadmin에 넣은 경우(SNAPSHOT_NETDIFF)다.
+      [원본에 적용]을 컨테이너 두 대와 개발 모드 Host API로 끝까지 돌려 시나리오 S0~S8의 기대값을 단언한다.
+      S0~S6은 제한 로그인(KEYSET_HASH), S7은 같은 로그인을 sysadmin에 넣은 경우(SNAPSHOT_NETDIFF), S8은 서명된 프로시저(막힘)다.
       순서는 docs/spikes/SP17.md(Split 끝까지)를 EXEC에 맞춘 것이다. CI는 .github/workflows/split-exec.yml.
       입력 EXEC: EXEC cl21.usp_Outer @id = 1, @delta = 5;  (cascadelab/sql/cl21.sql, cascadelab/cases/CL21-proc-no-branch.json)
       정상 결과: cl21.Parent id 1 qty 10→15, cl21.Touch parent_id 1 touched 0→1, cl21.Log에 'outer' 1행, cl21.Spare 그대로, 반환 값 0.
@@ -14,6 +14,8 @@
       ApplyService.ApplyAsync: 이미 커밋한 미리보기 id는 null → API 404(src/DbRipple.Api/DbRippleApi.cs). precondition_failed는 미리보기를 소비하지 않는다.
       src/DbRipple.Apply/ApplySteps.cs 검증 모드 결정 SQL: CREATE ANY DATABASE(또는 master CREATE DATABASE)와 원본 DB CONTROL이 있으면 스냅샷 가능
         → SNAPSHOT_NETDIFF(동의 불필요). sysadmin이면 둘 다 있다. Split 스냅샷은 원본 서버에 만들고 적용 뒤 지운다(ApplyService.cs 원본 스냅샷).
+      src/DbRipple.Apply/ApplySteps.cs OriginProcedures(서명): 최상위나 펼친 중첩 프로시저에 모듈 서명(sys.crypt_properties class 1)이 있으면
+        PROC_SIGNED_NOT_SUPPORTED로 막는다(정의가 같고 권한이 있어도). 미리보기는 막지 않는다(docs/architecture.md EXEC [적용] 서명 항목).
 실행: 저장소 루트, PowerShell 7(Linux 러너 기준, Windows PowerShell 5.1은 지원하지 않음).
       .env에 MSSQL_SA_PASSWORD, ORIGIN_SQL_SERVER=127.0.0.1,14334, ORIGIN_SQL_USER=dbr_origin_user, ORIGIN_SQL_PASSWORD, ORIGIN_SQL_TRUST_CERT=true($ 금지).
       pwsh -NoProfile -File scripts/split-exec-check.ps1 [-OutDir logs/home-test/split-exec] [-Port 5080] [-SkipBuild] [-SkipContainerStart] [-BaselineTimeoutSec 600]
@@ -903,6 +905,59 @@ SELECT CONCAT('VAL|snapshots|', COUNT(*)) AS line FROM sys.databases WHERE sourc
             else { $s7.notes.Add('끝난 뒤 dbr_origin_user sysadmin 회수') }
         }
     }
+
+    # ---------- S8 서명된 프로시저 ----------
+    # 2026-11-19 보고서 "확인하지 않은 것" 둘째. 서명은 인증서 사용자의 권한을 더해 실행 사용자의 DML 전용 경계를 넘을 수 있어
+    # [적용]은 서명된 최상위·중첩 프로시저를 PROC_SIGNED_NOT_SUPPORTED로 막는다(미리보기는 막지 않음). 정의·권한이 맞아도 이 이유 하나로만 막혀야 한다.
+    # 실제 원본처럼 서명이 처음부터 있는 상태가 되게 서명한 뒤 기준선을 새로 만든다(서명은 정의 글자를 바꾸지 않는다).
+    # 인증서·서명은 CascadeLab 안에 있고 준비 단계가 CascadeLab을 다시 만들므로 따로 지우지 않는다.
+    # 검증 모드는 단언하지 않는다: S7의 sysadmin 연결이 풀에 남았으면 SNAPSHOT_NETDIFF, 아니면 KEYSET_HASH(동의를 주므로 둘 다 프로시저 검사까지 간다).
+    $env:SPLIT_S8_CERT_PASSWORD = 'Aa1-' + [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(16))
+    $s8Cases = @(
+        @{ Id = 'S8a'; Title = '최상위 프로시저 서명'; Signed = 'cl21.usp_Outer'; Sql = @'
+SET NOCOUNT ON;
+IF NOT EXISTS (SELECT 1 FROM sys.certificates WHERE name = N'split_s8_cert')
+    CREATE CERTIFICATE split_s8_cert ENCRYPTION BY PASSWORD = N'{{PASSWORD}}' WITH SUBJECT = N'split-exec-check S8';
+ADD SIGNATURE TO OBJECT::cl21.usp_Outer BY CERTIFICATE split_s8_cert WITH PASSWORD = N'{{PASSWORD}}';
+SELECT CONCAT('VAL|signed|', OBJECT_SCHEMA_NAME(c.major_id), '.', OBJECT_NAME(c.major_id)) AS line FROM sys.crypt_properties AS c WHERE c.class = 1 ORDER BY line;
+'@ },
+        @{ Id = 'S8b'; Title = '중첩 프로시저만 서명'; Signed = 'cl21.usp_Inner'; Sql = @'
+SET NOCOUNT ON;
+DROP SIGNATURE FROM OBJECT::cl21.usp_Outer BY CERTIFICATE split_s8_cert;
+ADD SIGNATURE TO OBJECT::cl21.usp_Inner BY CERTIFICATE split_s8_cert WITH PASSWORD = N'{{PASSWORD}}';
+SELECT CONCAT('VAL|signed|', OBJECT_SCHEMA_NAME(c.major_id), '.', OBJECT_NAME(c.major_id)) AS line FROM sys.crypt_properties AS c WHERE c.class = 1 ORDER BY line;
+'@ }
+    )
+    foreach ($c in $s8Cases) {
+        $s8 = New-Scenario $c.Id "서명된 프로시저: $($c.Title)" "sa: $($c.Signed)에 인증서 서명(ADD SIGNATURE) → 기준선 새로 고침 → 새 미리보기 → [적용] {sqlHash, allowKeysetVerification:true}" "미리보기 ok, HTTP 200, precondition_failed, [PROC_SIGNED_NOT_SUPPORTED]만, message에 '모듈 서명(ADD SIGNATURE)이 있는 프로시저: $($c.Signed).', 원본 불변"
+        try {
+            Write-Step $c.Id
+            $file = Write-Text "q-$($c.Id.ToLowerInvariant())-sign.sql" $c.Sql
+            $r = Invoke-ContainerSql -File $file -Database CascadeLab -LogName "$($c.Id.ToLowerInvariant())-sign.log" -PasswordFromEnv 'SPLIT_S8_CERT_PASSWORD'
+            $s8.evidence.Add("$($c.Id.ToLowerInvariant())-sign.log")
+            if ($r.Code -ne 0) { throw "서명 실패($($c.Id.ToLowerInvariant())-sign.log)" }
+            $signedNow = @($r.Lines | Where-Object { $_ -clike 'VAL|signed|*' } | ForEach-Object { $_.Substring('VAL|signed|'.Length) })
+            Test-That $s8 (($signedNow -join ',') -ceq $c.Signed) "준비 조건 다름: 서명된 프로시저 기대 $($c.Signed), 실제 $($signedNow -join ',')"
+            $rb = Invoke-Refresh "baseline-$($c.Id.ToLowerInvariant())"
+            $s8.evidence.Add($rb.File)
+            $s8.notes.Add("기준선 새로 고침: HTTP $($rb.Post), state $($rb.State), $($rb.Seconds)초")
+            if (-not $rb.Ok) { throw "기준선 새로 고침 실패: state $($rb.State), lastError $($rb.LastError)" }
+            $before = Read-OriginState "$($c.Id.ToLowerInvariant())-origin-before"
+            $p = New-Preview $s8 $c.Id.ToLowerInvariant()
+            if ($p) {
+                $null = Invoke-Apply $s8 $p $true $c.Id.ToLowerInvariant()
+                $after = Read-OriginState "$($c.Id.ToLowerInvariant())-origin-after"
+                Set-Origin $s8 $before $after
+                Test-That $s8 ($s8.http -eq 200) "HTTP 기대 200, 실제 $($s8.http)"
+                Test-That $s8 ($s8.status -ceq 'precondition_failed') "status 기대 precondition_failed, 실제 $($s8.status)"
+                Test-Codes $s8 @('PROC_SIGNED_NOT_SUPPORTED')
+                $want = "모듈 서명(ADD SIGNATURE)이 있는 프로시저: $($c.Signed)."
+                Test-That $s8 (([string]$s8.message).IndexOf($want, [StringComparison]::Ordinal) -ge 0) "message에 '$want'가 없음"
+                $s8.notes.Add("verification.mode $($s8.verificationMode)(단언 안 함)")
+                Test-Unchanged $s8 $before $after
+            }
+        } catch { Add-Exception $s8 $_ }
+    }
 } catch {
     $script:SetupError = $_.Exception.Message
     Write-Step "준비 단계 또는 예기치 않은 오류: $($script:SetupError)"
@@ -916,7 +971,7 @@ try {
     $summaryPath = Join-Path $OutAbs 'summary.md'
     if (Test-Path -LiteralPath $summaryPath) {
         $summaryText = [IO.File]::ReadAllText($summaryPath, $Utf8)
-        $secrets = @(@($env:MSSQL_SA_PASSWORD, $env:ORIGIN_SQL_PASSWORD) | Where-Object { $_ })
+        $secrets = @(@($env:MSSQL_SA_PASSWORD, $env:ORIGIN_SQL_PASSWORD, $env:SPLIT_S8_CERT_PASSWORD) | Where-Object { $_ })
         if (@($secrets | Where-Object { $summaryText.Contains([string]$_) }).Count -gt 0) {
             Write-Host 'summary.md에 비밀값이 들어 있어 콘솔에 찍지 않음'
         } else {
