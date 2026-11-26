@@ -1259,7 +1259,7 @@ PostgreSQL 출처: [trigger behavior](https://www.postgresql.org/docs/current/tr
 - **6 비결정 열:** 존재(NULL 여부)와 형식만 비교한다(`VOLATILE_FORMAT`). 값 비교에서 뺀 열은 `volatileIgnored`에 "스키마.테이블.열"로 싣는다.
 - **KEYSET_HASH(v1.5 이름 `KEYSET`, 2026-11-13에 이름을 바꾸고 해시 비교를 더함):** 문장별 행 수(1)와 테이블 `COUNT_BIG(*)` 변화(`KEYSET_TABLE_COUNT`), 미리보기 키 집합의 after 값을 비교한다. 미리보기에 없던 테이블은 `COUNT_BIG`·`CHECKSUM_AGG(BINARY_CHECKSUM)`를 실행 전후로 비교하고 다르면 `OUTSIDE_TABLE_CHANGED`다(§5.3). `netSummaryMatch`는 null이다.
 
-**검증 범위:** `SNAPSHOT_NETDIFF`는 전체 사용자 테이블을 비교하고, `KEYSET_HASH`의 범위와 한계는 §5.3에 적었다. 클라이언트 타임아웃은 트랜잭션을 롤백하지 않으므로 `XACT_ABORT ON`과 finally 롤백을 쓴다.
+**검증 범위:** `SNAPSHOT_NETDIFF`는 전체 사용자 테이블을 비교하고, `KEYSET_HASH`의 범위와 한계는 §5.3에 적었다. 두 방식 모두 커밋 전 트랜잭션 안에서 원본 전체를 읽으므로, 실행이 바꾼 행의 잠금은 원본 크기에 거의 비례해 길어진다. 2026-11-26 Split CI 측정에서는 원본 약 95 MB일 때 KEYSET_HASH 0.86초, SNAPSHOT_NETDIFF 2.9초였다([보고서](test-reports/2026-11-19-ci-split-b1.md#원본-크기별-적용-잠금-시간2026-11-26-측정-l)). 그래서 `SNAPSHOT_NETDIFF` 결과에도 KEYSET_HASH처럼 이 비용을 한계 문구로 싣는다(`ApplyService.SnapshotNetdiffLimitation`). 클라이언트 타임아웃은 트랜잭션을 롤백하지 않으므로 `XACT_ABORT ON`과 finally 롤백을 쓴다.
 
 **범위 한정:** 이 작품은 공개 샘플 DB의 "원본 역할 사본"에만 적용한다. 실제 운영 DB에 적용하는 것은 범위 밖이며, 하려면 별도 승인이 필요하다.
 

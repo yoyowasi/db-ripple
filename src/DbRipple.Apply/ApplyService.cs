@@ -153,6 +153,13 @@ public sealed class ApplyService : IApplyService
     public const string SysadminLimitation =
         "원본 로그인이 sysadmin: 권한으로 막히는 문장이 없어 대상 서버·DB를 잘못 골라도 서버가 막지 않음(확인 상자에서 다시 확인)";
 
+    /// <summary>
+    /// SNAPSHOT_NETDIFF 검증의 잠금 비용(결과 한계, 스냅샷을 만든 [적용]에만 붙인다).
+    /// 2026-11-26 Split CI 측정 L: 잠금이 원본 크기에 거의 비례하고 KEYSET_HASH보다 약 3배 길었다(docs/test-reports/2026-11-19-ci-split-b1.md).
+    /// </summary>
+    public const string SnapshotNetdiffLimitation =
+        "SNAPSHOT_NETDIFF 검증: 실행 뒤 원본의 모든 사용자 테이블을 원본 스냅샷과 전부 비교함(커밋 전이라 원본이 클수록 바뀐 행을 오래 잠그고, KEYSET_HASH보다 오래 걸림)";
+
     bool TryStartRefresh(Run run)
     {
         if (Settings.Mode == ServerMode.Split)
@@ -243,6 +250,7 @@ public sealed class ApplyService : IApplyService
                     return Make(record, ApplyStatus.Error, new ApplyVerification { Mode = mode, Limitations = limitations }, [],
                         $"원본 스냅샷을 준비하지 못해 실행하지 않음: {reason}", run);
                 }
+                limitations.Add(SnapshotNetdiffLimitation);
             }
             else
             {
