@@ -2,7 +2,7 @@ name: CI
 
 # PR·main push마다: dotnet(DB 없음), web, scripts-ps51, db(실제 SQL Server 2025 CU10 컨테이너, DB 테스트 전체),
 # pg(PostgreSQL 16·17·18 서비스 컨테이너, 비 superuser 계정으로 PostgreSQL 최소판 통합 테스트).
-# 평가(Eval)·N1은 오래 걸려 main push와 수동 실행(workflow_dispatch)에서만 db 잡이 함께 돌린다.
+# db 잡은 PR·main push·수동 실행 모두 평가(Eval)·N1까지 돌린다(기본 3회, 수동 실행은 eval_repeat로 늘림).
 on:
   pull_request:
     branches: [main]

@@ -88,7 +88,7 @@ db-ripple은 원본을 복제한 샌드박스 DB에서 문장(또는 저장 프�
 결과는 `artifacts\db-ripple\`와 `artifacts\db-ripple-win-x64.zip`이다. 받는 사람은 Docker Desktop만 설치하고, 폴더 안 `README-실행.txt`대로 `docker compose up -d`로 샌드박스를 띄운 뒤 `DbRipple.Host.exe`를 실행한다.
 
 - 기본 브라우저가 일회용 실행 주소로 열린다. 그 창에서만 API를 쓸 수 있다.
-- 처음에는 화면의 설정에서 원본·샌드박스 연결을 저장한다(`%LOCALAPPDATA%\db-ripple\profile.json`, 비밀번호는 이 Windows 계정에서만 풀리게 암호화).
+- 처음에는 화면의 설정에서 원본·샌드박스 연결을 저장한다. 연결은 `%LOCALAPPDATA%\db-ripple\profile.json`에 들어간다. 비밀번호는 그 옆 `profile.secret`에 따로 두고, 이 Windows 계정에서만 풀리게 암호화한다.
 - 브라우저를 열지 않으려면 `DbRipple.Host.exe --no-browser`로 실행하고 콘솔에 찍힌 주소를 연다.
 - 개발 모드(`dotnet run`)와 실행 파일 모드를 가르는 규칙은 [설계 문서 §3.2](docs/architecture.md)에 있다.
 
@@ -127,7 +127,7 @@ dotnet run --project src\DbRipple.Host
 
 ### HTTP로
 
-개발 모드에서는 `/api` 아래의 POST에 헤더 `X-DbRipple-Request: 1`을 붙인다.
+개발 모드에서는 `/api` 아래의 POST·PUT·PATCH·DELETE에 헤더 `X-DbRipple-Request: 1`을 붙인다(없으면 403).
 
 ```powershell
 $h = @{ 'X-DbRipple-Request' = '1' }
@@ -224,9 +224,10 @@ PostgreSQL은 같은 흐름을 쓰되 샌드박스를 TEMPLATE으로 복제하�
 ```powershell
 . .\scripts\env.ps1
 dotnet test DbRipple.slnx
+dotnet test tests\DbRipple.Apply.Tests -p:ApplyIntegration=true
 ```
 
-테스트는 `dbrt_` 접두의 임시 DB를 만들고 지운다. `env.ps1`을 부르지 않으면 DB 테스트는 건너뛰고 단위 테스트만 돈다. PostgreSQL 통합 테스트는 `DBRIPPLE_PG_TEST_CONNECTION`(superuser가 아닌 계정, 관리용 DB `postgres`)이 있을 때만 돈다. 웹 화면은 `cd web; npm run typecheck; npm run build`로 검사한다.
+테스트는 `dbrt_` 접두의 임시 DB를 만들고 지운다. `env.ps1`을 부르지 않으면 DB 테스트는 건너뛰고 단위 테스트만 돈다. [적용]의 DB 테스트(`ApplySqlTests`)는 `-p:ApplyIntegration=true`를 줄 때만 컴파일되므로 둘째 줄로 따로 돌린다. PostgreSQL 통합 테스트는 `DBRIPPLE_PG_TEST_CONNECTION`(superuser가 아닌 계정, 관리용 DB `postgres`)이 있을 때만 돈다. 웹 화면은 `cd web; npm run build`로 검사한다(타입 검사 `vue-tsc --noEmit`을 먼저 돈다).
 
 GitHub Actions CI는 PR과 main마다 다음을 돌린다.
 - .NET 빌드·테스트, 웹 빌드, PowerShell 5.1 스크립트 회귀
@@ -234,13 +235,17 @@ GitHub Actions CI는 PR과 main마다 다음을 돌린다.
 - PostgreSQL 16·17·18 통합 테스트
 
 그 밖에 두 가지는 따로 돈다.
-- Split 모드의 EXEC [적용](원본 SQL Server 2022 + 샌드박스 2025): 관련 파일이 바뀐 PR과 수동 실행에서 확인한다(`split-exec.yml`).
+- Split 모드의 EXEC [적용](원본 SQL Server 2022 + 샌드박스 2025): 관련 파일이 바뀐 PR과 수동 실행에서 시나리오 S0~S8 11개를 확인한다(`split-exec.yml`).
+  - 권한·프로시저 정의 검사와 건수·해시 비교(`KEYSET_HASH`) 동의, 원본 로그인이 sysadmin일 때의 스냅샷 비교(`SNAPSHOT_NETDIFF`), 서명된 프로시저 차단을 본다.
+  - 수동 실행에 `lock_parents`를 주면 원본 크기별 [적용] 잠금 시간도 잰다.
+  - 결과는 [Split·B1 보고서(2026-11-19, 11-26 추가)](docs/test-reports/2026-11-19-ci-split-b1.md)에 있다.
 - 정식 20회 평가: CI 수동 실행의 `eval_repeat`로 돌린다.
 
 평가는 합성 DB [CascadeLab](cascadelab/README.md)의 손 정답과, 감사 장치 없는 사본에서 같은 SQL을 실행한 결과(오라클)로 한다.
-- 2026-11-12 측정: 사례 30개를 20회 반복해 셀 일치 176/176, 변경 탐지 115/115, 원인 간선 102/102였다.
+- 2026-11-12 측정: 사례 30개를 20회 반복해 셀 일치 176/176, 변경 탐지 115/115, 원인 간선 재현율 102/102였다(1회분, 20회 모두 같음). 원인 간선 정밀도는 0.9358이다.
 - 다른 방법과의 비교(변경 탐지): 직접 대상 테이블만 보는 방법은 0.3652, FK 정의만 따라가는 방법은 0.7391이었다(2026-11-19, 20회).
-- 큰 DELETE(CL20)는 2026-11-25 재측정에서 1만·5만·10만 행의 total p50이 각각 2.6·10.6·16.6초였다(GitHub Actions, vCPU 4개).
+- 사본에서 실행하고 최종 차이만 보는 방법도 변경 탐지는 1.0000으로 제품과 같다. 다만 왜 바뀌었는지(원인 간선 재현율)는 0이다. 제품이 더하는 것은 원인 귀속이다.
+- 큰 DELETE(CL20)는 2026-11-25 재측정에서 부모 1만·5만·10만 행의 total p50이 각각 2.6·10.6·16.6초였다(GitHub Actions, vCPU 4개). 연쇄 삭제와 트리거까지 바뀌는 행은 그 5배다. 5만·10만은 이미지 상한을 넘어 키만 수집되므로 [적용]할 수 없다.
 
 지표 정의와 전체 결과는 [docs/evaluation.md](docs/evaluation.md)에 있다.
 
@@ -248,6 +253,7 @@ GitHub Actions CI는 PR과 main마다 다음을 돌린다.
 
 - **문장:** INSERT·UPDATE·DELETE(여러 문장, `GO`로 나눈 배치 가능)와 저장 프로시저를 부르는 `EXEC`. SELECT, MERGE, OUTPUT 절, 변수·제어 흐름, 동적 SQL은 거부한다.
 - **[적용]:** 미리보기가 잘리지 않았을 때, 미리보기 후 30분 안에. 바뀐 행 이미지가 10만 개를 넘으면 키만 수집해 [적용]이 막힌다(UPDATE는 한 행이 이미지 2개, FK 연쇄·트리거로 바뀐 행도 센다). `EXEC`는 원본 실행 주체에 그 프로시저 실행 권한이 있고, 프로시저 정의가 기준선과 같고, 모듈 서명이 없을 때. 도구는 원본에 권한을 주지 않는다(시연 원본 `AW_Origin`은 `restore-aw-origin.ps1`이 준다).
+- **[적용] 잠금 시간:** [적용]은 커밋 전 트랜잭션 안에서 원본 전체를 읽어 검증한다. 그래서 바뀐 행의 잠금은 바꾼 행 수가 아니라 원본 크기에 거의 비례해 길어진다. 원본 약 95 MB(사용자 테이블 300만 행)에서 중앙값은 건수·해시 비교 0.86초, 스냅샷 비교 2.9초였다(2026-11-26 CI). 그 행을 쓰려는 다른 세션은 그동안 기다린다.
 - **확인한 환경:** SQL Server 2025 CU10(Linux 컨테이너). Split 원본은 SQL Server 2022 컨테이너에서도 확인했다(EXEC [적용] 포함). 데이터베이스 스냅샷 기능이 필요하다.
 - **PostgreSQL:** 미리보기만 된다. INSERT·UPDATE·DELETE만 받고, 원본과 샌드박스가 같은 서버에 있어야 한다. [적용](501), `CALL`·`DO`, Split, 설정 화면 저장은 없다. PostgreSQL 16·17·18에서 확인했다(CI).
 - **미리보기:** 한 번에 하나만 돈다.
@@ -258,7 +264,7 @@ GitHub Actions CI는 PR과 main마다 다음을 돌린다.
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | 설계: 결정 기록, 데이터 계약, 원인 귀속 규칙, 위험 |
 | [docs/evaluation.md](docs/evaluation.md) | 평가 보고서: 지표, 대조군, 결과, 타당성 위협 |
-| [docs/spikes/](docs/spikes/README.md) | 설계 전제를 실제 DB로 확인한 실험 기록(SP0~SP22) |
+| [docs/spikes/](docs/spikes/README.md) | 설계 전제를 실제 DB로 확인한 실험 기록(SP0~SP22, SP15는 기록 없음) |
 | [PostgreSQL 최소판 설계](docs/superpowers/specs/2026-11-18-postgres-preview-minimal.md) | PostgreSQL 미리보기의 범위, 결정, 권한 경계 |
 | [docs/home-test-plan.md](docs/home-test-plan.md) | DB로 확인할 항목과 순서, 실행 결과표 |
 | [docs/test-reports/](docs/test-reports/) | 날짜별 검증 보고서 |
