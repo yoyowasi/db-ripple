@@ -473,7 +473,8 @@ function Write-Summary {
         $md.Add('')
         $md.Add('| 검증 방식 | cl20 부모 | 사용자 테이블 행 | 데이터 MB | 회차 | 잠금 p50 | 잠금 최대 | drift p50 | execute p50 | netDiff p50 | commit p50 | snapshot p50 | [적용] HTTP p50 |')
         $md.Add('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|')
-        $groups = $script:LockRows | Group-Object -Property { "$($_.mode)|$($_.parents)" }
+        # Group-Object는 묶음을 키 문자열 순으로 내놓는다(100000, 1000000, 3). 부모 수는 숫자로 다시 정렬한다.
+        $groups = $script:LockRows | Group-Object -Property { "$($_.mode)|$($_.parents)" } | Sort-Object { $_.Group[0].mode }, { [long]$_.Group[0].parents }
         foreach ($g in $groups) {
             $rs = @($g.Group)
             $f = $rs[0]
