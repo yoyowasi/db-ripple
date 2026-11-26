@@ -2,9 +2,21 @@ name: Split EXEC 적용 확인
 
 # Split 모드(원본 sql-origin = SQL Server 2022, 샌드박스 sql = 2025 CU10)에서 저장 프로시저 호출 EXEC의 [적용]을
 # 컨테이너 두 대와 개발 모드 Host API로 끝까지 확인한다(scripts/split-exec-check.ps1, 시나리오 S0~S8, docs/spikes/SP17.md 순서).
-# ci.yml과 별개: 수동 실행과, 이 스크립트·워크플로·스크립트가 쓰는 파일·지키려는 제품 코드(EXEC [적용], Split 기준선, Host 설정)가 바뀐 PR에서만 돈다(약 2분).
+# ci.yml과 별개: 수동 실행과, 이 스크립트·워크플로·스크립트가 쓰는 파일·지키려는 제품 코드(EXEC [적용], Split 기준선, Host 설정)가 바뀐 PR에서만 돈다(약 3분).
+# 수동 실행에서 lock_parents를 주면 S0~S8 뒤에 원본 크기별 [적용] 잠금 시간도 잰다(측정 L, 크기·반복에 따라 수십 분). PR에서는 재지 않는다.
 on:
   workflow_dispatch:
+    inputs:
+      lock_parents:
+        description: "선택: 원본 크기별 [적용] 잠금 시간. cl20 부모 행 수를 쉼표로(1~1000000, 예: 3,100000,1000000). 비우면 측정 안 함"
+        required: false
+        default: ""
+        type: string
+      lock_repeat:
+        description: "잠금 시간 측정에서 크기·검증 방식마다 반복 횟수(1~10)"
+        required: false
+        default: "3"
+        type: string
   pull_request:
     paths:
       - scripts/split-exec-check.ps1
@@ -39,7 +51,8 @@ jobs:
   split-exec:
     name: "Split EXEC [적용] (원본 2022 + 샌드박스 2025 CU10)"
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # 잠금 시간 측정(lock_parents)이 있으면 기준선을 크기·방식·회차마다 새로 만들어 길어진다
+    timeout-minutes: ${{ inputs.lock_parents != '' && 120 || 60 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -69,12 +82,18 @@ jobs:
       - name: "setfacl 준비 (원본 백업 폴더 기본 ACL로 Host가 .bak을 읽게)"
         shell: bash
         run: command -v setfacl || { sudo apt-get update -q && sudo apt-get install -y -q acl; }
-      - name: "Split EXEC [적용] 확인 (S0~S8), 하나라도 기대와 다르면 실패"
+      - name: "Split EXEC [적용] 확인 (S0~S8, 선택: 잠금 시간 L), 하나라도 기대와 다르면 실패"
         shell: bash
+        env:
+          # 입력은 환경 변수로만 넘긴다(스크립트 본문에 끼워 넣지 않음). PR 실행에서는 비어 있다.
+          LOCK_PARENTS: ${{ inputs.lock_parents }}
+          LOCK_REPEAT: ${{ inputs.lock_repeat }}
         run: |
           # sp_container-run.ps1이 컨테이너로 복사하는 임시 SQL을 mssql 사용자가 읽게 한다
           umask 022
-          pwsh -NoProfile -File scripts/split-exec-check.ps1 -OutDir logs/home-test/split-exec
+          args=(-OutDir logs/home-test/split-exec)
+          if [ -n "${LOCK_PARENTS:-}" ]; then args+=(-LockParents "$LOCK_PARENTS" -LockRepeat "${LOCK_REPEAT:-3}"); fi
+          pwsh -NoProfile -File scripts/split-exec-check.ps1 "${args[@]}"
       - name: "진단 로그 정리 (비밀번호가 들어간 파일은 올리지 않는다)"
         id: scrub
         if: always()
